@@ -1,0 +1,260 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../apps/api/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+
+  @@map("organization_status")
+}
+
+enum UserStatus {
+  ACTIVE
+  FROZEN
+  DELETED
+
+  @@map("user_status")
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  LEFT
+
+  @@map("membership_status")
+}
+
+enum Role {
+  PLATFORM_ADMIN
+  ORGANIZATION_ADMIN
+  TOURNAMENT_ADMIN
+  TEAM_CAPTAIN
+  MATCH_REPORTER
+  OFFICIAL
+  REVIEWER
+
+  @@map("role")
+}
+
+enum RoleScopeType {
+  PLATFORM
+  ORGANIZATION
+  TOURNAMENT
+  TEAM
+  MATCH
+
+  @@map("role_scope_type")
+}
+
+enum AuditActorType {
+  USER
+  MATCH_REPORTER
+  OFFICIAL
+  ADMIN
+  SYSTEM
+  WORKER
+  IMPORT_BATCH
+  EMERGENCY_SQL
+
+  @@map("audit_actor_type")
+}
+
+enum OutboxJobStatus {
+  PENDING
+  PROCESSING
+  RETRYABLE
+  COMPLETED
+  FAILED_PERMANENT
+
+  @@map("outbox_job_status")
+}
+
+model Organization {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  slug               String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
+  name               String                   @db.VarChar(120)
+  status             OrganizationStatus       @default(ACTIVE)
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships        OrganizationMembership[]
+  roleAssignments    RoleAssignment[]
+  auditLogs          AuditLog[]
+  idempotencyRecords IdempotencyRecord[]
+  outboxJobs         OutboxJob[]
+
+  @@map("organizations")
+}
+
+model User {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  loginNameNormalized String?                  @map("login_name_normalized") @db.VarChar(120)
+  displayName         String                   @map("display_name") @db.VarChar(120)
+  status              UserStatus               @default(ACTIVE)
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships         OrganizationMembership[]
+  wechatIdentities    WechatIdentity[]
+  sessions            UserSession[]
+  roleAssignments     RoleAssignment[]         @relation("RoleAssignmentUser")
+  grantedAssignments  RoleAssignment[]         @relation("RoleAssignmentGrantor")
+  auditLogs           AuditLog[]
+  idempotencyRecords  IdempotencyRecord[]
+
+  @@map("app_users")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  status         MembershipStatus @default(PENDING)
+  joinedAt       DateTime?        @map("joined_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId], map: "organization_memberships_organization_id_user_id_key")
+  @@index([organizationId, status], map: "organization_memberships_organization_id_status_idx")
+  @@index([userId, status], map: "organization_memberships_user_id_status_idx")
+  @@map("organization_memberships")
+}
+
+model WechatIdentity {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  provider  String   @default("WECHAT") @db.VarChar(32)
+  openid    String   @db.VarChar(128)
+  unionid   String?  @db.VarChar(128)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, openid], map: "wechat_identities_provider_openid_key")
+  @@index([userId], map: "wechat_identities_user_id_idx")
+  @@map("wechat_identities")
+}
+
+model UserSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique(map: "user_sessions_refresh_token_hash_key") @map("refresh_token_hash") @db.VarChar(128)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  ipAddress        String?   @map("ip_address") @db.Inet
+  userAgent        String?   @map("user_agent") @db.VarChar(512)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt], map: "user_sessions_user_id_revoked_at_expires_at_idx")
+  @@map("user_sessions")
+}
+
+model RoleAssignment {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String?       @map("organization_id") @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  role            Role
+  scopeType       RoleScopeType @map("scope_type")
+  scopeId         String        @map("scope_id") @db.VarChar(64)
+  grantedByUserId String?       @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime      @default(now()) @map("granted_at") @db.Timestamptz(3)
+  revokedAt       DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user            User          @relation("RoleAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedByUser   User?         @relation("RoleAssignmentGrantor", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, role, scopeType, scopeId], map: "role_assignments_user_id_role_scope_type_scope_id_key")
+  @@index([organizationId, revokedAt], map: "role_assignments_organization_id_revoked_at_idx")
+  @@index([userId, revokedAt], map: "role_assignments_user_id_revoked_at_idx")
+  @@map("role_assignments")
+}
+
+model AuditLog {
+  id                String         @id @default(uuid()) @db.Uuid
+  organizationId    String         @map("organization_id") @db.Uuid
+  actorType         AuditActorType @map("actor_type")
+  actorUserId       String?        @map("actor_user_id") @db.Uuid
+  actorRoleSnapshot Json?          @map("actor_role_snapshot") @db.JsonB
+  action            String         @db.VarChar(120)
+  targetType        String         @map("target_type") @db.VarChar(120)
+  targetId          String         @map("target_id") @db.VarChar(128)
+  beforeSummary     Json?          @map("before_summary") @db.JsonB
+  afterSummary      Json?          @map("after_summary") @db.JsonB
+  reason            String?        @db.VarChar(500)
+  requestId         String         @map("request_id") @db.VarChar(128)
+  correlationId     String?        @map("correlation_id") @db.VarChar(128)
+  ipAddress         String?        @map("ip_address") @db.Inet
+  userAgent         String?        @map("user_agent") @db.VarChar(512)
+  source            String         @db.VarChar(64)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorUser         User?          @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, targetType, targetId, createdAt], map: "audit_logs_organization_id_target_type_target_id_created_at_idx")
+  @@index([requestId], map: "audit_logs_request_id_idx")
+  @@map("audit_logs")
+}
+
+model IdempotencyRecord {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  route          String        @db.VarChar(200)
+  idempotencyKey String        @map("idempotency_key") @db.VarChar(128)
+  requestHash    String        @map("request_hash") @db.Char(64)
+  responseStatus Int?          @map("response_status")
+  responseBody   Json?         @map("response_body") @db.JsonB
+  resourceType   String?       @map("resource_type") @db.VarChar(120)
+  resourceId     String?       @map("resource_id") @db.VarChar(128)
+  expiresAt      DateTime      @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, route, idempotencyKey], map: "idempotency_records_user_id_route_idempotency_key_key")
+  @@index([organizationId, createdAt], map: "idempotency_records_organization_id_created_at_idx")
+  @@index([expiresAt], map: "idempotency_records_expires_at_idx")
+  @@map("idempotency_records")
+}
+
+model OutboxJob {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String?         @map("organization_id") @db.Uuid
+  topic            String          @db.VarChar(120)
+  aggregateType    String          @map("aggregate_type") @db.VarChar(120)
+  aggregateId      String          @map("aggregate_id") @db.VarChar(128)
+  eventType        String          @map("event_type") @db.VarChar(120)
+  payload          Json            @db.JsonB
+  deduplicationKey String?         @map("deduplication_key") @db.VarChar(200)
+  status           OutboxJobStatus @default(PENDING)
+  attemptCount     Int             @default(0) @map("attempt_count")
+  maxAttempts      Int             @default(10) @map("max_attempts")
+  availableAt      DateTime        @default(now()) @map("available_at") @db.Timestamptz(3)
+  lockedAt         DateTime?       @map("locked_at") @db.Timestamptz(3)
+  lockedUntil      DateTime?       @map("locked_until") @db.Timestamptz(3)
+  lockedBy         String?         @map("locked_by") @db.VarChar(120)
+  processedAt      DateTime?       @map("processed_at") @db.Timestamptz(3)
+  lastError        String?         @map("last_error") @db.Text
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization     Organization?   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([status, availableAt], map: "outbox_jobs_status_available_at_idx")
+  @@index([lockedUntil], map: "outbox_jobs_locked_until_idx")
+  @@index([organizationId, createdAt], map: "outbox_jobs_organization_id_created_at_idx")
+  @@map("outbox_jobs")
+}
