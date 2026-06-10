@@ -1,0 +1,60 @@
+.page {
+  min-height: 100vh;
+  padding: 72px 40px 48px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  padding: 40px 32px;
+  border-left: 8px solid #d24d3f;
+  color: #f7faf6;
+  background: #183f2a;
+}
+
+.eyebrow {
+  color: #bfe2c8;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.title {
+  margin-top: 10px;
+  font-size: 54px;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin-top: 18px;
+  color: #e1ebe3;
+  font-size: 26px;
+  line-height: 1.6;
+}
+
+.module-list {
+  margin-top: 36px;
+  border-top: 1px solid #d6dcd6;
+}
+
+.module-row {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  align-items: center;
+  min-height: 104px;
+  border-bottom: 1px solid #d6dcd6;
+}
+
+.module-index {
+  color: #7d8780;
+  font-size: 22px;
+}
+
+.module-name {
+  font-size: 30px;
+  font-weight: 650;
+}
+
+.module-state {
+  color: #758078;
+  font-size: 22px;
+}
