@@ -1,0 +1,774 @@
+import { Button, Input, Text, Textarea, View } from '@tarojs/components'
+import Taro, { useDidHide, useDidShow, useUnload } from '@tarojs/taro'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { quickReportDraftRepository } from '../../features/quick-report/draft.repository'
+import {
+  MockNetworkError,
+  MockVersionConflictError,
+  quickReportRepository,
+  type MockNetworkMode,
+} from '../../features/quick-report/mock-quick-report.repository'
+import {
+  QUICK_REPORT_TYPE,
+  cloneFields,
+  getChangedFields,
+  getRestoreDecision,
+  mergeNonConflictingChanges,
+  type ConflictField,
+  type DraftContext,
+  type GoalEventDraft,
+  type MatchOutcome,
+  type QuickReportDraft,
+  type QuickReportFields,
+  type QuickReportServerSnapshot,
+  type TeamSide,
+} from '../../features/quick-report/quick-report.logic'
+
+import './index.scss'
+
+const MATCH_ID = 'match-spike-001'
+const DRAFT_CONTEXT: DraftContext = {
+  organizationId: 'org-east-campus',
+  matchId: MATCH_ID,
+  userId: 'user-reporter-01',
+  reportType: QUICK_REPORT_TYPE,
+}
+
+const EMPTY_FIELDS: QuickReportFields = {
+  homeScore: 0,
+  awayScore: 0,
+  outcome: 'FINISHED',
+  goals: [],
+  notes: '',
+}
+
+const OUTCOME_OPTIONS: Array<{ value: MatchOutcome; label: string }> = [
+  { value: 'FINISHED', label: '正常完赛' },
+  { value: 'HOME_FORFEIT', label: '主队弃权' },
+  { value: 'AWAY_FORFEIT', label: '客队弃权' },
+  { value: 'ABANDONED', label: '比赛中止' },
+]
+
+const CONFLICT_LABELS: Record<ConflictField, string> = {
+  homeScore: '主队比分',
+  awayScore: '客队比分',
+  outcome: '比赛结果',
+  goals: '进球事件',
+  notes: '备注',
+}
+
+type PagePhase = 'LOADING' | 'EDITING' | 'SUBMITTING' | 'SUBMITTED' | 'NETWORK_ERROR' | 'CONFLICT'
+
+interface ConflictState {
+  draft: QuickReportDraft
+  current: QuickReportServerSnapshot
+  changedFields: ConflictField[]
+}
+
+export default function QuickReportPage() {
+  const [serverSnapshot, setServerSnapshot] = useState<QuickReportServerSnapshot | null>(null)
+  const [fields, setFields] = useState<QuickReportFields>(EMPTY_FIELDS)
+  const [baseFields, setBaseFields] = useState<QuickReportFields>(EMPTY_FIELDS)
+  const [baseVersion, setBaseVersion] = useState(0)
+  const [phase, setPhase] = useState<PagePhase>('LOADING')
+  const [saveMessage, setSaveMessage] = useState('正在读取比赛与本地草稿…')
+  const [networkMode, setNetworkMode] = useState<MockNetworkMode>('ONLINE')
+  const [conflict, setConflict] = useState<ConflictState | null>(null)
+
+  const isActiveRef = useRef(true)
+  const needsRefreshRef = useRef(false)
+  const readyRef = useRef(false)
+  const dirtyRef = useRef(false)
+  const fieldsRef = useRef(fields)
+  const baseFieldsRef = useRef(baseFields)
+  const baseVersionRef = useRef(baseVersion)
+  const goalSequenceRef = useRef(2)
+
+  useEffect(() => {
+    fieldsRef.current = fields
+  }, [fields])
+
+  useEffect(() => {
+    baseFieldsRef.current = baseFields
+  }, [baseFields])
+
+  useEffect(() => {
+    baseVersionRef.current = baseVersion
+  }, [baseVersion])
+
+  const createCurrentDraft = useCallback(
+    (): QuickReportDraft => ({
+      context: DRAFT_CONTEXT,
+      baseVersion: baseVersionRef.current,
+      baseFields: cloneFields(baseFieldsRef.current),
+      fields: cloneFields(fieldsRef.current),
+      savedAt: new Date().toISOString(),
+    }),
+    [],
+  )
+
+  const persistDraft = useCallback(async () => {
+    if (!readyRef.current || !dirtyRef.current) {
+      return
+    }
+
+    const draft = createCurrentDraft()
+    await quickReportDraftRepository.write(draft)
+
+    if (isActiveRef.current) {
+      setSaveMessage(`草稿已保存 ${formatClock(draft.savedAt)}`)
+    }
+  }, [createCurrentDraft])
+
+  const applySnapshot = useCallback((snapshot: QuickReportServerSnapshot) => {
+    const nextFields = cloneFields(snapshot.fields)
+    setServerSnapshot(snapshot)
+    setFields(nextFields)
+    setBaseFields(cloneFields(snapshot.fields))
+    setBaseVersion(snapshot.version)
+    fieldsRef.current = nextFields
+    baseFieldsRef.current = cloneFields(snapshot.fields)
+    baseVersionRef.current = snapshot.version
+  }, [])
+
+  const showConflict = useCallback(
+    (draft: QuickReportDraft, current: QuickReportServerSnapshot) => {
+      setServerSnapshot(current)
+      setConflict({
+        draft,
+        current,
+        changedFields: getChangedFields(draft.fields, current.fields),
+      })
+      setPhase('CONFLICT')
+      setSaveMessage(`检测到版本冲突：草稿 v${draft.baseVersion}，当前 v${current.version}`)
+    },
+    [],
+  )
+
+  const loadInitialState = useCallback(async () => {
+    setPhase('LOADING')
+
+    const [snapshot, draft] = await Promise.all([
+      quickReportRepository.fetch(MATCH_ID),
+      quickReportDraftRepository.read(DRAFT_CONTEXT),
+    ])
+
+    if (!isActiveRef.current) {
+      needsRefreshRef.current = true
+      return
+    }
+
+    const decision = getRestoreDecision(draft, snapshot.version)
+    setServerSnapshot(snapshot)
+
+    if (decision === 'RESTORE' && draft) {
+      const restoredFields = cloneFields(draft.fields)
+      setFields(restoredFields)
+      setBaseFields(cloneFields(draft.baseFields))
+      setBaseVersion(draft.baseVersion)
+      fieldsRef.current = restoredFields
+      baseFieldsRef.current = cloneFields(draft.baseFields)
+      baseVersionRef.current = draft.baseVersion
+      dirtyRef.current = true
+      setSaveMessage(`已恢复 ${formatClock(draft.savedAt)} 的本地草稿`)
+      setPhase('EDITING')
+    } else if (decision === 'CONFLICT' && draft) {
+      const restoredFields = cloneFields(draft.fields)
+      setFields(restoredFields)
+      setBaseFields(cloneFields(draft.baseFields))
+      setBaseVersion(draft.baseVersion)
+      fieldsRef.current = restoredFields
+      baseFieldsRef.current = cloneFields(draft.baseFields)
+      baseVersionRef.current = draft.baseVersion
+      dirtyRef.current = true
+      showConflict(draft, snapshot)
+    } else {
+      applySnapshot(snapshot)
+      dirtyRef.current = false
+      setSaveMessage('暂无本地草稿')
+      setPhase('EDITING')
+    }
+
+    readyRef.current = true
+  }, [applySnapshot, showConflict])
+
+  useEffect(() => {
+    void loadInitialState()
+  }, [loadInitialState])
+
+  useEffect(() => {
+    if (!readyRef.current || !dirtyRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
+    setSaveMessage('正在自动保存…')
+    const timer = setTimeout(() => {
+      void persistDraft()
+    }, 650)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [fields, baseVersion, persistDraft, phase])
+
+  useDidHide(() => {
+    isActiveRef.current = false
+    needsRefreshRef.current = true
+    void persistDraft()
+  })
+
+  useDidShow(() => {
+    isActiveRef.current = true
+
+    if (!readyRef.current || !needsRefreshRef.current) {
+      return
+    }
+
+    needsRefreshRef.current = false
+    void refreshAfterResume()
+  })
+
+  useUnload(() => {
+    void persistDraft()
+  })
+
+  async function refreshAfterResume() {
+    const current = await quickReportRepository.fetch(MATCH_ID)
+    if (!isActiveRef.current) {
+      needsRefreshRef.current = true
+      return
+    }
+
+    if (dirtyRef.current && current.version !== baseVersionRef.current) {
+      showConflict(createCurrentDraft(), current)
+      return
+    }
+
+    if (!dirtyRef.current) {
+      applySnapshot(current)
+    } else {
+      setServerSnapshot(current)
+    }
+    setSaveMessage('已从后台恢复并检查服务端版本')
+  }
+
+  function updateFields(updater: (current: QuickReportFields) => QuickReportFields) {
+    dirtyRef.current = true
+    setPhase('EDITING')
+    setConflict(null)
+    setFields((current) => {
+      const next = updater(current)
+      fieldsRef.current = next
+      return next
+    })
+  }
+
+  function updateScore(side: TeamSide, value: string) {
+    const score = Math.max(0, Number.parseInt(value.replace(/\D/g, ''), 10) || 0)
+    updateFields((current) => ({
+      ...current,
+      [side === 'HOME' ? 'homeScore' : 'awayScore']: score,
+    }))
+  }
+
+  function addGoal() {
+    const id = `goal-${Date.now()}-${goalSequenceRef.current}`
+    goalSequenceRef.current += 1
+    updateFields((current) => ({
+      ...current,
+      goals: [
+        ...current.goals,
+        {
+          id,
+          team: 'HOME',
+          minute: 1,
+          scorer: '',
+        },
+      ],
+    }))
+  }
+
+  function updateGoal(id: string, patch: Partial<GoalEventDraft>) {
+    updateFields((current) => ({
+      ...current,
+      goals: current.goals.map((goal) => (goal.id === id ? { ...goal, ...patch } : goal)),
+    }))
+  }
+
+  function removeGoal(id: string) {
+    updateFields((current) => ({
+      ...current,
+      goals: current.goals.filter((goal) => goal.id !== id),
+    }))
+  }
+
+  async function submitReport() {
+    if (!serverSnapshot || phase === 'SUBMITTING') {
+      return
+    }
+
+    const invalidGoal = fields.goals.find((goal) => !goal.scorer.trim())
+    if (invalidGoal) {
+      await Taro.showToast({ title: '请补全进球球员', icon: 'none' })
+      return
+    }
+
+    dirtyRef.current = true
+    await persistDraft()
+
+    const confirmation = await Taro.showModal({
+      title: '确认提交快速报告',
+      content: `${serverSnapshot.homeTeamName} ${fields.homeScore} : ${fields.awayScore} ${serverSnapshot.awayTeamName}`,
+      confirmText: '确认提交',
+    })
+    if (!confirmation.confirm) {
+      return
+    }
+
+    setPhase('SUBMITTING')
+    setSaveMessage('正在提交报告…')
+
+    try {
+      const updated = await quickReportRepository.submit({
+        matchId: MATCH_ID,
+        expectedVersion: baseVersionRef.current,
+        fields: fieldsRef.current,
+      })
+
+      if (!isActiveRef.current) {
+        needsRefreshRef.current = true
+        return
+      }
+
+      applySnapshot(updated)
+      dirtyRef.current = false
+      setConflict(null)
+      setPhase('SUBMITTED')
+      setSaveMessage(`提交成功，服务端版本已更新为 v${updated.version}`)
+      await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+      await Taro.showToast({ title: '提交成功，草稿已删除', icon: 'success' })
+    } catch (error) {
+      if (error instanceof MockNetworkError) {
+        dirtyRef.current = true
+        await persistDraft()
+        setPhase('NETWORK_ERROR')
+        setSaveMessage('网络失败，输入已保存在本地草稿')
+        await Taro.showToast({ title: '网络失败，草稿已保留', icon: 'none' })
+        return
+      }
+
+      if (error instanceof MockVersionConflictError) {
+        const draft = createCurrentDraft()
+        await quickReportDraftRepository.write(draft)
+        showConflict(draft, error.current)
+        return
+      }
+
+      setPhase('EDITING')
+      setSaveMessage('提交失败，请稍后重试')
+      await Taro.showToast({ title: '提交失败', icon: 'none' })
+    }
+  }
+
+  async function toggleNetworkFailure() {
+    const nextMode: MockNetworkMode = networkMode === 'ONLINE' ? 'FAIL_SUBMIT' : 'ONLINE'
+    quickReportRepository.setNetworkMode(nextMode)
+    setNetworkMode(nextMode)
+    await Taro.showToast({
+      title: nextMode === 'FAIL_SUBMIT' ? '已模拟提交断网' : '网络已恢复',
+      icon: 'none',
+    })
+  }
+
+  async function simulateRemoteChange() {
+    dirtyRef.current = true
+    await persistDraft()
+    setSaveMessage('正在模拟另一位信息员提交…')
+    const current = await quickReportRepository.simulateRemoteChange(MATCH_ID)
+
+    if (!isActiveRef.current) {
+      needsRefreshRef.current = true
+      return
+    }
+
+    const draft = createCurrentDraft()
+    await quickReportDraftRepository.write(draft)
+    showConflict(draft, current)
+  }
+
+  async function mergeConflict() {
+    if (!conflict) {
+      return
+    }
+
+    const result = mergeNonConflictingChanges(
+      conflict.draft.baseFields,
+      conflict.draft.fields,
+      conflict.current.fields,
+    )
+    const mergedFields = cloneFields(result.merged)
+    const currentFields = cloneFields(conflict.current.fields)
+
+    setFields(mergedFields)
+    setBaseFields(currentFields)
+    setBaseVersion(conflict.current.version)
+    fieldsRef.current = mergedFields
+    baseFieldsRef.current = currentFields
+    baseVersionRef.current = conflict.current.version
+    dirtyRef.current = true
+    setConflict(null)
+    setPhase('EDITING')
+
+    const nextDraft = createCurrentDraft()
+    await quickReportDraftRepository.write(nextDraft)
+    setSaveMessage(
+      result.conflicts.length === 0
+        ? '已合并双方修改，请复核后提交'
+        : `已保留无冲突修改；${result.conflicts.map((field) => CONFLICT_LABELS[field]).join('、')}采用当前数据`,
+    )
+  }
+
+  async function discardLocalChanges() {
+    const current = conflict?.current ?? serverSnapshot
+    if (!current) {
+      return
+    }
+
+    const confirmation = await Taro.showModal({
+      title: '丢弃本地草稿',
+      content: '此操作会删除本地输入，并恢复为当前服务端数据。',
+      confirmText: '确认丢弃',
+      confirmColor: '#b33b31',
+    })
+    if (!confirmation.confirm) {
+      return
+    }
+
+    applySnapshot(current)
+    dirtyRef.current = false
+    setConflict(null)
+    setPhase('EDITING')
+    setSaveMessage('本地草稿已删除')
+    await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+  }
+
+  async function resetDemo() {
+    const confirmation = await Taro.showModal({
+      title: '重置 Spike 数据',
+      content: '将清除本地草稿和 mock 服务端变更。',
+      confirmText: '重置',
+    })
+    if (!confirmation.confirm) {
+      return
+    }
+
+    await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+    const snapshot = await quickReportRepository.reset(MATCH_ID)
+    applySnapshot(snapshot)
+    dirtyRef.current = false
+    setConflict(null)
+    setNetworkMode('ONLINE')
+    setPhase('EDITING')
+    setSaveMessage('Spike 数据已重置')
+  }
+
+  if (!serverSnapshot) {
+    return (
+      <View className="report-page report-page--loading">
+        <Text className="loading-title">正在准备快速报告</Text>
+        <Text className="loading-copy">{saveMessage}</Text>
+      </View>
+    )
+  }
+
+  return (
+    <View className="report-page">
+      <View className="match-header">
+        <View className="match-header__meta">
+          <Text>快速报告 Spike</Text>
+          <Text>服务端 v{baseVersion}</Text>
+        </View>
+        <View className="match-header__teams">
+          <Text className="team-name">{serverSnapshot.homeTeamName}</Text>
+          <Text className="match-versus">VS</Text>
+          <Text className="team-name team-name--away">{serverSnapshot.awayTeamName}</Text>
+        </View>
+        <Text className={`save-state save-state--${phase.toLowerCase()}`}>{saveMessage}</Text>
+      </View>
+
+      <View className="scenario-panel">
+        <View>
+          <Text className="section-kicker">验证场景</Text>
+          <Text className="scenario-copy">切换断网或制造远端更新，观察草稿与冲突处理。</Text>
+        </View>
+        <View className="scenario-actions">
+          <Button
+            className={`scenario-button ${networkMode === 'FAIL_SUBMIT' ? 'scenario-button--active' : ''}`}
+            onClick={() => void toggleNetworkFailure()}
+          >
+            {networkMode === 'FAIL_SUBMIT' ? '恢复网络' : '模拟提交断网'}
+          </Button>
+          <Button className="scenario-button" onClick={() => void simulateRemoteChange()}>
+            模拟他人提交
+          </Button>
+          <Button
+            className="scenario-button scenario-button--quiet"
+            onClick={() => void resetDemo()}
+          >
+            重置
+          </Button>
+        </View>
+      </View>
+
+      {conflict ? (
+        <ConflictPanel
+          conflict={conflict}
+          onMerge={() => void mergeConflict()}
+          onDiscard={() => void discardLocalChanges()}
+        />
+      ) : null}
+
+      <View className="form-section">
+        <View className="section-heading">
+          <View>
+            <Text className="section-kicker">01 比分</Text>
+            <Text className="section-title">主客队比分</Text>
+          </View>
+          <Text className="required-mark">必填</Text>
+        </View>
+
+        <View className="score-board">
+          <View className="score-side">
+            <Text className="score-team">{serverSnapshot.homeTeamName}</Text>
+            <Input
+              className="score-input"
+              type="number"
+              value={String(fields.homeScore)}
+              onInput={(event) => updateScore('HOME', event.detail.value)}
+            />
+          </View>
+          <Text className="score-divider">:</Text>
+          <View className="score-side">
+            <Text className="score-team">{serverSnapshot.awayTeamName}</Text>
+            <Input
+              className="score-input"
+              type="number"
+              value={String(fields.awayScore)}
+              onInput={(event) => updateScore('AWAY', event.detail.value)}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View className="form-section">
+        <View className="section-heading">
+          <View>
+            <Text className="section-kicker">02 赛果</Text>
+            <Text className="section-title">比赛状态或异常结果</Text>
+          </View>
+        </View>
+        <View className="choice-grid">
+          {OUTCOME_OPTIONS.map((option) => (
+            <Button
+              className={`choice-button ${fields.outcome === option.value ? 'choice-button--active' : ''}`}
+              key={option.value}
+              onClick={() =>
+                updateFields((current) => ({
+                  ...current,
+                  outcome: option.value,
+                }))
+              }
+            >
+              {option.label}
+            </Button>
+          ))}
+        </View>
+      </View>
+
+      <View className="form-section">
+        <View className="section-heading">
+          <View>
+            <Text className="section-kicker">03 事件</Text>
+            <Text className="section-title">进球事件</Text>
+          </View>
+          <Button className="add-button" onClick={addGoal}>
+            + 添加
+          </Button>
+        </View>
+
+        {fields.goals.length === 0 ? (
+          <View className="empty-goals">
+            <Text>暂无进球事件，可直接提交 0 : 0 或异常赛果。</Text>
+          </View>
+        ) : (
+          <View className="goal-list">
+            {fields.goals.map((goal, index) => (
+              <View className="goal-card" key={goal.id}>
+                <View className="goal-card__header">
+                  <Text className="goal-card__title">
+                    进球 {String(index + 1).padStart(2, '0')}
+                  </Text>
+                  <Button className="remove-button" onClick={() => removeGoal(goal.id)}>
+                    删除
+                  </Button>
+                </View>
+                <View className="team-toggle">
+                  <Button
+                    className={`team-toggle__button ${goal.team === 'HOME' ? 'team-toggle__button--active' : ''}`}
+                    onClick={() => updateGoal(goal.id, { team: 'HOME' })}
+                  >
+                    主队
+                  </Button>
+                  <Button
+                    className={`team-toggle__button ${goal.team === 'AWAY' ? 'team-toggle__button--active' : ''}`}
+                    onClick={() => updateGoal(goal.id, { team: 'AWAY' })}
+                  >
+                    客队
+                  </Button>
+                </View>
+                <View className="field-row">
+                  <View className="field-block field-block--minute">
+                    <Text className="field-label">分钟</Text>
+                    <Input
+                      className="text-input"
+                      type="number"
+                      value={String(goal.minute)}
+                      onInput={(event) =>
+                        updateGoal(goal.id, {
+                          minute: Math.max(1, Number.parseInt(event.detail.value, 10) || 1),
+                        })
+                      }
+                    />
+                  </View>
+                  <View className="field-block">
+                    <Text className="field-label">进球球员</Text>
+                    <Input
+                      className="text-input"
+                      placeholder="例：7 号 陈昊"
+                      value={goal.scorer}
+                      onInput={(event) => updateGoal(goal.id, { scorer: event.detail.value })}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View className="form-section">
+        <View className="section-heading">
+          <View>
+            <Text className="section-kicker">04 备注</Text>
+            <Text className="section-title">现场补充说明</Text>
+          </View>
+          <Text className="character-count">{fields.notes.length}/300</Text>
+        </View>
+        <Textarea
+          className="notes-input"
+          maxlength={300}
+          placeholder="记录中止原因、争议情况或待管理员复核的信息。"
+          value={fields.notes}
+          onInput={(event) =>
+            updateFields((current) => ({
+              ...current,
+              notes: event.detail.value,
+            }))
+          }
+        />
+      </View>
+
+      <View className="page-spacer" />
+      <View className="action-bar">
+        <Button className="discard-button" onClick={() => void discardLocalChanges()}>
+          丢弃草稿
+        </Button>
+        <Button
+          className="submit-button"
+          disabled={phase === 'SUBMITTING' || phase === 'CONFLICT'}
+          loading={phase === 'SUBMITTING'}
+          onClick={() => void submitReport()}
+        >
+          {phase === 'SUBMITTING' ? '提交中' : '确认提交'}
+        </Button>
+      </View>
+    </View>
+  )
+}
+
+function ConflictPanel({
+  conflict,
+  onMerge,
+  onDiscard,
+}: {
+  conflict: ConflictState
+  onMerge: () => void
+  onDiscard: () => void
+}) {
+  const changedLabels = conflict.changedFields.map((field) => CONFLICT_LABELS[field])
+
+  return (
+    <View className="conflict-panel">
+      <Text className="conflict-panel__eyebrow">409 VERSION CONFLICT</Text>
+      <Text className="conflict-panel__title">当前数据已被其他人员更新</Text>
+      <Text className="conflict-panel__copy">
+        草稿基于 v{conflict.draft.baseVersion}，服务端现为 v{conflict.current.version}。
+        {changedLabels.length > 0 ? `差异字段：${changedLabels.join('、')}。` : ''}
+      </Text>
+      <View className="comparison-grid">
+        <ReportPreview title="我的提交" fields={conflict.draft.fields} tone="local" />
+        <ReportPreview title="当前数据" fields={conflict.current.fields} tone="server" />
+      </View>
+      <View className="conflict-actions">
+        <Button className="conflict-button conflict-button--primary" onClick={onMerge}>
+          保留无冲突修改
+        </Button>
+        <Button className="conflict-button" onClick={onDiscard}>
+          放弃本地修改
+        </Button>
+      </View>
+      <Text className="conflict-panel__hint">
+        双方都修改的字段不会自动覆盖；选择合并后采用当前数据，并保留仅在本地修改的字段。
+      </Text>
+    </View>
+  )
+}
+
+function ReportPreview({
+  title,
+  fields,
+  tone,
+}: {
+  title: string
+  fields: QuickReportFields
+  tone: 'local' | 'server'
+}) {
+  const outcome = OUTCOME_OPTIONS.find((option) => option.value === fields.outcome)?.label
+  const goals =
+    fields.goals.length === 0
+      ? '无'
+      : fields.goals
+          .map(
+            (goal) =>
+              `${goal.team === 'HOME' ? '主' : '客'} ${goal.minute}' ${goal.scorer || '未填写'}`,
+          )
+          .join('；')
+
+  return (
+    <View className={`report-preview report-preview--${tone}`}>
+      <Text className="report-preview__title">{title}</Text>
+      <Text className="report-preview__score">
+        {fields.homeScore} : {fields.awayScore}
+      </Text>
+      <Text className="report-preview__line">赛果：{outcome}</Text>
+      <Text className="report-preview__line">进球：{goals}</Text>
+      <Text className="report-preview__line">备注：{fields.notes || '无'}</Text>
+    </View>
+  )
+}
+
+function formatClock(iso: string): string {
+  const date = new Date(iso)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+}

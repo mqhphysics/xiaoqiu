@@ -58,3 +58,48 @@
   color: #758078;
   font-size: 22px;
 }
+
+.spike-entry {
+  margin-top: 42px;
+  padding: 32px;
+  color: #f7faf6;
+  background: #183f2a;
+  border-radius: 16px;
+}
+
+.spike-label {
+  display: block;
+  color: #bfe2c8;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.spike-title {
+  display: block;
+  margin-top: 12px;
+  font-size: 32px;
+  font-weight: 850;
+}
+
+.spike-copy {
+  display: block;
+  margin-top: 14px;
+  color: #dce9df;
+  font-size: 23px;
+  line-height: 1.6;
+}
+
+.spike-button {
+  min-height: 76px;
+  margin: 26px 0 0;
+  color: #183f2a;
+  background: #d7eadc;
+  border-radius: 10px;
+  font-size: 23px;
+  font-weight: 850;
+}
+
+.spike-button::after {
+  border: 0;
+}
