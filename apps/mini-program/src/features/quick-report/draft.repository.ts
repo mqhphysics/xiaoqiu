@@ -11,9 +11,12 @@ export interface QuickReportDraftRepository {
   read(context: DraftContext): Promise<QuickReportDraft | null>
   write(draft: QuickReportDraft): Promise<void>
   remove(context: DraftContext): Promise<void>
+  setRemoveFailure(enabled: boolean): void
 }
 
 class TaroQuickReportDraftRepository implements QuickReportDraftRepository {
+  private removeFailure = false
+
   async read(context: DraftContext): Promise<QuickReportDraft | null> {
     const key = createDraftKey(context)
 
@@ -40,7 +43,22 @@ class TaroQuickReportDraftRepository implements QuickReportDraftRepository {
   }
 
   async remove(context: DraftContext): Promise<void> {
+    if (this.removeFailure) {
+      throw new DraftCleanupError()
+    }
+
     await Taro.removeStorage({ key: createDraftKey(context) })
+  }
+
+  setRemoveFailure(enabled: boolean): void {
+    this.removeFailure = enabled
+  }
+}
+
+export class DraftCleanupError extends Error {
+  constructor() {
+    super('模拟本地草稿删除失败')
+    this.name = 'DraftCleanupError'
   }
 }
 

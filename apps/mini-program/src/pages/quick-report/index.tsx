@@ -11,17 +11,22 @@ import {
 } from '../../features/quick-report/mock-quick-report.repository'
 import {
   QUICK_REPORT_TYPE,
+  applySubmissionOutcome,
   cloneFields,
   getChangedFields,
+  getResumeDecision,
   getRestoreDecision,
+  markDraftSubmitted,
   mergeNonConflictingChanges,
   type ConflictField,
   type DraftContext,
   type GoalEventDraft,
   type MatchOutcome,
+  type QuickReportClientState,
   type QuickReportDraft,
   type QuickReportFields,
   type QuickReportServerSnapshot,
+  type SubmitQuickReportResult,
   type TeamSide,
 } from '../../features/quick-report/quick-report.logic'
 
@@ -66,6 +71,16 @@ interface ConflictState {
   changedFields: ConflictField[]
 }
 
+type PendingPresentation =
+  | {
+      type: 'SUBMISSION_SUCCESS'
+      cleanupFailed: boolean
+      result: SubmitQuickReportResult
+    }
+  | {
+      type: 'NETWORK_FAILURE'
+    }
+
 export default function QuickReportPage() {
   const [serverSnapshot, setServerSnapshot] = useState<QuickReportServerSnapshot | null>(null)
   const [fields, setFields] = useState<QuickReportFields>(EMPTY_FIELDS)
@@ -74,15 +89,19 @@ export default function QuickReportPage() {
   const [phase, setPhase] = useState<PagePhase>('LOADING')
   const [saveMessage, setSaveMessage] = useState('正在读取比赛与本地草稿…')
   const [networkMode, setNetworkMode] = useState<MockNetworkMode>('ONLINE')
+  const [removeFailure, setRemoveFailure] = useState(false)
   const [conflict, setConflict] = useState<ConflictState | null>(null)
 
   const isActiveRef = useRef(true)
   const needsRefreshRef = useRef(false)
   const readyRef = useRef(false)
   const dirtyRef = useRef(false)
+  const serverSnapshotRef = useRef<QuickReportServerSnapshot | null>(serverSnapshot)
   const fieldsRef = useRef(fields)
   const baseFieldsRef = useRef(baseFields)
   const baseVersionRef = useRef(baseVersion)
+  const draftTaskQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const pendingPresentationRef = useRef<PendingPresentation | null>(null)
   const goalSequenceRef = useRef(2)
 
   useEffect(() => {
@@ -96,6 +115,27 @@ export default function QuickReportPage() {
   useEffect(() => {
     baseVersionRef.current = baseVersion
   }, [baseVersion])
+
+  const runDraftTask = useCallback((task: () => Promise<void>): Promise<void> => {
+    const run = draftTaskQueueRef.current.catch(() => undefined).then(task)
+    draftTaskQueueRef.current = run.catch(() => undefined)
+    return run
+  }, [])
+
+  const getCurrentClientState = useCallback((): QuickReportClientState | null => {
+    const snapshot = serverSnapshotRef.current
+    if (!snapshot) {
+      return null
+    }
+
+    return {
+      snapshot,
+      fields: cloneFields(fieldsRef.current),
+      baseFields: cloneFields(baseFieldsRef.current),
+      baseVersion: baseVersionRef.current,
+      dirty: dirtyRef.current,
+    }
+  }, [])
 
   const createCurrentDraft = useCallback(
     (): QuickReportDraft => ({
@@ -114,26 +154,78 @@ export default function QuickReportPage() {
     }
 
     const draft = createCurrentDraft()
-    await quickReportDraftRepository.write(draft)
+    await runDraftTask(() => quickReportDraftRepository.write(draft))
 
     if (isActiveRef.current) {
       setSaveMessage(`草稿已保存 ${formatClock(draft.savedAt)}`)
     }
-  }, [createCurrentDraft])
+  }, [createCurrentDraft, runDraftTask])
 
-  const applySnapshot = useCallback((snapshot: QuickReportServerSnapshot) => {
+  const recordSnapshot = useCallback((snapshot: QuickReportServerSnapshot) => {
     const nextFields = cloneFields(snapshot.fields)
-    setServerSnapshot(snapshot)
-    setFields(nextFields)
-    setBaseFields(cloneFields(snapshot.fields))
-    setBaseVersion(snapshot.version)
+    serverSnapshotRef.current = snapshot
     fieldsRef.current = nextFields
     baseFieldsRef.current = cloneFields(snapshot.fields)
     baseVersionRef.current = snapshot.version
   }, [])
 
+  const renderSnapshot = useCallback((snapshot: QuickReportServerSnapshot) => {
+    setServerSnapshot(snapshot)
+    setFields(cloneFields(snapshot.fields))
+    setBaseFields(cloneFields(snapshot.fields))
+    setBaseVersion(snapshot.version)
+  }, [])
+
+  const applySnapshot = useCallback(
+    (snapshot: QuickReportServerSnapshot) => {
+      recordSnapshot(snapshot)
+      renderSnapshot(snapshot)
+    },
+    [recordSnapshot, renderSnapshot],
+  )
+
+  const recordClientState = useCallback((state: QuickReportClientState) => {
+    serverSnapshotRef.current = state.snapshot
+    fieldsRef.current = cloneFields(state.fields)
+    baseFieldsRef.current = cloneFields(state.baseFields)
+    baseVersionRef.current = state.baseVersion
+    dirtyRef.current = state.dirty
+  }, [])
+
+  const renderClientState = useCallback((state: QuickReportClientState) => {
+    setServerSnapshot(state.snapshot)
+    setFields(cloneFields(state.fields))
+    setBaseFields(cloneFields(state.baseFields))
+    setBaseVersion(state.baseVersion)
+  }, [])
+
+  const cleanupSubmittedDraft = useCallback(
+    async (draft: QuickReportDraft, result: SubmitQuickReportResult): Promise<boolean> => {
+      let removeFailed = false
+      const submittedDraft = markDraftSubmitted(draft, result)
+
+      await runDraftTask(async () => {
+        try {
+          await quickReportDraftRepository.write(submittedDraft)
+        } catch {
+          // A successful removal still prevents the stale draft from returning.
+        }
+
+        try {
+          await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+        } catch {
+          removeFailed = true
+        }
+      })
+
+      return removeFailed
+    },
+    [runDraftTask],
+  )
+
   const showConflict = useCallback(
     (draft: QuickReportDraft, current: QuickReportServerSnapshot) => {
+      serverSnapshotRef.current = current
       setServerSnapshot(current)
       setConflict({
         draft,
@@ -160,6 +252,7 @@ export default function QuickReportPage() {
     }
 
     const decision = getRestoreDecision(draft, snapshot.version)
+    serverSnapshotRef.current = snapshot
     setServerSnapshot(snapshot)
 
     if (decision === 'RESTORE' && draft) {
@@ -183,6 +276,19 @@ export default function QuickReportPage() {
       baseVersionRef.current = draft.baseVersion
       dirtyRef.current = true
       showConflict(draft, snapshot)
+    } else if (decision === 'SUBMITTED' && draft) {
+      applySnapshot(snapshot)
+      dirtyRef.current = false
+      setPhase('SUBMITTED')
+      setSaveMessage(
+        `已识别提交 ${draft.submissionId ?? ''}，服务端版本为 v${snapshot.version}，正在重试清理旧草稿`,
+      )
+      try {
+        await runDraftTask(() => quickReportDraftRepository.remove(DRAFT_CONTEXT))
+        setSaveMessage(`服务端已提交成功，旧草稿已清理（v${snapshot.version}）`)
+      } catch {
+        setSaveMessage(`服务端已提交成功（v${snapshot.version}），本地旧草稿将在下次恢复时重试清理`)
+      }
     } else {
       applySnapshot(snapshot)
       dirtyRef.current = false
@@ -191,7 +297,7 @@ export default function QuickReportPage() {
     }
 
     readyRef.current = true
-  }, [applySnapshot, showConflict])
+  }, [applySnapshot, runDraftTask, showConflict])
 
   useEffect(() => {
     void loadInitialState()
@@ -221,7 +327,12 @@ export default function QuickReportPage() {
   useDidShow(() => {
     isActiveRef.current = true
 
-    if (!readyRef.current || !needsRefreshRef.current) {
+    if (!readyRef.current) {
+      void loadInitialState()
+      return
+    }
+
+    if (!needsRefreshRef.current) {
       return
     }
 
@@ -240,16 +351,64 @@ export default function QuickReportPage() {
       return
     }
 
-    if (dirtyRef.current && current.version !== baseVersionRef.current) {
-      showConflict(createCurrentDraft(), current)
+    const clientState = getCurrentClientState()
+    if (!clientState) {
+      applySnapshot(current)
+      dirtyRef.current = false
+      setPhase('EDITING')
       return
     }
 
-    if (!dirtyRef.current) {
+    const decision = getResumeDecision(clientState, current)
+    if (decision === 'CONFLICT') {
+      showConflict(createCurrentDraft(), current)
+      pendingPresentationRef.current = null
+      return
+    }
+
+    if (decision === 'APPLY_SERVER') {
       applySnapshot(current)
+      dirtyRef.current = false
     } else {
+      serverSnapshotRef.current = current
       setServerSnapshot(current)
     }
+
+    let pendingPresentation = pendingPresentationRef.current
+    pendingPresentationRef.current = null
+    if (pendingPresentation?.type === 'SUBMISSION_SUCCESS') {
+      if (pendingPresentation.cleanupFailed) {
+        try {
+          await runDraftTask(() => quickReportDraftRepository.remove(DRAFT_CONTEXT))
+          pendingPresentation = {
+            ...pendingPresentation,
+            cleanupFailed: false,
+          }
+        } catch {
+          pendingPresentation = {
+            ...pendingPresentation,
+            cleanupFailed: true,
+          }
+        }
+      }
+
+      setPhase('SUBMITTED')
+      setSaveMessage(createSubmissionSuccessMessage(pendingPresentation))
+      await Taro.showToast({
+        title: pendingPresentation.cleanupFailed ? '已提交，草稿待清理' : '提交成功',
+        icon: pendingPresentation.cleanupFailed ? 'none' : 'success',
+      })
+      return
+    }
+
+    if (pendingPresentation?.type === 'NETWORK_FAILURE') {
+      setPhase('NETWORK_ERROR')
+      setSaveMessage('网络失败，输入已保存在本地草稿')
+      await Taro.showToast({ title: '网络失败，草稿已保留', icon: 'none' })
+      return
+    }
+
+    setPhase(clientState.dirty ? 'EDITING' : 'SUBMITTED')
     setSaveMessage('已从后台恢复并检查服务端版本')
   }
 
@@ -326,32 +485,33 @@ export default function QuickReportPage() {
       return
     }
 
+    const submittedDraft = createCurrentDraft()
     setPhase('SUBMITTING')
     setSaveMessage('正在提交报告…')
 
+    let result: SubmitQuickReportResult
     try {
-      const updated = await quickReportRepository.submit({
+      result = await quickReportRepository.submit({
         matchId: MATCH_ID,
         expectedVersion: baseVersionRef.current,
         fields: fieldsRef.current,
       })
-
-      if (!isActiveRef.current) {
-        needsRefreshRef.current = true
-        return
-      }
-
-      applySnapshot(updated)
-      dirtyRef.current = false
-      setConflict(null)
-      setPhase('SUBMITTED')
-      setSaveMessage(`提交成功，服务端版本已更新为 v${updated.version}`)
-      await quickReportDraftRepository.remove(DRAFT_CONTEXT)
-      await Taro.showToast({ title: '提交成功，草稿已删除', icon: 'success' })
     } catch (error) {
       if (error instanceof MockNetworkError) {
-        dirtyRef.current = true
+        const currentState = getCurrentClientState()
+        if (currentState) {
+          recordClientState(applySubmissionOutcome(currentState, { type: 'NETWORK_FAILURE' }))
+        } else {
+          dirtyRef.current = true
+        }
         await persistDraft()
+
+        if (!isActiveRef.current) {
+          pendingPresentationRef.current = { type: 'NETWORK_FAILURE' }
+          needsRefreshRef.current = true
+          return
+        }
+
         setPhase('NETWORK_ERROR')
         setSaveMessage('网络失败，输入已保存在本地草稿')
         await Taro.showToast({ title: '网络失败，草稿已保留', icon: 'none' })
@@ -360,15 +520,73 @@ export default function QuickReportPage() {
 
       if (error instanceof MockVersionConflictError) {
         const draft = createCurrentDraft()
-        await quickReportDraftRepository.write(draft)
+        await runDraftTask(() => quickReportDraftRepository.write(draft))
+
+        if (!isActiveRef.current) {
+          needsRefreshRef.current = true
+          return
+        }
+
         showConflict(draft, error.current)
+        return
+      }
+
+      if (!isActiveRef.current) {
+        needsRefreshRef.current = true
         return
       }
 
       setPhase('EDITING')
       setSaveMessage('提交失败，请稍后重试')
       await Taro.showToast({ title: '提交失败', icon: 'none' })
+      return
     }
+
+    const currentState = getCurrentClientState()
+    if (!currentState) {
+      serverSnapshotRef.current = result.snapshot
+      fieldsRef.current = cloneFields(result.snapshot.fields)
+      baseFieldsRef.current = cloneFields(result.snapshot.fields)
+      baseVersionRef.current = result.submittedVersion
+      dirtyRef.current = false
+    }
+
+    const nextState = applySubmissionOutcome(
+      currentState ?? {
+        snapshot: result.snapshot,
+        fields: result.snapshot.fields,
+        baseFields: result.snapshot.fields,
+        baseVersion: result.submittedVersion,
+        dirty: false,
+      },
+      {
+        type: 'SUCCESS',
+        result,
+      },
+    )
+    recordClientState(nextState)
+
+    const cleanupFailed = await cleanupSubmittedDraft(submittedDraft, result)
+    const presentation: PendingPresentation = {
+      type: 'SUBMISSION_SUCCESS',
+      cleanupFailed,
+      result,
+    }
+
+    if (!isActiveRef.current) {
+      pendingPresentationRef.current = presentation
+      needsRefreshRef.current = true
+      return
+    }
+
+    renderClientState(nextState)
+    setConflict(null)
+    setPhase('SUBMITTED')
+    setSaveMessage(createSubmissionSuccessMessage(presentation))
+    await Taro.showToast({
+      title: cleanupFailed ? '已提交，草稿待清理' : '提交成功，草稿已删除',
+      icon: cleanupFailed ? 'none' : 'success',
+    })
   }
 
   async function toggleNetworkFailure() {
@@ -377,6 +595,16 @@ export default function QuickReportPage() {
     setNetworkMode(nextMode)
     await Taro.showToast({
       title: nextMode === 'FAIL_SUBMIT' ? '已模拟提交断网' : '网络已恢复',
+      icon: 'none',
+    })
+  }
+
+  async function toggleRemoveFailure() {
+    const nextValue = !removeFailure
+    quickReportDraftRepository.setRemoveFailure(nextValue)
+    setRemoveFailure(nextValue)
+    await Taro.showToast({
+      title: nextValue ? '已模拟草稿删除失败' : '草稿删除已恢复',
       icon: 'none',
     })
   }
@@ -421,7 +649,7 @@ export default function QuickReportPage() {
     setPhase('EDITING')
 
     const nextDraft = createCurrentDraft()
-    await quickReportDraftRepository.write(nextDraft)
+    await runDraftTask(() => quickReportDraftRepository.write(nextDraft))
     setSaveMessage(
       result.conflicts.length === 0
         ? '已合并双方修改，请复核后提交'
@@ -450,7 +678,7 @@ export default function QuickReportPage() {
     setConflict(null)
     setPhase('EDITING')
     setSaveMessage('本地草稿已删除')
-    await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+    await runDraftTask(() => quickReportDraftRepository.remove(DRAFT_CONTEXT))
   }
 
   async function resetDemo() {
@@ -463,7 +691,9 @@ export default function QuickReportPage() {
       return
     }
 
-    await quickReportDraftRepository.remove(DRAFT_CONTEXT)
+    quickReportDraftRepository.setRemoveFailure(false)
+    setRemoveFailure(false)
+    await runDraftTask(() => quickReportDraftRepository.remove(DRAFT_CONTEXT))
     const snapshot = await quickReportRepository.reset(MATCH_ID)
     applySnapshot(snapshot)
     dirtyRef.current = false
@@ -511,6 +741,12 @@ export default function QuickReportPage() {
           </Button>
           <Button className="scenario-button" onClick={() => void simulateRemoteChange()}>
             模拟他人提交
+          </Button>
+          <Button
+            className={`scenario-button ${removeFailure ? 'scenario-button--active' : ''}`}
+            onClick={() => void toggleRemoveFailure()}
+          >
+            {removeFailure ? '恢复草稿删除' : '模拟草稿删除失败'}
           </Button>
           <Button
             className="scenario-button scenario-button--quiet"
@@ -771,4 +1007,15 @@ function ReportPreview({
 function formatClock(iso: string): string {
   const date = new Date(iso)
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+}
+
+function createSubmissionSuccessMessage(
+  presentation: Extract<PendingPresentation, { type: 'SUBMISSION_SUCCESS' }>,
+): string {
+  const { cleanupFailed, result } = presentation
+  if (cleanupFailed) {
+    return `服务端已提交成功（${result.submissionId}，v${result.submittedVersion}），本地草稿将在恢复时重试清理`
+  }
+
+  return `提交成功（${result.submissionId}），服务端版本已更新为 v${result.submittedVersion}`
 }

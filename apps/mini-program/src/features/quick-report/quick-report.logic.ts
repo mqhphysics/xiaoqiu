@@ -33,6 +33,9 @@ export interface QuickReportDraft {
   baseFields: QuickReportFields
   fields: QuickReportFields
   savedAt: string
+  submissionId?: string
+  submittedVersion?: number
+  submittedAt?: string
 }
 
 export interface QuickReportServerSnapshot {
@@ -44,7 +47,32 @@ export interface QuickReportServerSnapshot {
   updatedAt: string
 }
 
-export type RestoreDecision = 'NONE' | 'RESTORE' | 'CONFLICT' | 'EXPIRED'
+export interface SubmitQuickReportResult {
+  submissionId: string
+  submittedVersion: number
+  submittedAt: string
+  snapshot: QuickReportServerSnapshot
+}
+
+export interface QuickReportClientState {
+  snapshot: QuickReportServerSnapshot
+  fields: QuickReportFields
+  baseFields: QuickReportFields
+  baseVersion: number
+  dirty: boolean
+}
+
+export type SubmissionOutcome =
+  | {
+      type: 'SUCCESS'
+      result: SubmitQuickReportResult
+    }
+  | {
+      type: 'NETWORK_FAILURE'
+    }
+
+export type RestoreDecision = 'NONE' | 'RESTORE' | 'CONFLICT' | 'EXPIRED' | 'SUBMITTED'
+export type ResumeDecision = 'APPLY_SERVER' | 'KEEP_LOCAL' | 'CONFLICT'
 
 export type ConflictField = 'homeScore' | 'awayScore' | 'outcome' | 'goals' | 'notes'
 
@@ -72,12 +100,66 @@ export function getRestoreDecision(
     return 'NONE'
   }
 
+  if (draft.submissionId && draft.submittedVersion !== undefined) {
+    return 'SUBMITTED'
+  }
+
   const savedAt = Date.parse(draft.savedAt)
   if (!Number.isFinite(savedAt) || now - savedAt > DRAFT_MAX_AGE_MS) {
     return 'EXPIRED'
   }
 
   return draft.baseVersion === serverVersion ? 'RESTORE' : 'CONFLICT'
+}
+
+export function applySubmissionOutcome(
+  state: QuickReportClientState,
+  outcome: SubmissionOutcome,
+): QuickReportClientState {
+  if (outcome.type === 'NETWORK_FAILURE') {
+    return {
+      ...state,
+      fields: cloneFields(state.fields),
+      baseFields: cloneFields(state.baseFields),
+      dirty: true,
+    }
+  }
+
+  const snapshot = outcome.result.snapshot
+  return {
+    snapshot,
+    fields: cloneFields(snapshot.fields),
+    baseFields: cloneFields(snapshot.fields),
+    baseVersion: outcome.result.submittedVersion,
+    dirty: false,
+  }
+}
+
+export function getResumeDecision(
+  state: QuickReportClientState,
+  current: QuickReportServerSnapshot,
+): ResumeDecision {
+  if (!state.dirty) {
+    return 'APPLY_SERVER'
+  }
+
+  return current.version === state.baseVersion ? 'KEEP_LOCAL' : 'CONFLICT'
+}
+
+export function markDraftSubmitted(
+  draft: QuickReportDraft,
+  result: SubmitQuickReportResult,
+): QuickReportDraft {
+  return {
+    ...draft,
+    baseVersion: result.submittedVersion,
+    baseFields: cloneFields(result.snapshot.fields),
+    fields: cloneFields(result.snapshot.fields),
+    savedAt: result.submittedAt,
+    submissionId: result.submissionId,
+    submittedVersion: result.submittedVersion,
+    submittedAt: result.submittedAt,
+  }
 }
 
 export function cloneFields(fields: QuickReportFields): QuickReportFields {

@@ -4,6 +4,7 @@ import {
   cloneFields,
   type QuickReportFields,
   type QuickReportServerSnapshot,
+  type SubmitQuickReportResult,
 } from './quick-report.logic'
 
 const MOCK_DELAY_MS = 360
@@ -19,7 +20,7 @@ export interface SubmitQuickReportInput {
 
 export interface QuickReportRepository {
   fetch(matchId: string): Promise<QuickReportServerSnapshot>
-  submit(input: SubmitQuickReportInput): Promise<QuickReportServerSnapshot>
+  submit(input: SubmitQuickReportInput): Promise<SubmitQuickReportResult>
   simulateRemoteChange(matchId: string): Promise<QuickReportServerSnapshot>
   reset(matchId: string): Promise<QuickReportServerSnapshot>
   setNetworkMode(mode: MockNetworkMode): void
@@ -51,7 +52,7 @@ class TaroMockQuickReportRepository implements QuickReportRepository {
     return this.read(matchId)
   }
 
-  async submit(input: SubmitQuickReportInput): Promise<QuickReportServerSnapshot> {
+  async submit(input: SubmitQuickReportInput): Promise<SubmitQuickReportResult> {
     await delay()
 
     if (this.networkMode === 'FAIL_SUBMIT') {
@@ -63,14 +64,20 @@ class TaroMockQuickReportRepository implements QuickReportRepository {
       throw new MockVersionConflictError(current)
     }
 
+    const submittedAt = new Date().toISOString()
     const updated: QuickReportServerSnapshot = {
       ...current,
       version: current.version + 1,
       fields: cloneFields(input.fields),
-      updatedAt: new Date().toISOString(),
+      updatedAt: submittedAt,
     }
     await this.write(updated)
-    return updated
+    return {
+      submissionId: `submission-${input.matchId}-${updated.version}`,
+      submittedVersion: updated.version,
+      submittedAt,
+      snapshot: updated,
+    }
   }
 
   async simulateRemoteChange(matchId: string): Promise<QuickReportServerSnapshot> {
