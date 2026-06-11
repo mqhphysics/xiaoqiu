@@ -1,7 +1,8 @@
 # Coolify 预发布骨架
 
-`compose.yaml` 从仓库根 context 构建 API、Worker 和 Admin Web。数据库不包含在
-预发布应用栈中，应在 Coolify 创建独立 PostgreSQL 资源并启用持久卷与备份。
+`compose.yaml` 从仓库根 context 构建 migration job、API、Worker 和 Admin Web。
+数据库不包含在预发布应用栈中，应在 Coolify 创建独立 PostgreSQL 资源并启用持久卷与备份。
+每次部署先执行一次 `prisma migrate deploy`；只有 migration 成功后 API 和 Worker 才启动。
 
 ## 前置条件
 
@@ -19,17 +20,19 @@
    `admin-web:80`。
 3. 设置 `APP_VERSION` 为提交哈希，设置 `VITE_API_BASE_URL` 为公开 API
    地址，例如 `https://api-staging.example.edu/api`。
-4. 部署后检查：
+4. 确认 migration 容器以退出码 0 完成，然后检查：
 
 ```bash
-curl --fail --show-error https://api-staging.example.edu/api/health
+curl --fail --show-error https://api-staging.example.edu/api/health/live
+curl --fail --show-error https://api-staging.example.edu/api/health/ready
 curl --fail --show-error https://staging.example.edu/healthz
 ```
 
 ## 失败处理
 
 - 构建失败：先在仓库根目录执行任务卡中的本地镜像构建命令，确认锁文件与构建脚本。
-- API 不健康：检查 `DATABASE_URL`、容器日志和 `/api/health`。
+- Migration 失败：不要启动或切流到新 API/Worker；检查迁移日志、数据库权限和当前迁移版本。
+- API 不健康：检查 `DATABASE_URL`、容器日志和 `/api/health/ready`。
 - Admin Web 可访问但请求错误：确认 `VITE_API_BASE_URL` 在构建时已设置；修改后必须重建镜像。
 - Worker 重启：先检查数据库连通性，再按 Worker 堆积 Runbook 排查。
 

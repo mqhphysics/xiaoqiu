@@ -24,7 +24,8 @@
 验证：
 
 ```bash
-curl --fail --show-error https://api-staging.example.edu/api/health
+curl --fail --show-error https://api-staging.example.edu/api/health/live
+curl --fail --show-error https://api-staging.example.edu/api/health/ready
 curl --fail --show-error https://staging.example.edu/healthz
 ```
 

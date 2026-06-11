@@ -30,16 +30,23 @@ Outbox 表落地后，在 `psql` 中执行只读查询：
 ```sql
 SELECT status, topic, count(*) AS jobs, min(available_at) AS oldest_available_at
 FROM outbox_jobs
-WHERE status IN ('PENDING', 'FAILED_RETRYABLE', 'PROCESSING')
+WHERE status IN ('PENDING', 'PROCESSING', 'FAILED_RETRYABLE')
 GROUP BY status, topic
 ORDER BY oldest_available_at;
 
 SELECT id, topic, status, attempt_count, max_attempts, last_error_code,
-       available_at, locked_by, locked_until, correlation_id
+       last_error, available_at, locked_by, locked_until, correlation_id
 FROM outbox_jobs
 WHERE status IN ('FAILED_RETRYABLE', 'FAILED_PERMANENT')
 ORDER BY available_at
 LIMIT 50;
+
+SELECT status, topic, count(*) AS jobs
+FROM outbox_jobs
+WHERE status IN ('SUCCEEDED', 'CANCELLED')
+  AND updated_at >= now() - interval '1 hour'
+GROUP BY status, topic
+ORDER BY status, topic;
 ```
 
 判断故障类型：
@@ -56,7 +63,9 @@ LIMIT 50;
 3. 验证 Handler 幂等和副作用。
 4. 再分批恢复同 Topic。
 5. 不可重试任务标记为 `FAILED_PERMANENT`，保留错误和审计。
-6. 记录事故时间线、最大堆积年龄和恢复结果。
+6. 已成功任务保持 `SUCCEEDED`，管理员取消的未执行任务保持 `CANCELLED`。
+7. 记录 `last_error_code`、`last_error`、`correlation_id`、事故时间线、
+   最大堆积年龄和恢复结果。
 
 管理重放 API 尚未落地时，不通过临时 SQL 篡改 payload 或伪造成功状态。
 

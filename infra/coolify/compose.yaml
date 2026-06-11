@@ -1,6 +1,18 @@
 name: xiaoqiu-staging
 
 services:
+  migration:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.migration
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22.14.0-bookworm-slim}
+        PNPM_VERSION: ${PNPM_VERSION:-11.5.2}
+    restart: 'no'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://replace-me:replace-me@postgres.invalid:5432/xiaoqiu}
+
   api:
     build:
       context: ../..
@@ -18,12 +30,15 @@ services:
       SENTRY_DSN_API: ${SENTRY_DSN_API:-}
     expose:
       - '3000'
+    depends_on:
+      migration:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - fetch('http://127.0.0.1:3000/api/health').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+        - fetch('http://127.0.0.1:3000/api/health/ready').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
       interval: 10s
       timeout: 5s
       retries: 6
@@ -43,8 +58,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://replace-me:replace-me@postgres.invalid:5432/xiaoqiu}
       SENTRY_DSN_WORKER: ${SENTRY_DSN_WORKER:-}
     depends_on:
-      api:
-        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
 
   admin-web:
     build:

@@ -54,7 +54,8 @@ docker compose --env-file infra/.env -f infra/compose.yaml exec -T postgres psql
 先停止高风险写入并再做一次当前状态备份。恢复后重新启动 API 与 Worker，检查：
 
 ```bash
-curl --fail --show-error https://api-staging.example.edu/api/health
+curl --fail --show-error https://api-staging.example.edu/api/health/live
+curl --fail --show-error https://api-staging.example.edu/api/health/ready
 ```
 
 ## 失败处理
