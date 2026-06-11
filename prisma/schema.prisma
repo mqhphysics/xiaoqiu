@@ -72,9 +72,10 @@ enum AuditActorType {
 enum OutboxJobStatus {
   PENDING
   PROCESSING
-  RETRYABLE
-  COMPLETED
+  SUCCEEDED
+  FAILED_RETRYABLE
   FAILED_PERMANENT
+  CANCELLED
 
   @@map("outbox_job_status")
 }
@@ -240,6 +241,7 @@ model OutboxJob {
   eventType        String          @map("event_type") @db.VarChar(120)
   payload          Json            @db.JsonB
   deduplicationKey String?         @map("deduplication_key") @db.VarChar(200)
+  correlationId    String?         @map("correlation_id") @db.VarChar(128)
   status           OutboxJobStatus @default(PENDING)
   attemptCount     Int             @default(0) @map("attempt_count")
   maxAttempts      Int             @default(10) @map("max_attempts")
@@ -248,6 +250,7 @@ model OutboxJob {
   lockedUntil      DateTime?       @map("locked_until") @db.Timestamptz(3)
   lockedBy         String?         @map("locked_by") @db.VarChar(120)
   processedAt      DateTime?       @map("processed_at") @db.Timestamptz(3)
+  lastErrorCode    String?         @map("last_error_code") @db.VarChar(120)
   lastError        String?         @map("last_error") @db.Text
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -255,6 +258,7 @@ model OutboxJob {
 
   @@index([status, availableAt], map: "outbox_jobs_status_available_at_idx")
   @@index([lockedUntil], map: "outbox_jobs_locked_until_idx")
+  @@index([correlationId], map: "outbox_jobs_correlation_id_idx")
   @@index([organizationId, createdAt], map: "outbox_jobs_organization_id_created_at_idx")
   @@map("outbox_jobs")
 }

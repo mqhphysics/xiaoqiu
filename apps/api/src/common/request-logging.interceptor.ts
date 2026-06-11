@@ -9,6 +9,7 @@ import type { Response } from 'express'
 import { finalize, type Observable } from 'rxjs'
 
 import { getRequestId, type RequestWithId } from './request-context'
+import { getSafeRequestPath } from './safe-request-path'
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
@@ -26,7 +27,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           JSON.stringify({
             durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
             method: request.method,
-            path: request.originalUrl,
+            path: getSafeRequestPath(request),
             requestId: getRequestId(request),
             status: response.statusCode,
           }),

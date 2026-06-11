@@ -1,6 +1,6 @@
 import { HttpStatus, ValidationPipe, type ValidationError } from '@nestjs/common'
+import { ERROR_CODES } from '@xiaoqiu/contracts'
 
-import { API_ERROR_CODES } from './api-error-codes'
 import { ApiHttpException } from './api-http.exception'
 
 function flattenValidationErrors(errors: ValidationError[], parentPath = ''): string[] {
@@ -15,7 +15,7 @@ export function createValidationPipe(): ValidationPipe {
   return new ValidationPipe({
     exceptionFactory: (errors) =>
       new ApiHttpException(HttpStatus.BAD_REQUEST, {
-        code: API_ERROR_CODES.VALIDATION_FAILED,
+        code: ERROR_CODES.VALIDATION_FAILED,
         message: '请求参数校验失败',
         details: {
           errors: flattenValidationErrors(errors),

@@ -24,9 +24,10 @@ CREATE TYPE "audit_actor_type" AS ENUM (
 CREATE TYPE "outbox_job_status" AS ENUM (
   'PENDING',
   'PROCESSING',
-  'RETRYABLE',
-  'COMPLETED',
-  'FAILED_PERMANENT'
+  'SUCCEEDED',
+  'FAILED_RETRYABLE',
+  'FAILED_PERMANENT',
+  'CANCELLED'
 );
 
 CREATE TABLE "organizations" (
@@ -147,6 +148,7 @@ CREATE TABLE "outbox_jobs" (
   "event_type" VARCHAR(120) NOT NULL,
   "payload" JSONB NOT NULL,
   "deduplication_key" VARCHAR(200),
+  "correlation_id" VARCHAR(128),
   "status" "outbox_job_status" NOT NULL DEFAULT 'PENDING',
   "attempt_count" INTEGER NOT NULL DEFAULT 0,
   "max_attempts" INTEGER NOT NULL DEFAULT 10,
@@ -155,6 +157,7 @@ CREATE TABLE "outbox_jobs" (
   "locked_until" TIMESTAMPTZ(3),
   "locked_by" VARCHAR(120),
   "processed_at" TIMESTAMPTZ(3),
+  "last_error_code" VARCHAR(120),
   "last_error" TEXT,
   "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -199,6 +202,7 @@ CREATE UNIQUE INDEX "outbox_jobs_deduplication_key_key"
   WHERE "deduplication_key" IS NOT NULL;
 CREATE INDEX "outbox_jobs_status_available_at_idx" ON "outbox_jobs"("status", "available_at");
 CREATE INDEX "outbox_jobs_locked_until_idx" ON "outbox_jobs"("locked_until");
+CREATE INDEX "outbox_jobs_correlation_id_idx" ON "outbox_jobs"("correlation_id");
 CREATE INDEX "outbox_jobs_organization_id_created_at_idx"
   ON "outbox_jobs"("organization_id", "created_at");
 

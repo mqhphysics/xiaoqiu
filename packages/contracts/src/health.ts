@@ -1,4 +1,3 @@
-export type HealthStatus = 'ok' | 'degraded'
 export type DependencyHealthStatus = 'ok' | 'down'
 
 export interface DependencyHealth {
@@ -6,11 +5,14 @@ export interface DependencyHealth {
   latencyMs: number
 }
 
-export interface HealthResponse {
+export interface LivenessResponse {
   service: 'api'
-  status: HealthStatus
+  status: 'ok'
   version: string
   timestamp: string
   requestId: string
+}
+
+export interface ReadinessResponse extends LivenessResponse {
   database: DependencyHealth
 }

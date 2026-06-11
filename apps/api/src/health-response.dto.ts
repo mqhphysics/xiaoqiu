@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import type { DependencyHealth, HealthResponse } from '@xiaoqiu/contracts'
+import type { DependencyHealth, LivenessResponse, ReadinessResponse } from '@xiaoqiu/contracts'
 
 export class DependencyHealthDto implements DependencyHealth {
   @ApiProperty({ type: String, enum: ['ok', 'down'], example: 'ok' })
@@ -9,12 +9,12 @@ export class DependencyHealthDto implements DependencyHealth {
   latencyMs!: number
 }
 
-export class HealthResponseDto implements HealthResponse {
+export class LivenessResponseDto implements LivenessResponse {
   @ApiProperty({ type: String, enum: ['api'], example: 'api' })
   service!: 'api'
 
-  @ApiProperty({ type: String, enum: ['ok', 'degraded'], example: 'ok' })
-  status!: HealthResponse['status']
+  @ApiProperty({ type: String, enum: ['ok'], example: 'ok' })
+  status!: 'ok'
 
   @ApiProperty({ type: String, example: '0.1.0' })
   version!: string
@@ -28,7 +28,9 @@ export class HealthResponseDto implements HealthResponse {
 
   @ApiProperty({ type: String, example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
   requestId!: string
+}
 
+export class ReadinessResponseDto extends LivenessResponseDto implements ReadinessResponse {
   @ApiProperty({ type: () => DependencyHealthDto })
   database!: DependencyHealthDto
 }

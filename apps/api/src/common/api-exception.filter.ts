@@ -6,20 +6,20 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from '@nestjs/common'
-import type { ApiErrorResponse, ErrorCode } from '@xiaoqiu/contracts'
+import { ERROR_CODES, isErrorCode, type ApiErrorResponse, type ErrorCode } from '@xiaoqiu/contracts'
 import type { Response } from 'express'
 
-import { API_ERROR_CODES } from './api-error-codes'
 import type { ApiHttpExceptionBody } from './api-http.exception'
 import { getRequestId, type RequestWithId } from './request-context'
+import { getSafeRequestPath } from './safe-request-path'
 
 const STATUS_ERROR_CODES: Readonly<Partial<Record<number, ErrorCode>>> = {
-  [HttpStatus.BAD_REQUEST]: API_ERROR_CODES.BAD_REQUEST,
-  [HttpStatus.UNAUTHORIZED]: API_ERROR_CODES.UNAUTHORIZED,
-  [HttpStatus.FORBIDDEN]: API_ERROR_CODES.FORBIDDEN,
-  [HttpStatus.NOT_FOUND]: API_ERROR_CODES.NOT_FOUND,
-  [HttpStatus.CONFLICT]: API_ERROR_CODES.CONFLICT,
-  [HttpStatus.SERVICE_UNAVAILABLE]: API_ERROR_CODES.SERVICE_UNAVAILABLE,
+  [HttpStatus.BAD_REQUEST]: ERROR_CODES.BAD_REQUEST,
+  [HttpStatus.UNAUTHORIZED]: ERROR_CODES.UNAUTHORIZED,
+  [HttpStatus.FORBIDDEN]: ERROR_CODES.FORBIDDEN,
+  [HttpStatus.NOT_FOUND]: ERROR_CODES.NOT_FOUND,
+  [HttpStatus.CONFLICT]: ERROR_CODES.CONFLICT,
+  [HttpStatus.SERVICE_UNAVAILABLE]: ERROR_CODES.SERVICE_UNAVAILABLE,
 }
 
 const STATUS_MESSAGES: Readonly<Partial<Record<number, string>>> = {
@@ -37,7 +37,7 @@ function isApiHttpExceptionBody(value: unknown): value is ApiHttpExceptionBody {
   }
 
   const candidate = value as Partial<ApiHttpExceptionBody>
-  return typeof candidate.code === 'string' && typeof candidate.message === 'string'
+  return isErrorCode(candidate.code) && typeof candidate.message === 'string'
 }
 
 @Catch()
@@ -54,7 +54,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : undefined
 
-    let code = STATUS_ERROR_CODES[status] ?? API_ERROR_CODES.INTERNAL_ERROR
+    let code = STATUS_ERROR_CODES[status] ?? ERROR_CODES.INTERNAL_ERROR
     let message = STATUS_MESSAGES[status] ?? '服务器内部错误'
     let details: Record<string, unknown> | undefined
 
@@ -69,7 +69,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
         JSON.stringify({
           error: exception instanceof Error ? exception.message : 'unknown error',
           method: request.method,
-          path: request.originalUrl,
+          path: getSafeRequestPath(request),
           requestId,
           status,
         }),

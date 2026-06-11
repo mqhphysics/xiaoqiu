@@ -12,6 +12,12 @@ export const ERROR_CODES = {
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
 
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return (
+    typeof value === 'string' && (Object.values(ERROR_CODES) as readonly string[]).includes(value)
+  )
+}
+
 export interface ApiErrorResponse {
   code: ErrorCode
   message: string

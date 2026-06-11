@@ -1,13 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import type { ApiErrorResponse } from '@xiaoqiu/contracts'
-
-import { API_ERROR_CODES } from './api-error-codes'
+import { ERROR_CODES, type ApiErrorResponse } from '@xiaoqiu/contracts'
 
 export class ApiErrorResponseDto implements ApiErrorResponse {
   @ApiProperty({
     type: String,
-    enum: Object.values(API_ERROR_CODES),
-    example: API_ERROR_CODES.VALIDATION_FAILED,
+    enum: Object.values(ERROR_CODES),
+    example: ERROR_CODES.VALIDATION_FAILED,
   })
   code!: ApiErrorResponse['code']
 
