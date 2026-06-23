@@ -1,4 +1,5 @@
-import { Text, View } from '@tarojs/components'
+import { Button, Text, View } from '@tarojs/components'
+import Taro from '@tarojs/taro'
 
 import './index.scss'
 
@@ -21,6 +22,18 @@ export default function IndexPage() {
             <Text className="module-state">待接入</Text>
           </View>
         ))}
+      </View>
+
+      <View className="spike-entry">
+        <Text className="spike-label">P0 · SPIKE 01</Text>
+        <Text className="spike-title">快速比赛报告与弱网草稿</Text>
+        <Text className="spike-copy">验证自动保存、退出恢复、断网保留和版本冲突对比。</Text>
+        <Button
+          className="spike-button"
+          onClick={() => void Taro.navigateTo({ url: '/pages/quick-report/index' })}
+        >
+          进入技术验证
+        </Button>
       </View>
     </View>
   )
