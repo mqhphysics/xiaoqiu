@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  PNPM_CONFIG_REPORTER: append-only
+  DATABASE_URL: postgresql://xiaoqiu_ci:xiaoqiu_ci@localhost:5432/xiaoqiu_ci?schema=public
+  TEST_DATABASE_URL: postgresql://xiaoqiu_ci:xiaoqiu_ci@localhost:5432/xiaoqiu_ci?schema=public
+
+jobs:
+  verify:
+    name: Monorepo quality gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17.4-bookworm
+        env:
+          POSTGRES_USER: xiaoqiu_ci
+          POSTGRES_PASSWORD: xiaoqiu_ci
+          POSTGRES_DB: xiaoqiu_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xiaoqiu_ci -d xiaoqiu_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm 11.5.2
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - name: Install Node.js 22.14.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for PostgreSQL
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U xiaoqiu_ci -d xiaoqiu_ci; then
+              exit 0
+            fi
+            echo "PostgreSQL is not ready yet (attempt ${attempt}/30)"
+            sleep 2
+          done
+
+          echo "::error::PostgreSQL did not become ready within 60 seconds"
+          exit 1
+
+      - name: Apply Prisma migrations
+        run: pnpm --filter @xiaoqiu/api db:migrate:deploy
+
+      - name: Seed database twice
+        run: |
+          pnpm --filter @xiaoqiu/api db:seed
+          pnpm --filter @xiaoqiu/api db:seed
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test without skipped database coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee test-output.log
+
+          if grep -Eiq '# SKIP|(^|[^[:alnum:]_])skipped[[:space:]]+[1-9][0-9]*|ℹ skipped [1-9][0-9]*' test-output.log; then
+            echo "::error::Skipped tests detected. Database integration coverage is mandatory in CI."
+            exit 1
+          fi
+
+          if ! grep -Fq 'PostgreSQL rejects duplicate organization slugs' test-output.log; then
+            echo "::error::Expected PostgreSQL integration test was not collected."
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload test output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.log
+          if-no-files-found: ignore
