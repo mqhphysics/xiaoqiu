@@ -7,8 +7,11 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/node_modules/**',
+      '**/.worktrees/**',
       '**/.taro/**',
+      '**/.swc/**',
       '**/coverage/**',
+      '**/*.tsbuildinfo',
       'packages/api-client/src/generated/**',
     ],
   },

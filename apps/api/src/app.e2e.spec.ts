@@ -102,6 +102,20 @@ test('GET /api/health/ready checks PostgreSQL', async () => {
   assert.equal(databaseQueryCount, 1)
 })
 
+test('GET /api/health remains a readiness-compatible endpoint', async () => {
+  const response = await request(app.getHttpServer())
+    .get('/api/health')
+    .set('x-request-id', 'health-alias-request')
+    .expect(200)
+
+  assert.equal(response.headers['x-request-id'], 'health-alias-request')
+  assert.equal(response.body.requestId, 'health-alias-request')
+  assert.equal(response.body.status, 'ok')
+  assert.equal(response.body.database.status, 'ok')
+  assert.equal(typeof response.body.database.latencyMs, 'number')
+  assert.equal(databaseQueryCount, 1)
+})
+
 test('GET /api/health/ready returns 503 when PostgreSQL is unavailable', async () => {
   databaseFailure = true
 
@@ -143,8 +157,10 @@ test('OpenAPI JSON is available at the stable endpoint', async () => {
   const response = await request(app.getHttpServer()).get('/api/openapi.json').expect(200)
 
   assert.equal(response.body.info.title, '晓球 API')
+  assert.ok(response.body.paths['/api/health'])
   assert.ok(response.body.paths['/api/health/live'])
   assert.ok(response.body.paths['/api/health/ready'])
+  assert.ok(response.body.paths['/api/health'].get.responses['503'])
   assert.ok(response.body.paths['/api/health/ready'].get.responses['503'])
   assert.deepEqual(
     [...response.body.components.schemas.ApiErrorResponseDto.properties.code.enum].sort(),

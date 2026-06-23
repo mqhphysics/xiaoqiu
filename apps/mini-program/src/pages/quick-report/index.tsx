@@ -103,6 +103,7 @@ export default function QuickReportPage() {
   const draftTaskQueueRef = useRef<Promise<void>>(Promise.resolve())
   const pendingPresentationRef = useRef<PendingPresentation | null>(null)
   const goalSequenceRef = useRef(2)
+  const submissionInFlightRef = useRef(false)
 
   useEffect(() => {
     fieldsRef.current = fields
@@ -304,7 +305,12 @@ export default function QuickReportPage() {
   }, [loadInitialState])
 
   useEffect(() => {
-    if (!readyRef.current || !dirtyRef.current || phase === 'SUBMITTING') {
+    if (
+      !readyRef.current ||
+      !dirtyRef.current ||
+      phase === 'SUBMITTING' ||
+      submissionInFlightRef.current
+    ) {
       return
     }
 
@@ -413,6 +419,10 @@ export default function QuickReportPage() {
   }
 
   function updateFields(updater: (current: QuickReportFields) => QuickReportFields) {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     dirtyRef.current = true
     setPhase('EDITING')
     setConflict(null)
@@ -463,7 +473,7 @@ export default function QuickReportPage() {
   }
 
   async function submitReport() {
-    if (!serverSnapshot || phase === 'SUBMITTING') {
+    if (!serverSnapshot || submissionInFlightRef.current || phase === 'SUBMITTING') {
       return
     }
 
@@ -473,28 +483,74 @@ export default function QuickReportPage() {
       return
     }
 
-    dirtyRef.current = true
-    await persistDraft()
-
-    const confirmation = await Taro.showModal({
-      title: '确认提交快速报告',
-      content: `${serverSnapshot.homeTeamName} ${fields.homeScore} : ${fields.awayScore} ${serverSnapshot.awayTeamName}`,
-      confirmText: '确认提交',
-    })
-    if (!confirmation.confirm) {
-      return
-    }
-
-    const submittedDraft = createCurrentDraft()
-    setPhase('SUBMITTING')
-    setSaveMessage('正在提交报告…')
-
-    let result: SubmitQuickReportResult
+    submissionInFlightRef.current = true
     try {
-      result = await quickReportRepository.submit({
+      dirtyRef.current = true
+      await persistDraft()
+
+      const confirmation = await Taro.showModal({
+        title: '确认提交快速报告',
+        content: `${serverSnapshot.homeTeamName} ${fields.homeScore} : ${fields.awayScore} ${serverSnapshot.awayTeamName}`,
+        confirmText: '确认提交',
+      })
+      if (!confirmation.confirm) {
+        return
+      }
+
+      const submittedDraft = createCurrentDraft()
+      setPhase('SUBMITTING')
+      setSaveMessage('正在提交报告…')
+
+      const result = await quickReportRepository.submit({
         matchId: MATCH_ID,
-        expectedVersion: baseVersionRef.current,
-        fields: fieldsRef.current,
+        expectedVersion: submittedDraft.baseVersion,
+        fields: cloneFields(submittedDraft.fields),
+      })
+
+      const currentState = getCurrentClientState()
+      if (!currentState) {
+        serverSnapshotRef.current = result.snapshot
+        fieldsRef.current = cloneFields(result.snapshot.fields)
+        baseFieldsRef.current = cloneFields(result.snapshot.fields)
+        baseVersionRef.current = result.submittedVersion
+        dirtyRef.current = false
+      }
+
+      const nextState = applySubmissionOutcome(
+        currentState ?? {
+          snapshot: result.snapshot,
+          fields: result.snapshot.fields,
+          baseFields: result.snapshot.fields,
+          baseVersion: result.submittedVersion,
+          dirty: false,
+        },
+        {
+          type: 'SUCCESS',
+          result,
+        },
+      )
+      recordClientState(nextState)
+
+      const cleanupFailed = await cleanupSubmittedDraft(submittedDraft, result)
+      const presentation: PendingPresentation = {
+        type: 'SUBMISSION_SUCCESS',
+        cleanupFailed,
+        result,
+      }
+
+      if (!isActiveRef.current) {
+        pendingPresentationRef.current = presentation
+        needsRefreshRef.current = true
+        return
+      }
+
+      renderClientState(nextState)
+      setConflict(null)
+      setPhase('SUBMITTED')
+      setSaveMessage(createSubmissionSuccessMessage(presentation))
+      await Taro.showToast({
+        title: cleanupFailed ? '已提交，草稿待清理' : '提交成功，草稿已删除',
+        icon: cleanupFailed ? 'none' : 'success',
       })
     } catch (error) {
       if (error instanceof MockNetworkError) {
@@ -539,57 +595,16 @@ export default function QuickReportPage() {
       setPhase('EDITING')
       setSaveMessage('提交失败，请稍后重试')
       await Taro.showToast({ title: '提交失败', icon: 'none' })
-      return
+    } finally {
+      submissionInFlightRef.current = false
     }
-
-    const currentState = getCurrentClientState()
-    if (!currentState) {
-      serverSnapshotRef.current = result.snapshot
-      fieldsRef.current = cloneFields(result.snapshot.fields)
-      baseFieldsRef.current = cloneFields(result.snapshot.fields)
-      baseVersionRef.current = result.submittedVersion
-      dirtyRef.current = false
-    }
-
-    const nextState = applySubmissionOutcome(
-      currentState ?? {
-        snapshot: result.snapshot,
-        fields: result.snapshot.fields,
-        baseFields: result.snapshot.fields,
-        baseVersion: result.submittedVersion,
-        dirty: false,
-      },
-      {
-        type: 'SUCCESS',
-        result,
-      },
-    )
-    recordClientState(nextState)
-
-    const cleanupFailed = await cleanupSubmittedDraft(submittedDraft, result)
-    const presentation: PendingPresentation = {
-      type: 'SUBMISSION_SUCCESS',
-      cleanupFailed,
-      result,
-    }
-
-    if (!isActiveRef.current) {
-      pendingPresentationRef.current = presentation
-      needsRefreshRef.current = true
-      return
-    }
-
-    renderClientState(nextState)
-    setConflict(null)
-    setPhase('SUBMITTED')
-    setSaveMessage(createSubmissionSuccessMessage(presentation))
-    await Taro.showToast({
-      title: cleanupFailed ? '已提交，草稿待清理' : '提交成功，草稿已删除',
-      icon: cleanupFailed ? 'none' : 'success',
-    })
   }
 
   async function toggleNetworkFailure() {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     const nextMode: MockNetworkMode = networkMode === 'ONLINE' ? 'FAIL_SUBMIT' : 'ONLINE'
     quickReportRepository.setNetworkMode(nextMode)
     setNetworkMode(nextMode)
@@ -600,6 +615,10 @@ export default function QuickReportPage() {
   }
 
   async function toggleRemoveFailure() {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     const nextValue = !removeFailure
     quickReportDraftRepository.setRemoveFailure(nextValue)
     setRemoveFailure(nextValue)
@@ -610,6 +629,10 @@ export default function QuickReportPage() {
   }
 
   async function simulateRemoteChange() {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     dirtyRef.current = true
     await persistDraft()
     setSaveMessage('正在模拟另一位信息员提交…')
@@ -626,7 +649,7 @@ export default function QuickReportPage() {
   }
 
   async function mergeConflict() {
-    if (!conflict) {
+    if (!conflict || submissionInFlightRef.current || phase === 'SUBMITTING') {
       return
     }
 
@@ -658,6 +681,10 @@ export default function QuickReportPage() {
   }
 
   async function discardLocalChanges() {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     const current = conflict?.current ?? serverSnapshot
     if (!current) {
       return
@@ -682,6 +709,10 @@ export default function QuickReportPage() {
   }
 
   async function resetDemo() {
+    if (submissionInFlightRef.current || phase === 'SUBMITTING') {
+      return
+    }
+
     const confirmation = await Taro.showModal({
       title: '重置 Spike 数据',
       content: '将清除本地草稿和 mock 服务端变更。',
@@ -712,6 +743,8 @@ export default function QuickReportPage() {
     )
   }
 
+  const interactionsLocked = phase === 'SUBMITTING'
+
   return (
     <View className="report-page">
       <View className="match-header">
@@ -735,21 +768,28 @@ export default function QuickReportPage() {
         <View className="scenario-actions">
           <Button
             className={`scenario-button ${networkMode === 'FAIL_SUBMIT' ? 'scenario-button--active' : ''}`}
+            disabled={interactionsLocked}
             onClick={() => void toggleNetworkFailure()}
           >
             {networkMode === 'FAIL_SUBMIT' ? '恢复网络' : '模拟提交断网'}
           </Button>
-          <Button className="scenario-button" onClick={() => void simulateRemoteChange()}>
+          <Button
+            className="scenario-button"
+            disabled={interactionsLocked}
+            onClick={() => void simulateRemoteChange()}
+          >
             模拟他人提交
           </Button>
           <Button
             className={`scenario-button ${removeFailure ? 'scenario-button--active' : ''}`}
+            disabled={interactionsLocked}
             onClick={() => void toggleRemoveFailure()}
           >
             {removeFailure ? '恢复草稿删除' : '模拟草稿删除失败'}
           </Button>
           <Button
             className="scenario-button scenario-button--quiet"
+            disabled={interactionsLocked}
             onClick={() => void resetDemo()}
           >
             重置
@@ -760,6 +800,7 @@ export default function QuickReportPage() {
       {conflict ? (
         <ConflictPanel
           conflict={conflict}
+          disabled={interactionsLocked}
           onMerge={() => void mergeConflict()}
           onDiscard={() => void discardLocalChanges()}
         />
@@ -781,6 +822,7 @@ export default function QuickReportPage() {
               className="score-input"
               type="number"
               value={String(fields.homeScore)}
+              disabled={interactionsLocked}
               onInput={(event) => updateScore('HOME', event.detail.value)}
             />
           </View>
@@ -791,6 +833,7 @@ export default function QuickReportPage() {
               className="score-input"
               type="number"
               value={String(fields.awayScore)}
+              disabled={interactionsLocked}
               onInput={(event) => updateScore('AWAY', event.detail.value)}
             />
           </View>
@@ -808,6 +851,7 @@ export default function QuickReportPage() {
           {OUTCOME_OPTIONS.map((option) => (
             <Button
               className={`choice-button ${fields.outcome === option.value ? 'choice-button--active' : ''}`}
+              disabled={interactionsLocked}
               key={option.value}
               onClick={() =>
                 updateFields((current) => ({
@@ -828,7 +872,7 @@ export default function QuickReportPage() {
             <Text className="section-kicker">03 事件</Text>
             <Text className="section-title">进球事件</Text>
           </View>
-          <Button className="add-button" onClick={addGoal}>
+          <Button className="add-button" disabled={interactionsLocked} onClick={addGoal}>
             + 添加
           </Button>
         </View>
@@ -845,19 +889,25 @@ export default function QuickReportPage() {
                   <Text className="goal-card__title">
                     进球 {String(index + 1).padStart(2, '0')}
                   </Text>
-                  <Button className="remove-button" onClick={() => removeGoal(goal.id)}>
+                  <Button
+                    className="remove-button"
+                    disabled={interactionsLocked}
+                    onClick={() => removeGoal(goal.id)}
+                  >
                     删除
                   </Button>
                 </View>
                 <View className="team-toggle">
                   <Button
                     className={`team-toggle__button ${goal.team === 'HOME' ? 'team-toggle__button--active' : ''}`}
+                    disabled={interactionsLocked}
                     onClick={() => updateGoal(goal.id, { team: 'HOME' })}
                   >
                     主队
                   </Button>
                   <Button
                     className={`team-toggle__button ${goal.team === 'AWAY' ? 'team-toggle__button--active' : ''}`}
+                    disabled={interactionsLocked}
                     onClick={() => updateGoal(goal.id, { team: 'AWAY' })}
                   >
                     客队
@@ -870,6 +920,7 @@ export default function QuickReportPage() {
                       className="text-input"
                       type="number"
                       value={String(goal.minute)}
+                      disabled={interactionsLocked}
                       onInput={(event) =>
                         updateGoal(goal.id, {
                           minute: Math.max(1, Number.parseInt(event.detail.value, 10) || 1),
@@ -883,6 +934,7 @@ export default function QuickReportPage() {
                       className="text-input"
                       placeholder="例：7 号 陈昊"
                       value={goal.scorer}
+                      disabled={interactionsLocked}
                       onInput={(event) => updateGoal(goal.id, { scorer: event.detail.value })}
                     />
                   </View>
@@ -906,6 +958,7 @@ export default function QuickReportPage() {
           maxlength={300}
           placeholder="记录中止原因、争议情况或待管理员复核的信息。"
           value={fields.notes}
+          disabled={interactionsLocked}
           onInput={(event) =>
             updateFields((current) => ({
               ...current,
@@ -917,7 +970,11 @@ export default function QuickReportPage() {
 
       <View className="page-spacer" />
       <View className="action-bar">
-        <Button className="discard-button" onClick={() => void discardLocalChanges()}>
+        <Button
+          className="discard-button"
+          disabled={interactionsLocked}
+          onClick={() => void discardLocalChanges()}
+        >
           丢弃草稿
         </Button>
         <Button
@@ -935,10 +992,12 @@ export default function QuickReportPage() {
 
 function ConflictPanel({
   conflict,
+  disabled,
   onMerge,
   onDiscard,
 }: {
   conflict: ConflictState
+  disabled: boolean
   onMerge: () => void
   onDiscard: () => void
 }) {
@@ -957,10 +1016,14 @@ function ConflictPanel({
         <ReportPreview title="当前数据" fields={conflict.current.fields} tone="server" />
       </View>
       <View className="conflict-actions">
-        <Button className="conflict-button conflict-button--primary" onClick={onMerge}>
+        <Button
+          className="conflict-button conflict-button--primary"
+          disabled={disabled}
+          onClick={onMerge}
+        >
           保留无冲突修改
         </Button>
-        <Button className="conflict-button" onClick={onDiscard}>
+        <Button className="conflict-button" disabled={disabled} onClick={onDiscard}>
           放弃本地修改
         </Button>
       </View>

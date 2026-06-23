@@ -26,6 +26,20 @@ export class AppController {
     return this.appService.liveness(getRequestId(request))
   }
 
+  @Get('health')
+  @ApiOperation({ summary: '检查 API 是否可接收流量的兼容入口' })
+  @ApiOkResponse({
+    description: 'API 与 PostgreSQL 均可用',
+    type: ReadinessResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'PostgreSQL 不可用，响应使用统一错误结构',
+    type: ApiErrorResponseDto,
+  })
+  health(@Req() request: RequestWithId): Promise<ReadinessResponseDto> {
+    return this.appService.readiness(getRequestId(request))
+  }
+
   @Get('health/ready')
   @ApiOperation({ summary: '检查 API 是否可接收流量' })
   @ApiOkResponse({
