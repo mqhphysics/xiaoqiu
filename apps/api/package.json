@@ -3,25 +3,42 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "contracts:build": "npm --prefix ../../packages/contracts run build",
+    "predev": "npm run contracts:build && npm run prisma:generate",
     "dev": "tsx watch src/main.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "prebuild": "npm run contracts:build && npm run prisma:generate",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-prisma-engine.mjs dist/generated/prisma",
     "start": "node dist/main.js",
+    "pretypecheck": "npm run contracts:build && npm run prisma:generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test"
+    "pretest": "npm run contracts:build && npm run prisma:generate",
+    "test": "tsc -p tsconfig.test.json && node scripts/copy-prisma-engine.mjs dist/test/generated/prisma && node --test \"dist/test/**/*.spec.js\"",
+    "prisma:validate": "prisma validate --schema ../../prisma/schema.prisma",
+    "prisma:format": "prisma format --schema ../../prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma && prettier --write \"src/generated/prisma/**/*.ts\"",
+    "db:migrate:deploy": "prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "predb:seed": "npm run prisma:generate",
+    "db:seed": "tsx src/database/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "latest",
     "@nestjs/core": "latest",
     "@nestjs/platform-express": "latest",
     "@nestjs/swagger": "latest",
+    "@prisma/client": "6.19.3",
+    "@xiaoqiu/contracts": "workspace:*",
     "class-transformer": "latest",
     "class-validator": "latest",
     "reflect-metadata": "latest",
     "rxjs": "latest"
   },
   "devDependencies": {
+    "@nestjs/testing": "11.1.26",
     "@types/express": "latest",
     "@types/node": "latest",
+    "@types/supertest": "7.2.0",
+    "prisma": "6.19.3",
+    "supertest": "7.2.2",
     "tsx": "latest"
   }
 }
