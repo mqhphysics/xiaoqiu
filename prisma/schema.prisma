@@ -80,6 +80,53 @@ enum OutboxJobStatus {
   @@map("outbox_job_status")
 }
 
+enum TournamentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@map("tournament_status")
+}
+
+enum CompetitionRuleVersionStatus {
+  PUBLISHED
+  RETIRED
+
+  @@map("competition_rule_version_status")
+}
+
+enum StageType {
+  GROUP
+  KNOCKOUT
+
+  @@map("stage_type")
+}
+
+enum SchedulePlanStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+
+  @@map("schedule_plan_status")
+}
+
+enum ScheduleRevisionStatus {
+  PUBLISHED
+
+  @@map("schedule_revision_status")
+}
+
+enum MatchStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+
+  @@map("match_status")
+}
+
 model Organization {
   id                 String                   @id @default(uuid()) @db.Uuid
   slug               String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
@@ -92,6 +139,14 @@ model Organization {
   auditLogs          AuditLog[]
   idempotencyRecords IdempotencyRecord[]
   outboxJobs         OutboxJob[]
+  seasons            Season[]
+  tournaments        Tournament[]
+  teams              Team[]
+  playerProfiles     PlayerProfile[]
+  venues             Venue[]
+  schedulePlans      SchedulePlan[]
+  scheduleRevisions  ScheduleRevision[]
+  matches            Match[]
 
   @@map("organizations")
 }
@@ -261,4 +316,239 @@ model OutboxJob {
   @@index([correlationId], map: "outbox_jobs_correlation_id_idx")
   @@index([organizationId, createdAt], map: "outbox_jobs_organization_id_created_at_idx")
   @@map("outbox_jobs")
+}
+
+model Season {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  seasonCode     String       @map("season_code") @db.VarChar(64)
+  name           String       @db.VarChar(120)
+  startsOn       DateTime?    @map("starts_on") @db.Date
+  endsOn         DateTime?    @map("ends_on") @db.Date
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournaments    Tournament[]
+
+  @@unique([organizationId, seasonCode], map: "seasons_organization_id_season_code_key")
+  @@index([organizationId, createdAt], map: "seasons_organization_id_created_at_idx")
+  @@map("seasons")
+}
+
+model Tournament {
+  id                String                   @id @default(uuid()) @db.Uuid
+  organizationId    String                   @map("organization_id") @db.Uuid
+  seasonId          String                   @map("season_id") @db.Uuid
+  tournamentCode    String                   @map("tournament_code") @db.VarChar(64)
+  name              String                   @db.VarChar(160)
+  status            TournamentStatus         @default(DRAFT)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  season            Season                   @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  ruleVersions      CompetitionRuleVersion[]
+  stages            Stage[]
+  schedulePlans     SchedulePlan[]
+  scheduleRevisions ScheduleRevision[]
+  matches           Match[]
+
+  @@unique([organizationId, tournamentCode], map: "tournaments_organization_id_tournament_code_key")
+  @@index([organizationId, status, createdAt], map: "tournaments_organization_id_status_created_at_idx")
+  @@index([seasonId], map: "tournaments_season_id_idx")
+  @@map("tournaments")
+}
+
+model CompetitionRuleVersion {
+  id             String                       @id @default(uuid()) @db.Uuid
+  organizationId String                       @map("organization_id") @db.Uuid
+  tournamentId   String                       @map("tournament_id") @db.Uuid
+  version        Int
+  name           String                       @db.VarChar(120)
+  status         CompetitionRuleVersionStatus @default(PUBLISHED)
+  rules          Json                         @db.JsonB
+  publishedAt    DateTime                     @default(now()) @map("published_at") @db.Timestamptz(3)
+  createdAt      DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  tournament     Tournament                   @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+
+  @@unique([tournamentId, version], map: "competition_rule_versions_tournament_id_version_key")
+  @@index([organizationId, tournamentId], map: "competition_rule_versions_organization_id_tournament_id_idx")
+  @@map("competition_rule_versions")
+}
+
+model Stage {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  tournamentId   String             @map("tournament_id") @db.Uuid
+  stageCode      String             @map("stage_code") @db.VarChar(64)
+  name           String             @db.VarChar(120)
+  type           StageType
+  sortOrder      Int                @default(0) @map("sort_order")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  tournament     Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  groups         TournamentGroup[]
+  rounds         CompetitionRound[]
+  matches        Match[]
+
+  @@unique([tournamentId, stageCode], map: "tournament_stages_tournament_id_stage_code_key")
+  @@index([organizationId, tournamentId, sortOrder], map: "tournament_stages_organization_id_tournament_id_sort_order_idx")
+  @@map("tournament_stages")
+}
+
+model TournamentGroup {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  stageId        String   @map("stage_id") @db.Uuid
+  groupCode      String   @map("group_code") @db.VarChar(64)
+  name           String   @db.VarChar(120)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stage          Stage    @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  matches        Match[]
+
+  @@unique([stageId, groupCode], map: "tournament_groups_stage_id_group_code_key")
+  @@index([organizationId, stageId, sortOrder], map: "tournament_groups_organization_id_stage_id_sort_order_idx")
+  @@map("tournament_groups")
+}
+
+model CompetitionRound {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  stageId        String   @map("stage_id") @db.Uuid
+  roundNumber    Int      @map("round_number")
+  name           String   @db.VarChar(120)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stage          Stage    @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  matches        Match[]
+
+  @@unique([stageId, roundNumber], map: "competition_rounds_stage_id_round_number_key")
+  @@index([organizationId, stageId, roundNumber], map: "competition_rounds_organization_id_stage_id_round_number_idx")
+  @@map("competition_rounds")
+}
+
+model Team {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  teamCode       String       @map("team_code") @db.VarChar(64)
+  name           String       @db.VarChar(160)
+  shortName      String?      @map("short_name") @db.VarChar(80)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  homeMatches    Match[]      @relation("MatchHomeTeam")
+  awayMatches    Match[]      @relation("MatchAwayTeam")
+
+  @@unique([organizationId, teamCode], map: "teams_organization_id_team_code_key")
+  @@index([organizationId, name], map: "teams_organization_id_name_idx")
+  @@map("teams")
+}
+
+model PlayerProfile {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  sourceType     String?      @map("source_type") @db.VarChar(64)
+  sourceKey      String?      @map("source_key") @db.VarChar(120)
+  displayName    String       @map("display_name") @db.VarChar(120)
+  jerseyName     String?      @map("jersey_name") @db.VarChar(120)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, displayName], map: "player_profiles_organization_id_display_name_idx")
+  @@map("player_profiles")
+}
+
+model Venue {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  venueCode      String       @map("venue_code") @db.VarChar(64)
+  name           String       @db.VarChar(160)
+  address        String?      @db.VarChar(240)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  matches        Match[]
+
+  @@unique([organizationId, venueCode], map: "venues_organization_id_venue_code_key")
+  @@index([organizationId, name], map: "venues_organization_id_name_idx")
+  @@map("venues")
+}
+
+model SchedulePlan {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  tournamentId   String             @map("tournament_id") @db.Uuid
+  name           String             @db.VarChar(160)
+  status         SchedulePlanStatus @default(DRAFT)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  publishedAt    DateTime?          @map("published_at") @db.Timestamptz(3)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament     Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  revisions      ScheduleRevision[]
+  matches        Match[]
+
+  @@index([organizationId, tournamentId, status], map: "schedule_plans_organization_id_tournament_id_status_idx")
+  @@map("schedule_plans")
+}
+
+model ScheduleRevision {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @map("organization_id") @db.Uuid
+  tournamentId   String                 @map("tournament_id") @db.Uuid
+  schedulePlanId String                 @map("schedule_plan_id") @db.Uuid
+  version        Int
+  status         ScheduleRevisionStatus @default(PUBLISHED)
+  snapshot       Json                   @db.JsonB
+  publishedAt    DateTime               @default(now()) @map("published_at") @db.Timestamptz(3)
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament     Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  schedulePlan   SchedulePlan           @relation(fields: [schedulePlanId], references: [id], onDelete: Restrict)
+  matches        Match[]
+
+  @@unique([schedulePlanId, version], map: "schedule_revisions_schedule_plan_id_version_key")
+  @@index([organizationId, tournamentId, publishedAt], map: "schedule_revisions_org_tournament_published_at_idx")
+  @@map("schedule_revisions")
+}
+
+model Match {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  tournamentId       String            @map("tournament_id") @db.Uuid
+  schedulePlanId     String?           @map("schedule_plan_id") @db.Uuid
+  scheduleRevisionId String?           @map("schedule_revision_id") @db.Uuid
+  stageId            String?           @map("stage_id") @db.Uuid
+  groupId            String?           @map("group_id") @db.Uuid
+  roundId            String?           @map("round_id") @db.Uuid
+  homeTeamId         String?           @map("home_team_id") @db.Uuid
+  awayTeamId         String?           @map("away_team_id") @db.Uuid
+  venueId            String?           @map("venue_id") @db.Uuid
+  matchCode          String            @map("match_code") @db.VarChar(64)
+  title              String            @db.VarChar(160)
+  status             MatchStatus       @default(DRAFT)
+  scheduledStartAt   DateTime?         @map("scheduled_start_at") @db.Timestamptz(3)
+  sortOrder          Int               @default(0) @map("sort_order")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament         Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  schedulePlan       SchedulePlan?     @relation(fields: [schedulePlanId], references: [id], onDelete: SetNull)
+  scheduleRevision   ScheduleRevision? @relation(fields: [scheduleRevisionId], references: [id], onDelete: SetNull)
+  stage              Stage?            @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  group              TournamentGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  round              CompetitionRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  homeTeam           Team?             @relation("MatchHomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeam           Team?             @relation("MatchAwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  venue              Venue?            @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, matchCode], map: "matches_organization_id_match_code_key")
+  @@index([organizationId, scheduledStartAt], map: "matches_organization_id_scheduled_start_at_idx")
+  @@index([tournamentId, status, scheduledStartAt], map: "matches_tournament_id_status_scheduled_start_at_idx")
+  @@index([stageId, roundId], map: "matches_stage_id_round_id_idx")
+  @@index([scheduleRevisionId, scheduledStartAt], map: "matches_schedule_revision_id_scheduled_start_at_idx")
+  @@map("matches")
 }
