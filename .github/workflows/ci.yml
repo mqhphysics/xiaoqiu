@@ -94,10 +94,19 @@ jobs:
           set -o pipefail
           pnpm test 2>&1 | tee test-output.log
 
-          if grep -Eiq '# SKIP|(^|[^[:alnum:]_])skipped[[:space:]]+[1-9][0-9]*|ℹ skipped [1-9][0-9]*' test-output.log; then
-            echo "::error::Skipped tests detected. Database integration coverage is mandatory in CI."
-            exit 1
-          fi
+          node <<'NODE'
+          const fs = require('node:fs')
+          const log = fs.readFileSync('test-output.log', 'utf8')
+          const skippedCounts = [
+            ...log.matchAll(/# skipped (\d+)/gi),
+            ...log.matchAll(/ℹ skipped (\d+)/g),
+          ].map((match) => Number(match[1]))
+
+          if (/# SKIP(?:\s|$)/.test(log) || skippedCounts.some((count) => count > 0)) {
+            console.error('::error::Skipped tests detected. Database integration coverage is mandatory in CI.')
+            process.exit(1)
+          }
+          NODE
 
           if ! grep -Fq 'PostgreSQL rejects duplicate organization slugs' test-output.log; then
             echo "::error::Expected PostgreSQL integration test was not collected."
