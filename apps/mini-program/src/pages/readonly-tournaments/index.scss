@@ -1,0 +1,98 @@
+.readonly-page {
+  min-height: 100vh;
+  padding: 36px 28px 48px;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  padding: 34px 30px;
+  color: #f8fbf8;
+  background: #183f2a;
+  border-radius: 22px;
+}
+
+.hero__eyebrow,
+.source-note,
+.tournament-card__status {
+  color: #bfe2c8;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.hero__title {
+  margin-top: 10px;
+  font-size: 44px;
+  font-weight: 900;
+}
+
+.hero__copy,
+.tournament-card__copy {
+  margin-top: 12px;
+  font-size: 24px;
+  line-height: 1.55;
+}
+
+.state-card,
+.tournament-card {
+  display: block;
+  margin-top: 24px;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #dce2dc;
+  border-radius: 18px;
+}
+
+.state-card__title {
+  display: block;
+  color: #516055;
+  font-size: 24px;
+  line-height: 1.5;
+}
+
+.state-card__button {
+  margin: 20px 0 0;
+  color: #ffffff;
+  background: #183f2a;
+  border-radius: 10px;
+}
+
+.state-card__button::after {
+  border: 0;
+}
+
+.tournament-list {
+  margin-top: 24px;
+}
+
+.source-note {
+  display: block;
+  margin: 0 0 16px;
+  color: #728076;
+}
+
+.tournament-card__status {
+  display: block;
+  color: #2c6842;
+}
+
+.tournament-card__title {
+  display: block;
+  margin-top: 10px;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.tournament-card__meta,
+.tournament-card__date {
+  display: block;
+  margin-top: 14px;
+  color: #69756c;
+  font-size: 22px;
+}
+
+.tournament-card__copy {
+  display: block;
+  color: #344238;
+}

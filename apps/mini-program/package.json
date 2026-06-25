@@ -8,7 +8,7 @@
     "build": "taro build --type weapp",
     "build:h5": "taro build --type h5",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types src/features/quick-report/quick-report.logic.test.ts"
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types src/features/quick-report/quick-report.logic.test.ts src/features/readonly-schedule/readonly-schedule.logic.test.ts"
   },
   "dependencies": {
     "@tarojs/components": "4.2.0",

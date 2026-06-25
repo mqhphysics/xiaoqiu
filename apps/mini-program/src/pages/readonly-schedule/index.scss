@@ -1,0 +1,138 @@
+.schedule-page {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.schedule-header,
+.state-card,
+.match-card {
+  display: block;
+  padding: 26px;
+  background: #ffffff;
+  border: 1px solid #dce2dc;
+  border-radius: 18px;
+}
+
+.schedule-header {
+  color: #f8fbf8;
+  background: #183f2a;
+}
+
+.schedule-header__title {
+  display: block;
+  font-size: 38px;
+  font-weight: 900;
+}
+
+.schedule-header__copy,
+.state-card__title,
+.source-note,
+.match-card__meta {
+  display: block;
+  margin-top: 12px;
+  font-size: 22px;
+  line-height: 1.55;
+}
+
+.schedule-header__copy {
+  color: #e2eee5;
+}
+
+.state-card,
+.date-group {
+  margin-top: 22px;
+}
+
+.retry-button {
+  margin: 20px 0 0;
+  color: #ffffff;
+  background: #183f2a;
+  border-radius: 10px;
+}
+
+.retry-button::after {
+  border: 0;
+}
+
+.source-note {
+  color: #728076;
+}
+
+.date-title {
+  display: block;
+  margin-bottom: 14px;
+  color: #183f2a;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.stage-group {
+  margin-top: 16px;
+}
+
+.stage-title {
+  display: block;
+  margin-bottom: 12px;
+  color: #647068;
+  font-size: 21px;
+  font-weight: 850;
+}
+
+.match-card {
+  margin-top: 12px;
+}
+
+.match-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.match-card__time {
+  flex: 1;
+  color: #183f2a;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.status-pill {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.status-pill--normal {
+  color: #1f5b35;
+  background: #dfece2;
+}
+
+.status-pill--muted {
+  color: #5d685f;
+  background: #eef1ee;
+}
+
+.status-pill--danger {
+  color: #9d342c;
+  background: #fde7e3;
+}
+
+.status-pill--done {
+  color: #5b4b18;
+  background: #f4e7bb;
+}
+
+.match-card__teams {
+  display: block;
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+  font-size: 28px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.match-card__meta {
+  color: #68736b;
+}
