@@ -447,6 +447,24 @@ export class ScheduleService {
       throw this.notFound()
     }
 
+    const visibleMatch = await this.prisma.match.findFirst({
+      select: { id: true },
+      where: {
+        organizationId,
+        scheduleRevisionId: {
+          not: null,
+        },
+        tournament: {
+          status: TournamentStatus.PUBLISHED,
+        },
+        OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }],
+      },
+    })
+
+    if (visibleMatch === null) {
+      throw this.notFound()
+    }
+
     return this.toTeamView(team)
   }
 

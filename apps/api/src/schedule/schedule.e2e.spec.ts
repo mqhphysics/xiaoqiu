@@ -204,6 +204,15 @@ class FakePrisma {
 
   private matchesWhere(row: Row, where: Row): boolean {
     return Object.entries(where).every(([key, expected]) => {
+      if (key === 'OR' && Array.isArray(expected)) {
+        return expected.some((condition) => this.matchesWhere(row, condition as Row))
+      }
+
+      if (key === 'tournament' && typeof expected === 'object' && expected !== null) {
+        const tournament = this.tournaments.find((item) => item.id === row.tournamentId)
+        return tournament === undefined ? false : this.matchesWhere(tournament, expected as Row)
+      }
+
       const actual = row[key]
 
       if (typeof expected === 'object' && expected !== null && 'in' in expected) {
@@ -333,6 +342,11 @@ test('P1 schedule slice creates and publishes a tournament schedule', async () =
 
   await request(app.getHttpServer())
     .get(`/api/public/tournaments/${tournament.body.id}/schedule`)
+    .set(PUBLIC_HEADERS)
+    .expect(404)
+
+  await request(app.getHttpServer())
+    .get(`/api/public/teams/${teamA.body.id}`)
     .set(PUBLIC_HEADERS)
     .expect(404)
 
