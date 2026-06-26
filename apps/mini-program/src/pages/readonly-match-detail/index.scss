@@ -1,0 +1,134 @@
+.match-page {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.state-card,
+.match-hero,
+.info-card {
+  display: block;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #dce2dc;
+  border-radius: 18px;
+}
+
+.match-hero {
+  color: #ffffff;
+  background: #183f2a;
+}
+
+.versus {
+  margin-top: 24px;
+}
+
+.team-name,
+.versus-mark,
+.source-note,
+.info-title,
+.info-line,
+.warning-line,
+.state-card__title {
+  display: block;
+}
+
+.team-name {
+  overflow-wrap: anywhere;
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.versus-mark {
+  margin: 14px 0;
+  color: #bfe2c8;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.source-note {
+  margin-top: 22px;
+  color: #bfe2c8;
+  font-size: 20px;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.status-pill--normal {
+  color: #1f5b35;
+  background: #dfece2;
+}
+
+.status-pill--muted {
+  color: #5d685f;
+  background: #eef1ee;
+}
+
+.status-pill--danger {
+  color: #9d342c;
+  background: #fde7e3;
+}
+
+.status-pill--done {
+  color: #5b4b18;
+  background: #f4e7bb;
+}
+
+.info-card,
+.action-row {
+  margin-top: 22px;
+}
+
+.info-title {
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.info-line,
+.warning-line,
+.state-card__title {
+  margin-top: 14px;
+  color: #4d5a51;
+  font-size: 24px;
+  line-height: 1.5;
+}
+
+.warning-line {
+  color: #9d342c;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 76px;
+  margin: 0;
+  border-radius: 12px;
+  font-size: 23px;
+  font-weight: 850;
+}
+
+.primary-button {
+  color: #ffffff;
+  background: #183f2a;
+}
+
+.secondary-button {
+  color: #183f2a;
+  background: #dfece2;
+}
+
+.primary-button::after,
+.secondary-button::after {
+  border: 0;
+}

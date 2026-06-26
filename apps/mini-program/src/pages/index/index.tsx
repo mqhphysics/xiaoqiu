@@ -16,10 +16,18 @@ export default function IndexPage() {
 
       <View className="module-list">
         {modules.map((module, index) => (
-          <View className="module-row" key={module}>
+          <View
+            className="module-row"
+            key={module}
+            onClick={() => {
+              if (module === '赛事赛程') {
+                void Taro.navigateTo({ url: '/pages/readonly-tournaments/index' })
+              }
+            }}
+          >
             <Text className="module-index">{String(index + 1).padStart(2, '0')}</Text>
             <Text className="module-name">{module}</Text>
-            <Text className="module-state">待接入</Text>
+            <Text className="module-state">{module === '赛事赛程' ? '进入' : '待接入'}</Text>
           </View>
         ))}
       </View>

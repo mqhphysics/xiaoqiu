@@ -80,6 +80,30 @@ async function seed(): Promise<void> {
       revokedAt: null,
     },
   })
+
+  await prisma.roleAssignment.upsert({
+    where: {
+      userId_role_scopeType_scopeId: {
+        userId: user.id,
+        role: Role.TOURNAMENT_ADMIN,
+        scopeType: RoleScopeType.ORGANIZATION,
+        scopeId: organization.id,
+      },
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000000005',
+      organizationId: organization.id,
+      userId: user.id,
+      role: Role.TOURNAMENT_ADMIN,
+      scopeType: RoleScopeType.ORGANIZATION,
+      scopeId: organization.id,
+      grantedByUserId: user.id,
+    },
+    update: {
+      organizationId: organization.id,
+      revokedAt: null,
+    },
+  })
 }
 
 seed()

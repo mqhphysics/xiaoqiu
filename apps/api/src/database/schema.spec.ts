@@ -7,6 +7,10 @@ const migrationPath = resolve(
   process.cwd(),
   '../../prisma/migrations/20260610150000_initial_api_foundation/migration.sql',
 )
+const scheduleMigrationPath = resolve(
+  process.cwd(),
+  '../../prisma/migrations/20260624110000_p1_schedule_slice/migration.sql',
+)
 const apiSourcePath = resolve(process.cwd(), 'src')
 
 test('initial migration enforces organization and idempotency uniqueness', async () => {
@@ -62,4 +66,40 @@ test('API logging and error codes use the approved single sources', async () => 
   assert.match(requestLogger, /getSafeRequestPath/)
   assert.match(exceptionFilter, /getSafeRequestPath/)
   assert.match(exceptionFilter, /ERROR_CODES/)
+})
+
+test('P1 schedule migration creates required tables and uniqueness constraints', async () => {
+  const migration = await readFile(scheduleMigrationPath, 'utf8')
+
+  for (const table of [
+    'seasons',
+    'tournaments',
+    'competition_rule_versions',
+    'tournament_stages',
+    'tournament_groups',
+    'competition_rounds',
+    'teams',
+    'player_profiles',
+    'venues',
+    'matches',
+    'schedule_plans',
+    'schedule_revisions',
+  ]) {
+    assert.match(migration, new RegExp(`CREATE TABLE "${table}"`))
+  }
+
+  for (const index of [
+    'seasons_organization_id_season_code_key',
+    'tournaments_organization_id_tournament_code_key',
+    'competition_rule_versions_tournament_id_version_key',
+    'teams_organization_id_team_code_key',
+    'venues_organization_id_venue_code_key',
+    'schedule_revisions_schedule_plan_id_version_key',
+  ]) {
+    assert.match(migration, new RegExp(`CREATE UNIQUE INDEX "${index}"`))
+  }
+
+  assert.match(migration, /FOREIGN KEY \("organization_id"\) REFERENCES "organizations"\("id"\)/)
+  assert.match(migration, /CREATE INDEX "matches_organization_id_scheduled_start_at_idx"/)
+  assert.match(migration, /CREATE INDEX "matches_tournament_id_status_scheduled_start_at_idx"/)
 })
