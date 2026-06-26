@@ -1,0 +1,97 @@
+.detail-page {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.state-card,
+.summary-card,
+.section-card {
+  display: block;
+  margin-top: 22px;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #dce2dc;
+  border-radius: 18px;
+}
+
+.summary-card {
+  margin-top: 0;
+  color: #f8fbf8;
+  background: #183f2a;
+}
+
+.summary-card__status,
+.summary-card__source {
+  display: block;
+  color: #bfe2c8;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.summary-card__title {
+  display: block;
+  margin-top: 10px;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.summary-card__meta,
+.summary-card__copy,
+.summary-card__source,
+.rule-line,
+.team-row__meta,
+.state-card__title {
+  display: block;
+  margin-top: 12px;
+  font-size: 23px;
+  line-height: 1.55;
+}
+
+.summary-card__meta,
+.summary-card__copy {
+  color: #e2eee5;
+}
+
+.action-grid {
+  margin-top: 22px;
+}
+
+.primary-button {
+  min-height: 76px;
+  margin: 0;
+  color: #ffffff;
+  background: #183f2a;
+  border-radius: 12px;
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.primary-button::after {
+  border: 0;
+}
+
+.section-title {
+  display: block;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.rule-line {
+  color: #4a574e;
+}
+
+.team-row {
+  padding: 22px 0;
+  border-top: 1px solid #e4e9e4;
+}
+
+.team-row__name {
+  display: block;
+  font-size: 27px;
+  font-weight: 850;
+}
+
+.team-row__meta {
+  color: #69756c;
+}
