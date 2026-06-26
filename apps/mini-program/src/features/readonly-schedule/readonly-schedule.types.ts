@@ -1,4 +1,4 @@
-export type MatchStatus = 'PUBLISHED' | 'SCHEDULED' | 'CANCELLED' | 'FINISHED'
+export type MatchStatus = 'DRAFT' | 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED'
 
 export interface ReadonlyTournamentSummary {
   id: string

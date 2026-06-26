@@ -45,10 +45,14 @@ export function groupMatchesByDateAndStage(matches: ReadonlyMatch[]): ScheduleDa
 
 export function getMatchStatusText(status: MatchStatus): string {
   switch (status) {
-    case 'PUBLISHED':
-      return '已发布'
+    case 'DRAFT':
+      return '草稿'
     case 'SCHEDULED':
       return '未开始'
+    case 'LIVE':
+      return '进行中'
+    case 'POSTPONED':
+      return '已延期'
     case 'CANCELLED':
       return '已取消'
     case 'FINISHED':
@@ -58,12 +62,16 @@ export function getMatchStatusText(status: MatchStatus): string {
 
 export function getMatchStatusTone(status: MatchStatus): 'normal' | 'muted' | 'danger' | 'done' {
   switch (status) {
+    case 'DRAFT':
+      return 'muted'
+    case 'LIVE':
+      return 'normal'
+    case 'POSTPONED':
+      return 'muted'
     case 'CANCELLED':
       return 'danger'
     case 'FINISHED':
       return 'done'
-    case 'PUBLISHED':
-      return 'normal'
     case 'SCHEDULED':
       return 'muted'
   }

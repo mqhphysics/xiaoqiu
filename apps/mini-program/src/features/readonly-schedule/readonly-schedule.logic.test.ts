@@ -10,7 +10,7 @@ import type { ReadonlyMatch } from './readonly-schedule.types.ts'
 
 const matches: ReadonlyMatch[] = [
   createMatch('m-3', '2026-07-02T09:00:00+08:00', '八强赛', 'CANCELLED'),
-  createMatch('m-1', '2026-07-01T15:00:00+08:00', '小组赛', 'PUBLISHED'),
+  createMatch('m-1', '2026-07-01T15:00:00+08:00', '小组赛', 'LIVE'),
   createMatch('m-2', '2026-07-01T10:00:00+08:00', '小组赛', 'SCHEDULED'),
   createMatch('m-4', '2026-07-02T11:00:00+08:00', '小组赛', 'FINISHED'),
 ]
@@ -41,7 +41,8 @@ test('groupMatchesByDateAndStage groups schedule by date then stage', () => {
 
 test('getMatchStatusText maps readonly match statuses', () => {
   assert.equal(getMatchStatusText('SCHEDULED'), '未开始')
-  assert.equal(getMatchStatusText('PUBLISHED'), '已发布')
+  assert.equal(getMatchStatusText('LIVE'), '进行中')
+  assert.equal(getMatchStatusText('POSTPONED'), '已延期')
   assert.equal(getMatchStatusText('CANCELLED'), '已取消')
   assert.equal(getMatchStatusText('FINISHED'), '已结束')
 })

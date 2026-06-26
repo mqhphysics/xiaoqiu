@@ -64,7 +64,7 @@ export const readonlyScheduleMockFixture: ReadonlyScheduleFixture = {
           awayTeamId: 'team-spark',
           homeTeamName: '绿茵学院',
           awayTeamName: '星火学院',
-          status: 'PUBLISHED',
+          status: 'SCHEDULED',
         },
         {
           id: 'match-002',
