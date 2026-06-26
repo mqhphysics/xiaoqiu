@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Req } from '@nestjs/common'
 import {
+  ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
@@ -59,6 +60,7 @@ export class ScheduleController {
   @Post('admin/seasons')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建赛季' })
+  @ApiBody({ type: CreateSeasonDto })
   @ApiCreatedResponse({ type: SeasonResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   createSeason(@Req() request: RequestWithId, @Body() body: CreateSeasonDto) {
@@ -69,6 +71,7 @@ export class ScheduleController {
   @Post('admin/tournaments')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建赛事' })
+  @ApiBody({ type: CreateTournamentDto })
   @ApiCreatedResponse({ type: TournamentResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -80,6 +83,7 @@ export class ScheduleController {
   @Post('admin/tournaments/:id/rule-versions')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建赛事规则版本' })
+  @ApiBody({ type: CreateCompetitionRuleVersionDto })
   @ApiCreatedResponse({ type: CompetitionRuleVersionResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -95,6 +99,7 @@ export class ScheduleController {
   @Post('admin/tournaments/:id/teams')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建球队' })
+  @ApiBody({ type: CreateTeamDto })
   @ApiCreatedResponse({ type: TeamResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -110,6 +115,7 @@ export class ScheduleController {
   @Post('admin/venues')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建场地' })
+  @ApiBody({ type: CreateVenueDto })
   @ApiCreatedResponse({ type: VenueResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   createVenue(@Req() request: RequestWithId, @Body() body: CreateVenueDto) {
@@ -120,6 +126,7 @@ export class ScheduleController {
   @Post('admin/tournaments/:id/matches')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建比赛草案' })
+  @ApiBody({ type: CreateMatchDto })
   @ApiCreatedResponse({ type: MatchResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -135,6 +142,7 @@ export class ScheduleController {
   @Post('admin/schedule-plans')
   @P1AdminHeaders()
   @ApiOperation({ summary: 'P1 开发期创建赛程草案' })
+  @ApiBody({ type: CreateSchedulePlanDto })
   @ApiCreatedResponse({ type: SchedulePlanResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })

@@ -1,4 +1,5 @@
-import { Children, FormEvent, useEffect, useMemo, useState } from 'react'
+import { Children, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 
 import { createAdminScheduleRepository } from './repository'
 import type {
