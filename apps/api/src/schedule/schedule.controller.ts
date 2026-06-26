@@ -19,6 +19,7 @@ import {
   P1_TOURNAMENT_ADMIN_ROLE,
 } from './dev-context'
 import {
+  AdminScheduleWorkbenchResponseDto,
   CompetitionRuleVersionResponseDto,
   CreateCompetitionRuleVersionDto,
   CreateMatchDto,
@@ -44,6 +45,16 @@ import { ScheduleService } from './schedule.service'
 @Controller()
 export class ScheduleController {
   constructor(@Inject(ScheduleService) private readonly scheduleService: ScheduleService) {}
+
+  @Get('admin/schedule-workbench')
+  @P1AdminHeaders()
+  @ApiOperation({ summary: 'P1 开发期读取后台赛程工作台快照' })
+  @ApiOkResponse({ type: AdminScheduleWorkbenchResponseDto })
+  @ApiForbiddenResponse({ type: ApiErrorResponseDto })
+  getAdminScheduleWorkbench(@Req() request: RequestWithId) {
+    const context = requireP1DevAdminContext(request)
+    return this.scheduleService.getAdminScheduleWorkbench(context.organizationId)
+  }
 
   @Post('admin/seasons')
   @P1AdminHeaders()

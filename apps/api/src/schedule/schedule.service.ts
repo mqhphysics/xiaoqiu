@@ -34,6 +34,56 @@ type MatchWithRelations = Prisma.MatchGetPayload<{ include: typeof MATCH_INCLUDE
 export class ScheduleService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
+  async getAdminScheduleWorkbench(organizationId: string) {
+    const seasons = await this.prisma.season.findMany({
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId },
+    })
+    const tournaments = await this.prisma.tournament.findMany({
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId },
+    })
+    const ruleVersions = await this.prisma.competitionRuleVersion.findMany({
+      orderBy: [{ tournamentId: 'asc' }, { version: 'desc' }],
+      where: { organizationId },
+    })
+    const teams = await this.prisma.team.findMany({
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId },
+    })
+    const venues = await this.prisma.venue.findMany({
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId },
+    })
+    const matches = await this.prisma.match.findMany({
+      include: MATCH_INCLUDE,
+      orderBy: [{ scheduledStartAt: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      where: { organizationId },
+    })
+    const schedulePlans = await this.prisma.schedulePlan.findMany({
+      include: {
+        matches: {
+          select: { id: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      where: { organizationId },
+    })
+
+    return {
+      seasons: seasons.map((season) => this.toSeasonView(season)),
+      tournaments: tournaments.map((tournament) => this.toTournamentView(tournament)),
+      ruleVersions: ruleVersions.map((ruleVersion) => this.toRuleVersionView(ruleVersion)),
+      teams: teams.map((team) => this.toTeamView(team)),
+      venues: venues.map((venue) => this.toVenueView(venue)),
+      matches: matches.map((match) => this.toMatchView(match)),
+      schedulePlans: schedulePlans.map((plan) => ({
+        ...this.toSchedulePlanView(plan),
+        matchIds: plan.matches.map((match) => match.id),
+      })),
+    }
+  }
+
   async createSeason(organizationId: string, dto: CreateSeasonDto) {
     const data: Prisma.SeasonUncheckedCreateInput = {
       organizationId,

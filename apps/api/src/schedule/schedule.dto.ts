@@ -328,6 +328,11 @@ export class SchedulePlanResponseDto implements SchedulePlanView {
   publishedAt?: string | null
 }
 
+export class AdminSchedulePlanResponseDto extends SchedulePlanResponseDto {
+  @ApiProperty({ type: [String], format: 'uuid' })
+  matchIds!: string[]
+}
+
 export class ScheduleRevisionResponseDto implements ScheduleRevisionView {
   @ApiProperty({ format: 'uuid' })
   id!: string
@@ -376,4 +381,27 @@ export class TournamentScheduleResponseDto implements TournamentScheduleView {
 export class PublicTournamentListResponseDto implements PublicTournamentListView {
   @ApiProperty({ type: [TournamentResponseDto] })
   items!: TournamentResponseDto[]
+}
+
+export class AdminScheduleWorkbenchResponseDto {
+  @ApiProperty({ type: [SeasonResponseDto] })
+  seasons!: SeasonResponseDto[]
+
+  @ApiProperty({ type: [TournamentResponseDto] })
+  tournaments!: TournamentResponseDto[]
+
+  @ApiProperty({ type: [CompetitionRuleVersionResponseDto] })
+  ruleVersions!: CompetitionRuleVersionResponseDto[]
+
+  @ApiProperty({ type: [TeamResponseDto] })
+  teams!: TeamResponseDto[]
+
+  @ApiProperty({ type: [VenueResponseDto] })
+  venues!: VenueResponseDto[]
+
+  @ApiProperty({ type: [MatchResponseDto] })
+  matches!: MatchResponseDto[]
+
+  @ApiProperty({ type: [AdminSchedulePlanResponseDto] })
+  schedulePlans!: AdminSchedulePlanResponseDto[]
 }

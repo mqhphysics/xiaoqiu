@@ -17,16 +17,10 @@ import type {
 
 const organizations: OrganizationContext[] = [
   {
-    organizationId: 'xiaoqiu-dev',
+    organizationId: '00000000-0000-4000-8000-000000000001',
     organizationName: '晓球开发组织',
-    userId: 'dev-admin',
-    role: 'TournamentAdmin',
-  },
-  {
-    organizationId: 'campus-cup-demo',
-    organizationName: '校园杯演示组织',
-    userId: 'dev-admin',
-    role: 'TournamentAdmin',
+    userId: '00000000-0000-4000-8000-000000000002',
+    role: 'TOURNAMENT_ADMIN',
   },
 ]
 
@@ -138,7 +132,7 @@ export function AdminScheduleWorkspace() {
         <section className="dev-banner" aria-label="开发期请求上下文">
           <strong>{repository.mode === 'api' ? 'API 模式' : 'Mock 模式'}</strong>
           <span>
-            请求头：`x-organization-id={context.organizationId}`、`x-dev-user-id={context.userId}`、`x-dev-role=
+            请求头：`x-dev-organization-id={context.organizationId}`、`x-dev-user-id={context.userId}`、`x-dev-role=
             {context.role}`
           </span>
           {repository.mode === 'mock' ? (
@@ -222,7 +216,7 @@ export function AdminScheduleWorkspace() {
             onPublishSchedulePlan={(plan) =>
               runAction(
                 `publish-plan-${plan.id}`,
-                () => repository.publishSchedulePlan(context, plan.id, plan.version),
+                () => repository.publishSchedulePlan(context, plan.id),
                 '赛程已发布，页面已更新发布版本和时间。',
               )
             }
@@ -386,6 +380,7 @@ function TeamsSection(props: {
   onRefresh: () => void
 }) {
   const [teamInput, setTeamInput] = useState<CreateTeamInput>({
+    tournamentId: '',
     code: 'team-a',
     name: '第一代表队',
     shortName: '一队',
@@ -398,6 +393,13 @@ function TeamsSection(props: {
     location: '西区运动场',
   })
 
+  useEffect(() => {
+    setTeamInput((current) => ({
+      ...current,
+      tournamentId: current.tournamentId || props.snapshot.tournaments[0]?.id || '',
+    }))
+  }, [props.snapshot.tournaments])
+
   return (
     <div className="section-stack">
       <div className="panel-toolbar">
@@ -408,6 +410,15 @@ function TeamsSection(props: {
 
       <Panel title="创建球队" description="球队代码用于稳定引用，重复代码会返回可读错误。">
         <form className="form-grid" onSubmit={submitForm(() => props.onCreateTeam(teamInput))}>
+          <SelectField
+            label="所属赛事"
+            value={teamInput.tournamentId}
+            options={props.snapshot.tournaments.map((tournament) => ({
+              value: tournament.id,
+              label: `${tournament.name}（${tournament.code}）`,
+            }))}
+            onChange={(tournamentId) => setTeamInput({ ...teamInput, tournamentId })}
+          />
           <TextField label="球队代码" value={teamInput.code} onChange={(code) => setTeamInput({ ...teamInput, code })} />
           <TextField label="球队名称" value={teamInput.name} onChange={(name) => setTeamInput({ ...teamInput, name })} />
           <TextField label="短名" value={teamInput.shortName} onChange={(shortName) => setTeamInput({ ...teamInput, shortName })} />
@@ -416,7 +427,7 @@ function TeamsSection(props: {
             value={teamInput.crestPlaceholder}
             onChange={(crestPlaceholder) => setTeamInput({ ...teamInput, crestPlaceholder })}
           />
-          <SubmitButton busy={props.pendingAction === 'create-team'} disabled={props.isBusy}>
+          <SubmitButton busy={props.pendingAction === 'create-team'} disabled={props.isBusy || !teamInput.tournamentId}>
             创建球队
           </SubmitButton>
         </form>
@@ -549,7 +560,7 @@ function ScheduleSection(props: {
         </form>
       </Panel>
 
-      <Panel title="创建赛程草案" description="草案先校验，校验通过后使用 expectedVersion 发布。">
+      <Panel title="创建赛程草案" description="草案可先校验；发布时后端会再次检查可发布条件。">
         <form className="form-grid" onSubmit={submitForm(() => props.onCreateSchedulePlan(planInput))}>
           <SelectField
             label="所属赛事"
@@ -612,7 +623,7 @@ function ScheduleSection(props: {
               </button>
               <button
                 type="button"
-                disabled={props.isBusy || plan.status !== 'READY'}
+                disabled={props.isBusy || plan.status !== 'DRAFT'}
                 onClick={() => props.onPublishSchedulePlan(plan)}
               >
                 {props.pendingAction === `publish-plan-${plan.id}` ? '发布中...' : '发布赛程'}

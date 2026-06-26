@@ -38,6 +38,8 @@ class FakePrisma {
   season = {
     create: async ({ data }: { data: Row }) => this.create(this.seasons, data),
     findFirst: async ({ where }: { where: Row }) => this.findFirst(this.seasons, where),
+    findMany: async ({ where }: { where: Row }) =>
+      this.seasons.filter((season) => this.matchesWhere(season, where)),
   }
 
   tournament = {
@@ -71,16 +73,22 @@ class FakePrisma {
         publishedAt: new Date(),
         ...data,
       }),
+    findMany: async ({ where }: { where: Row }) =>
+      this.ruleVersions.filter((ruleVersion) => this.matchesWhere(ruleVersion, where)),
   }
 
   team = {
     create: async ({ data }: { data: Row }) => this.create(this.teams, data),
     findFirst: async ({ where }: { where: Row }) => this.findFirst(this.teams, where),
+    findMany: async ({ where }: { where: Row }) =>
+      this.teams.filter((team) => this.matchesWhere(team, where)),
   }
 
   venue = {
     create: async ({ data }: { data: Row }) => this.create(this.venues, data),
     findFirst: async ({ where }: { where: Row }) => this.findFirst(this.venues, where),
+    findMany: async ({ where }: { where: Row }) =>
+      this.venues.filter((venue) => this.matchesWhere(venue, where)),
   }
 
   match = {
@@ -146,6 +154,21 @@ class FakePrisma {
         tournament: this.tournaments.find((tournament) => tournament.id === plan.tournamentId),
       }
     },
+    findMany: async ({ include, where }: { include?: Row; where: Row }) =>
+      this.schedulePlans
+        .filter((plan) => this.matchesWhere(plan, where))
+        .map((plan) => {
+          if (include === undefined) {
+            return plan
+          }
+
+          return {
+            ...plan,
+            matches: this.matches
+              .filter((match) => match.schedulePlanId === plan.id)
+              .map((match) => ({ id: match.id })),
+          }
+        }),
     update: async ({ data, where }: { data: Row; where: Row }) =>
       this.updateOne(this.schedulePlans, where, data),
   }
@@ -401,6 +424,18 @@ test('P1 schedule slice creates and publishes a tournament schedule', async () =
     .expect(200)
   assert.equal(publicTeam.body.teamCode, 'TEAM-A')
 
+  const workbench = await request(app.getHttpServer())
+    .get('/api/admin/schedule-workbench')
+    .set(ADMIN_HEADERS)
+    .expect(200)
+  assert.equal(workbench.body.seasons.length, 1)
+  assert.equal(workbench.body.tournaments.length, 1)
+  assert.equal(workbench.body.ruleVersions.length, 1)
+  assert.equal(workbench.body.teams.length, 2)
+  assert.equal(workbench.body.venues.length, 1)
+  assert.equal(workbench.body.matches.length, 1)
+  assert.deepEqual(workbench.body.schedulePlans[0].matchIds, [match.body.id])
+
   const duplicatePublish = await request(app.getHttpServer())
     .post(`/api/admin/schedule-plans/${plan.body.id}/publish`)
     .set(ADMIN_HEADERS)
@@ -438,6 +473,7 @@ test('OpenAPI includes P1 schedule paths', async () => {
   const response = await request(app.getHttpServer()).get('/api/openapi.json').expect(200)
 
   for (const path of [
+    '/api/admin/schedule-workbench',
     '/api/admin/seasons',
     '/api/admin/tournaments',
     '/api/admin/tournaments/{id}/rule-versions',

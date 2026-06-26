@@ -6,7 +6,7 @@ export interface OrganizationContext {
   organizationId: string
   organizationName: string
   userId: string
-  role: 'TournamentAdmin'
+  role: 'TOURNAMENT_ADMIN'
 }
 
 export interface Season {
@@ -22,7 +22,7 @@ export interface Tournament {
   seasonId: string
   code: string
   name: string
-  status: 'DRAFT' | 'ACTIVE'
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   createdAt: string
 }
 
@@ -60,7 +60,7 @@ export interface Match {
   awayTeamId: string
   venueId: string
   scheduledStartAt: string
-  status: 'SCHEDULED'
+  status: 'DRAFT' | 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED'
   createdAt: string
 }
 
@@ -69,7 +69,7 @@ export interface SchedulePlan {
   tournamentId: string
   name: string
   matchIds: string[]
-  status: 'DRAFT' | 'READY' | 'PUBLISHED'
+  status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
   version: number
   validationMessage: string
   publishedVersion: number | null
@@ -106,6 +106,7 @@ export interface PublishRuleVersionInput {
 }
 
 export interface CreateTeamInput {
+  tournamentId: string
   code: string
   name: string
   shortName: string
@@ -145,5 +146,5 @@ export interface AdminScheduleRepository {
   createMatch(context: OrganizationContext, input: CreateMatchInput): Promise<Match>
   createSchedulePlan(context: OrganizationContext, input: CreateSchedulePlanInput): Promise<SchedulePlan>
   validateSchedulePlan(context: OrganizationContext, planId: string): Promise<SchedulePlan>
-  publishSchedulePlan(context: OrganizationContext, planId: string, expectedVersion: number): Promise<SchedulePlan>
+  publishSchedulePlan(context: OrganizationContext, planId: string): Promise<SchedulePlan>
 }
