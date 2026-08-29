@@ -13,5 +13,6 @@ Thumbs.db
 .idea/
 .vscode/
 .worktrees/
+/private-data/
 apps/mini-program/project.private.config.json
 packages/api-client/src/generated/

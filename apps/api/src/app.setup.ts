@@ -8,6 +8,18 @@ import { createValidationPipe } from './common/validation'
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api')
+  app.enableCors({
+    origin: resolveCorsOrigins(),
+    allowedHeaders: [
+      'content-type',
+      'idempotency-key',
+      'x-dev-organization-id',
+      'x-dev-role',
+      'x-dev-user-id',
+      'x-request-id',
+      'x-request-source',
+    ],
+  })
   app.use(requestIdMiddleware)
   app.useGlobalPipes(createValidationPipe())
   app.useGlobalFilters(new ApiExceptionFilter())
@@ -23,4 +35,23 @@ export function configureApp(app: INestApplication): void {
   SwaggerModule.setup('api/docs', app, document, {
     jsonDocumentUrl: 'api/openapi.json',
   })
+}
+
+function resolveCorsOrigins(): string[] {
+  const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+
+  if (configuredOrigins?.length) {
+    return configuredOrigins
+  }
+
+  return [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+    'http://localhost:10086',
+    'http://127.0.0.1:10086',
+  ]
 }

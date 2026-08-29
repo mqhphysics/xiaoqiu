@@ -31,51 +31,51 @@ import {
 } from 'class-validator'
 
 export class CreateSeasonDto {
-  @ApiProperty({ example: '2026' })
+  @ApiProperty({ type: String, example: '2026' })
   @IsString()
   @Length(1, 64)
   seasonCode!: string
 
-  @ApiProperty({ example: '2026 校园杯赛季' })
+  @ApiProperty({ type: String, example: '2026 校园杯赛季' })
   @IsString()
   @Length(1, 120)
   name!: string
 
-  @ApiPropertyOptional({ example: '2026-09-01' })
+  @ApiPropertyOptional({ type: String, example: '2026-09-01' })
   @IsOptional()
   @IsISO8601({ strict: true })
   startsOn?: string
 
-  @ApiPropertyOptional({ example: '2026-12-31' })
+  @ApiPropertyOptional({ type: String, example: '2026-12-31' })
   @IsOptional()
   @IsISO8601({ strict: true })
   endsOn?: string
 }
 
 export class CreateTournamentDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   @IsUUID()
   seasonId!: string
 
-  @ApiProperty({ example: 'CAMPUS-CUP-2026' })
+  @ApiProperty({ type: String, example: 'CAMPUS-CUP-2026' })
   @IsString()
   @Length(1, 64)
   tournamentCode!: string
 
-  @ApiProperty({ example: '2026 校园足球杯' })
+  @ApiProperty({ type: String, example: '2026 校园足球杯' })
   @IsString()
   @Length(1, 160)
   name!: string
 }
 
 export class CreateCompetitionRuleVersionDto {
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ type: Number, example: 1 })
   @IsInt()
   @Min(1)
   @Max(999)
   version!: number
 
-  @ApiProperty({ example: '首发规则' })
+  @ApiProperty({ type: String, example: '首发规则' })
   @IsString()
   @Length(1, 120)
   name!: string
@@ -86,17 +86,17 @@ export class CreateCompetitionRuleVersionDto {
 }
 
 export class CreateTeamDto {
-  @ApiProperty({ example: 'TEAM-A' })
+  @ApiProperty({ type: String, example: 'TEAM-A' })
   @IsString()
   @Length(1, 64)
   teamCode!: string
 
-  @ApiProperty({ example: '数学学院' })
+  @ApiProperty({ type: String, example: '数学学院' })
   @IsString()
   @Length(1, 160)
   name!: string
 
-  @ApiPropertyOptional({ example: '数学' })
+  @ApiPropertyOptional({ type: String, example: '数学' })
   @IsOptional()
   @IsString()
   @Length(1, 80)
@@ -104,17 +104,17 @@ export class CreateTeamDto {
 }
 
 export class CreateVenueDto {
-  @ApiProperty({ example: 'FIELD-1' })
+  @ApiProperty({ type: String, example: 'FIELD-1' })
   @IsString()
   @Length(1, 64)
   venueCode!: string
 
-  @ApiProperty({ example: '东区足球场' })
+  @ApiProperty({ type: String, example: '东区足球场' })
   @IsString()
   @Length(1, 160)
   name!: string
 
-  @ApiPropertyOptional({ example: '大学城校区东区' })
+  @ApiPropertyOptional({ type: String, example: '大学城校区东区' })
   @IsOptional()
   @IsString()
   @Length(1, 240)
@@ -122,37 +122,37 @@ export class CreateVenueDto {
 }
 
 export class CreateMatchDto {
-  @ApiProperty({ example: 'M-001' })
+  @ApiProperty({ type: String, example: 'M-001' })
   @IsString()
   @Length(1, 64)
   matchCode!: string
 
-  @ApiProperty({ example: '数学学院 vs 物理学院' })
+  @ApiProperty({ type: String, example: '数学学院 vs 物理学院' })
   @IsString()
   @Length(1, 160)
   title!: string
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
   @IsOptional()
   @IsUUID()
   homeTeamId?: string
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
   @IsOptional()
   @IsUUID()
   awayTeamId?: string
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
   @IsOptional()
   @IsUUID()
   venueId?: string
 
-  @ApiPropertyOptional({ example: '2026-10-01T09:00:00.000Z' })
+  @ApiPropertyOptional({ type: String, example: '2026-10-01T09:00:00.000Z' })
   @IsOptional()
   @IsISO8601({ strict: true })
   scheduledStartAt?: string
 
-  @ApiPropertyOptional({ example: 1 })
+  @ApiPropertyOptional({ type: Number, example: 1 })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -160,11 +160,11 @@ export class CreateMatchDto {
 }
 
 export class CreateSchedulePlanDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   @IsUUID()
   tournamentId!: string
 
-  @ApiProperty({ example: '小组赛首版草案' })
+  @ApiProperty({ type: String, example: '小组赛首版草案' })
   @IsString()
   @Length(1, 160)
   name!: string
@@ -177,154 +177,179 @@ export class CreateSchedulePlanDto {
 }
 
 export class SeasonResponseDto implements SeasonView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   seasonCode!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   startsOn?: string | null
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   endsOn?: string | null
 }
 
 export class TournamentResponseDto implements TournamentView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   seasonId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   tournamentCode!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiProperty({ enum: TOURNAMENT_STATUSES })
+  @ApiProperty({ type: String, enum: TOURNAMENT_STATUSES })
   status!: TournamentView['status']
 }
 
 export class CompetitionRuleVersionResponseDto implements CompetitionRuleVersionView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   tournamentId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: Number })
   version!: number
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   status!: CompetitionRuleVersionView['status']
 
   @ApiProperty({ type: 'object', additionalProperties: true })
   rules!: Record<string, unknown>
 
-  @ApiProperty()
+  @ApiProperty({ type: String, format: 'date-time' })
   publishedAt!: string
 }
 
 export class TeamResponseDto implements TeamView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   teamCode!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   shortName?: string | null
 }
 
 export class VenueResponseDto implements VenueView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   venueCode!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   address?: string | null
 }
 
-export class MatchResponseDto implements MatchView {
-  @ApiProperty({ format: 'uuid' })
+export class MatchTeamResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String })
+  teamCode!: string
+
+  @ApiProperty({ type: String })
+  name!: string
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  shortName?: string | null
+}
+
+export class MatchVenueResponseDto {
+  @ApiProperty({ type: String, format: 'uuid' })
+  id!: string
+
+  @ApiProperty({ type: String })
+  venueCode!: string
+
+  @ApiProperty({ type: String })
+  name!: string
+}
+
+export class MatchResponseDto implements MatchView {
+  @ApiProperty({ type: String, format: 'uuid' })
+  id!: string
+
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   tournamentId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   matchCode!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   title!: string
 
-  @ApiProperty({ enum: MATCH_STATUSES })
+  @ApiProperty({ type: String, enum: MATCH_STATUSES })
   status!: MatchView['status']
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   scheduledStartAt?: string | null
 
-  @ApiPropertyOptional({ nullable: true })
-  homeTeam!: NonNullable<MatchView['homeTeam']> | null
+  @ApiPropertyOptional({ type: () => MatchTeamResponseDto, nullable: true })
+  homeTeam!: MatchTeamResponseDto | null
 
-  @ApiPropertyOptional({ nullable: true })
-  awayTeam!: NonNullable<MatchView['awayTeam']> | null
+  @ApiPropertyOptional({ type: () => MatchTeamResponseDto, nullable: true })
+  awayTeam!: MatchTeamResponseDto | null
 
-  @ApiPropertyOptional({ nullable: true })
-  venue!: NonNullable<MatchView['venue']> | null
+  @ApiPropertyOptional({ type: () => MatchVenueResponseDto, nullable: true })
+  venue!: MatchVenueResponseDto | null
 }
 
 export class SchedulePlanResponseDto implements SchedulePlanView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   tournamentId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: String })
   name!: string
 
-  @ApiProperty({ enum: SCHEDULE_PLAN_STATUSES })
+  @ApiProperty({ type: String, enum: SCHEDULE_PLAN_STATUSES })
   status!: SchedulePlanView['status']
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   publishedAt?: string | null
 }
 
@@ -334,25 +359,25 @@ export class AdminSchedulePlanResponseDto extends SchedulePlanResponseDto {
 }
 
 export class ScheduleRevisionResponseDto implements ScheduleRevisionView {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   organizationId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   tournamentId!: string
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ type: String, format: 'uuid' })
   schedulePlanId!: string
 
-  @ApiProperty()
+  @ApiProperty({ type: Number })
   version!: number
 
-  @ApiProperty({ enum: SCHEDULE_REVISION_STATUSES })
+  @ApiProperty({ type: String, enum: SCHEDULE_REVISION_STATUSES })
   status!: ScheduleRevisionView['status']
 
-  @ApiProperty()
+  @ApiProperty({ type: String, format: 'date-time' })
   publishedAt!: string
 }
 
@@ -360,48 +385,48 @@ export class TournamentDetailResponseDto
   extends TournamentResponseDto
   implements TournamentDetailView
 {
-  @ApiProperty({ type: SeasonResponseDto })
+  @ApiProperty({ type: () => SeasonResponseDto })
   season!: SeasonResponseDto
 
-  @ApiProperty({ type: [CompetitionRuleVersionResponseDto] })
+  @ApiProperty({ type: () => [CompetitionRuleVersionResponseDto] })
   ruleVersions!: CompetitionRuleVersionResponseDto[]
 }
 
 export class TournamentScheduleResponseDto implements TournamentScheduleView {
-  @ApiProperty({ type: TournamentResponseDto })
+  @ApiProperty({ type: () => TournamentResponseDto })
   tournament!: TournamentResponseDto
 
-  @ApiProperty({ type: ScheduleRevisionResponseDto })
+  @ApiProperty({ type: () => ScheduleRevisionResponseDto })
   revision!: ScheduleRevisionResponseDto
 
-  @ApiProperty({ type: [MatchResponseDto] })
+  @ApiProperty({ type: () => [MatchResponseDto] })
   matches!: MatchResponseDto[]
 }
 
 export class PublicTournamentListResponseDto implements PublicTournamentListView {
-  @ApiProperty({ type: [TournamentResponseDto] })
+  @ApiProperty({ type: () => [TournamentResponseDto] })
   items!: TournamentResponseDto[]
 }
 
 export class AdminScheduleWorkbenchResponseDto {
-  @ApiProperty({ type: [SeasonResponseDto] })
+  @ApiProperty({ type: () => [SeasonResponseDto] })
   seasons!: SeasonResponseDto[]
 
-  @ApiProperty({ type: [TournamentResponseDto] })
+  @ApiProperty({ type: () => [TournamentResponseDto] })
   tournaments!: TournamentResponseDto[]
 
-  @ApiProperty({ type: [CompetitionRuleVersionResponseDto] })
+  @ApiProperty({ type: () => [CompetitionRuleVersionResponseDto] })
   ruleVersions!: CompetitionRuleVersionResponseDto[]
 
-  @ApiProperty({ type: [TeamResponseDto] })
+  @ApiProperty({ type: () => [TeamResponseDto] })
   teams!: TeamResponseDto[]
 
-  @ApiProperty({ type: [VenueResponseDto] })
+  @ApiProperty({ type: () => [VenueResponseDto] })
   venues!: VenueResponseDto[]
 
-  @ApiProperty({ type: [MatchResponseDto] })
+  @ApiProperty({ type: () => [MatchResponseDto] })
   matches!: MatchResponseDto[]
 
-  @ApiProperty({ type: [AdminSchedulePlanResponseDto] })
+  @ApiProperty({ type: () => [AdminSchedulePlanResponseDto] })
   schedulePlans!: AdminSchedulePlanResponseDto[]
 }
