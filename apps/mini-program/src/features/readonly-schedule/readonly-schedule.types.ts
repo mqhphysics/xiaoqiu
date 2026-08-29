@@ -1,5 +1,7 @@
 export type MatchStatus = 'DRAFT' | 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED'
 
+export type PublicDataSource = 'api' | 'mock'
+
 export interface ReadonlyTournamentSummary {
   id: string
   name: string
@@ -14,16 +16,28 @@ export interface ReadonlyTournamentSummary {
   description: string
 }
 
-export interface ReadonlyTeam {
+export interface ReadonlyTeamSummary {
   id: string
   tournamentId: string
+  teamCode: string
   name: string
   shortName: string
-  groupName: string
-  coachName: string
-  captainName: string
-  colors: string
-  rosterPreview: string[]
+  registrationStatus: string
+  rosterStatus: string
+  rosterPlayerCount: number
+}
+
+export interface ReadonlyRosterPlayer {
+  id: string
+  displayName: string
+  shirtNumber: string | null
+}
+
+export interface ReadonlyTeam extends ReadonlyTeamSummary {
+  leaderDisplayName: string | null
+  coachDisplayName: string | null
+  rosterSnapshotVersion: number | null
+  players: ReadonlyRosterPlayer[]
 }
 
 export interface ReadonlyMatch {
@@ -45,12 +59,13 @@ export interface ReadonlyMatch {
 
 export interface ReadonlyTournamentDetail extends ReadonlyTournamentSummary {
   rules: string[]
-  teams: ReadonlyTeam[]
+  teams: ReadonlyTeamSummary[]
   recentMatches: ReadonlyMatch[]
 }
 
 export interface ReadonlyScheduleFixture {
   tournaments: ReadonlyTournamentDetail[]
+  teamDetails: ReadonlyTeam[]
 }
 
 export interface ScheduleDateGroup {
@@ -62,4 +77,9 @@ export interface ScheduleDateGroup {
 export interface ScheduleStageGroup {
   stageName: string
   matches: ReadonlyMatch[]
+}
+
+export interface ScheduleFilters {
+  dateKey?: string | undefined
+  stageName?: string | undefined
 }
