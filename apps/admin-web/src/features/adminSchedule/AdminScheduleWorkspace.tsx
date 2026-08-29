@@ -1,6 +1,7 @@
 import { Children, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
+import { AdminRosterWorkspace } from '../adminRoster/AdminRosterWorkspace'
 import { createAdminScheduleRepository } from './repository'
 import type {
   AdminScheduleSnapshot,
@@ -46,6 +47,18 @@ export function AdminScheduleWorkspace() {
   const [error, setError] = useState('')
 
   const selectedTournamentId = snapshot.tournaments[0]?.id ?? ''
+  const isRosterSection = activeSection === 'rosters'
+  const workspaceCopy = isRosterSection
+    ? {
+        eyebrow: 'P2-SB-12-03',
+        title: '球队与名单核对',
+        description: '核对报名状态、名单人数、脱敏字段、数据质量告警和不可变快照版本。',
+      }
+    : {
+        eyebrow: 'P1-SB-11-02',
+        title: '后台赛事创建纵向切片',
+        description: '完成创建赛季、赛事、球队、场地、比赛、草案校验和发布的首个后台工作流。',
+      }
 
   const refresh = async (successMessage?: string) => {
     setIsLoading(true)
@@ -97,6 +110,9 @@ export function AdminScheduleWorkspace() {
           <NavButton active={activeSection === 'teams'} onClick={() => setActiveSection('teams')}>
             球队
           </NavButton>
+          <NavButton active={activeSection === 'rosters'} onClick={() => setActiveSection('rosters')}>
+            球队与名单
+          </NavButton>
           <NavButton active={activeSection === 'schedule'} onClick={() => setActiveSection('schedule')}>
             赛程
           </NavButton>
@@ -106,9 +122,9 @@ export function AdminScheduleWorkspace() {
       <section className="admin-main">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">P1-SB-11-02</p>
-            <h2>后台赛事创建纵向切片</h2>
-            <p>完成创建赛季、赛事、球队、场地、比赛、草案校验和发布的首个后台工作流。</p>
+            <p className="eyebrow">{workspaceCopy.eyebrow}</p>
+            <h2>{workspaceCopy.title}</h2>
+            <p>{workspaceCopy.description}</p>
           </div>
           <label className="field compact-field">
             <span>当前组织</span>
@@ -137,27 +153,33 @@ export function AdminScheduleWorkspace() {
             {context.role}`
           </span>
           {repository.mode === 'mock' ? (
-            <span>未设置 VITE_API_BASE_URL，当前数据保存于浏览器 localStorage，仅用于本切片验收。</span>
+            <span>
+              {isRosterSection
+                ? '未设置 VITE_API_BASE_URL，球队与名单页面仅显示带开发标识的虚构 Mock 数据。'
+                : '未设置 VITE_API_BASE_URL，当前数据保存于浏览器 localStorage，仅用于本切片验收。'}
+            </span>
           ) : (
             <span>API Base URL：{repository.apiBaseUrl}</span>
           )}
         </section>
 
-        {(notice || error) && (
+        {(error || (!isRosterSection && notice)) && (
           <section className="feedback-strip" aria-live="polite">
-            {notice ? <p className="success-text">{notice}</p> : null}
+            {!isRosterSection && notice ? <p className="success-text">{notice}</p> : null}
             {error ? <p className="error-text">{error}</p> : null}
           </section>
         )}
 
-        <section className="summary-grid" aria-label="当前数据概览">
-          <Metric label="赛季" value={snapshot.seasons.length} />
-          <Metric label="赛事" value={snapshot.tournaments.length} />
-          <Metric label="球队" value={snapshot.teams.length} />
-          <Metric label="场地" value={snapshot.venues.length} />
-          <Metric label="比赛" value={snapshot.matches.length} />
-          <Metric label="赛程草案" value={snapshot.schedulePlans.length} />
-        </section>
+        {!isRosterSection ? (
+          <section className="summary-grid" aria-label="当前数据概览">
+            <Metric label="赛季" value={snapshot.seasons.length} />
+            <Metric label="赛事" value={snapshot.tournaments.length} />
+            <Metric label="球队" value={snapshot.teams.length} />
+            <Metric label="场地" value={snapshot.venues.length} />
+            <Metric label="比赛" value={snapshot.matches.length} />
+            <Metric label="赛程草案" value={snapshot.schedulePlans.length} />
+          </section>
+        ) : null}
 
         {activeSection === 'events' ? (
           <EventsSection
@@ -193,6 +215,10 @@ export function AdminScheduleWorkspace() {
             }
             onRefresh={() => refresh('列表已刷新。')}
           />
+        ) : null}
+
+        {activeSection === 'rosters' ? (
+          <AdminRosterWorkspace context={context} tournaments={snapshot.tournaments} />
         ) : null}
 
         {activeSection === 'schedule' ? (
