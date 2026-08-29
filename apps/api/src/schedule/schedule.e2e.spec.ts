@@ -28,6 +28,7 @@ class FakePrisma {
   tournaments: Row[] = []
   ruleVersions: Row[] = []
   teams: Row[] = []
+  teamRegistrations: Row[] = []
   venues: Row[] = []
   matches: Row[] = []
   schedulePlans: Row[] = []
@@ -82,6 +83,21 @@ class FakePrisma {
     findFirst: async ({ where }: { where: Row }) => this.findFirst(this.teams, where),
     findMany: async ({ where }: { where: Row }) =>
       this.teams.filter((team) => this.matchesWhere(team, where)),
+  }
+
+  teamRegistration = {
+    findFirst: async ({ include, where }: { include?: Row; where: Row }) => {
+      const registration = this.findFirst(this.teamRegistrations, where)
+
+      if (registration === null || include === undefined) {
+        return registration
+      }
+
+      return {
+        ...registration,
+        team: this.teams.find((team) => team.id === registration.teamId),
+      }
+    },
   }
 
   venue = {
@@ -417,6 +433,14 @@ test('P1 schedule slice creates and publishes a tournament schedule', async () =
     .set(PUBLIC_HEADERS)
     .expect(200)
   assert.equal(publicMatch.body.homeTeam.name, '数学学院')
+
+  fakePrisma.teamRegistrations.push({
+    id: randomUUID(),
+    organizationId: ORGANIZATION_ID,
+    tournamentId: tournament.body.id,
+    teamId: teamA.body.id,
+    status: 'APPROVED',
+  })
 
   const publicTeam = await request(app.getHttpServer())
     .get(`/api/public/teams/${teamA.body.id}`)
