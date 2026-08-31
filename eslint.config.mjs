@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/.swc/**',
       '**/coverage/**',
       '**/*.tsbuildinfo',
+      'private-data/**',
       'packages/api-client/src/generated/**',
     ],
   },

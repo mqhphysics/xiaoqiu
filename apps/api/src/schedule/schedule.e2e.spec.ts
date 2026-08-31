@@ -61,8 +61,21 @@ class FakePrisma {
         season: this.seasons.find((season) => season.id === tournament.seasonId),
       }
     },
-    findMany: async ({ where }: { where: Row }) =>
-      this.tournaments.filter((tournament) => this.matchesWhere(tournament, where)),
+    findMany: async ({ orderBy, where }: { orderBy?: { createdAt?: 'asc' | 'desc' }; where: Row }) => {
+      const tournaments = this.tournaments.filter((tournament) =>
+        this.matchesWhere(tournament, where),
+      )
+      const direction = orderBy?.createdAt
+      if (direction === undefined) {
+        return tournaments
+      }
+
+      return tournaments.sort((left, right) => {
+        const delta =
+          (left.createdAt as Date).getTime() - (right.createdAt as Date).getTime()
+        return direction === 'asc' ? delta : -delta
+      })
+    },
     update: async ({ data, where }: { data: Row; where: Row }) =>
       this.updateOne(this.tournaments, where, data),
   }
@@ -415,11 +428,34 @@ test('P1 schedule slice creates and publishes a tournament schedule', async () =
   assert.equal(outboxJob.eventType, 'SchedulePlanPublished')
   assert.equal(outboxJob.correlationId, 'publish-request-id')
 
+  const originalTournament = fakePrisma.tournaments.find(
+    (item) => item.id === tournament.body.id,
+  )
+  if (originalTournament === undefined) {
+    throw new Error('published tournament was not persisted')
+  }
+  originalTournament.createdAt = new Date('2026-08-01T00:00:00.000Z')
+
+  const latestTournamentId = randomUUID()
+  fakePrisma.tournaments.push({
+    ...originalTournament,
+    id: latestTournamentId,
+    tournamentCode: 'LATEST-PUBLISHED',
+    name: '最新发布赛事',
+    createdAt: new Date('2026-08-02T00:00:00.000Z'),
+    updatedAt: new Date('2026-08-02T00:00:00.000Z'),
+  })
+
   const tournaments = await request(app.getHttpServer())
     .get('/api/public/tournaments')
     .set(PUBLIC_HEADERS)
     .expect(200)
-  assert.equal(tournaments.body.items.length, 1)
+  assert.equal(tournaments.body.items.length, 2)
+  assert.equal(tournaments.body.items[0].id, latestTournamentId)
+  fakePrisma.tournaments.splice(
+    fakePrisma.tournaments.findIndex((item) => item.id === latestTournamentId),
+    1,
+  )
 
   const schedule = await request(app.getHttpServer())
     .get(`/api/public/tournaments/${tournament.body.id}/schedule`)

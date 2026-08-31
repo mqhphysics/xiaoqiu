@@ -386,7 +386,7 @@ export class ScheduleService {
 
   async listPublicTournaments(organizationId: string) {
     const tournaments = await this.prisma.tournament.findMany({
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       where: {
         organizationId,
         status: TournamentStatus.PUBLISHED,

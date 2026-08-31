@@ -447,18 +447,14 @@ function readErrorMessage(data: unknown, statusCode: number): string {
 }
 
 function getApiContext(): ApiContext | undefined {
-  const maybeProcess = globalThis as {
-    process?: { env?: { TARO_APP_API_BASE_URL?: string; TARO_APP_ORGANIZATION_ID?: string } }
-  }
-  const baseUrl = maybeProcess.process?.env?.TARO_APP_API_BASE_URL
+  const baseUrl = process.env.TARO_APP_API_BASE_URL
   if (!baseUrl || baseUrl.trim().length === 0) {
     return undefined
   }
 
   return {
     baseUrl: normalizeApiBaseUrl(baseUrl),
-    organizationId:
-      maybeProcess.process?.env?.TARO_APP_ORGANIZATION_ID?.trim() || DEFAULT_ORGANIZATION_ID,
+    organizationId: process.env.TARO_APP_ORGANIZATION_ID?.trim() || DEFAULT_ORGANIZATION_ID,
   }
 }
 
