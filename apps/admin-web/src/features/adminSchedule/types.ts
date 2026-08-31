@@ -1,4 +1,4 @@
-export type WorkbenchSection = 'events' | 'teams' | 'schedule'
+export type WorkbenchSection = 'events' | 'teams' | 'rosters' | 'schedule'
 
 export type RepositoryMode = 'api' | 'mock'
 
