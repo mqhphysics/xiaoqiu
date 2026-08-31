@@ -1,105 +1,304 @@
-.page {
-  min-height: 100vh;
-  padding: 72px 40px 48px;
-}
-
-.header {
+.home-hero {
   display: flex;
-  flex-direction: column;
-  padding: 40px 32px;
-  border-left: 8px solid #d24d3f;
-  color: #f7faf6;
-  background: #183f2a;
+  align-items: flex-end;
+  min-height: 470px;
+  padding: 48px;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: #173b27;
+  background-image: url('../../assets/campus-football-hero-v2.png');
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1200px rgba(10, 27, 17, 0.58);
 }
 
-.eyebrow {
-  color: #bfe2c8;
-  font-size: 22px;
-  font-weight: 700;
+.home-hero__content {
+  width: 100%;
+  max-width: 720px;
 }
 
-.title {
-  margin-top: 10px;
-  font-size: 54px;
-  font-weight: 800;
-}
-
-.subtitle {
-  margin-top: 18px;
-  color: #e1ebe3;
-  font-size: 26px;
-  line-height: 1.6;
-}
-
-.module-list {
-  margin-top: 36px;
-  border-top: 1px solid #d6dcd6;
-}
-
-.module-row {
-  display: grid;
-  grid-template-columns: 70px 1fr auto;
-  align-items: center;
-  min-height: 104px;
-  border-bottom: 1px solid #d6dcd6;
-}
-
-.module-index {
-  color: #7d8780;
-  font-size: 22px;
-}
-
-.module-name {
-  font-size: 30px;
-  font-weight: 650;
-}
-
-.module-state {
-  color: #758078;
-  font-size: 22px;
-}
-
-.spike-entry {
-  margin-top: 42px;
-  padding: 32px;
-  color: #f7faf6;
-  background: #183f2a;
-  border-radius: 16px;
-}
-
-.spike-label {
+.home-hero__eyebrow,
+.home-hero__title,
+.home-hero__event,
+.home-hero__focus-label,
+.home-hero__focus-teams,
+.home-hero__focus-meta {
   display: block;
-  color: #bfe2c8;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 1px;
 }
 
-.spike-title {
-  display: block;
+.home-hero__eyebrow {
+  color: #d7e9da;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.home-hero__title {
+  margin-top: 8px;
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.home-hero__event {
   margin-top: 12px;
-  font-size: 32px;
-  font-weight: 850;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
-.spike-copy {
+.home-hero__focus {
+  margin-top: 34px;
+  padding-left: 16px;
+  border-left: 4px solid #e5bf4c;
+}
+
+.home-hero__focus-label {
+  color: #ffeaa7;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.home-hero__focus-teams {
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.home-hero__focus-meta {
+  margin-top: 7px;
+  color: #e6eee8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.home-hero__secondary {
+  color: #ffffff;
+  background: rgba(18, 38, 25, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+}
+
+.home-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: #ffffff;
+  border: 1px solid #dce1dc;
+  border-top: 0;
+}
+
+.home-fact {
+  min-width: 0;
+  padding: 22px 24px;
+  border-right: 1px solid #dce1dc;
+}
+
+.home-fact:last-child {
+  border-right: 0;
+}
+
+.home-fact--accent {
+  background: #f7edcc;
+}
+
+.home-fact__value,
+.home-fact__label {
   display: block;
-  margin-top: 14px;
-  color: #dce9df;
-  font-size: 23px;
-  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
-.spike-button {
-  min-height: 76px;
-  margin: 26px 0 0;
+.home-fact__value {
   color: #183f2a;
-  background: #d7eadc;
-  border-radius: 10px;
-  font-size: 23px;
-  font-weight: 850;
+  font-size: 22px;
+  font-weight: 900;
 }
 
-.spike-button::after {
-  border: 0;
+.home-fact__label {
+  margin-top: 6px;
+  color: #6a756d;
+  font-size: 13px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr);
+  gap: 28px;
+}
+
+.home-grid__main,
+.home-grid__aside {
+  min-width: 0;
+}
+
+.home-match-list,
+.home-team-list {
+  overflow: hidden;
+}
+
+.home-match {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 94px;
+  padding: 17px 20px;
+  border-bottom: 1px solid #e2e6e2;
+}
+
+.home-match:last-child,
+.home-team:last-child {
+  border-bottom: 0;
+}
+
+.home-match__date,
+.home-match__clock,
+.home-match__teams,
+.home-match__meta,
+.home-team__name,
+.home-team__meta {
+  display: block;
+}
+
+.home-match__date {
+  color: #6b766e;
+  font-size: 12px;
+}
+
+.home-match__clock {
+  margin-top: 4px;
+  color: #183f2a;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.home-match__body,
+.home-team__body {
+  min-width: 0;
+}
+
+.home-match__teams,
+.home-team__name {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.home-match__meta,
+.home-team__meta {
+  margin-top: 5px;
+  color: #6a756d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.home-team {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 15px 18px;
+  border-bottom: 1px solid #e2e6e2;
+}
+
+.home-team__arrow {
+  color: #7b857e;
+  font-size: 26px;
+}
+
+@media (max-width: 900px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-hero {
+    min-height: 390px;
+    padding: 30px 22px;
+    background-position: 56% center;
+    box-shadow: inset 0 0 0 1200px rgba(10, 27, 17, 0.63);
+  }
+
+  .home-hero__title {
+    font-size: 44px;
+  }
+
+  .home-hero__event {
+    font-size: 20px;
+  }
+
+  .home-hero__focus {
+    margin-top: 25px;
+  }
+
+  .home-hero__focus-teams {
+    font-size: 18px;
+  }
+
+  .home-hero__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .home-hero__actions .button {
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  .home-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-fact {
+    padding: 17px;
+    border-right: 1px solid #dce1dc;
+    border-bottom: 1px solid #dce1dc;
+  }
+
+  .home-fact:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .home-fact:nth-child(n + 3) {
+    border-bottom: 0;
+  }
+
+  .home-fact__value {
+    font-size: 18px;
+  }
+
+  .home-grid {
+    gap: 32px;
+  }
+
+  .home-match {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 13px;
+    min-height: 96px;
+    padding: 14px;
+  }
+
+  .home-match .status-tag {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .home-match__teams {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .home-hero__actions {
+    grid-template-columns: 1fr;
+  }
 }

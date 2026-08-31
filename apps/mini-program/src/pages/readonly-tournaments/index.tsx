@@ -2,28 +2,34 @@ import { Button, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  readonlyScheduleRepository,
-} from '../../features/readonly-schedule/readonly-schedule.repository'
-import type { ReadonlyTournamentSummary } from '../../features/readonly-schedule/readonly-schedule.types'
+import { PublicShell } from '../../components/public-shell'
+import { DataState } from '../../components/public-ui'
+import { readonlyScheduleRepository } from '../../features/readonly-schedule/readonly-schedule.repository'
+import type {
+  PublicDataSource,
+  ReadonlyTournamentSummary,
+} from '../../features/readonly-schedule/readonly-schedule.types'
 
 import './index.scss'
 
 type PageState =
-  | { phase: 'LOADING' }
-  | { phase: 'FAILED'; message: string }
-  | { phase: 'READY'; tournaments: ReadonlyTournamentSummary[]; source: 'api' | 'mock' }
+  | { phase: 'loading' }
+  | { phase: 'failed'; message: string }
+  | { phase: 'ready'; tournaments: ReadonlyTournamentSummary[]; source: PublicDataSource }
 
 export default function ReadonlyTournamentsPage() {
-  const [state, setState] = useState<PageState>({ phase: 'LOADING' })
+  const [state, setState] = useState<PageState>({ phase: 'loading' })
 
   const load = useCallback(async () => {
-    setState({ phase: 'LOADING' })
+    setState({ phase: 'loading' })
     try {
       const result = await readonlyScheduleRepository.listTournaments()
-      setState({ phase: 'READY', tournaments: result.data, source: result.source })
-    } catch {
-      setState({ phase: 'FAILED', message: '赛事列表加载失败，请稍后重试。' })
+      setState({ phase: 'ready', tournaments: result.data, source: result.source })
+    } catch (error) {
+      setState({
+        phase: 'failed',
+        message: error instanceof Error ? error.message : '赛事列表加载失败，请稍后重试。',
+      })
     }
   }, [])
 
@@ -32,56 +38,75 @@ export default function ReadonlyTournamentsPage() {
   }, [load])
 
   return (
-    <View className="readonly-page">
-      <View className="hero">
-        <Text className="hero__eyebrow">P1 READONLY</Text>
-        <Text className="hero__title">赛事与赛程</Text>
-        <Text className="hero__copy">先把公开赛事看清楚，再进入报名和比赛数据闭环。</Text>
+    <PublicShell active="tournaments" source={state.phase === 'ready' ? state.source : undefined}>
+      <View className="page-intro">
+        <View>
+          <Text className="page-intro__eyebrow">TOURNAMENTS</Text>
+          <Text className="page-intro__title">校园赛事</Text>
+        </View>
+        <Text className="page-intro__copy">浏览已经正式发布的赛事、赛程和参赛球队。</Text>
       </View>
 
-      {state.phase === 'LOADING' && <Text className="state-card">正在加载赛事…</Text>}
+      {state.phase === 'loading' && <DataState kind="loading" title="正在加载赛事" />}
 
-      {state.phase === 'FAILED' && (
-        <View className="state-card">
-          <Text className="state-card__title">{state.message}</Text>
-          <Button className="state-card__button" onClick={() => void load()}>
-            重试
-          </Button>
-        </View>
+      {state.phase === 'failed' && (
+        <DataState
+          kind="error"
+          title="赛事列表加载失败"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
 
-      {state.phase === 'READY' && state.tournaments.length === 0 && (
-        <Text className="state-card">暂无已发布赛事。</Text>
+      {state.phase === 'ready' && state.tournaments.length === 0 && (
+        <DataState
+          kind="empty"
+          title="暂无已发布赛事"
+          description="赛事管理员发布后，公开赛事会出现在这里。"
+        />
       )}
 
-      {state.phase === 'READY' && state.tournaments.length > 0 && (
-        <View className="tournament-list">
-          <Text className="source-note">
-            数据来源：{state.source === 'api' ? '只读 API' : '本地 mock fixture'}
-          </Text>
+      {state.phase === 'ready' && state.tournaments.length > 0 && (
+        <View className="tournament-grid">
           {state.tournaments.map((tournament) => (
-            <View
-              className="tournament-card"
-              key={tournament.id}
-              onClick={() =>
-                void Taro.navigateTo({
-                  url: `/pages/readonly-tournament-detail/index?tournamentId=${tournament.id}`,
-                })
-              }
-            >
-              <Text className="tournament-card__status">{tournament.statusText}</Text>
+            <View className="tournament-card surface" key={tournament.id}>
+              <View className="tournament-card__topline">
+                <Text className="status-tag status-tag--approved">{tournament.statusText}</Text>
+                <Text className="tournament-card__code">{tournament.code}</Text>
+              </View>
               <Text className="tournament-card__title">{tournament.name}</Text>
-              <Text className="tournament-card__meta">
-                {tournament.seasonName} · {tournament.teamCount} 队 · {tournament.matchCount} 场
-              </Text>
+              <Text className="tournament-card__season">{tournament.seasonName}</Text>
               <Text className="tournament-card__copy">{tournament.description}</Text>
-              <Text className="tournament-card__date">
-                {tournament.startDate} 至 {tournament.endDate}
-              </Text>
+              <View className="tournament-card__facts">
+                <View>
+                  <Text className="tournament-card__fact-value">{tournament.teamCount}</Text>
+                  <Text className="tournament-card__fact-label">球队</Text>
+                </View>
+                <View>
+                  <Text className="tournament-card__fact-value">{tournament.matchCount}</Text>
+                  <Text className="tournament-card__fact-label">比赛</Text>
+                </View>
+                <View>
+                  <Text className="tournament-card__fact-value tournament-card__fact-value--date">
+                    {tournament.startDate}
+                  </Text>
+                  <Text className="tournament-card__fact-label">开始日期</Text>
+                </View>
+              </View>
+              <Button
+                className="button button--primary tournament-card__button"
+                onClick={() =>
+                  void Taro.navigateTo({
+                    url: `/pages/readonly-tournament-detail/index?tournamentId=${encodeURIComponent(tournament.id)}`,
+                  })
+                }
+              >
+                进入赛事
+              </Button>
             </View>
           ))}
         </View>
       )}
-    </View>
+    </PublicShell>
   )
 }

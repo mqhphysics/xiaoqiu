@@ -2,11 +2,16 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  filterMatches,
+  filterTeams,
+  findFocusMatch,
   getMatchStatusText,
+  getScheduleDateOptions,
+  getScheduleStageOptions,
   groupMatchesByDateAndStage,
   sortMatchesByStartAt,
 } from './readonly-schedule.logic.ts'
-import type { ReadonlyMatch } from './readonly-schedule.types.ts'
+import type { ReadonlyMatch, ReadonlyTeamSummary } from './readonly-schedule.types.ts'
 
 const matches: ReadonlyMatch[] = [
   createMatch('m-3', '2026-07-02T09:00:00+08:00', '八强赛', 'CANCELLED'),
@@ -47,6 +52,40 @@ test('getMatchStatusText maps readonly match statuses', () => {
   assert.equal(getMatchStatusText('FINISHED'), '已结束')
 })
 
+test('schedule filters keep date and stage selection deterministic', () => {
+  assert.deepEqual(getScheduleDateOptions(matches), ['2026-07-01', '2026-07-02'])
+  assert.deepEqual(getScheduleStageOptions(matches), ['小组赛', '八强赛'])
+  assert.deepEqual(
+    filterMatches(matches, { dateKey: '2026-07-02', stageName: '小组赛' }).map((match) => match.id),
+    ['m-4'],
+  )
+})
+
+test('team search matches public name, short name and stable team code', () => {
+  const teams: ReadonlyTeamSummary[] = [
+    createTeam('team-b', '江湾联队', '江湾', 'RIVER-02'),
+    createTeam('team-a', '星火学院', '星火', 'SPARK-01'),
+  ]
+
+  assert.deepEqual(
+    filterTeams(teams, ' spark 01 ').map((team) => team.id),
+    ['team-a'],
+  )
+  assert.deepEqual(
+    filterTeams(teams, '江湾').map((team) => team.id),
+    ['team-b'],
+  )
+})
+
+test('focus match prefers live then the next scheduled match', () => {
+  assert.equal(findFocusMatch(matches, new Date('2026-07-01T08:00:00+08:00'))?.id, 'm-1')
+
+  const withoutLive = matches.map((match) =>
+    match.id === 'm-1' ? { ...match, status: 'FINISHED' as const } : match,
+  )
+  assert.equal(findFocusMatch(withoutLive, new Date('2026-07-01T08:00:00+08:00'))?.id, 'm-2')
+})
+
 function createMatch(
   id: string,
   scheduledStartAt: string,
@@ -66,5 +105,23 @@ function createMatch(
     homeTeamName: '主队',
     awayTeamName: '客队',
     status,
+  }
+}
+
+function createTeam(
+  id: string,
+  name: string,
+  shortName: string,
+  teamCode: string,
+): ReadonlyTeamSummary {
+  return {
+    id,
+    tournamentId: 'tournament-1',
+    teamCode,
+    name,
+    shortName,
+    registrationStatus: 'APPROVED',
+    rosterStatus: 'LOCKED',
+    rosterPlayerCount: 18,
   }
 }

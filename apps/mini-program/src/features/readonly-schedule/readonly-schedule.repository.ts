@@ -1,10 +1,13 @@
 import Taro from '@tarojs/taro'
 
 import { readonlyScheduleMockFixture } from './mock-fixture'
+import { sortMatchesByStartAt } from './readonly-schedule.logic'
 import type {
   MatchStatus,
+  PublicDataSource,
   ReadonlyMatch,
   ReadonlyTeam,
+  ReadonlyTeamSummary,
   ReadonlyTournamentDetail,
   ReadonlyTournamentSummary,
 } from './readonly-schedule.types'
@@ -13,7 +16,7 @@ const DEFAULT_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001'
 
 interface RepositoryResult<T> {
   data: T
-  source: 'api' | 'mock'
+  source: PublicDataSource
 }
 
 interface ApiContext {
@@ -86,14 +89,33 @@ interface ApiTournamentSchedule {
   matches: ApiMatch[]
 }
 
-interface ApiTeam {
+interface ApiPublicTeamSummary {
   id: string
+  tournamentId: string
   teamCode: string
   name: string
   shortName?: string | null
+  registrationStatus: string
+  rosterStatus: string
+  rosterPlayerCount: number
 }
 
-class ApiRequestError extends Error {
+interface ApiPublicRosterPlayer {
+  id: string
+  displayName: string
+  shirtNumber?: string | null
+}
+
+interface ApiPublicTeamDetail extends ApiPublicTeamSummary {
+  leaderDisplayName?: string | null
+  coachDisplayName?: string | null
+  rosterSnapshotVersion?: number | null
+  players: ApiPublicRosterPlayer[]
+}
+
+type ApiPublicTeamList = { items: ApiPublicTeamSummary[] } | ApiPublicTeamSummary[]
+
+export class PublicApiRequestError extends Error {
   constructor(
     readonly statusCode: number,
     message: string,
@@ -123,7 +145,9 @@ class ReadonlyScheduleRepository {
     }
   }
 
-  async getTournament(tournamentId: string): Promise<RepositoryResult<ReadonlyTournamentDetail | null>> {
+  async getTournament(
+    tournamentId: string,
+  ): Promise<RepositoryResult<ReadonlyTournamentDetail | null>> {
     const apiContext = getApiContext()
     if (!apiContext) {
       const tournament =
@@ -137,7 +161,7 @@ class ReadonlyScheduleRepository {
         source: 'api',
       }
     } catch (error) {
-      if (error instanceof ApiRequestError && error.statusCode === 404) {
+      if (error instanceof PublicApiRequestError && error.statusCode === 404) {
         return { data: null, source: 'api' }
       }
       throw error
@@ -147,7 +171,9 @@ class ReadonlyScheduleRepository {
   async listMatches(tournamentId: string): Promise<RepositoryResult<ReadonlyMatch[]>> {
     const apiContext = getApiContext()
     if (!apiContext) {
-      const tournament = readonlyScheduleMockFixture.tournaments.find((item) => item.id === tournamentId)
+      const tournament = readonlyScheduleMockFixture.tournaments.find(
+        (item) => item.id === tournamentId,
+      )
       return {
         data: tournament?.recentMatches ?? [],
         source: 'mock',
@@ -167,7 +193,9 @@ class ReadonlyScheduleRepository {
   async getMatch(matchId: string): Promise<RepositoryResult<ReadonlyMatch | null>> {
     const apiContext = getApiContext()
     if (!apiContext) {
-      const matches = readonlyScheduleMockFixture.tournaments.flatMap((tournament) => tournament.recentMatches)
+      const matches = readonlyScheduleMockFixture.tournaments.flatMap(
+        (tournament) => tournament.recentMatches,
+      )
       return {
         data: matches.find((match) => match.id === matchId) ?? null,
         source: 'mock',
@@ -175,36 +203,57 @@ class ReadonlyScheduleRepository {
     }
 
     try {
-      return {
-        data: mapMatch(await requestApi<ApiMatch>(apiContext, `/public/matches/${encodeURIComponent(matchId)}`)),
-        source: 'api',
-      }
+      const match = await requestApi<ApiMatch>(
+        apiContext,
+        `/public/matches/${encodeURIComponent(matchId)}`,
+      )
+      return { data: mapMatch(match), source: 'api' }
     } catch (error) {
-      if (error instanceof ApiRequestError && error.statusCode === 404) {
+      if (error instanceof PublicApiRequestError && error.statusCode === 404) {
         return { data: null, source: 'api' }
       }
       throw error
     }
   }
 
-  async getTeam(teamId: string): Promise<RepositoryResult<ReadonlyTeam | null>> {
+  async listTeams(tournamentId: string): Promise<RepositoryResult<ReadonlyTeamSummary[]>> {
     const apiContext = getApiContext()
     if (!apiContext) {
-      const teams = readonlyScheduleMockFixture.tournaments.flatMap((tournament) => tournament.teams)
-      return {
-        data: teams.find((team) => team.id === teamId) ?? null,
-        source: 'mock',
-      }
+      const tournament = readonlyScheduleMockFixture.tournaments.find(
+        (item) => item.id === tournamentId,
+      )
+      return { data: tournament?.teams ?? [], source: 'mock' }
+    }
+
+    const response = await requestApi<ApiPublicTeamList>(
+      apiContext,
+      `/public/tournaments/${encodeURIComponent(tournamentId)}/teams`,
+    )
+    const items = Array.isArray(response) ? response : response.items
+    return { data: items.map(mapTeamSummary), source: 'api' }
+  }
+
+  async getTeam(
+    tournamentId: string,
+    teamId: string,
+  ): Promise<RepositoryResult<ReadonlyTeam | null>> {
+    const apiContext = getApiContext()
+    if (!apiContext) {
+      const team =
+        readonlyScheduleMockFixture.teamDetails.find(
+          (item) => item.tournamentId === tournamentId && item.id === teamId,
+        ) ?? null
+      return { data: team, source: 'mock' }
     }
 
     try {
-      const team = await requestApi<ApiTeam>(apiContext, `/public/teams/${encodeURIComponent(teamId)}`)
-      return {
-        data: mapTeam(team, await this.findTournamentIdForTeam(apiContext, team.id)),
-        source: 'api',
-      }
+      const team = await requestApi<ApiPublicTeamDetail>(
+        apiContext,
+        `/public/tournaments/${encodeURIComponent(tournamentId)}/teams/${encodeURIComponent(teamId)}`,
+      )
+      return { data: mapTeamDetail(team), source: 'api' }
     } catch (error) {
-      if (error instanceof ApiRequestError && error.statusCode === 404) {
+      if (error instanceof PublicApiRequestError && error.statusCode === 404) {
         return { data: null, source: 'api' }
       }
       throw error
@@ -215,34 +264,15 @@ class ReadonlyScheduleRepository {
     apiContext: ApiContext,
     tournamentId: string,
   ): Promise<ReadonlyTournamentDetail> {
-    const [detail, schedule] = await Promise.all([
-      requestApi<ApiTournamentDetail>(apiContext, `/public/tournaments/${encodeURIComponent(tournamentId)}`),
-      requestApi<ApiTournamentSchedule>(
-        apiContext,
-        `/public/tournaments/${encodeURIComponent(tournamentId)}/schedule`,
-      ),
+    const encodedId = encodeURIComponent(tournamentId)
+    const [detail, schedule, teamList] = await Promise.all([
+      requestApi<ApiTournamentDetail>(apiContext, `/public/tournaments/${encodedId}`),
+      requestApi<ApiTournamentSchedule>(apiContext, `/public/tournaments/${encodedId}/schedule`),
+      requestApi<ApiPublicTeamList>(apiContext, `/public/tournaments/${encodedId}/teams`),
     ])
+    const teams = Array.isArray(teamList) ? teamList : teamList.items
 
-    return mapTournamentDetail(detail, schedule)
-  }
-
-  private async findTournamentIdForTeam(apiContext: ApiContext, teamId: string): Promise<string> {
-    const list = await requestApi<ApiTournamentList>(apiContext, '/public/tournaments')
-
-    for (const tournament of list.items) {
-      const schedule = await requestApi<ApiTournamentSchedule>(
-        apiContext,
-        `/public/tournaments/${encodeURIComponent(tournament.id)}/schedule`,
-      )
-      const hasTeam = schedule.matches.some(
-        (match) => match.homeTeam?.id === teamId || match.awayTeam?.id === teamId,
-      )
-      if (hasTeam) {
-        return tournament.id
-      }
-    }
-
-    return ''
+    return mapTournamentDetail(detail, schedule, teams)
   }
 }
 
@@ -251,16 +281,17 @@ export const readonlyScheduleRepository = new ReadonlyScheduleRepository()
 function mapTournamentDetail(
   detail: ApiTournamentDetail,
   schedule: ApiTournamentSchedule,
+  apiTeams: ApiPublicTeamSummary[],
 ): ReadonlyTournamentDetail {
-  const matches = schedule.matches.map(mapMatch)
-  const teams = collectTeams(detail.id, schedule.matches)
+  const matches = sortMatchesByStartAt(schedule.matches.map(mapMatch))
+  const teams = apiTeams.map(mapTeamSummary)
 
   return {
     id: detail.id,
     name: detail.name,
     code: detail.tournamentCode,
     seasonName: detail.season.name,
-    organizationName: '晓球开发组织',
+    organizationName: '校园赛事组织',
     statusText: getTournamentStatusText(detail.status),
     startDate: formatDateRangePoint(matches.at(0)?.scheduledStartAt),
     endDate: formatDateRangePoint(matches.at(-1)?.scheduledStartAt),
@@ -307,7 +338,7 @@ function mapMatch(match: ApiMatch): ReadonlyMatch {
   return {
     id: match.id,
     tournamentId: match.tournamentId,
-    stageName: '赛程',
+    stageName: inferStageName(match.title),
     roundName: match.title || match.matchCode,
     scheduledStartAt: match.scheduledStartAt ?? new Date(0).toISOString(),
     venueName: match.venue?.name ?? '待定场地',
@@ -320,32 +351,30 @@ function mapMatch(match: ApiMatch): ReadonlyMatch {
   }
 }
 
-function collectTeams(tournamentId: string, matches: ApiMatch[]): ReadonlyTeam[] {
-  const teams = new Map<string, ApiMatchTeam>()
-
-  for (const match of matches) {
-    if (match.homeTeam) {
-      teams.set(match.homeTeam.id, match.homeTeam)
-    }
-    if (match.awayTeam) {
-      teams.set(match.awayTeam.id, match.awayTeam)
-    }
-  }
-
-  return [...teams.values()].map((team) => mapTeam(team, tournamentId))
-}
-
-function mapTeam(team: ApiTeam | ApiMatchTeam, tournamentId: string): ReadonlyTeam {
+function mapTeamSummary(team: ApiPublicTeamSummary): ReadonlyTeamSummary {
   return {
     id: team.id,
-    tournamentId,
+    tournamentId: team.tournamentId,
+    teamCode: team.teamCode,
     name: team.name,
     shortName: team.shortName ?? team.name,
-    groupName: '未分组',
-    coachName: '待补充',
-    captainName: '待补充',
-    colors: '待定',
-    rosterPreview: ['名单将在报名后展示'],
+    registrationStatus: team.registrationStatus,
+    rosterStatus: team.rosterStatus,
+    rosterPlayerCount: team.rosterPlayerCount,
+  }
+}
+
+function mapTeamDetail(team: ApiPublicTeamDetail): ReadonlyTeam {
+  return {
+    ...mapTeamSummary(team),
+    leaderDisplayName: team.leaderDisplayName ?? null,
+    coachDisplayName: team.coachDisplayName ?? null,
+    rosterSnapshotVersion: team.rosterSnapshotVersion ?? null,
+    players: team.players.map((player) => ({
+      id: player.id,
+      displayName: player.displayName,
+      shirtNumber: player.shirtNumber ?? null,
+    })),
   }
 }
 
@@ -363,6 +392,12 @@ function getTournamentStatusText(status: ApiTournament['status']): string {
     case 'ARCHIVED':
       return '已归档'
   }
+}
+
+function inferStageName(title: string): string {
+  if (title.includes('决赛')) return '淘汰赛'
+  if (title.includes('八强') || title.includes('四强')) return '淘汰赛'
+  return '小组赛'
 }
 
 function formatDateRangePoint(value: string | undefined): string {
@@ -387,11 +422,14 @@ async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new ApiRequestError(response.statusCode, readErrorMessage(response.data, response.statusCode))
+    throw new PublicApiRequestError(
+      response.statusCode,
+      readErrorMessage(response.data, response.statusCode),
+    )
   }
 
   if (response.data === undefined || response.data === null) {
-    throw new ApiRequestError(response.statusCode, 'API 返回为空')
+    throw new PublicApiRequestError(response.statusCode, 'API 返回为空')
   }
 
   return response.data
