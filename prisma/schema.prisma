@@ -127,6 +127,49 @@ enum MatchStatus {
   @@map("match_status")
 }
 
+enum TeamRegistrationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  WITHDRAWN
+  SUSPENDED
+
+  @@map("team_registration_status")
+}
+
+enum RosterSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  APPROVED
+  LOCKED
+  REOPENED
+  WITHDRAWN
+
+  @@map("roster_submission_status")
+}
+
+enum DataQualityStatus {
+  CLEAN
+  WARNING
+  ERROR
+
+  @@map("data_quality_status")
+}
+
+enum ImportBatchStatus {
+  UPLOADED
+  VALIDATING
+  READY
+  IMPORTING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+
+  @@map("import_batch_status")
+}
+
 model Organization {
   id                 String                   @id @default(uuid()) @db.Uuid
   slug               String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
@@ -147,6 +190,12 @@ model Organization {
   schedulePlans      SchedulePlan[]
   scheduleRevisions  ScheduleRevision[]
   matches            Match[]
+  teamRegistrations  TeamRegistration[]
+  rosterSubmissions  RosterSubmission[]
+  rosterEntries      RosterEntry[]
+  rosterSnapshots    RosterSnapshot[]
+  snapshotEntries    RosterSnapshotEntry[]
+  importBatches      ImportBatch[]
 
   @@map("organizations")
 }
@@ -351,8 +400,12 @@ model Tournament {
   schedulePlans     SchedulePlan[]
   scheduleRevisions ScheduleRevision[]
   matches           Match[]
+  teamRegistrations TeamRegistration[]
+  rosterSnapshots   RosterSnapshot[]
+  importBatches     ImportBatch[]
 
   @@unique([organizationId, tournamentCode], map: "tournaments_organization_id_tournament_code_key")
+  @@unique([id, organizationId], map: "tournaments_id_organization_id_key")
   @@index([organizationId, status, createdAt], map: "tournaments_organization_id_status_created_at_idx")
   @@index([seasonId], map: "tournaments_season_id_idx")
   @@map("tournaments")
@@ -430,33 +483,41 @@ model CompetitionRound {
 }
 
 model Team {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  teamCode       String       @map("team_code") @db.VarChar(64)
-  name           String       @db.VarChar(160)
-  shortName      String?      @map("short_name") @db.VarChar(80)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  homeMatches    Match[]      @relation("MatchHomeTeam")
-  awayMatches    Match[]      @relation("MatchAwayTeam")
+  id              String             @id @default(uuid()) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  teamCode        String             @map("team_code") @db.VarChar(64)
+  name            String             @db.VarChar(160)
+  shortName       String?            @map("short_name") @db.VarChar(80)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  homeMatches     Match[]            @relation("MatchHomeTeam")
+  awayMatches     Match[]            @relation("MatchAwayTeam")
+  registrations   TeamRegistration[]
+  rosterSnapshots RosterSnapshot[]
 
   @@unique([organizationId, teamCode], map: "teams_organization_id_team_code_key")
+  @@unique([id, organizationId], map: "teams_id_organization_id_key")
   @@index([organizationId, name], map: "teams_organization_id_name_idx")
   @@map("teams")
 }
 
 model PlayerProfile {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  sourceType     String?      @map("source_type") @db.VarChar(64)
-  sourceKey      String?      @map("source_key") @db.VarChar(120)
-  displayName    String       @map("display_name") @db.VarChar(120)
-  jerseyName     String?      @map("jersey_name") @db.VarChar(120)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id              String                @id @default(uuid()) @db.Uuid
+  organizationId  String                @map("organization_id") @db.Uuid
+  sourceType      String?               @map("source_type") @db.VarChar(64)
+  sourceKey       String?               @map("source_key") @db.VarChar(120)
+  displayName     String                @map("display_name") @db.VarChar(120)
+  jerseyName      String?               @map("jersey_name") @db.VarChar(120)
+  studentIdMasked String?               @map("student_id_masked") @db.VarChar(64)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterEntries   RosterEntry[]
+  snapshotEntries RosterSnapshotEntry[]
 
+  // PostgreSQL partial uniqueness for non-null source_key is enforced by migration SQL.
+  @@unique([id, organizationId], map: "player_profiles_id_organization_id_key")
   @@index([organizationId, displayName], map: "player_profiles_organization_id_display_name_idx")
   @@map("player_profiles")
 }
@@ -551,4 +612,147 @@ model Match {
   @@index([stageId, roundId], map: "matches_stage_id_round_id_idx")
   @@index([scheduleRevisionId, scheduledStartAt], map: "matches_schedule_revision_id_scheduled_start_at_idx")
   @@map("matches")
+}
+
+model TeamRegistration {
+  id                String                 @id @default(uuid()) @db.Uuid
+  organizationId    String                 @map("organization_id") @db.Uuid
+  tournamentId      String                 @map("tournament_id") @db.Uuid
+  teamId            String                 @map("team_id") @db.Uuid
+  status            TeamRegistrationStatus @default(DRAFT)
+  leaderDisplayName String?                @map("leader_display_name") @db.VarChar(120)
+  coachDisplayName  String?                @map("coach_display_name") @db.VarChar(120)
+  contactName       String?                @map("contact_name") @db.VarChar(120)
+  contactPhone      String?                @map("contact_phone") @db.VarChar(40)
+  approvedAt        DateTime?              @map("approved_at") @db.Timestamptz(3)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament        Tournament             @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_tournament_organization_fkey")
+  team              Team                   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_team_organization_fkey")
+  rosterSubmissions RosterSubmission[]
+  rosterSnapshots   RosterSnapshot[]
+  importBatches     ImportBatch[]
+
+  @@unique([tournamentId, teamId], map: "team_registrations_tournament_id_team_id_key")
+  @@unique([id, organizationId], map: "team_registrations_id_organization_id_key")
+  @@index([organizationId, tournamentId, status], map: "team_registrations_org_tournament_status_idx")
+  @@index([organizationId, teamId], map: "team_registrations_organization_id_team_id_idx")
+  @@map("team_registrations")
+}
+
+model RosterSubmission {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  organizationId     String                 @map("organization_id") @db.Uuid
+  teamRegistrationId String                 @map("team_registration_id") @db.Uuid
+  submissionVersion  Int                    @map("submission_version")
+  status             RosterSubmissionStatus @default(DRAFT)
+  dataQualityStatus  DataQualityStatus      @default(CLEAN) @map("data_quality_status")
+  warningCodes       String[]               @default([]) @map("warning_codes")
+  sourceFileHash     String                 @map("source_file_hash") @db.Char(64)
+  submittedAt        DateTime?              @map("submitted_at") @db.Timestamptz(3)
+  approvedAt         DateTime?              @map("approved_at") @db.Timestamptz(3)
+  lockedAt           DateTime?              @map("locked_at") @db.Timestamptz(3)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  teamRegistration   TeamRegistration       @relation(fields: [teamRegistrationId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_submissions_registration_organization_fkey")
+  entries            RosterEntry[]
+  snapshot           RosterSnapshot?
+
+  @@unique([teamRegistrationId, submissionVersion], map: "roster_submissions_registration_id_version_key")
+  @@unique([teamRegistrationId, sourceFileHash], map: "roster_submissions_registration_id_source_hash_key")
+  @@unique([id, organizationId], map: "roster_submissions_id_organization_id_key")
+  @@index([organizationId, status, createdAt], map: "roster_submissions_organization_id_status_created_at_idx")
+  @@index([teamRegistrationId, status], map: "roster_submissions_registration_id_status_idx")
+  @@map("roster_submissions")
+}
+
+model RosterEntry {
+  id                 String           @id @default(uuid()) @db.Uuid
+  organizationId     String           @map("organization_id") @db.Uuid
+  rosterSubmissionId String           @map("roster_submission_id") @db.Uuid
+  playerProfileId    String           @map("player_profile_id") @db.Uuid
+  shirtNumber        String?          @map("shirt_number") @db.VarChar(16)
+  sortOrder          Int              @default(0) @map("sort_order")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterSubmission   RosterSubmission @relation(fields: [rosterSubmissionId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_entries_submission_organization_fkey")
+  playerProfile      PlayerProfile    @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_entries_player_organization_fkey")
+
+  @@unique([rosterSubmissionId, playerProfileId], map: "roster_entries_submission_id_player_profile_id_key")
+  @@index([organizationId, playerProfileId, rosterSubmissionId], map: "roster_entries_org_player_submission_idx")
+  @@map("roster_entries")
+}
+
+model RosterSnapshot {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @map("organization_id") @db.Uuid
+  tournamentId       String                @map("tournament_id") @db.Uuid
+  teamId             String                @map("team_id") @db.Uuid
+  teamRegistrationId String                @map("team_registration_id") @db.Uuid
+  rosterSubmissionId String                @unique(map: "roster_snapshots_roster_submission_id_key") @map("roster_submission_id") @db.Uuid
+  snapshotVersion    Int                   @map("snapshot_version")
+  sourceFileHash     String                @map("source_file_hash") @db.Char(64)
+  lockedAt           DateTime?             @map("locked_at") @db.Timestamptz(3)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament         Tournament            @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshots_tournament_organization_fkey")
+  team               Team                  @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshots_team_organization_fkey")
+  teamRegistration   TeamRegistration      @relation(fields: [teamRegistrationId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshots_registration_organization_fkey")
+  rosterSubmission   RosterSubmission      @relation(fields: [rosterSubmissionId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshots_submission_organization_fkey")
+  entries            RosterSnapshotEntry[]
+  importBatches      ImportBatch[]
+
+  @@unique([tournamentId, teamId, snapshotVersion], map: "roster_snapshots_tournament_id_team_id_version_key")
+  @@unique([rosterSubmissionId, organizationId], map: "roster_snapshots_submission_id_organization_id_key")
+  @@unique([id, organizationId], map: "roster_snapshots_id_organization_id_key")
+  @@index([organizationId, tournamentId, teamId, lockedAt], map: "roster_snapshots_org_tournament_team_locked_at_idx")
+  @@index([teamRegistrationId, snapshotVersion], map: "roster_snapshots_registration_id_version_idx")
+  @@map("roster_snapshots")
+}
+
+model RosterSnapshotEntry {
+  id               String         @id @default(uuid()) @db.Uuid
+  organizationId   String         @map("organization_id") @db.Uuid
+  rosterSnapshotId String         @map("roster_snapshot_id") @db.Uuid
+  playerProfileId  String         @map("player_profile_id") @db.Uuid
+  displayName      String         @map("display_name") @db.VarChar(120)
+  shirtNumber      String?        @map("shirt_number") @db.VarChar(16)
+  studentIdMasked  String?        @map("student_id_masked") @db.VarChar(64)
+  sortOrder        Int            @default(0) @map("sort_order")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterSnapshot   RosterSnapshot @relation(fields: [rosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshot_entries_snapshot_organization_fkey")
+  playerProfile    PlayerProfile  @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "roster_snapshot_entries_player_organization_fkey")
+
+  @@unique([rosterSnapshotId, playerProfileId], map: "roster_snapshot_entries_snapshot_id_player_id_key")
+  @@index([organizationId, rosterSnapshotId, sortOrder], map: "roster_snapshot_entries_org_snapshot_sort_idx")
+  @@map("roster_snapshot_entries")
+}
+
+model ImportBatch {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  tournamentId       String            @map("tournament_id") @db.Uuid
+  teamRegistrationId String?           @map("team_registration_id") @db.Uuid
+  rosterSnapshotId   String?           @map("roster_snapshot_id") @db.Uuid
+  importType         String            @map("import_type") @db.VarChar(64)
+  schemaVersion      Int               @map("schema_version")
+  sourceFileHash     String            @map("source_file_hash") @db.Char(64)
+  status             ImportBatchStatus @default(UPLOADED)
+  teamCode           String            @map("team_code") @db.VarChar(64)
+  rowCount           Int               @map("row_count")
+  warningCodes       String[]          @default([]) @map("warning_codes")
+  confirmedAt        DateTime?         @map("confirmed_at") @db.Timestamptz(3)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament         Tournament        @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "import_batches_tournament_organization_fkey")
+  teamRegistration   TeamRegistration? @relation(fields: [teamRegistrationId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "import_batches_registration_organization_fkey")
+  rosterSnapshot     RosterSnapshot?   @relation(fields: [rosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "import_batches_snapshot_organization_fkey")
+
+  @@unique([organizationId, tournamentId, importType, sourceFileHash], map: "import_batches_org_tournament_type_source_hash_key")
+  @@index([organizationId, tournamentId, createdAt], map: "import_batches_org_tournament_created_at_idx")
+  @@index([teamRegistrationId, createdAt], map: "import_batches_registration_id_created_at_idx")
+  @@map("import_batches")
 }

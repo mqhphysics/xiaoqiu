@@ -8,6 +8,7 @@ import {
   MatchStatus,
   OutboxJobStatus,
   SchedulePlanStatus,
+  TeamRegistrationStatus,
   TournamentStatus,
   type Prisma,
 } from '../generated/prisma/client'
@@ -486,36 +487,24 @@ export class ScheduleService {
   }
 
   async getPublicTeam(organizationId: string, teamId: string) {
-    const team = await this.prisma.team.findFirst({
-      where: {
-        id: teamId,
-        organizationId,
-      },
-    })
-
-    if (team === null) {
-      throw this.notFound()
-    }
-
-    const visibleMatch = await this.prisma.match.findFirst({
-      select: { id: true },
+    const registration = await this.prisma.teamRegistration.findFirst({
+      include: { team: true },
       where: {
         organizationId,
-        scheduleRevisionId: {
-          not: null,
-        },
+        status: TeamRegistrationStatus.APPROVED,
+        teamId,
         tournament: {
+          organizationId,
           status: TournamentStatus.PUBLISHED,
         },
-        OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }],
       },
     })
 
-    if (visibleMatch === null) {
+    if (registration === null) {
       throw this.notFound()
     }
 
-    return this.toTeamView(team)
+    return this.toTeamView(registration.team)
   }
 
   private async requireSeason(organizationId: string, seasonId: string) {

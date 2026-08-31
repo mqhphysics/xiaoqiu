@@ -17,6 +17,7 @@
     "prisma:format": "prisma format --schema ../../prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma && prettier --write \"src/generated/prisma/**/*.ts\"",
     "db:migrate:deploy": "prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "db:import:registration": "tsx src/roster/import-registration.cli.ts",
     "predb:seed": "npm run prisma:generate",
     "db:seed": "tsx src/database/seed.ts"
   },
