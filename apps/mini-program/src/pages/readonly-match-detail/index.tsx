@@ -1,50 +1,45 @@
-import { Button, Navigator, Text, View } from '@tarojs/components'
+import { Button, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
-import { DataState, SectionHeading } from '../../components/public-ui'
+import { DataState } from '../../components/public-ui'
+import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
 import {
-  formatDateLabel,
-  formatMatchTime,
-  getMatchStatusText,
-  getMatchStatusTone,
-} from '../../features/readonly-schedule/readonly-schedule.logic'
-import { readonlyScheduleRepository } from '../../features/readonly-schedule/readonly-schedule.repository'
-import type {
-  PublicDataSource,
-  ReadonlyMatch,
-} from '../../features/readonly-schedule/readonly-schedule.types'
+  eventLabel,
+  formatLongDate,
+  formatTime,
+  positionLabel,
+} from '../../features/product/product.format'
+import { productRepository } from '../../features/product/product.repository'
+import type { MatchExperienceResponse } from '../../features/product/product.types'
 
 import './index.scss'
 
 type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
-  | { phase: 'ready'; match: ReadonlyMatch; source: PublicDataSource }
+  | { phase: 'ready'; match: MatchExperienceResponse }
 
-export default function ReadonlyMatchDetailPage() {
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+export default function MatchDetailPage() {
   const matchId = getCurrentInstance().router?.params.matchId ?? ''
+  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const [lineupTeamId, setLineupTeamId] = useState('')
 
   const load = useCallback(async () => {
     if (!matchId) {
-      setState({ phase: 'failed', message: '缺少比赛参数，请从赛程进入。' })
+      setState({ phase: 'failed', message: '缺少比赛参数。' })
       return
     }
-
     setState({ phase: 'loading' })
     try {
-      const result = await readonlyScheduleRepository.getMatch(matchId)
-      if (!result.data) {
-        setState({ phase: 'failed', message: '没有找到该比赛，或比赛尚未公开。' })
-        return
-      }
-      setState({ phase: 'ready', match: result.data, source: result.source })
+      const match = await productRepository.getMatch(matchId)
+      setLineupTeamId(match.lineups[0]?.team.id ?? '')
+      setState({ phase: 'ready', match })
     } catch (error) {
       setState({
         phase: 'failed',
-        message: error instanceof Error ? error.message : '比赛详情加载失败，请稍后重试。',
+        message: error instanceof Error ? error.message : '比赛详情加载失败。',
       })
     }
   }, [matchId])
@@ -53,144 +48,146 @@ export default function ReadonlyMatchDetailPage() {
     void load()
   }, [load])
 
-  const tournamentId = state.phase === 'ready' ? state.match.tournamentId : undefined
-
   return (
-    <PublicShell
-      active="schedule"
-      tournamentId={tournamentId}
-      source={state.phase === 'ready' ? state.source : undefined}
-    >
+    <PublicShell active="schedule" tournamentId={state.phase === 'ready' ? state.match.tournamentId : undefined}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取比赛详情" />}
-
       {state.phase === 'failed' && (
-        <DataState
-          kind="error"
-          title="比赛详情不可用"
-          description={state.message}
-          onRetry={() => void load()}
-        />
+        <DataState kind="error" title="比赛详情不可用" description={state.message} onRetry={() => void load()} />
       )}
-
-      {state.phase === 'ready' && <MatchContent match={state.match} />}
+      {state.phase === 'ready' && (
+        <MatchContent match={state.match} lineupTeamId={lineupTeamId} onLineupTeamChange={setLineupTeamId} />
+      )}
     </PublicShell>
   )
 }
 
-function MatchContent({ match }: { match: ReadonlyMatch }) {
+function MatchContent({
+  match,
+  lineupTeamId,
+  onLineupTeamChange,
+}: {
+  match: MatchExperienceResponse
+  lineupTeamId: string
+  onLineupTeamChange: (id: string) => void
+}) {
+  const hasScore = match.homeScore !== null && match.awayScore !== null
+  const selectedLineup = match.lineups.find((lineup) => lineup.team.id === lineupTeamId) ?? match.lineups[0]
   return (
     <View>
-      <View className="match-detail-heading">
-        <View>
-          <Text className="match-detail-heading__eyebrow">
-            {match.stageName} · {match.roundName}
-          </Text>
-          <Text className="match-detail-heading__date">
-            {formatDateLabel(match.scheduledStartAt)} {formatMatchTime(match.scheduledStartAt)}
-          </Text>
+      <View className="experience-match-header">
+        <View className="experience-match-header__meta">
+          <Text>{match.stageName ?? '赛事'} · {match.roundName ?? match.title}</Text>
+          <MatchStatus status={match.status} />
         </View>
-        <Text className={`status-tag status-tag--${getMatchStatusTone(match.status)}`}>
-          {getMatchStatusText(match.status)}
+        <Text className="experience-match-header__date">
+          {formatLongDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
         </Text>
-      </View>
+        <Text className="experience-match-header__venue">{match.venue?.name ?? '场地待定'}</Text>
 
-      <View className="match-scoreboard">
-        <TeamSide
-          label="主队"
-          name={match.homeTeamName}
-          teamId={match.homeTeamId}
-          tournamentId={match.tournamentId}
-        />
-        <View className="match-scoreboard__center">
-          <Text className="match-scoreboard__versus">VS</Text>
-          <Text className="match-scoreboard__status">{getMatchStatusText(match.status)}</Text>
-        </View>
-        <TeamSide
-          label="客队"
-          name={match.awayTeamName}
-          teamId={match.awayTeamId}
-          tournamentId={match.tournamentId}
-        />
-      </View>
-
-      <View className="match-info-grid">
-        <View className="match-info surface">
-          <Text className="match-info__label">比赛时间</Text>
-          <Text className="match-info__value">
-            {formatDateLabel(match.scheduledStartAt)} {formatMatchTime(match.scheduledStartAt)}
-          </Text>
-        </View>
-        <View className="match-info surface">
-          <Text className="match-info__label">比赛场地</Text>
-          <Text className="match-info__value">
-            {match.venueName}
-            {match.pitchName ? ` · ${match.pitchName}` : ''}
-          </Text>
-        </View>
-        <View className="match-info surface">
-          <Text className="match-info__label">赛事阶段</Text>
-          <Text className="match-info__value">
-            {match.stageName} · {match.roundName}
-          </Text>
+        <View className="experience-scoreboard">
+          <TeamSide team={match.homeTeam} placeholder={match.homePlaceholder} tournamentId={match.tournamentId} />
+          <View className="experience-scoreboard__score">
+            <Text>{hasScore ? match.homeScore + ' : ' + match.awayScore : 'VS'}</Text>
+            {(match.homePenaltyScore !== null || match.awayPenaltyScore !== null) && (
+              <Text>点球 {match.homePenaltyScore ?? 0} : {match.awayPenaltyScore ?? 0}</Text>
+            )}
+          </View>
+          <TeamSide team={match.awayTeam} placeholder={match.awayPlaceholder} tournamentId={match.tournamentId} />
         </View>
       </View>
 
-      {match.statusReason && (
-        <View className="match-notice match-notice--warning">
-          <Text className="match-notice__label">赛程说明</Text>
-          <Text className="match-notice__copy">{match.statusReason}</Text>
+      {(match.summary || match.statusReason) && (
+        <View className="match-summary surface">
+          <Text className="match-summary__label">{match.statusReason ? '比赛说明' : '比赛战报'}</Text>
+          <Text className="match-summary__body">{match.statusReason ?? match.summary}</Text>
+          {match.attendance !== null && <Text className="match-summary__attendance">现场观众 {match.attendance} 人</Text>}
         </View>
       )}
 
-      <View className="content-section">
-        <SectionHeading eyebrow="MATCH DATA" title="比赛数据" />
-        <View className="match-notice">
-          <Text className="match-notice__label">暂未提供</Text>
-          <Text className="match-notice__copy">
-            当前公开数据仅包含比赛时间、场地、对阵与状态，比分和比赛事件尚未接入。
-          </Text>
+      <View className="match-experience-grid">
+        <View className="match-event-section">
+          <ProductSection kicker="TIMELINE" title="比赛事件" note={match.events.length + ' 条'} />
+          {match.events.length === 0 ? (
+            <DataState kind="empty" title="暂无比赛事件" />
+          ) : (
+            <View className="event-timeline surface">
+              {match.events.map((event) => (
+                <View
+                  className={'event-row ' + (event.team.id === match.homeTeam?.id ? 'event-row--home' : 'event-row--away')}
+                  key={event.id}
+                >
+                  <Text className="event-row__minute">{event.minute}{event.stoppageMinute ? '+' + event.stoppageMinute : ''}'</Text>
+                  <Text className={'event-row__type event-row__type--' + event.type.toLowerCase()}>{eventLabel(event.type)}</Text>
+                  <View className="event-row__copy">
+                    <Text>{event.player?.displayName ?? event.team.shortName}</Text>
+                    <Text>
+                      {event.relatedPlayer ? '助攻 ' + event.relatedPlayer.displayName : event.description ?? event.team.name}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View className="match-lineup-section">
+          <ProductSection kicker="LINEUPS" title="双方阵容" note={match.lineups.length > 0 ? '公开出场名单' : '待公布'} />
+          {match.lineups.length === 0 ? (
+            <DataState kind="empty" title="阵容尚未公布" />
+          ) : (
+            <View className="lineup-panel surface">
+              <View className="lineup-tabs">
+                {match.lineups.map((lineup) => (
+                  <Button
+                    className={lineupTeamId === lineup.team.id ? 'lineup-tab--active' : ''}
+                    key={lineup.team.id}
+                    onClick={() => onLineupTeamChange(lineup.team.id)}
+                  >
+                    {lineup.team.shortName}
+                  </Button>
+                ))}
+              </View>
+              <View className="lineup-list">
+                {selectedLineup?.players.map((player) => (
+                  <View
+                    className="lineup-player"
+                    key={player.id}
+                    onClick={() => void Taro.navigateTo({ url: '/pages/player-detail/index?playerId=' + encodeURIComponent(player.id) + '&tournamentId=' + encodeURIComponent(match.tournamentId) })}
+                  >
+                    <Text className="lineup-player__number">{player.shirtNumber ?? '-'}</Text>
+                    <UserAvatar name={player.displayName} size="small" />
+                    <View className="lineup-player__copy">
+                      <Text>{player.displayName}</Text>
+                      <Text>{positionLabel(player.position)} · {player.starter ? '首发' : '替补'}</Text>
+                    </View>
+                    <Text className="lineup-player__minutes">{player.minutesPlayed}'</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </View>
-
-      <Button
-        className="button button--secondary match-back-button"
-        onClick={() =>
-          void Taro.navigateTo({
-            url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(match.tournamentId)}`,
-          })
-        }
-      >
-        返回完整赛程
-      </Button>
     </View>
   )
 }
 
 function TeamSide({
-  label,
-  name,
-  teamId,
+  team,
+  placeholder,
   tournamentId,
 }: {
-  label: string
-  name: string
-  teamId: string
+  team: MatchExperienceResponse['homeTeam']
+  placeholder: string | null | undefined
   tournamentId: string
 }) {
   return (
-    <View className="match-team">
-      <Text className="match-team__label">{label}</Text>
-      <Text className="match-team__name">{name}</Text>
-      {teamId ? (
-        <Navigator
-          className="match-team__link"
-          url={`/pages/readonly-team-detail/index?tournamentId=${encodeURIComponent(tournamentId)}&teamId=${encodeURIComponent(teamId)}`}
-        >
-          查看球队
-        </Navigator>
-      ) : (
-        <View className="match-team__link match-team__link--disabled">席位待定</View>
-      )}
+    <View
+      className={'experience-scoreboard__team ' + (team ? 'experience-scoreboard__team--linked' : '')}
+      onClick={() => team && void Taro.navigateTo({ url: '/pages/readonly-team-detail/index?teamId=' + encodeURIComponent(team.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+    >
+      <TeamCrest team={team} size="large" />
+      <Text>{team?.name ?? placeholder ?? '席位待定'}</Text>
     </View>
   )
 }

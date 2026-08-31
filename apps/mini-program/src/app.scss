@@ -7,10 +7,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
 }
 
-view,
-text,
-button,
-input {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -25,6 +24,21 @@ input {
   max-width: 1180px;
   margin: 0 auto;
   padding: 34px 0 28px;
+}
+
+button {
+  letter-spacing: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
 }
 
 .page-intro {

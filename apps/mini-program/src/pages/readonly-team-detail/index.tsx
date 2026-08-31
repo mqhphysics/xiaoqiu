@@ -1,171 +1,140 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
-import { DataState, SectionHeading, TeamMark } from '../../components/public-ui'
-import {
-  getRegistrationStatusText,
-  getRosterStatusText,
-} from '../../features/readonly-schedule/readonly-schedule.logic'
-import { readonlyScheduleRepository } from '../../features/readonly-schedule/readonly-schedule.repository'
-import type {
-  PublicDataSource,
-  ReadonlyTeam,
-} from '../../features/readonly-schedule/readonly-schedule.types'
+import { DataState } from '../../components/public-ui'
+import { MatchCard, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
+import { positionLabel } from '../../features/product/product.format'
+import { productRepository } from '../../features/product/product.repository'
+import type { TeamDashboardResponse } from '../../features/product/product.types'
 
 import './index.scss'
 
 type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
-  | { phase: 'ready'; team: ReadonlyTeam; source: PublicDataSource }
+  | { phase: 'ready'; team: TeamDashboardResponse; tournamentId: string }
 
-export default function ReadonlyTeamDetailPage() {
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+export default function TeamDetailPage() {
   const params = getCurrentInstance().router?.params
-  const tournamentId = params?.tournamentId ?? ''
   const teamId = params?.teamId ?? ''
+  const routeTournamentId = params?.tournamentId ?? ''
+  const [state, setState] = useState<PageState>({ phase: 'loading' })
 
   const load = useCallback(async () => {
-    if (!tournamentId || !teamId) {
-      setState({ phase: 'failed', message: '缺少赛事或球队参数，请从球队列表进入。' })
+    if (!teamId) {
+      setState({ phase: 'failed', message: '缺少球队参数。' })
       return
     }
-
     setState({ phase: 'loading' })
     try {
-      const result = await readonlyScheduleRepository.getTeam(tournamentId, teamId)
-      if (!result.data) {
-        setState({ phase: 'failed', message: '没有找到该球队，或球队名单尚未公开。' })
-        return
-      }
-      setState({ phase: 'ready', team: result.data, source: result.source })
+      const tournamentId = routeTournamentId || (await productRepository.getHome()).tournament.id
+      const team = await productRepository.getTeamDashboard(teamId, tournamentId)
+      setState({ phase: 'ready', team, tournamentId })
     } catch (error) {
       setState({
         phase: 'failed',
-        message: error instanceof Error ? error.message : '球队详情加载失败，请稍后重试。',
+        message: error instanceof Error ? error.message : '球队详情加载失败。',
       })
     }
-  }, [teamId, tournamentId])
+  }, [routeTournamentId, teamId])
 
   useEffect(() => {
     void load()
   }, [load])
 
   return (
-    <PublicShell
-      active="teams"
-      tournamentId={tournamentId}
-      source={state.phase === 'ready' ? state.source : undefined}
-    >
-      {state.phase === 'loading' && <DataState kind="loading" title="正在读取球队与公开名单" />}
-
+    <PublicShell active="team" tournamentId={state.phase === 'ready' ? state.tournamentId : routeTournamentId}>
+      {state.phase === 'loading' && <DataState kind="loading" title="正在读取球队档案" />}
       {state.phase === 'failed' && (
-        <DataState
-          kind="error"
-          title="球队详情不可用"
-          description={state.message}
-          onRetry={() => void load()}
-        />
+        <DataState kind="error" title="球队详情不可用" description={state.message} onRetry={() => void load()} />
       )}
-
-      {state.phase === 'ready' && <TeamContent team={state.team} />}
+      {state.phase === 'ready' && <TeamContent data={state.team} tournamentId={state.tournamentId} />}
     </PublicShell>
   )
 }
 
-function TeamContent({ team }: { team: ReadonlyTeam }) {
+function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tournamentId: string }) {
   return (
     <View>
-      <View className="team-detail-hero">
-        <View className="team-detail-hero__identity">
-          <View className="team-detail-mark">
-            <TeamMark teamCode={team.teamCode} name={team.name} />
-          </View>
-          <View className="team-detail-hero__copy">
-            <Text className="team-detail-hero__eyebrow">{team.teamCode}</Text>
-            <Text className="team-detail-hero__title">{team.name}</Text>
-            <Text className="team-detail-hero__short">{team.shortName}</Text>
+      <View className="public-team-hero" style={{ borderColor: data.team.primaryColor ?? '#1f6b45' }}>
+        <View className="public-team-hero__identity">
+          <TeamCrest team={data.team} size="large" />
+          <View>
+            <Text className="public-team-hero__eyebrow">{data.team.teamCode} · {data.team.groupName}</Text>
+            <Text className="public-team-hero__title">{data.team.name}</Text>
+            <Text className="public-team-hero__college">{data.team.collegeName}</Text>
+            <Text className="public-team-hero__motto">{data.team.motto}</Text>
           </View>
         </View>
-        <View className="team-detail-hero__statuses">
-          <Text className="status-tag status-tag--approved">
-            {getRegistrationStatusText(team.registrationStatus)}
-          </Text>
-          <Text className="status-tag status-tag--locked">
-            {getRosterStatusText(team.rosterStatus)}
-          </Text>
+        <View className="public-team-hero__staff">
+          <View><Text>队长</Text><Text>{data.team.captainName ?? '未设置'}</Text></View>
+          <View><Text>教练</Text><Text>{data.team.coachName ?? '未设置'}</Text></View>
         </View>
       </View>
 
-      <View className="team-detail-facts">
-        <View className="team-detail-fact">
-          <Text className="team-detail-fact__label">领队</Text>
-          <Text className="team-detail-fact__value">{team.leaderDisplayName ?? '未公开'}</Text>
-        </View>
-        <View className="team-detail-fact">
-          <Text className="team-detail-fact__label">教练</Text>
-          <Text className="team-detail-fact__value">{team.coachDisplayName ?? '未公开'}</Text>
-        </View>
-        <View className="team-detail-fact">
-          <Text className="team-detail-fact__label">名单版本</Text>
-          <Text className="team-detail-fact__value">
-            {team.rosterSnapshotVersion === null ? '待锁定' : `v${team.rosterSnapshotVersion}`}
-          </Text>
-        </View>
-        <View className="team-detail-fact">
-          <Text className="team-detail-fact__label">公开球员</Text>
-          <Text className="team-detail-fact__value">{team.rosterPlayerCount} 人</Text>
+      <View className="public-team-record">
+        <Record value={data.stats.played} label="比赛" />
+        <Record value={data.stats.won} label="胜" />
+        <Record value={data.stats.drawn} label="平" />
+        <Record value={data.stats.lost} label="负" />
+        <Record value={data.stats.goalsFor + ':' + data.stats.goalsAgainst} label="进失球" />
+        <Record value={data.stats.points} label="积分" accent />
+      </View>
+
+      <View className="public-team-about surface">
+        <Text className="public-team-about__label">球队简介</Text>
+        <Text className="public-team-about__body">{data.team.description ?? '暂无球队简介。'}</Text>
+        <Text className="public-team-about__founded">{data.team.foundedYear ? '成立于 ' + data.team.foundedYear + ' 年' : ''}</Text>
+      </View>
+
+      <View className="public-team-section">
+        <ProductSection kicker="MATCHES" title="球队赛程" note="近期与待进行" />
+        <View className="public-team-match-grid">
+          {[...data.upcomingMatches, ...data.recentMatches].slice(0, 6).map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              onClick={() => void Taro.navigateTo({ url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id) })}
+            />
+          ))}
         </View>
       </View>
 
-      <View className="content-section">
-        <SectionHeading eyebrow="PUBLIC ROSTER" title="公开名单" action="姓名与球衣号" />
-        {team.players.length === 0 ? (
-          <DataState
-            kind="empty"
-            title="暂无公开球员"
-            description="名单锁定后，允许公开的姓名和球衣号会显示在这里。"
-          />
-        ) : (
-          <View className="roster-table surface">
-            <View className="roster-table__head">
-              <Text>号码</Text>
-              <Text>球员</Text>
-            </View>
-            {team.players.map((player) => (
-              <View className="roster-table__row" key={player.id}>
-                <Text className="roster-table__number">{player.shirtNumber ?? '-'}</Text>
-                <Text className="roster-table__name">{player.displayName}</Text>
+      <View className="public-team-section">
+        <ProductSection kicker="SQUAD" title="完整阵容" note={data.roster.length + ' 名球员'} />
+        <View className="public-roster surface">
+          <View className="public-roster__head">
+            <Text>号码</Text><Text>球员</Text><Text>位置 / 年级</Text><Text>出场</Text><Text>进球</Text><Text>助攻</Text>
+          </View>
+          {data.roster.map((player) => (
+            <View
+              className="public-roster__row"
+              key={player.id}
+              onClick={() => void Taro.navigateTo({ url: '/pages/player-detail/index?playerId=' + encodeURIComponent(player.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+            >
+              <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
+              <View className="public-roster__player">
+                <UserAvatar name={player.displayName} color={player.profileColor} size="small" />
+                <Text>{player.displayName}</Text>
               </View>
-            ))}
-          </View>
-        )}
+              <Text>{positionLabel(player.position)} · {player.academicYear}</Text>
+              <Text>{player.appearances}</Text>
+              <Text>{player.goals}</Text>
+              <Text>{player.assists}</Text>
+            </View>
+          ))}
+        </View>
       </View>
+    </View>
+  )
+}
 
-      <View className="team-detail-actions">
-        <Button
-          className="button button--secondary"
-          onClick={() =>
-            void Taro.navigateTo({
-              url: `/pages/readonly-teams/index?tournamentId=${encodeURIComponent(team.tournamentId)}`,
-            })
-          }
-        >
-          返回球队列表
-        </Button>
-        <Button
-          className="button button--outline"
-          onClick={() =>
-            void Taro.navigateTo({
-              url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(team.tournamentId)}`,
-            })
-          }
-        >
-          查看赛事赛程
-        </Button>
-      </View>
+function Record({ value, label, accent = false }: { value: number | string; label: string; accent?: boolean }) {
+  return (
+    <View className={'public-team-record__item ' + (accent ? 'public-team-record__item--accent' : '')}>
+      <Text>{value}</Text><Text>{label}</Text>
     </View>
   )
 }

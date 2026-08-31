@@ -11,6 +11,7 @@ export function configureApp(app: INestApplication): void {
   app.enableCors({
     origin: resolveCorsOrigins(),
     allowedHeaders: [
+      'authorization',
       'content-type',
       'idempotency-key',
       'x-dev-organization-id',
@@ -29,6 +30,7 @@ export function configureApp(app: INestApplication): void {
     .setTitle('晓球 API')
     .setDescription('晓球平台 REST API')
     .setVersion(process.env.APP_VERSION ?? '0.1.0')
+    .addBearerAuth()
     .build()
   const document = SwaggerModule.createDocument(app, swaggerConfig)
 
@@ -53,5 +55,7 @@ function resolveCorsOrigins(): string[] {
     'http://127.0.0.1:5174',
     'http://localhost:10086',
     'http://127.0.0.1:10086',
+    'http://localhost:10087',
+    'http://127.0.0.1:10087',
   ]
 }

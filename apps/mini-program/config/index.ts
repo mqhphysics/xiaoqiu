@@ -26,7 +26,9 @@ const config: UserConfigExport = {
   outputRoot: 'dist',
   plugins: [],
   env: {
-    TARO_APP_API_BASE_URL: JSON.stringify(buildEnvironment?.TARO_APP_API_BASE_URL ?? ''),
+    TARO_APP_API_BASE_URL: JSON.stringify(
+      buildEnvironment?.TARO_APP_API_BASE_URL ?? 'http://127.0.0.1:3001',
+    ),
     TARO_APP_ORGANIZATION_ID: JSON.stringify(buildEnvironment?.TARO_APP_ORGANIZATION_ID ?? ''),
   },
   defineConstants: {},
@@ -42,7 +44,7 @@ const config: UserConfigExport = {
     },
   },
   cache: {
-    enable: true,
+    enable: false,
   },
   mini: {
     postcss: {
@@ -68,6 +70,9 @@ const config: UserConfigExport = {
   h5: {
     publicPath: '/',
     staticDirectory: 'static',
+    devServer: {
+      hot: false,
+    },
     htmlPluginOption: {
       favicon: path.resolve(__dirname, '../src/assets/favicon.svg'),
     },

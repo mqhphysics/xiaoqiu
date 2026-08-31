@@ -4,7 +4,7 @@
 
 开始任务前依次阅读：
 
-1. `docs/implementation/晓球方案A详细实施方案v0.2.md`
+1. `docs/architecture/晓球产品与技术架构最终版.md`
 2. 本文件
 3. `docs/tasks/` 中分配给你的任务卡
 
