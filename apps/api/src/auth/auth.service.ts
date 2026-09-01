@@ -5,11 +5,17 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
-import { AuditActorType, UserStatus } from '../generated/prisma/client'
+import {
+  AuditActorType,
+  MembershipStatus,
+  UserStatus,
+  VerificationLevel,
+} from '../generated/prisma/client'
 import type {
   AdminIdentityDto,
   AuthUserDto,
   LoginResponseDto,
+  RegisterDto,
   ResetPasswordByIdentityDto,
 } from './auth.dto'
 import { hashPassword, verifyPassword } from './password'
@@ -98,6 +104,103 @@ export class AuthService {
       expiresAt: expiresAt.toISOString(),
       user: mapAuthUser(user),
     }
+  }
+
+  async register(
+    body: RegisterDto,
+    organizationId: string,
+    request: {
+      ip?: string | undefined
+      requestId: string
+      userAgent?: string | undefined
+    },
+  ): Promise<LoginResponseDto> {
+    const username = normalizeIdentifier(body.username)
+    const email = normalizeIdentifier(body.email)
+    const studentId = body.studentId.trim()
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    if (!organization) {
+      throw new ApiHttpException(HttpStatus.NOT_FOUND, {
+        code: ERROR_CODES.NOT_FOUND,
+        message: '当前组织不可用',
+      })
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ loginNameNormalized: username }, { studentId }, { emailNormalized: email }],
+      },
+      select: {
+        loginNameNormalized: true,
+        studentId: true,
+        emailNormalized: true,
+      },
+    })
+    if (existing) {
+      const field =
+        existing.loginNameNormalized === username
+          ? '用户名'
+          : existing.studentId === studentId
+            ? '学号'
+            : '邮箱'
+      throw new ApiHttpException(HttpStatus.CONFLICT, {
+        code: ERROR_CODES.CONFLICT,
+        message: `${field}已被使用`,
+      })
+    }
+
+    const credential = hashPassword(body.password)
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          loginNameNormalized: username,
+          displayName: body.displayName.trim(),
+          realName: body.realName.trim(),
+          realNameNormalized: normalizeIdentifier(body.realName),
+          studentId,
+          email: body.email.trim(),
+          emailNormalized: email,
+          verificationLevel: VerificationLevel.UNVERIFIED,
+          status: UserStatus.ACTIVE,
+        },
+      })
+      await tx.passwordCredential.create({
+        data: {
+          userId: user.id,
+          passwordHash: credential.hash,
+          passwordSalt: credential.salt,
+          algorithm: credential.algorithm,
+        },
+      })
+      await tx.organizationMembership.create({
+        data: {
+          organizationId,
+          userId: user.id,
+          status: MembershipStatus.ACTIVE,
+          joinedAt: new Date(),
+        },
+      })
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ACCOUNT_REGISTERED',
+          targetType: 'User',
+          targetId: user.id,
+          reason: '用户自主注册',
+          requestId: request.requestId,
+          ipAddress: request.ip ?? null,
+          userAgent: request.userAgent?.slice(0, 512) ?? null,
+          source: 'API',
+        },
+      })
+    })
+
+    return this.login(username, body.password, request)
   }
 
   async getSession(authorization: string | undefined): Promise<AuthenticatedSession | null> {
@@ -279,16 +382,18 @@ export class AuthService {
       },
     })
 
-    return memberships.filter(({ user }) => user.studentId !== null).map(({ user }) => ({
-      id: user.id,
-      username: user.loginNameNormalized ?? '',
-      displayName: user.displayName,
-      realName: user.realName,
-      studentId: user.studentId,
-      email: user.email,
-      verificationLevel: user.verificationLevel,
-      roles: user.roleAssignments.map((assignment) => assignment.role),
-    }))
+    return memberships
+      .filter(({ user }) => user.studentId !== null)
+      .map(({ user }) => ({
+        id: user.id,
+        username: user.loginNameNormalized ?? '',
+        displayName: user.displayName,
+        realName: user.realName,
+        studentId: user.studentId,
+        email: user.email,
+        verificationLevel: user.verificationLevel,
+        roles: user.roleAssignments.map((assignment) => assignment.role),
+      }))
   }
 }
 

@@ -29,7 +29,10 @@ export default function PlayerDetailPage() {
     }
     setState({ phase: 'loading' })
     try {
-      setState({ phase: 'ready', player: await productRepository.getPlayer(playerId, tournamentId) })
+      setState({
+        phase: 'ready',
+        player: await productRepository.getPlayer(playerId, tournamentId),
+      })
     } catch (error) {
       setState({
         phase: 'failed',
@@ -43,16 +46,29 @@ export default function PlayerDetailPage() {
   }, [load])
 
   return (
-    <PublicShell active="data" tournamentId={tournamentId}>
+    <PublicShell active="data" showBack tournamentId={tournamentId}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取球员档案" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="球员档案不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="球员档案不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
-      {state.phase === 'ready' && <PlayerContent player={state.player} tournamentId={tournamentId} />}
+      {state.phase === 'ready' && (
+        <PlayerContent player={state.player} tournamentId={tournamentId} />
+      )}
     </PublicShell>
   )
 }
-function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse; tournamentId: string }) {
+function PlayerContent({
+  player,
+  tournamentId,
+}: {
+  player: PlayerDetailResponse
+  tournamentId: string
+}) {
   return (
     <View>
       <View className="player-hero" style={{ borderColor: player.profileColor ?? '#1f6b45' }}>
@@ -70,10 +86,21 @@ function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse;
         {player.team && (
           <View
             className="player-team-link"
-            onClick={() => void Taro.navigateTo({ url: '/pages/readonly-team-detail/index?teamId=' + encodeURIComponent(player.team!.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+            onClick={() =>
+              void Taro.navigateTo({
+                url:
+                  '/pages/readonly-team-detail/index?teamId=' +
+                  encodeURIComponent(player.team!.id) +
+                  '&tournamentId=' +
+                  encodeURIComponent(tournamentId),
+              })
+            }
           >
             <TeamCrest team={player.team} />
-            <View><Text>{player.team.name}</Text><Text>{player.tournamentName}</Text></View>
+            <View>
+              <Text>{player.team.name}</Text>
+              <Text>{player.tournamentName}</Text>
+            </View>
           </View>
         )}
       </View>
@@ -84,7 +111,10 @@ function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse;
         <PlayerStat label="分钟" value={player.stats.minutes} />
         <PlayerStat label="进球" value={player.stats.goals} accent />
         <PlayerStat label="助攻" value={player.stats.assists} accent />
-        <PlayerStat label="黄 / 红牌" value={player.stats.yellowCards + ' / ' + player.stats.redCards} />
+        <PlayerStat
+          label="黄 / 红牌"
+          value={player.stats.yellowCards + ' / ' + player.stats.redCards}
+        />
       </View>
 
       <View className="player-detail-grid">
@@ -108,7 +138,11 @@ function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse;
       </View>
 
       <View className="player-matches">
-        <ProductSection kicker="RECENT APPEARANCES" title="最近出场" note={player.recentMatches.length + ' 场'} />
+        <ProductSection
+          kicker="RECENT APPEARANCES"
+          title="最近出场"
+          note={player.recentMatches.length + ' 场'}
+        />
         {player.recentMatches.length === 0 ? (
           <DataState kind="empty" title="暂无比赛出场记录" />
         ) : (
@@ -117,7 +151,13 @@ function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse;
               <View className="player-match-wrap" key={match.id}>
                 <MatchCard
                   match={match}
-                  onClick={() => void Taro.navigateTo({ url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id) })}
+                  onClick={() =>
+                    void Taro.navigateTo({
+                      url:
+                        '/pages/readonly-match-detail/index?matchId=' +
+                        encodeURIComponent(match.id),
+                    })
+                  }
                 />
                 <Text className="player-match-wrap__appearance">
                   {match.starter ? '首发' : '替补'} · {match.minutesPlayed} 分钟
@@ -131,16 +171,28 @@ function PlayerContent({ player, tournamentId }: { player: PlayerDetailResponse;
   )
 }
 
-function PlayerStat({ label, value, accent = false }: { label: string; value: number | string; accent?: boolean }) {
+function PlayerStat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: number | string
+  accent?: boolean
+}) {
   return (
     <View className={'player-stat ' + (accent ? 'player-stat--accent' : '')}>
-      <Text>{value}</Text><Text>{label}</Text>
+      <Text>{value}</Text>
+      <Text>{label}</Text>
     </View>
   )
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <View className="player-fact"><Text>{label}</Text><Text>{value}</Text></View>
+    <View className="player-fact">
+      <Text>{label}</Text>
+      <Text>{value}</Text>
+    </View>
   )
 }

@@ -186,4 +186,59 @@ export async function seedDemoAccountsAndCommunity(
       },
     })
   }
+
+  const reviewFixtures = [
+    {
+      matchCode: 'GC26-SF-01',
+      username: 'student',
+      rating: 5,
+      body: '淘汰赛强度一下就上来了，双方最后二十分钟都踢得很有内容。',
+    },
+    {
+      matchCode: 'GC26-SF-01',
+      username: 'player',
+      rating: 4,
+      body: '攻防转换很快，一队对第二落点的控制是胜负关键。',
+    },
+    {
+      matchCode: 'GC26-SF-01',
+      username: 'reporter',
+      rating: 5,
+      body: '现场节奏和看台氛围都很好，比赛事件已经完成复核。',
+    },
+    {
+      matchCode: 'GC26-A-R1-01',
+      username: 'captain',
+      rating: 4,
+      body: '德比踢得很艰苦，感谢两边同学在赛后互相致意。',
+    },
+  ] as const
+  const reviewMatches = await tx.match.findMany({
+    where: {
+      organizationId,
+      tournamentId,
+      matchCode: { in: [...new Set(reviewFixtures.map((review) => review.matchCode))] },
+    },
+    select: { id: true, matchCode: true },
+  })
+  const matchesByCode = new Map(reviewMatches.map((match) => [match.matchCode, match.id]))
+
+  for (const [index, review] of reviewFixtures.entries()) {
+    const matchId = matchesByCode.get(review.matchCode)
+    const userId = usersByUsername.get(review.username)
+    if (!matchId || !userId) continue
+    await tx.matchReview.upsert({
+      where: { matchId_userId: { matchId, userId } },
+      create: {
+        id: fixtureId(`match-review:${review.matchCode}:${review.username}`),
+        organizationId,
+        matchId,
+        userId,
+        rating: review.rating,
+        body: review.body,
+        createdAt: new Date(`2026-08-31T${18 + index}:15:00+08:00`),
+      },
+      update: { rating: review.rating, body: review.body },
+    })
+  }
 }

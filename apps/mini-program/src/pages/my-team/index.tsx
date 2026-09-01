@@ -70,7 +70,10 @@ export default function MyTeamPage() {
         primaryId,
         followedIds.filter((id) => id !== primaryId),
       )
-      const dashboard = await productRepository.getTeamDashboard(primaryId, state.home.tournament.id)
+      const dashboard = await productRepository.getTeamDashboard(
+        primaryId,
+        state.home.tournament.id,
+      )
       setState({ ...state, preferences, dashboard })
       setEditing(false)
       await Taro.showToast({ title: '主队已保存', icon: 'success' })
@@ -89,7 +92,12 @@ export default function MyTeamPage() {
     <PublicShell active="team" tournamentId={tournamentId}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在加载主队空间" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="主队空间不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="主队空间不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
       {state.phase === 'ready' && (
         <View>
@@ -130,7 +138,10 @@ function VisitorTeamView({ home }: { home: HomeResponse }) {
         <Text className="team-guest-header__eyebrow">MY CLUB</Text>
         <Text className="team-guest-header__title">选择你的主队</Text>
         <Text className="team-guest-header__copy">登录后保存主队与关注队伍。</Text>
-        <Button className="button button--light team-guest-header__login" onClick={() => void Taro.navigateTo({ url: '/pages/me/index' })}>
+        <Button
+          className="button button--light team-guest-header__login"
+          onClick={() => void Taro.reLaunch({ url: '/pages/login/index' })}
+        >
           登录账户
         </Button>
       </View>
@@ -193,10 +204,16 @@ function TeamSelector({
           const isPrimary = team.id === primaryId
           const isFollowed = followedIds.includes(team.id)
           return (
-            <View className={'team-choice ' + (isPrimary ? 'team-choice--primary' : '')} key={team.id}>
+            <View
+              className={'team-choice ' + (isPrimary ? 'team-choice--primary' : '')}
+              key={team.id}
+            >
               <View className="team-choice__identity">
                 <TeamCrest team={team} />
-                <View><Text>{team.name}</Text><Text>{team.collegeName}</Text></View>
+                <View>
+                  <Text>{team.name}</Text>
+                  <Text>{team.collegeName}</Text>
+                </View>
               </View>
               <View className="team-choice__actions">
                 <Button
@@ -218,8 +235,17 @@ function TeamSelector({
         })}
       </View>
       <View className="team-selector__footer">
-        <Button className="button button--outline" onClick={onCancel}>取消</Button>
-        <Button className="button button--primary" disabled={!primaryId || saving} loading={saving} onClick={onSave}>保存选择</Button>
+        <Button className="button button--outline" onClick={onCancel}>
+          取消
+        </Button>
+        <Button
+          className="button button--primary"
+          disabled={!primaryId || saving}
+          loading={saving}
+          onClick={onSave}
+        >
+          保存选择
+        </Button>
       </View>
     </View>
   )
@@ -242,13 +268,17 @@ function TeamDashboard({
         <View className="my-team-hero__identity">
           <TeamCrest team={data.team} size="large" />
           <View className="my-team-hero__copy">
-            <Text className="my-team-hero__label">我的主队 · {data.team.groupName ?? '参赛球队'}</Text>
+            <Text className="my-team-hero__label">
+              我的主队 · {data.team.groupName ?? '参赛球队'}
+            </Text>
             <Text className="my-team-hero__title">{data.team.name}</Text>
             <Text className="my-team-hero__college">{data.team.collegeName}</Text>
             <Text className="my-team-hero__motto">{data.team.motto}</Text>
           </View>
         </View>
-        <Button className="my-team-hero__edit" onClick={onEdit}>管理关注</Button>
+        <Button className="my-team-hero__edit" onClick={onEdit}>
+          管理关注
+        </Button>
       </View>
 
       <View className="team-record">
@@ -268,7 +298,12 @@ function TeamDashboard({
               <MatchCard
                 key={match.id}
                 match={match}
-                onClick={() => void Taro.navigateTo({ url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id) })}
+                onClick={() =>
+                  void Taro.navigateTo({
+                    url:
+                      '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
+                  })
+                }
               />
             ))}
           </View>
@@ -278,7 +313,10 @@ function TeamDashboard({
           <View className="team-profile surface">
             <ProfileRow label="队长" value={data.team.captainName ?? '未设置'} />
             <ProfileRow label="教练" value={data.team.coachName ?? '未设置'} />
-            <ProfileRow label="成立" value={data.team.foundedYear ? data.team.foundedYear + ' 年' : '未填写'} />
+            <ProfileRow
+              label="成立"
+              value={data.team.foundedYear ? data.team.foundedYear + ' 年' : '未填写'}
+            />
             <ProfileRow label="简介" value={data.team.description ?? '暂无简介'} multiline />
           </View>
         </View>
@@ -291,17 +329,29 @@ function TeamDashboard({
             <View
               className="squad-player"
               key={player.id}
-              onClick={() => void Taro.navigateTo({ url: '/pages/player-detail/index?playerId=' + encodeURIComponent(player.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+              onClick={() =>
+                void Taro.navigateTo({
+                  url:
+                    '/pages/player-detail/index?playerId=' +
+                    encodeURIComponent(player.id) +
+                    '&tournamentId=' +
+                    encodeURIComponent(tournamentId),
+                })
+              }
             >
               <Text className="squad-player__number">{player.shirtNumber ?? '-'}</Text>
               <UserAvatar name={player.displayName} color={player.profileColor} />
               <View className="squad-player__copy">
                 <Text>{player.displayName}</Text>
-                <Text>{positionLabel(player.position)} · {player.academicYear}</Text>
+                <Text>
+                  {positionLabel(player.position)} · {player.academicYear}
+                </Text>
               </View>
               <View className="squad-player__stats">
                 <Text>{player.appearances} 场</Text>
-                <Text>{player.goals} 球 · {player.assists} 助</Text>
+                <Text>
+                  {player.goals} 球 · {player.assists} 助
+                </Text>
               </View>
             </View>
           ))}
@@ -313,8 +363,14 @@ function TeamDashboard({
           <ProductSection kicker="FOLLOWING" title="其他关注" note={followedTeams.length + ' 支'} />
           <View className="followed-team-list">
             {followedTeams.map((team) => (
-              <View className="followed-team" key={team.id} onClick={() => void goToTeam(team.id, tournamentId)}>
-                <TeamCrest team={team} /><Text>{team.name}</Text><Text>查看</Text>
+              <View
+                className="followed-team"
+                key={team.id}
+                onClick={() => void goToTeam(team.id, tournamentId)}
+              >
+                <TeamCrest team={team} />
+                <Text>{team.name}</Text>
+                <Text>查看</Text>
               </View>
             ))}
           </View>
@@ -324,24 +380,46 @@ function TeamDashboard({
   )
 }
 
-function Record({ value, label, accent = false }: { value: number | string; label: string; accent?: boolean }) {
+function Record({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number | string
+  label: string
+  accent?: boolean
+}) {
   return (
     <View className={'team-record__item ' + (accent ? 'team-record__item--accent' : '')}>
-      <Text>{value}</Text><Text>{label}</Text>
+      <Text>{value}</Text>
+      <Text>{label}</Text>
     </View>
   )
 }
 
-function ProfileRow({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+function ProfileRow({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string
+  value: string
+  multiline?: boolean
+}) {
   return (
     <View className={'team-profile__row ' + (multiline ? 'team-profile__row--multiline' : '')}>
-      <Text>{label}</Text><Text>{value}</Text>
+      <Text>{label}</Text>
+      <Text>{value}</Text>
     </View>
   )
 }
 
 async function goToTeam(teamId: string, tournamentId: string) {
   await Taro.navigateTo({
-    url: '/pages/readonly-team-detail/index?teamId=' + encodeURIComponent(teamId) + '&tournamentId=' + encodeURIComponent(tournamentId),
+    url:
+      '/pages/readonly-team-detail/index?teamId=' +
+      encodeURIComponent(teamId) +
+      '&tournamentId=' +
+      encodeURIComponent(tournamentId),
   })
 }

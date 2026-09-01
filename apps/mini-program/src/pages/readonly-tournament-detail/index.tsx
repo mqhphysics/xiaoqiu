@@ -57,6 +57,7 @@ export default function ReadonlyTournamentDetailPage() {
   return (
     <PublicShell
       active="tournaments"
+      showBack
       tournamentId={tournamentId}
       source={state.phase === 'ready' ? state.source : undefined}
     >

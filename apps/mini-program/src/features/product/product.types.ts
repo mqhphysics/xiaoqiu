@@ -113,6 +113,15 @@ export interface AuthSession {
   user: AuthUser
 }
 
+export interface RegisterInput {
+  username: string
+  displayName: string
+  realName: string
+  studentId: string
+  email: string
+  password: string
+}
+
 export interface HomeResponse {
   tournament: {
     id: string
@@ -276,6 +285,21 @@ export interface MatchExperienceResponse extends MatchSummary {
       minutesPlayed: number
     }>
   }>
+  reviews: {
+    averageRating: number | null
+    ratingCount: number
+    viewerReview: {
+      rating: number
+      body: string | null
+    } | null
+    comments: Array<{
+      id: string
+      rating: number
+      body: string
+      createdAt: string
+      author: PostAuthor
+    }>
+  }
 }
 
 export interface TeamPreferencesResponse {

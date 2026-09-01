@@ -38,7 +38,11 @@ export default function ReadonlyTournamentsPage() {
   }, [load])
 
   return (
-    <PublicShell active="tournaments" source={state.phase === 'ready' ? state.source : undefined}>
+    <PublicShell
+      active="tournaments"
+      showBack
+      source={state.phase === 'ready' ? state.source : undefined}
+    >
       <View className="page-intro">
         <View>
           <Text className="page-intro__eyebrow">TOURNAMENTS</Text>

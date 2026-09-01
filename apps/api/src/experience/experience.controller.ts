@@ -22,6 +22,7 @@ import {
 import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
 import type {
   CreateCommentDto,
+  CreateMatchReviewDto,
   CreatePostDto,
   SearchQueryDto,
   UpdateTeamPreferencesDto,
@@ -106,12 +107,30 @@ export class ExperienceController {
 
   @Get('public/matches/:matchId/experience')
   @PublicOrganizationHeader()
-  @ApiOperation({ summary: '读取比分、事件时间轴和阵容' })
+  @ApiOperation({ summary: '读取评分、比分、事件时间轴和阵容' })
   match(
     @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
     @Param('matchId') matchId: string,
   ) {
-    return this.experienceService.getMatchExperience(resolveOrganizationId(organizationId), matchId)
+    return this.experienceService.getMatchExperience(
+      resolveOrganizationId(organizationId),
+      matchId,
+      authorization,
+    )
+  }
+
+  @Post('matches/:matchId/reviews')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '提交或更新当前用户的比赛评分' })
+  @ApiOkResponse({ description: '更新后的比赛体验数据' })
+  reviewMatch(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('matchId') matchId: string,
+    @Body() body: CreateMatchReviewDto,
+  ) {
+    return this.experienceService.reviewMatch(authorization, matchId, body)
   }
 
   @Get('public/posts')

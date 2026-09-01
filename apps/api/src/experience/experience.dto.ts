@@ -5,10 +5,13 @@ import {
   ArrayUnique,
   IsArray,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Length,
+  Max,
+  Min,
 } from 'class-validator'
 
 export class SearchQueryDto {
@@ -55,4 +58,18 @@ export class CreateCommentDto {
   @IsString()
   @Length(1, 300)
   body!: string
+}
+
+export class CreateMatchReviewDto {
+  @ApiProperty({ type: Number, minimum: 1, maximum: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rating!: number
+
+  @ApiPropertyOptional({ type: String, maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  body?: string
 }

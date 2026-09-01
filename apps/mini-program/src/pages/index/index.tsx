@@ -85,7 +85,7 @@ export default function IndexPage() {
   const handleLike = async (post: PostSummary) => {
     if (!readSession()) {
       await Taro.showToast({ title: '登录后可以点赞', icon: 'none' })
-      await Taro.navigateTo({ url: '/pages/me/index' })
+      await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
     try {
@@ -115,7 +115,7 @@ export default function IndexPage() {
   const openComposer = async () => {
     if (!readSession()) {
       await Taro.showToast({ title: '请先登录', icon: 'none' })
-      await Taro.navigateTo({ url: '/pages/me/index' })
+      await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
     setComposerOpen(true)
@@ -359,7 +359,11 @@ function HomeContent({
         </View>
 
         <View className="team-column">
-          <ProductSection kicker="TEAMS" title="参赛球队" note={`${data.tournament.teamCount} 支`} />
+          <ProductSection
+            kicker="TEAMS"
+            title="参赛球队"
+            note={`${data.tournament.teamCount} 支`}
+          />
           <View className="team-directory surface">
             {data.teams.map((team) => (
               <View
@@ -390,7 +394,8 @@ function HomeContent({
 }
 
 function SearchResults({ result, tournamentId }: { result: SearchResponse; tournamentId: string }) {
-  const total = result.players.length + result.teams.length + result.matches.length + result.posts.length
+  const total =
+    result.players.length + result.teams.length + result.matches.length + result.posts.length
   return (
     <View className="search-results">
       <View className="search-results__head">
@@ -428,8 +433,12 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
         <View className="search-result-row" key={match.id} onClick={() => void goToMatch(match.id)}>
           <Text className="search-result-row__tag">赛</Text>
           <View className="search-result-row__copy">
-            <Text>{match.homeTeam?.name ?? '待定'} vs {match.awayTeam?.name ?? '待定'}</Text>
-            <Text>{match.title} · {formatDate(match.scheduledStartAt)}</Text>
+            <Text>
+              {match.homeTeam?.name ?? '待定'} vs {match.awayTeam?.name ?? '待定'}
+            </Text>
+            <Text>
+              {match.title} · {formatDate(match.scheduledStartAt)}
+            </Text>
           </View>
         </View>
       ))}

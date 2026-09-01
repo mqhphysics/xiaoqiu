@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service'
 import { MatchEventType, MatchStatus, PostStatus, PostType } from '../generated/prisma/client'
 import type {
   CreateCommentDto,
+  CreateMatchReviewDto,
   CreatePostDto,
   SearchQueryDto,
   UpdateTeamPreferencesDto,
@@ -482,7 +483,8 @@ export class ExperienceService {
     }
   }
 
-  async getMatchExperience(organizationId: string, matchId: string) {
+  async getMatchExperience(organizationId: string, matchId: string, authorization?: string) {
+    const session = await this.authService.getSession(authorization)
     const match = await this.prisma.match.findFirst({
       where: { id: matchId, organizationId },
       include: {
@@ -498,9 +500,17 @@ export class ExperienceService {
           include: { player: true, team: true },
           orderBy: [{ teamId: 'asc' }, { starter: 'desc' }, { shirtNumber: 'asc' }],
         },
+        reviews: {
+          include: { user: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     })
     if (!match) throw notFound('比赛不存在')
+    const viewerReview = session
+      ? match.reviews.find((review) => review.userId === session.userId)
+      : undefined
+    const ratingTotal = match.reviews.reduce((total, review) => total + review.rating, 0)
 
     return {
       ...mapMatch(match),
@@ -535,7 +545,63 @@ export class ExperienceService {
               minutesPlayed: appearance.minutesPlayed,
             })),
         })),
+      reviews: {
+        averageRating:
+          match.reviews.length > 0
+            ? Math.round((ratingTotal / match.reviews.length) * 10) / 10
+            : null,
+        ratingCount: match.reviews.length,
+        viewerReview: viewerReview
+          ? { rating: viewerReview.rating, body: viewerReview.body }
+          : null,
+        comments: match.reviews
+          .filter((review) => Boolean(review.body))
+          .map((review) => ({
+            id: review.id,
+            rating: review.rating,
+            body: review.body!,
+            createdAt: review.createdAt.toISOString(),
+            author: {
+              id: review.user.id,
+              displayName: review.user.displayName,
+              verificationLevel: review.user.verificationLevel,
+            },
+          })),
+      },
     }
+  }
+
+  async reviewMatch(
+    authorization: string | undefined,
+    matchId: string,
+    input: CreateMatchReviewDto,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    const match = await this.prisma.match.findFirst({
+      where: { id: matchId, organizationId: session.organizationId },
+      select: { id: true, status: true },
+    })
+    if (!match) throw notFound('比赛不存在')
+    if (match.status !== MatchStatus.FINISHED) {
+      throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
+        code: ERROR_CODES.BAD_REQUEST,
+        message: '比赛结束后才可评分',
+      })
+    }
+
+    const body = input.body?.trim() || null
+    await this.prisma.matchReview.upsert({
+      where: { matchId_userId: { matchId, userId: session.userId } },
+      create: {
+        organizationId: session.organizationId,
+        matchId,
+        userId: session.userId,
+        rating: input.rating,
+        body,
+      },
+      update: { rating: input.rating, body },
+    })
+    return this.getMatchExperience(session.organizationId, matchId, authorization)
   }
 
   async listPosts(organizationId: string, authorization?: string) {

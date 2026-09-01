@@ -1,6 +1,6 @@
 import Taro from '@tarojs/taro'
 
-import { clearSession, readSession, saveSession } from './session'
+import { clearSession, leaveGuestMode, readSession, saveSession } from './session'
 import type {
   AdminIdentity,
   AuthSession,
@@ -13,6 +13,7 @@ import type {
   PostComment,
   PostDetail,
   PostSummary,
+  RegisterInput,
   SearchCategory,
   SearchResponse,
   TeamDashboardResponse,
@@ -69,6 +70,16 @@ export const productRepository = {
     return session
   },
 
+  register: async (input: RegisterInput) => {
+    const session = await request<AuthSession>('/auth/register', {
+      method: 'POST',
+      data: input,
+      authenticated: false,
+    })
+    saveSession(session)
+    return session
+  },
+
   getMe: () => request<AuthUser>('/auth/me'),
 
   resetPasswordByIdentity: (realName: string, studentId: string, newPassword: string) =>
@@ -80,11 +91,18 @@ export const productRepository = {
 
   getAdminIdentities: () => request<AdminIdentity[]>('/admin/identities'),
 
+  reviewMatch: (matchId: string, rating: number, body?: string) =>
+    request<MatchExperienceResponse>(`/matches/${encodeURIComponent(matchId)}/reviews`, {
+      method: 'POST',
+      data: { rating, ...(body?.trim() ? { body: body.trim() } : {}) },
+    }),
+
   logout: async () => {
     try {
       await request<void>('/auth/logout', { method: 'POST' })
     } finally {
       clearSession()
+      leaveGuestMode()
     }
   },
 

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsString, Length } from 'class-validator'
+import { IsEmail, IsString, Length, Matches } from 'class-validator'
 
 export class LoginDto {
   @ApiProperty({
@@ -14,6 +14,45 @@ export class LoginDto {
   username!: string
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
+  @IsString()
+  @Length(8, 128)
+  password!: string
+}
+
+export class RegisterDto {
+  @ApiProperty({ type: String, description: '登录用户名', example: 'linzhixia' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(3, 32)
+  @Matches(/^[A-Za-z0-9_.-]+$/, { message: '用户名只能包含字母、数字、点、下划线和短横线' })
+  username!: string
+
+  @ApiProperty({ type: String, description: '公开昵称', example: '知夏看球' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(2, 120)
+  displayName!: string
+
+  @ApiProperty({ type: String, description: '后台实名', example: '林知夏' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(2, 120)
+  realName!: string
+
+  @ApiProperty({ type: String, example: '20249990001' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(6, 32)
+  @Matches(/^[A-Za-z0-9-]+$/, { message: '学号格式不正确' })
+  studentId!: string
+
+  @ApiProperty({ type: String, format: 'email', example: 'student@example.com' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsEmail()
+  @Length(5, 254)
+  email!: string
+
+  @ApiProperty({ type: String, example: 'YourPassword2026!' })
   @IsString()
   @Length(8, 128)
   password!: string

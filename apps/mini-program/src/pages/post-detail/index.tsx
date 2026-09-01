@@ -51,7 +51,7 @@ export default function PostDetailPage() {
     if (state.phase !== 'ready') return
     if (!readSession()) {
       await Taro.showToast({ title: '登录后可以点赞', icon: 'none' })
-      await Taro.navigateTo({ url: '/pages/me/index' })
+      await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
     try {
@@ -61,7 +61,10 @@ export default function PostDetailPage() {
         post: { ...state.post, likedByMe: result.liked, likeCount: result.likeCount },
       })
     } catch (error) {
-      await Taro.showToast({ title: error instanceof Error ? error.message : '操作失败', icon: 'none' })
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '操作失败',
+        icon: 'none',
+      })
     }
   }
 
@@ -69,7 +72,7 @@ export default function PostDetailPage() {
     if (state.phase !== 'ready' || comment.trim().length < 2 || submitting) return
     if (!readSession()) {
       await Taro.showToast({ title: '登录后可以评论', icon: 'none' })
-      await Taro.navigateTo({ url: '/pages/me/index' })
+      await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
     setSubmitting(true)
@@ -86,21 +89,37 @@ export default function PostDetailPage() {
       setComment('')
       await Taro.showToast({ title: '评论已发布', icon: 'success' })
     } catch (error) {
-      await Taro.showToast({ title: error instanceof Error ? error.message : '评论失败', icon: 'none' })
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '评论失败',
+        icon: 'none',
+      })
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <PublicShell active="home" tournamentId={state.phase === 'ready' ? state.tournamentId : undefined}>
+    <PublicShell
+      active="home"
+      showBack
+      tournamentId={state.phase === 'ready' ? state.tournamentId : undefined}
+    >
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取动态" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="动态不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="动态不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
       {state.phase === 'ready' && (
         <View className="post-detail-layout">
-          <View className={'post-detail ' + (state.post.type === 'OFFICIAL' ? 'post-detail--official' : '')}>
+          <View
+            className={
+              'post-detail ' + (state.post.type === 'OFFICIAL' ? 'post-detail--official' : '')
+            }
+          >
             <View className="post-detail__author">
               <UserAvatar name={state.post.author.displayName} />
               <View>
@@ -108,14 +127,19 @@ export default function PostDetailPage() {
                   <Text>{state.post.author.displayName}</Text>
                   <Text>{verificationLabel(state.post.author.verificationLevel)}</Text>
                 </View>
-                <Text className="post-detail__time">{formatRelativeTime(state.post.publishedAt)}</Text>
+                <Text className="post-detail__time">
+                  {formatRelativeTime(state.post.publishedAt)}
+                </Text>
               </View>
             </View>
             {state.post.type === 'OFFICIAL' && <Text className="post-detail__type">官方发布</Text>}
             {state.post.title && <Text className="post-detail__title">{state.post.title}</Text>}
             <Text className="post-detail__body">{state.post.body}</Text>
             <View className="post-detail__actions">
-              <Button className={state.post.likedByMe ? 'post-detail__liked' : ''} onClick={() => void toggleLike()}>
+              <Button
+                className={state.post.likedByMe ? 'post-detail__liked' : ''}
+                onClick={() => void toggleLike()}
+              >
                 {state.post.likedByMe ? '已赞' : '点赞'} · {state.post.likeCount}
               </Button>
               <Text>评论 · {state.post.commentCount}</Text>
@@ -142,12 +166,17 @@ export default function PostDetailPage() {
               </Button>
             </View>
             <View className="comment-list">
-              {state.post.comments.length === 0 && <Text className="comment-list__empty">还没有评论</Text>}
+              {state.post.comments.length === 0 && (
+                <Text className="comment-list__empty">还没有评论</Text>
+              )}
               {state.post.comments.map((item) => (
                 <View className="comment-item" key={item.id}>
                   <UserAvatar name={item.author.displayName} size="small" />
                   <View className="comment-item__copy">
-                    <View><Text>{item.author.displayName}</Text><Text>{formatRelativeTime(item.createdAt)}</Text></View>
+                    <View>
+                      <Text>{item.author.displayName}</Text>
+                      <Text>{formatRelativeTime(item.createdAt)}</Text>
+                    </View>
                     <Text>{item.body}</Text>
                   </View>
                 </View>

@@ -250,6 +250,7 @@ model Organization {
   teamPreferences    UserTeamPreference[]
   matchEvents        MatchEvent[]
   matchAppearances   MatchAppearance[]
+  matchReviews       MatchReview[]
   posts              Post[]
   postLikes          PostLike[]
   postComments       PostComment[]
@@ -286,6 +287,7 @@ model User {
   posts               Post[]                   @relation("PostAuthor")
   postLikes           PostLike[]
   postComments        PostComment[]
+  matchReviews        MatchReview[]
 
   @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
@@ -727,6 +729,7 @@ model Match {
   venue              Venue?            @relation(fields: [venueId], references: [id], onDelete: SetNull)
   events             MatchEvent[]
   appearances        MatchAppearance[]
+  reviews            MatchReview[]
 
   @@unique([organizationId, matchCode], map: "matches_organization_id_match_code_key")
   @@index([organizationId, scheduledStartAt], map: "matches_organization_id_scheduled_start_at_idx")
@@ -734,6 +737,25 @@ model Match {
   @@index([stageId, roundId], map: "matches_stage_id_round_id_idx")
   @@index([scheduleRevisionId, scheduledStartAt], map: "matches_schedule_revision_id_scheduled_start_at_idx")
   @@map("matches")
+}
+
+model MatchReview {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  matchId        String       @map("match_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  rating         Int
+  body           String?      @db.VarChar(500)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  match          Match        @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId], map: "match_reviews_match_id_user_id_key")
+  @@index([matchId, createdAt], map: "match_reviews_match_id_created_at_idx")
+  @@index([organizationId, userId, createdAt], map: "match_reviews_org_user_created_at_idx")
+  @@map("match_reviews")
 }
 
 model TeamRegistration {

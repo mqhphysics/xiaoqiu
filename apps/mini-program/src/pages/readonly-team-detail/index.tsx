@@ -45,32 +45,60 @@ export default function TeamDetailPage() {
   }, [load])
 
   return (
-    <PublicShell active="team" tournamentId={state.phase === 'ready' ? state.tournamentId : routeTournamentId}>
+    <PublicShell
+      active="team"
+      showBack
+      tournamentId={state.phase === 'ready' ? state.tournamentId : routeTournamentId}
+    >
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取球队档案" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="球队详情不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="球队详情不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
-      {state.phase === 'ready' && <TeamContent data={state.team} tournamentId={state.tournamentId} />}
+      {state.phase === 'ready' && (
+        <TeamContent data={state.team} tournamentId={state.tournamentId} />
+      )}
     </PublicShell>
   )
 }
 
-function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tournamentId: string }) {
+function TeamContent({
+  data,
+  tournamentId,
+}: {
+  data: TeamDashboardResponse
+  tournamentId: string
+}) {
   return (
     <View>
-      <View className="public-team-hero" style={{ borderColor: data.team.primaryColor ?? '#1f6b45' }}>
+      <View
+        className="public-team-hero"
+        style={{ borderColor: data.team.primaryColor ?? '#1f6b45' }}
+      >
         <View className="public-team-hero__identity">
           <TeamCrest team={data.team} size="large" />
           <View>
-            <Text className="public-team-hero__eyebrow">{data.team.teamCode} · {data.team.groupName}</Text>
+            <Text className="public-team-hero__eyebrow">
+              {data.team.teamCode} · {data.team.groupName}
+            </Text>
             <Text className="public-team-hero__title">{data.team.name}</Text>
             <Text className="public-team-hero__college">{data.team.collegeName}</Text>
             <Text className="public-team-hero__motto">{data.team.motto}</Text>
           </View>
         </View>
         <View className="public-team-hero__staff">
-          <View><Text>队长</Text><Text>{data.team.captainName ?? '未设置'}</Text></View>
-          <View><Text>教练</Text><Text>{data.team.coachName ?? '未设置'}</Text></View>
+          <View>
+            <Text>队长</Text>
+            <Text>{data.team.captainName ?? '未设置'}</Text>
+          </View>
+          <View>
+            <Text>教练</Text>
+            <Text>{data.team.coachName ?? '未设置'}</Text>
+          </View>
         </View>
       </View>
 
@@ -86,7 +114,9 @@ function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tour
       <View className="public-team-about surface">
         <Text className="public-team-about__label">球队简介</Text>
         <Text className="public-team-about__body">{data.team.description ?? '暂无球队简介。'}</Text>
-        <Text className="public-team-about__founded">{data.team.foundedYear ? '成立于 ' + data.team.foundedYear + ' 年' : ''}</Text>
+        <Text className="public-team-about__founded">
+          {data.team.foundedYear ? '成立于 ' + data.team.foundedYear + ' 年' : ''}
+        </Text>
       </View>
 
       <View className="public-team-section">
@@ -96,7 +126,11 @@ function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tour
             <MatchCard
               key={match.id}
               match={match}
-              onClick={() => void Taro.navigateTo({ url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id) })}
+              onClick={() =>
+                void Taro.navigateTo({
+                  url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
+                })
+              }
             />
           ))}
         </View>
@@ -106,20 +140,35 @@ function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tour
         <ProductSection kicker="SQUAD" title="完整阵容" note={data.roster.length + ' 名球员'} />
         <View className="public-roster surface">
           <View className="public-roster__head">
-            <Text>号码</Text><Text>球员</Text><Text>位置 / 年级</Text><Text>出场</Text><Text>进球</Text><Text>助攻</Text>
+            <Text>号码</Text>
+            <Text>球员</Text>
+            <Text>位置 / 年级</Text>
+            <Text>出场</Text>
+            <Text>进球</Text>
+            <Text>助攻</Text>
           </View>
           {data.roster.map((player) => (
             <View
               className="public-roster__row"
               key={player.id}
-              onClick={() => void Taro.navigateTo({ url: '/pages/player-detail/index?playerId=' + encodeURIComponent(player.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+              onClick={() =>
+                void Taro.navigateTo({
+                  url:
+                    '/pages/player-detail/index?playerId=' +
+                    encodeURIComponent(player.id) +
+                    '&tournamentId=' +
+                    encodeURIComponent(tournamentId),
+                })
+              }
             >
               <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
               <View className="public-roster__player">
                 <UserAvatar name={player.displayName} color={player.profileColor} size="small" />
                 <Text>{player.displayName}</Text>
               </View>
-              <Text>{positionLabel(player.position)} · {player.academicYear}</Text>
+              <Text>
+                {positionLabel(player.position)} · {player.academicYear}
+              </Text>
               <Text>{player.appearances}</Text>
               <Text>{player.goals}</Text>
               <Text>{player.assists}</Text>
@@ -131,10 +180,21 @@ function TeamContent({ data, tournamentId }: { data: TeamDashboardResponse; tour
   )
 }
 
-function Record({ value, label, accent = false }: { value: number | string; label: string; accent?: boolean }) {
+function Record({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number | string
+  label: string
+  accent?: boolean
+}) {
   return (
-    <View className={'public-team-record__item ' + (accent ? 'public-team-record__item--accent' : '')}>
-      <Text>{value}</Text><Text>{label}</Text>
+    <View
+      className={'public-team-record__item ' + (accent ? 'public-team-record__item--accent' : '')}
+    >
+      <Text>{value}</Text>
+      <Text>{label}</Text>
     </View>
   )
 }

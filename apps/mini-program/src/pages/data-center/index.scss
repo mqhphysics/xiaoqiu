@@ -367,15 +367,16 @@
 
 .bracket-scroll {
   display: flex;
-  align-items: stretch;
-  gap: 18px;
-  padding: 4px 2px 18px;
+  align-items: flex-start;
+  gap: 72px;
+  min-width: 690px;
+  padding: 4px 38px 24px 2px;
   overflow-x: auto;
 }
 
 .bracket-round {
-  width: 300px;
-  min-width: 300px;
+  width: 290px;
+  min-width: 290px;
 }
 
 .bracket-round__title {
@@ -390,11 +391,65 @@
 }
 
 .bracket-round__matches {
+  position: relative;
   display: flex;
-  height: calc(100% - 45px);
+  height: 470px;
   flex-direction: column;
   justify-content: space-around;
-  gap: 14px;
+  gap: 64px;
+}
+
+.bracket-match-slot {
+  position: relative;
+  z-index: 2;
+}
+
+.bracket-round--0 .bracket-match-slot::after {
+  position: absolute;
+  top: 50%;
+  right: -36px;
+  width: 36px;
+  height: 2px;
+  background: #9aac9f;
+  content: '';
+}
+
+.bracket-round--0 .bracket-round__matches::after {
+  position: absolute;
+  z-index: 1;
+  top: 25%;
+  right: -36px;
+  bottom: 25%;
+  width: 2px;
+  background: #9aac9f;
+  content: '';
+}
+
+.bracket-round--1 .bracket-round__matches {
+  justify-content: center;
+  gap: 54px;
+}
+
+.bracket-match-slot--final::before {
+  position: absolute;
+  top: 50%;
+  left: -36px;
+  width: 36px;
+  height: 2px;
+  background: #9aac9f;
+  content: '';
+}
+
+.bracket-match-slot--third {
+  opacity: 0.92;
+}
+
+.bracket-match__label {
+  display: block;
+  margin-bottom: 7px;
+  color: #8d3c34;
+  font-size: 9px;
+  font-weight: 900;
 }
 
 .bracket-match {
@@ -404,6 +459,16 @@
   border-left: 4px solid #d4b34a;
   border-radius: 4px;
   cursor: pointer;
+  box-shadow: 0 5px 14px rgba(25, 42, 31, 0.06);
+}
+
+.bracket-match-slot--final .bracket-match {
+  border-left-color: #963f35;
+  box-shadow: 0 7px 18px rgba(91, 46, 38, 0.13);
+}
+
+.bracket-match-slot--third .bracket-match {
+  border-left-color: #7c887f;
 }
 
 .bracket-match__meta {

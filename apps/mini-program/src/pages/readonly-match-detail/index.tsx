@@ -1,4 +1,4 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Text, Textarea, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -8,10 +8,12 @@ import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../compon
 import {
   eventLabel,
   formatLongDate,
+  formatRelativeTime,
   formatTime,
   positionLabel,
 } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { readSession } from '../../features/product/session'
 import type { MatchExperienceResponse } from '../../features/product/product.types'
 
 import './index.scss'
@@ -21,10 +23,11 @@ type PageState =
   | { phase: 'failed'; message: string }
   | { phase: 'ready'; match: MatchExperienceResponse }
 
+type DetailTab = 'ratings' | 'events' | 'lineups'
+
 export default function MatchDetailPage() {
   const matchId = getCurrentInstance().router?.params.matchId ?? ''
   const [state, setState] = useState<PageState>({ phase: 'loading' })
-  const [lineupTeamId, setLineupTeamId] = useState('')
 
   const load = useCallback(async () => {
     if (!matchId) {
@@ -33,9 +36,7 @@ export default function MatchDetailPage() {
     }
     setState({ phase: 'loading' })
     try {
-      const match = await productRepository.getMatch(matchId)
-      setLineupTeamId(match.lineups[0]?.team.id ?? '')
-      setState({ phase: 'ready', match })
+      setState({ phase: 'ready', match: await productRepository.getMatch(matchId) })
     } catch (error) {
       setState({
         phase: 'failed',
@@ -49,13 +50,25 @@ export default function MatchDetailPage() {
   }, [load])
 
   return (
-    <PublicShell active="schedule" tournamentId={state.phase === 'ready' ? state.match.tournamentId : undefined}>
+    <PublicShell
+      active="schedule"
+      showBack
+      tournamentId={state.phase === 'ready' ? state.match.tournamentId : undefined}
+    >
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取比赛详情" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="比赛详情不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="比赛详情不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
       {state.phase === 'ready' && (
-        <MatchContent match={state.match} lineupTeamId={lineupTeamId} onLineupTeamChange={setLineupTeamId} />
+        <MatchContent
+          match={state.match}
+          onMatchUpdated={(match) => setState({ phase: 'ready', match })}
+        />
       )}
     </PublicShell>
   )
@@ -63,20 +76,60 @@ export default function MatchDetailPage() {
 
 function MatchContent({
   match,
-  lineupTeamId,
-  onLineupTeamChange,
+  onMatchUpdated,
 }: {
   match: MatchExperienceResponse
-  lineupTeamId: string
-  onLineupTeamChange: (id: string) => void
+  onMatchUpdated: (match: MatchExperienceResponse) => void
 }) {
+  const [activeTab, setActiveTab] = useState<DetailTab>('ratings')
+  const [lineupTeamId, setLineupTeamId] = useState(match.lineups[0]?.team.id ?? '')
+  const [rating, setRating] = useState(match.reviews.viewerReview?.rating ?? 0)
+  const [reviewBody, setReviewBody] = useState(match.reviews.viewerReview?.body ?? '')
+  const [submitting, setSubmitting] = useState(false)
   const hasScore = match.homeScore !== null && match.awayScore !== null
-  const selectedLineup = match.lineups.find((lineup) => lineup.team.id === lineupTeamId) ?? match.lineups[0]
+  const isFinished = match.status === 'FINISHED' || match.status === 'CONFIRMED'
+  const selectedLineup =
+    match.lineups.find((lineup) => lineup.team.id === lineupTeamId) ?? match.lineups[0]
+
+  useEffect(() => {
+    setRating(match.reviews.viewerReview?.rating ?? 0)
+    setReviewBody(match.reviews.viewerReview?.body ?? '')
+    setLineupTeamId(match.lineups[0]?.team.id ?? '')
+  }, [match.id, match.reviews.viewerReview, match.lineups])
+
+  const submitReview = async () => {
+    if (!isFinished || submitting) return
+    if (!readSession()) {
+      await Taro.showToast({ title: '登录后可以评分', icon: 'none' })
+      await Taro.reLaunch({ url: '/pages/login/index' })
+      return
+    }
+    if (rating < 1) {
+      await Taro.showToast({ title: '请先选择 1 至 5 星', icon: 'none' })
+      return
+    }
+    setSubmitting(true)
+    try {
+      const updated = await productRepository.reviewMatch(match.id, rating, reviewBody)
+      onMatchUpdated(updated)
+      await Taro.showToast({ title: '评分已保存', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '评分提交失败',
+        icon: 'none',
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <View>
       <View className="experience-match-header">
         <View className="experience-match-header__meta">
-          <Text>{match.stageName ?? '赛事'} · {match.roundName ?? match.title}</Text>
+          <Text>
+            {match.stageName ?? '赛事'} · {match.roundName ?? match.title}
+          </Text>
           <MatchStatus status={match.status} />
         </View>
         <Text className="experience-match-header__date">
@@ -85,43 +138,97 @@ function MatchContent({
         <Text className="experience-match-header__venue">{match.venue?.name ?? '场地待定'}</Text>
 
         <View className="experience-scoreboard">
-          <TeamSide team={match.homeTeam} placeholder={match.homePlaceholder} tournamentId={match.tournamentId} />
+          <TeamSide
+            team={match.homeTeam}
+            placeholder={match.homePlaceholder}
+            tournamentId={match.tournamentId}
+          />
           <View className="experience-scoreboard__score">
-            <Text>{hasScore ? match.homeScore + ' : ' + match.awayScore : 'VS'}</Text>
+            <Text>{hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}</Text>
             {(match.homePenaltyScore !== null || match.awayPenaltyScore !== null) && (
-              <Text>点球 {match.homePenaltyScore ?? 0} : {match.awayPenaltyScore ?? 0}</Text>
+              <Text>
+                点球 {match.homePenaltyScore ?? 0} : {match.awayPenaltyScore ?? 0}
+              </Text>
             )}
           </View>
-          <TeamSide team={match.awayTeam} placeholder={match.awayPlaceholder} tournamentId={match.tournamentId} />
+          <TeamSide
+            team={match.awayTeam}
+            placeholder={match.awayPlaceholder}
+            tournamentId={match.tournamentId}
+          />
         </View>
       </View>
 
       {(match.summary || match.statusReason) && (
         <View className="match-summary surface">
-          <Text className="match-summary__label">{match.statusReason ? '比赛说明' : '比赛战报'}</Text>
+          <Text className="match-summary__label">
+            {match.statusReason ? '比赛说明' : '比赛战报'}
+          </Text>
           <Text className="match-summary__body">{match.statusReason ?? match.summary}</Text>
-          {match.attendance !== null && <Text className="match-summary__attendance">现场观众 {match.attendance} 人</Text>}
+          {match.attendance !== null && (
+            <Text className="match-summary__attendance">现场观众 {match.attendance} 人</Text>
+          )}
         </View>
       )}
 
-      <View className="match-experience-grid">
-        <View className="match-event-section">
-          <ProductSection kicker="TIMELINE" title="比赛事件" note={match.events.length + ' 条'} />
+      <View className="match-detail-tabs">
+        <TabButton
+          active={activeTab === 'ratings'}
+          label="评分与评论"
+          note={match.reviews.ratingCount > 0 ? String(match.reviews.ratingCount) : undefined}
+          onClick={() => setActiveTab('ratings')}
+        />
+        <TabButton
+          active={activeTab === 'events'}
+          label="比赛事件"
+          note={match.events.length > 0 ? String(match.events.length) : undefined}
+          onClick={() => setActiveTab('events')}
+        />
+        <TabButton
+          active={activeTab === 'lineups'}
+          label="双方阵容"
+          onClick={() => setActiveTab('lineups')}
+        />
+      </View>
+
+      {activeTab === 'ratings' && (
+        <RatingsPanel
+          body={reviewBody}
+          isFinished={isFinished}
+          match={match}
+          rating={rating}
+          submitting={submitting}
+          onBodyChange={setReviewBody}
+          onRatingChange={setRating}
+          onSubmit={() => void submitReview()}
+        />
+      )}
+
+      {activeTab === 'events' && (
+        <View className="match-tab-content">
+          <ProductSection kicker="TIMELINE" title="比赛事件" note={`${match.events.length} 条`} />
           {match.events.length === 0 ? (
             <DataState kind="empty" title="暂无比赛事件" />
           ) : (
             <View className="event-timeline surface">
               {match.events.map((event) => (
                 <View
-                  className={'event-row ' + (event.team.id === match.homeTeam?.id ? 'event-row--home' : 'event-row--away')}
+                  className={`event-row ${event.team.id === match.homeTeam?.id ? 'event-row--home' : 'event-row--away'}`}
                   key={event.id}
                 >
-                  <Text className="event-row__minute">{event.minute}{event.stoppageMinute ? '+' + event.stoppageMinute : ''}'</Text>
-                  <Text className={'event-row__type event-row__type--' + event.type.toLowerCase()}>{eventLabel(event.type)}</Text>
+                  <Text className="event-row__minute">
+                    {event.minute}
+                    {event.stoppageMinute ? `+${event.stoppageMinute}` : ''}'
+                  </Text>
+                  <Text className={`event-row__type event-row__type--${event.type.toLowerCase()}`}>
+                    {eventLabel(event.type)}
+                  </Text>
                   <View className="event-row__copy">
                     <Text>{event.player?.displayName ?? event.team.shortName}</Text>
                     <Text>
-                      {event.relatedPlayer ? '助攻 ' + event.relatedPlayer.displayName : event.description ?? event.team.name}
+                      {event.relatedPlayer
+                        ? `助攻 ${event.relatedPlayer.displayName}`
+                        : (event.description ?? event.team.name)}
                     </Text>
                   </View>
                 </View>
@@ -129,9 +236,15 @@ function MatchContent({
             </View>
           )}
         </View>
+      )}
 
-        <View className="match-lineup-section">
-          <ProductSection kicker="LINEUPS" title="双方阵容" note={match.lineups.length > 0 ? '公开出场名单' : '待公布'} />
+      {activeTab === 'lineups' && (
+        <View className="match-tab-content">
+          <ProductSection
+            kicker="LINEUPS"
+            title="双方阵容"
+            note={match.lineups.length > 0 ? '公开出场名单' : '待公布'}
+          />
           {match.lineups.length === 0 ? (
             <DataState kind="empty" title="阵容尚未公布" />
           ) : (
@@ -141,7 +254,7 @@ function MatchContent({
                   <Button
                     className={lineupTeamId === lineup.team.id ? 'lineup-tab--active' : ''}
                     key={lineup.team.id}
-                    onClick={() => onLineupTeamChange(lineup.team.id)}
+                    onClick={() => setLineupTeamId(lineup.team.id)}
                   >
                     {lineup.team.shortName}
                   </Button>
@@ -152,13 +265,23 @@ function MatchContent({
                   <View
                     className="lineup-player"
                     key={player.id}
-                    onClick={() => void Taro.navigateTo({ url: '/pages/player-detail/index?playerId=' + encodeURIComponent(player.id) + '&tournamentId=' + encodeURIComponent(match.tournamentId) })}
+                    onClick={() =>
+                      void Taro.navigateTo({
+                        url:
+                          '/pages/player-detail/index?playerId=' +
+                          encodeURIComponent(player.id) +
+                          '&tournamentId=' +
+                          encodeURIComponent(match.tournamentId),
+                      })
+                    }
                   >
                     <Text className="lineup-player__number">{player.shirtNumber ?? '-'}</Text>
                     <UserAvatar name={player.displayName} size="small" />
                     <View className="lineup-player__copy">
                       <Text>{player.displayName}</Text>
-                      <Text>{positionLabel(player.position)} · {player.starter ? '首发' : '替补'}</Text>
+                      <Text>
+                        {positionLabel(player.position)} · {player.starter ? '首发' : '替补'}
+                      </Text>
                     </View>
                     <Text className="lineup-player__minutes">{player.minutesPlayed}'</Text>
                   </View>
@@ -167,9 +290,137 @@ function MatchContent({
             </View>
           )}
         </View>
+      )}
+    </View>
+  )
+}
+
+function RatingsPanel({
+  match,
+  rating,
+  body,
+  isFinished,
+  submitting,
+  onRatingChange,
+  onBodyChange,
+  onSubmit,
+}: {
+  match: MatchExperienceResponse
+  rating: number
+  body: string
+  isFinished: boolean
+  submitting: boolean
+  onRatingChange: (rating: number) => void
+  onBodyChange: (body: string) => void
+  onSubmit: () => void
+}) {
+  const session = readSession()
+  return (
+    <View className="ratings-layout match-tab-content">
+      <View className="rating-overview surface">
+        <View className="rating-overview__score">
+          <Text>{match.reviews.averageRating?.toFixed(1) ?? '-'}</Text>
+          <Text>{renderStars(Math.round(match.reviews.averageRating ?? 0))}</Text>
+          <Text>{match.reviews.ratingCount} 人评分</Text>
+        </View>
+        <View className="rating-form">
+          <Text className="rating-form__title">
+            {!isFinished
+              ? '赛后开放评分'
+              : session
+                ? match.reviews.viewerReview
+                  ? '更新我的评分'
+                  : '为这场比赛评分'
+                : '登录后参与评分'}
+          </Text>
+          <View className="rating-stars" aria-label="选择星级">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <Button
+                aria-label={`${value} 星`}
+                className={value <= rating ? 'rating-star rating-star--active' : 'rating-star'}
+                disabled={!isFinished}
+                key={value}
+                onClick={() => onRatingChange(value)}
+              >
+                ★
+              </Button>
+            ))}
+          </View>
+          <Textarea
+            className="rating-form__textarea"
+            disabled={!isFinished}
+            maxlength={500}
+            placeholder={
+              isFinished ? '说说这场比赛的节奏、表现或现场体验（可选）' : '比赛结束后可评论'
+            }
+            value={body}
+            onInput={(event) => onBodyChange(event.detail.value)}
+          />
+          <Button
+            className="button button--primary rating-form__submit"
+            disabled={!isFinished || rating < 1 || submitting}
+            loading={submitting}
+            onClick={onSubmit}
+          >
+            {session ? '保存评分' : '登录后评分'}
+          </Button>
+        </View>
+      </View>
+
+      <View className="match-review-section">
+        <ProductSection
+          kicker="MATCH REVIEWS"
+          title="观赛评论"
+          note={`${match.reviews.comments.length} 条`}
+        />
+        {match.reviews.comments.length === 0 ? (
+          <DataState kind="empty" title={isFinished ? '还没有评论，来写第一条' : '比赛尚未开始'} />
+        ) : (
+          <View className="match-review-list">
+            {match.reviews.comments.map((review) => (
+              <View className="match-review surface" key={review.id}>
+                <UserAvatar name={review.author.displayName} size="small" />
+                <View className="match-review__copy">
+                  <View className="match-review__heading">
+                    <Text>{review.author.displayName}</Text>
+                    <Text>{renderStars(review.rating)}</Text>
+                    <Text>{formatRelativeTime(review.createdAt)}</Text>
+                  </View>
+                  <Text className="match-review__body">{review.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </View>
   )
+}
+
+function TabButton({
+  label,
+  note,
+  active,
+  onClick,
+}: {
+  label: string
+  note?: string | undefined
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <Button
+      className={active ? 'match-detail-tab match-detail-tab--active' : 'match-detail-tab'}
+      onClick={onClick}
+    >
+      <Text>{label}</Text>
+      {note && <Text>{note}</Text>}
+    </Button>
+  )
+}
+
+function renderStars(value: number): string {
+  return `${'★'.repeat(Math.max(0, Math.min(5, value)))}${'☆'.repeat(Math.max(0, 5 - value))}`
 }
 
 function TeamSide({
@@ -183,8 +434,17 @@ function TeamSide({
 }) {
   return (
     <View
-      className={'experience-scoreboard__team ' + (team ? 'experience-scoreboard__team--linked' : '')}
-      onClick={() => team && void Taro.navigateTo({ url: '/pages/readonly-team-detail/index?teamId=' + encodeURIComponent(team.id) + '&tournamentId=' + encodeURIComponent(tournamentId) })}
+      className={`experience-scoreboard__team ${team ? 'experience-scoreboard__team--linked' : ''}`}
+      onClick={() =>
+        team &&
+        void Taro.navigateTo({
+          url:
+            '/pages/readonly-team-detail/index?teamId=' +
+            encodeURIComponent(team.id) +
+            '&tournamentId=' +
+            encodeURIComponent(tournamentId),
+        })
+      }
     >
       <TeamCrest team={team} size="large" />
       <Text>{team?.name ?? placeholder ?? '席位待定'}</Text>

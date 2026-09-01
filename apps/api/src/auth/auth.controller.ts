@@ -2,6 +2,8 @@ import { Body, Controller, Get, Headers, HttpCode, Inject, Ip, Post, Req } from 
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -11,7 +13,14 @@ import type { Request } from 'express'
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
 import { getRequestId, type RequestWithId } from '../common/request-context'
-import { AuthUserDto, LoginDto, LoginResponseDto, ResetPasswordByIdentityDto } from './auth.dto'
+import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
+import {
+  AuthUserDto,
+  LoginDto,
+  LoginResponseDto,
+  RegisterDto,
+  ResetPasswordByIdentityDto,
+} from './auth.dto'
 import { AuthService } from './auth.service'
 
 @ApiTags('auth')
@@ -21,13 +30,31 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: '使用本地演示账号登录' })
+  @ApiOperation({ summary: '使用用户名、昵称、实名、学号或邮箱登录' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
   login(@Body() body: LoginDto, @Ip() ip: string, @Req() request: Request) {
     return this.authService.login(body.username, body.password, {
       ip,
+      userAgent: request.headers['user-agent'],
+    })
+  }
+
+  @Post('register')
+  @ApiOperation({ summary: '注册实名学生账号' })
+  @ApiBody({ type: RegisterDto })
+  @ApiCreatedResponse({ type: LoginResponseDto })
+  @ApiConflictResponse({ type: ApiErrorResponseDto })
+  register(
+    @Body() body: RegisterDto,
+    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ) {
+    return this.authService.register(body, organizationId?.trim() || DEMO_ORGANIZATION_ID, {
+      ip,
+      requestId: getRequestId(request),
       userAgent: request.headers['user-agent'],
     })
   }

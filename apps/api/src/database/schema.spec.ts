@@ -15,6 +15,10 @@ const identityMigrationPath = resolve(
   process.cwd(),
   '../../prisma/migrations/20260901110000_identity_login/migration.sql',
 )
+const matchReviewMigrationPath = resolve(
+  process.cwd(),
+  '../../prisma/migrations/20260901143000_match_reviews/migration.sql',
+)
 const apiSourcePath = resolve(process.cwd(), 'src')
 
 test('initial migration enforces organization and idempotency uniqueness', async () => {
@@ -117,4 +121,15 @@ test('identity migration keeps full student IDs restricted and uniquely addressa
   assert.match(migration, /CREATE UNIQUE INDEX "app_users_student_id_key"/)
   assert.match(migration, /CREATE UNIQUE INDEX "app_users_email_normalized_key"/)
   assert.match(migration, /CREATE UNIQUE INDEX "player_profiles_organization_id_student_id_key"/)
+})
+
+test('match review migration enforces one bounded rating per user and match', async () => {
+  const migration = await readFile(matchReviewMigrationPath, 'utf8')
+
+  assert.match(migration, /CREATE TABLE "match_reviews"/)
+  assert.match(migration, /CHECK \("rating" BETWEEN 1 AND 5\)/)
+  assert.match(migration, /CREATE UNIQUE INDEX "match_reviews_match_id_user_id_key"/)
+  assert.match(migration, /FOREIGN KEY \("organization_id"\) REFERENCES "organizations"\("id"\)/)
+  assert.match(migration, /FOREIGN KEY \("match_id"\) REFERENCES "matches"\("id"\)/)
+  assert.match(migration, /FOREIGN KEY \("user_id"\) REFERENCES "app_users"\("id"\)/)
 })
