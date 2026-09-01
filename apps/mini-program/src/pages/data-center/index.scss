@@ -3,10 +3,10 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 26px;
-  padding: 32px;
+  padding: 24px 26px;
   color: #ffffff;
   background: #183f2a;
-  border-bottom: 6px solid #d5b34a;
+  border-bottom: 4px solid #d5b34a;
 }
 
 .data-hero__eyebrow,
@@ -23,14 +23,14 @@
 }
 
 .data-hero__title {
-  margin-top: 8px;
-  font-size: 31px;
+  margin-top: 6px;
+  font-size: 27px;
   font-weight: 900;
   line-height: 1.25;
 }
 
 .data-hero__subtitle {
-  margin-top: 8px;
+  margin-top: 5px;
   color: #d6e3d9;
   font-size: 13px;
 }
@@ -44,19 +44,22 @@
 
 .season-switcher__buttons {
   display: flex;
-  gap: 6px;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
 }
 
 .season-button {
-  min-width: 62px;
-  min-height: 36px;
+  min-width: 56px;
+  min-height: 30px;
   margin: 0;
   padding: 0 12px;
   color: #dce8df;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 36px;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 30px;
 }
 
 .season-button::after {
@@ -70,28 +73,27 @@
 }
 
 .data-view-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 18px;
-  background: #ffffff;
-  border: 1px solid #dce1dc;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  margin-top: 15px;
+  padding: 3px;
+  background: #e6ebe7;
+  border-radius: 8px;
 }
 
 .data-view-tab {
-  min-height: 46px;
+  min-width: 86px;
+  min-height: 34px;
   margin: 0;
-  padding: 0 10px;
+  padding: 0 13px;
   color: #647068;
   background: transparent;
-  border-right: 1px solid #e1e5e2;
-  border-radius: 0;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 46px;
-}
-
-.data-view-tab:last-child {
-  border-right: 0;
+  line-height: 34px;
 }
 
 .data-view-tab::after {
@@ -99,8 +101,19 @@
 }
 
 .data-view-tab--active {
-  color: #ffffff;
-  background: #9b4034;
+  color: #173f29;
+  background: #ffffff;
+  box-shadow: 0 1px 5px rgba(29, 50, 35, 0.12);
+}
+
+.data-context-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+  color: #79837c;
+  font-size: 9px;
 }
 
 .data-kpi-grid {
@@ -365,110 +378,87 @@
   font-weight: 900;
 }
 
-.bracket-scroll {
-  display: flex;
-  align-items: flex-start;
-  gap: 72px;
-  min-width: 690px;
-  padding: 4px 38px 24px 2px;
-  overflow-x: auto;
+.bracket-page {
+  min-width: 0;
+  overflow: hidden;
 }
 
-.bracket-round {
-  width: 290px;
-  min-width: 290px;
+.bracket-scroll {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px 2px 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: #aab6ad #e7ebe8;
+}
+
+.bracket-canvas {
+  position: relative;
+  min-width: 0;
 }
 
 .bracket-round__title {
-  display: block;
-  margin-bottom: 11px;
-  padding: 10px 13px;
-  color: #ffffff;
-  background: #183f2a;
-  border-radius: 4px;
-  font-size: 12px;
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 8px 11px;
+  color: #214330;
+  background: #e4ebe6;
+  border-top: 2px solid #315f43;
+  border-radius: 3px;
+  font-size: 10px;
   font-weight: 900;
+  line-height: 14px;
+  text-align: center;
 }
 
-.bracket-round__matches {
-  position: relative;
-  display: flex;
-  height: 470px;
-  flex-direction: column;
-  justify-content: space-around;
-  gap: 64px;
+.bracket-connector {
+  position: absolute;
+  z-index: 0;
+  background: #9aa99e;
+  pointer-events: none;
 }
 
 .bracket-match-slot {
-  position: relative;
+  position: absolute;
   z-index: 2;
-}
-
-.bracket-round--0 .bracket-match-slot::after {
-  position: absolute;
-  top: 50%;
-  right: -36px;
-  width: 36px;
-  height: 2px;
-  background: #9aac9f;
-  content: '';
-}
-
-.bracket-round--0 .bracket-round__matches::after {
-  position: absolute;
-  z-index: 1;
-  top: 25%;
-  right: -36px;
-  bottom: 25%;
-  width: 2px;
-  background: #9aac9f;
-  content: '';
-}
-
-.bracket-round--1 .bracket-round__matches {
-  justify-content: center;
-  gap: 54px;
-}
-
-.bracket-match-slot--final::before {
-  position: absolute;
-  top: 50%;
-  left: -36px;
-  width: 36px;
-  height: 2px;
-  background: #9aac9f;
-  content: '';
+  box-sizing: border-box;
 }
 
 .bracket-match-slot--third {
-  opacity: 0.92;
+  padding-top: 17px;
 }
 
 .bracket-match__label {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  margin-bottom: 7px;
-  color: #8d3c34;
-  font-size: 9px;
+  color: #737d76;
+  font-size: 8px;
   font-weight: 900;
 }
 
 .bracket-match {
-  padding: 13px;
+  box-sizing: border-box;
+  height: 104px;
+  padding: 8px 10px;
   background: #ffffff;
   border: 1px solid #dbe1dc;
-  border-left: 4px solid #d4b34a;
+  border-left: 3px solid #d4b34a;
   border-radius: 4px;
   cursor: pointer;
   box-shadow: 0 5px 14px rgba(25, 42, 31, 0.06);
 }
 
-.bracket-match-slot--final .bracket-match {
-  border-left-color: #963f35;
-  box-shadow: 0 7px 18px rgba(91, 46, 38, 0.13);
-}
-
 .bracket-match-slot--third .bracket-match {
+  height: 87px;
   border-left-color: #7c887f;
+  box-shadow: none;
 }
 
 .bracket-match__meta {
@@ -476,7 +466,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 9px;
+  margin-bottom: 5px;
   color: #7a837d;
   font-size: 9px;
 }
@@ -486,14 +476,14 @@
   grid-template-columns: auto minmax(0, 1fr) 24px;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: 31px;
   color: #1e2921;
   font-size: 12px;
   font-weight: 800;
 }
 
 .bracket-match__team > text:last-child {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 900;
   text-align: right;
 }
@@ -585,7 +575,7 @@
 @media (max-width: 720px) {
   .data-hero {
     display: block;
-    padding: 24px 19px;
+    padding: 20px 16px;
   }
 
   .data-hero__title {
@@ -593,7 +583,7 @@
   }
 
   .season-switcher {
-    margin-top: 20px;
+    margin-top: 14px;
   }
 
   .season-switcher__label {
@@ -601,10 +591,26 @@
   }
 
   .data-view-tab {
-    min-height: 42px;
+    min-width: 0;
+    min-height: 32px;
     padding: 0 3px;
-    font-size: 12px;
-    line-height: 42px;
+    font-size: 10px;
+    line-height: 32px;
+  }
+
+  .data-view-tabs {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .data-context-note {
+    display: block;
+    line-height: 1.65;
+  }
+
+  .data-context-note text {
+    display: block;
   }
 
   .data-kpi-grid {

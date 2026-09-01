@@ -33,6 +33,12 @@ export interface SeedTournamentFixture {
   rounds: Record<string, string>
 }
 
+export const DEMO_STARTERS_PER_TEAM = 8
+
+export function isDemoMatchStarter(playerIndex: number): boolean {
+  return playerIndex < DEMO_STARTERS_PER_TEAM
+}
+
 export async function seedDemoTournament(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -174,7 +180,8 @@ export async function seedDemoTournament(
     }
   }
 
-  const knockoutRoundNames = year === '2026' ? ['半决赛', '决赛日'] : ['八强赛', '半决赛', '决赛日']
+  const knockoutRoundNames =
+    year === '2026' ? ['十六强', '八强赛', '半决赛', '决赛日'] : ['八强赛', '半决赛', '决赛日']
   for (const [index, name] of knockoutRoundNames.entries()) {
     const number = index + 1
     const id = fixtureId(`round:${year}:knockout:${number}`)
@@ -240,7 +247,26 @@ export async function seedDemoRosters(
   fixture: SeedTournamentFixture,
   teams: Array<{ id: string }>,
 ): Promise<void> {
-  for (const [teamIndex, team] of teams.entries()) {
+  const participatingTeams = fixture.year === '2026' ? teams : teams.slice(0, 8)
+  const coachSurnames = [
+    '王',
+    '李',
+    '赵',
+    '冯',
+    '陆',
+    '秦',
+    '顾',
+    '严',
+    '沈',
+    '江',
+    '陶',
+    '白',
+    '杜',
+    '夏',
+    '乔',
+    '孟',
+  ]
+  for (const [teamIndex, team] of participatingTeams.entries()) {
     const definition = DEMO_TEAMS[teamIndex]!
     const teamPlayers = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
     const registrationId = fixtureId(`registration:${fixture.year}:${definition.code}`)
@@ -249,6 +275,11 @@ export async function seedDemoRosters(
     const sourceFileHash = createHash('sha256')
       .update(`DEMO_FIXTURE:${fixture.year}:${definition.code}`)
       .digest('hex')
+    const groupId =
+      fixture.year === '2026' && teamIndex < 8
+        ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null)
+        : null
+    const coachDisplayName = `${coachSurnames[teamIndex] ?? '林'}教练`
 
     await tx.teamRegistration.upsert({
       where: { tournamentId_teamId: { tournamentId: fixture.id, teamId: team.id } },
@@ -257,19 +288,17 @@ export async function seedDemoRosters(
         organizationId,
         tournamentId: fixture.id,
         teamId: team.id,
-        groupId:
-          fixture.year === '2026' ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null) : null,
+        groupId,
         status: TeamRegistrationStatus.APPROVED,
         leaderDisplayName: teamPlayers[6]!.displayName,
-        coachDisplayName: `${['王', '李', '赵', '冯', '陆', '秦', '顾', '严'][teamIndex]}教练`,
+        coachDisplayName,
         approvedAt: new Date(`${fixture.year}-04-15T10:00:00+08:00`),
       },
       update: {
-        groupId:
-          fixture.year === '2026' ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null) : null,
+        groupId,
         status: TeamRegistrationStatus.APPROVED,
         leaderDisplayName: teamPlayers[6]!.displayName,
-        coachDisplayName: `${['王', '李', '赵', '冯', '陆', '秦', '顾', '严'][teamIndex]}教练`,
+        coachDisplayName,
         approvedAt: new Date(`${fixture.year}-04-15T10:00:00+08:00`),
       },
     })
@@ -427,7 +456,7 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
-        ? '8 支球队分为 2 组，小组前 2 名进入半决赛；胜 3 分、平 1 分、负 0 分。'
+        ? '16 支球队进入单败淘汰赛，依次进行十六强、八强、半决赛和决赛；三四名赛为独立支线。'
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
@@ -464,7 +493,7 @@ async function seedMatchFacts(
         teamId: teams[teamIndex]!.id,
         playerId: player.id,
         shirtNumber: player.shirtNumber,
-        starter: index < 11,
+        starter: isDemoMatchStarter(index),
         minutesPlayed:
           index < 8
             ? matchMinutes
