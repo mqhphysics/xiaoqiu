@@ -261,6 +261,11 @@ model User {
   id                  String                   @id @default(uuid()) @db.Uuid
   loginNameNormalized String?                  @map("login_name_normalized") @db.VarChar(120)
   displayName         String                   @map("display_name") @db.VarChar(120)
+  realName            String?                  @map("real_name") @db.VarChar(120)
+  realNameNormalized  String?                  @map("real_name_normalized") @db.VarChar(120)
+  studentId           String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
+  email               String?                  @db.VarChar(254)
+  emailNormalized     String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
   avatarUrl           String?                  @map("avatar_url") @db.VarChar(512)
   bio                 String?                  @db.VarChar(280)
   verificationLevel   VerificationLevel        @default(UNVERIFIED) @map("verification_level")
@@ -282,6 +287,7 @@ model User {
   postLikes           PostLike[]
   postComments        PostComment[]
 
+  @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
 }
 
@@ -531,15 +537,15 @@ model Stage {
 }
 
 model TournamentGroup {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  stageId        String   @map("stage_id") @db.Uuid
-  groupCode      String   @map("group_code") @db.VarChar(64)
-  name           String   @db.VarChar(120)
-  sortOrder      Int      @default(0) @map("sort_order")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  stage          Stage    @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  stageId        String             @map("stage_id") @db.Uuid
+  groupCode      String             @map("group_code") @db.VarChar(64)
+  name           String             @db.VarChar(120)
+  sortOrder      Int                @default(0) @map("sort_order")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stage          Stage              @relation(fields: [stageId], references: [id], onDelete: Restrict)
   matches        Match[]
   registrations  TeamRegistration[]
 
@@ -565,22 +571,22 @@ model CompetitionRound {
 }
 
 model Team {
-  id              String             @id @default(uuid()) @db.Uuid
-  organizationId  String             @map("organization_id") @db.Uuid
-  teamCode        String             @map("team_code") @db.VarChar(64)
-  name            String             @db.VarChar(160)
-  shortName       String?            @map("short_name") @db.VarChar(80)
-  collegeName     String?            @map("college_name") @db.VarChar(160)
-  description     String?            @db.VarChar(600)
-  motto           String?            @db.VarChar(160)
-  primaryColor    String?            @map("primary_color") @db.VarChar(16)
-  secondaryColor  String?            @map("secondary_color") @db.VarChar(16)
-  foundedYear     Int?               @map("founded_year")
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  homeMatches     Match[]            @relation("MatchHomeTeam")
-  awayMatches     Match[]            @relation("MatchAwayTeam")
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  teamCode        String               @map("team_code") @db.VarChar(64)
+  name            String               @db.VarChar(160)
+  shortName       String?              @map("short_name") @db.VarChar(80)
+  collegeName     String?              @map("college_name") @db.VarChar(160)
+  description     String?              @db.VarChar(600)
+  motto           String?              @db.VarChar(160)
+  primaryColor    String?              @map("primary_color") @db.VarChar(16)
+  secondaryColor  String?              @map("secondary_color") @db.VarChar(16)
+  foundedYear     Int?                 @map("founded_year")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  homeMatches     Match[]              @relation("MatchHomeTeam")
+  awayMatches     Match[]              @relation("MatchAwayTeam")
   registrations   TeamRegistration[]
   rosterSnapshots RosterSnapshot[]
   preferences     UserTeamPreference[]
@@ -594,35 +600,37 @@ model Team {
 }
 
 model PlayerProfile {
-  id              String                @id @default(uuid()) @db.Uuid
-  organizationId  String                @map("organization_id") @db.Uuid
-  sourceType      String?               @map("source_type") @db.VarChar(64)
-  sourceKey       String?               @map("source_key") @db.VarChar(120)
-  displayName     String                @map("display_name") @db.VarChar(120)
-  jerseyName      String?               @map("jersey_name") @db.VarChar(120)
-  studentIdMasked String?               @map("student_id_masked") @db.VarChar(64)
-  position        PlayerPosition?
-  secondaryPosition PlayerPosition?     @map("secondary_position")
-  dominantFoot    DominantFoot?          @map("dominant_foot")
-  heightCm        Int?                   @map("height_cm")
-  academicYear    String?                @map("academic_year") @db.VarChar(32)
-  major           String?                @db.VarChar(120)
-  hometown        String?                @db.VarChar(120)
-  bio             String?                @db.VarChar(600)
-  profileColor    String?                @map("profile_color") @db.VarChar(16)
-  isDemo          Boolean                @default(false) @map("is_demo")
-  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  rosterEntries   RosterEntry[]
-  snapshotEntries RosterSnapshotEntry[]
-  linkedUser      User?                  @relation("UserLinkedPlayer")
-  scoredEvents    MatchEvent[]            @relation("MatchEventPlayer")
-  assistedEvents  MatchEvent[]            @relation("MatchEventRelatedPlayer")
-  appearances     MatchAppearance[]
+  id                String                @id @default(uuid()) @db.Uuid
+  organizationId    String                @map("organization_id") @db.Uuid
+  sourceType        String?               @map("source_type") @db.VarChar(64)
+  sourceKey         String?               @map("source_key") @db.VarChar(120)
+  displayName       String                @map("display_name") @db.VarChar(120)
+  jerseyName        String?               @map("jersey_name") @db.VarChar(120)
+  studentId         String?               @map("student_id") @db.VarChar(32)
+  studentIdMasked   String?               @map("student_id_masked") @db.VarChar(64)
+  position          PlayerPosition?
+  secondaryPosition PlayerPosition?       @map("secondary_position")
+  dominantFoot      DominantFoot?         @map("dominant_foot")
+  heightCm          Int?                  @map("height_cm")
+  academicYear      String?               @map("academic_year") @db.VarChar(32)
+  major             String?               @db.VarChar(120)
+  hometown          String?               @db.VarChar(120)
+  bio               String?               @db.VarChar(600)
+  profileColor      String?               @map("profile_color") @db.VarChar(16)
+  isDemo            Boolean               @default(false) @map("is_demo")
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterEntries     RosterEntry[]
+  snapshotEntries   RosterSnapshotEntry[]
+  linkedUser        User?                 @relation("UserLinkedPlayer")
+  scoredEvents      MatchEvent[]          @relation("MatchEventPlayer")
+  assistedEvents    MatchEvent[]          @relation("MatchEventRelatedPlayer")
+  appearances       MatchAppearance[]
 
   // PostgreSQL partial uniqueness for non-null source_key is enforced by migration SQL.
   @@unique([id, organizationId], map: "player_profiles_id_organization_id_key")
+  @@unique([organizationId, studentId], map: "player_profiles_organization_id_student_id_key")
   @@index([organizationId, displayName], map: "player_profiles_organization_id_display_name_idx")
   @@map("player_profiles")
 }
@@ -778,21 +786,21 @@ model UserTeamPreference {
 model MatchEvent {
   id              String         @id @default(uuid()) @db.Uuid
   organizationId  String         @map("organization_id") @db.Uuid
-  matchId          String         @map("match_id") @db.Uuid
-  teamId           String         @map("team_id") @db.Uuid
-  playerId         String?        @map("player_id") @db.Uuid
-  relatedPlayerId  String?        @map("related_player_id") @db.Uuid
-  type              MatchEventType
-  minute            Int
-  stoppageMinute    Int?           @map("stoppage_minute")
-  description       String?        @db.VarChar(240)
-  sortOrder         Int            @default(0) @map("sort_order")
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  match             Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team              Team           @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_events_team_organization_fkey")
-  player            PlayerProfile? @relation("MatchEventPlayer", fields: [playerId], references: [id], onDelete: SetNull)
-  relatedPlayer     PlayerProfile? @relation("MatchEventRelatedPlayer", fields: [relatedPlayerId], references: [id], onDelete: SetNull)
+  matchId         String         @map("match_id") @db.Uuid
+  teamId          String         @map("team_id") @db.Uuid
+  playerId        String?        @map("player_id") @db.Uuid
+  relatedPlayerId String?        @map("related_player_id") @db.Uuid
+  type            MatchEventType
+  minute          Int
+  stoppageMinute  Int?           @map("stoppage_minute")
+  description     String?        @db.VarChar(240)
+  sortOrder       Int            @default(0) @map("sort_order")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  match           Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team            Team           @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_events_team_organization_fkey")
+  player          PlayerProfile? @relation("MatchEventPlayer", fields: [playerId], references: [id], onDelete: SetNull)
+  relatedPlayer   PlayerProfile? @relation("MatchEventRelatedPlayer", fields: [relatedPlayerId], references: [id], onDelete: SetNull)
 
   @@index([matchId, minute, sortOrder], map: "match_events_match_id_minute_sort_idx")
   @@index([organizationId, playerId, type], map: "match_events_org_player_type_idx")
@@ -803,17 +811,17 @@ model MatchEvent {
 model MatchAppearance {
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid
-  matchId         String        @map("match_id") @db.Uuid
-  teamId          String        @map("team_id") @db.Uuid
-  playerId        String        @map("player_id") @db.Uuid
-  shirtNumber     String?       @map("shirt_number") @db.VarChar(16)
-  starter         Boolean       @default(false)
-  minutesPlayed   Int           @default(0) @map("minutes_played")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  matchId        String        @map("match_id") @db.Uuid
+  teamId         String        @map("team_id") @db.Uuid
+  playerId       String        @map("player_id") @db.Uuid
+  shirtNumber    String?       @map("shirt_number") @db.VarChar(16)
+  starter        Boolean       @default(false)
+  minutesPlayed  Int           @default(0) @map("minutes_played")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  match           Match         @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  team            Team          @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_appearances_team_organization_fkey")
-  player          PlayerProfile @relation(fields: [playerId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_appearances_player_organization_fkey")
+  match          Match         @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team           Team          @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_appearances_team_organization_fkey")
+  player         PlayerProfile @relation(fields: [playerId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "match_appearances_player_organization_fkey")
 
   @@unique([matchId, playerId], map: "match_appearances_match_id_player_id_key")
   @@index([organizationId, playerId, matchId], map: "match_appearances_org_player_match_idx")
@@ -822,23 +830,23 @@ model MatchAppearance {
 }
 
 model Post {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  tournamentId   String?      @map("tournament_id") @db.Uuid
-  authorUserId   String?      @map("author_user_id") @db.Uuid
-  type           PostType     @default(COMMUNITY)
-  status         PostStatus   @default(PUBLISHED)
-  title          String?      @db.VarChar(180)
-  body           String       @db.VarChar(2000)
-  imageUrl       String?      @map("image_url") @db.VarChar(512)
-  publishedAt    DateTime     @default(now()) @map("published_at") @db.Timestamptz(3)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  tournament     Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
-  author          User?        @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  likes           PostLike[]
-  comments        PostComment[]
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  tournamentId   String?       @map("tournament_id") @db.Uuid
+  authorUserId   String?       @map("author_user_id") @db.Uuid
+  type           PostType      @default(COMMUNITY)
+  status         PostStatus    @default(PUBLISHED)
+  title          String?       @db.VarChar(180)
+  body           String        @db.VarChar(2000)
+  imageUrl       String?       @map("image_url") @db.VarChar(512)
+  publishedAt    DateTime      @default(now()) @map("published_at") @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament     Tournament?   @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  author         User?         @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  likes          PostLike[]
+  comments       PostComment[]
 
   @@index([organizationId, status, publishedAt], map: "posts_org_status_published_at_idx")
   @@index([tournamentId, status, publishedAt], map: "posts_tournament_status_published_at_idx")

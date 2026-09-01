@@ -20,7 +20,7 @@ import {
 } from '@nestjs/swagger'
 
 import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
-import {
+import type {
   CreateCommentDto,
   CreatePostDto,
   SearchQueryDto,

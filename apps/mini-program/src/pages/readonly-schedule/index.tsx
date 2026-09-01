@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, TeamCrest } from '../../components/product-ui'
-import { formatDate, formatLongDate, formatTime } from '../../features/product/product.format'
+import { formatLongDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import type { CompetitionDataResponse, MatchSummary } from '../../features/product/product.types'
 
@@ -45,7 +45,12 @@ export default function SchedulePage() {
     <PublicShell active="schedule" tournamentId={tournamentId}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取完整赛程" />}
       {state.phase === 'failed' && (
-        <DataState kind="error" title="赛程不可用" description={state.message} onRetry={() => void load()} />
+        <DataState
+          kind="error"
+          title="赛程不可用"
+          description={state.message}
+          onRetry={() => void load()}
+        />
       )}
       {state.phase === 'ready' && (
         <ScheduleContent
@@ -76,7 +81,8 @@ function ScheduleContent({
   const groups = useMemo(() => {
     const filtered = data.schedule.filter((match) => {
       if (filter === 'finished') return ['FINISHED', 'CONFIRMED'].includes(match.status)
-      if (filter === 'upcoming') return !['FINISHED', 'CONFIRMED', 'CANCELLED'].includes(match.status)
+      if (filter === 'upcoming')
+        return !['FINISHED', 'CONFIRMED', 'CANCELLED'].includes(match.status)
       return true
     })
     const sorted = [...filtered].sort((a, b) => {
@@ -92,7 +98,9 @@ function ScheduleContent({
     return [...result.entries()]
   }, [data.schedule, direction, filter])
 
-  const finished = data.schedule.filter((match) => ['FINISHED', 'CONFIRMED'].includes(match.status)).length
+  const finished = data.schedule.filter((match) =>
+    ['FINISHED', 'CONFIRMED'].includes(match.status),
+  ).length
   return (
     <View>
       <View className="schedule-header">
@@ -102,21 +110,52 @@ function ScheduleContent({
           <Text className="schedule-header__event">{data.tournament.name}</Text>
         </View>
         <View className="schedule-header__summary">
-          <View><Text>{data.schedule.length}</Text><Text>全部</Text></View>
-          <View><Text>{finished}</Text><Text>已结束</Text></View>
-          <View><Text>{data.schedule.length - finished}</Text><Text>待进行</Text></View>
+          <View>
+            <Text>{data.schedule.length}</Text>
+            <Text>全部</Text>
+          </View>
+          <View>
+            <Text>{finished}</Text>
+            <Text>已结束</Text>
+          </View>
+          <View>
+            <Text>{data.schedule.length - finished}</Text>
+            <Text>待进行</Text>
+          </View>
         </View>
       </View>
 
       <View className="schedule-controls">
         <View className="schedule-segment">
-          <FilterButton active={filter === 'all'} label="全部" onClick={() => onFilterChange('all')} />
-          <FilterButton active={filter === 'upcoming'} label="未开始" onClick={() => onFilterChange('upcoming')} />
-          <FilterButton active={filter === 'finished'} label="已结束" onClick={() => onFilterChange('finished')} />
+          <FilterButton
+            active={filter === 'all'}
+            label="全部"
+            onClick={() => onFilterChange('all')}
+          />
+          <FilterButton
+            active={filter === 'upcoming'}
+            label="未开始"
+            onClick={() => onFilterChange('upcoming')}
+          />
+          <FilterButton
+            active={filter === 'finished'}
+            label="已结束"
+            onClick={() => onFilterChange('finished')}
+          />
         </View>
         <View className="schedule-order">
-          <Button className={direction === 'asc' ? 'schedule-order__active' : ''} onClick={() => onDirectionChange('asc')}>日期正序</Button>
-          <Button className={direction === 'desc' ? 'schedule-order__active' : ''} onClick={() => onDirectionChange('desc')}>日期倒序</Button>
+          <Button
+            className={direction === 'asc' ? 'schedule-order__active' : ''}
+            onClick={() => onDirectionChange('asc')}
+          >
+            日期正序
+          </Button>
+          <Button
+            className={direction === 'desc' ? 'schedule-order__active' : ''}
+            onClick={() => onDirectionChange('desc')}
+          >
+            日期倒序
+          </Button>
         </View>
       </View>
 
@@ -131,7 +170,9 @@ function ScheduleContent({
                 <Text>{matches.length} 场</Text>
               </View>
               <View className="schedule-day__matches">
-                {matches.map((match) => <ScheduleMatch key={match.id} match={match} />)}
+                {matches.map((match) => (
+                  <ScheduleMatch key={match.id} match={match} />
+                ))}
               </View>
             </View>
           ))}
@@ -141,9 +182,20 @@ function ScheduleContent({
   )
 }
 
-function FilterButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function FilterButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+}) {
   return (
-    <Button className={'schedule-filter-button ' + (active ? 'schedule-filter-button--active' : '')} onClick={onClick}>
+    <Button
+      className={'schedule-filter-button ' + (active ? 'schedule-filter-button--active' : '')}
+      onClick={onClick}
+    >
       {label}
     </Button>
   )
@@ -154,7 +206,11 @@ function ScheduleMatch({ match }: { match: MatchSummary }) {
   return (
     <View
       className="timeline-match"
-      onClick={() => void Taro.navigateTo({ url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id) })}
+      onClick={() =>
+        void Taro.navigateTo({
+          url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
+        })
+      }
     >
       <View className="timeline-match__time">
         <Text>{formatTime(match.scheduledStartAt)}</Text>

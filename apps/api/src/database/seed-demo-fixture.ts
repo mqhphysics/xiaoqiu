@@ -1,10 +1,6 @@
 import type { PrismaClient } from '../generated/prisma/client'
 import { DEMO_ORGANIZATION_ID, DEMO_PLAYERS, DEMO_TEAMS, fixtureId } from './demo-fixture'
-import {
-  seedDemoMatches,
-  seedDemoRosters,
-  seedDemoTournament,
-} from './seed-demo-competition'
+import { seedDemoMatches, seedDemoRosters, seedDemoTournament } from './seed-demo-competition'
 import { seedDemoAccountsAndCommunity } from './seed-demo-social'
 
 export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
@@ -67,7 +63,8 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
             sourceKey: player.sourceKey,
             displayName: player.displayName,
             jerseyName: player.jerseyName,
-            studentIdMasked: `DEMO****${player.sourceKey.slice(-2)}`,
+            studentId: player.studentId,
+            studentIdMasked: maskStudentId(player.studentId),
             position: player.position,
             secondaryPosition: player.secondaryPosition,
             dominantFoot: player.dominantFoot,
@@ -82,6 +79,8 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
           update: {
             displayName: player.displayName,
             jerseyName: player.jerseyName,
+            studentId: player.studentId,
+            studentIdMasked: maskStudentId(player.studentId),
             position: player.position,
             secondaryPosition: player.secondaryPosition,
             dominantFoot: player.dominantFoot,
@@ -146,4 +145,8 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
     },
     { maxWait: 15_000, timeout: 120_000 },
   )
+}
+
+function maskStudentId(studentId: string): string {
+  return `${studentId.slice(0, 4)}*****${studentId.slice(-2)}`
 }

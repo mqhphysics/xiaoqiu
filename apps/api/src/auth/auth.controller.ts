@@ -10,7 +10,8 @@ import {
 import type { Request } from 'express'
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
-import { AuthUserDto, LoginDto, LoginResponseDto } from './auth.dto'
+import { getRequestId, type RequestWithId } from '../common/request-context'
+import { AuthUserDto, LoginDto, LoginResponseDto, ResetPasswordByIdentityDto } from './auth.dto'
 import { AuthService } from './auth.service'
 
 @ApiTags('auth')
@@ -27,6 +28,23 @@ export class AuthController {
   login(@Body() body: LoginDto, @Ip() ip: string, @Req() request: Request) {
     return this.authService.login(body.username, body.password, {
       ip,
+      userAgent: request.headers['user-agent'],
+    })
+  }
+
+  @Post('password/reset-by-identity')
+  @HttpCode(204)
+  @ApiOperation({ summary: '演示环境通过实名与学号重置密码' })
+  @ApiBody({ type: ResetPasswordByIdentityDto })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  async resetPasswordByIdentity(
+    @Body() body: ResetPasswordByIdentityDto,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ): Promise<void> {
+    await this.authService.resetPasswordByIdentity(body, {
+      ip,
+      requestId: getRequestId(request),
       userAgent: request.headers['user-agent'],
     })
   }

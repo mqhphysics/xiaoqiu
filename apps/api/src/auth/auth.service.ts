@@ -5,9 +5,14 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
-import { UserStatus } from '../generated/prisma/client'
-import type { AuthUserDto, LoginResponseDto } from './auth.dto'
-import { verifyPassword } from './password'
+import { AuditActorType, UserStatus } from '../generated/prisma/client'
+import type {
+  AdminIdentityDto,
+  AuthUserDto,
+  LoginResponseDto,
+  ResetPasswordByIdentityDto,
+} from './auth.dto'
+import { hashPassword, verifyPassword } from './password'
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -23,14 +28,35 @@ export class AuthService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async login(
-    username: string,
+    identifier: string,
     password: string,
     request: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<LoginResponseDto> {
-    const user = await this.prisma.user.findFirst({
-      where: { loginNameNormalized: username, status: UserStatus.ACTIVE },
+    const normalizedIdentifier = normalizeIdentifier(identifier)
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        status: UserStatus.ACTIVE,
+        OR: [
+          { loginNameNormalized: normalizedIdentifier },
+          { displayName: { equals: identifier.trim(), mode: 'insensitive' } },
+          { realNameNormalized: normalizedIdentifier },
+          { studentId: identifier.trim() },
+          { emailNormalized: normalizedIdentifier },
+        ],
+      },
       include: userInclude,
+      take: 10,
     })
+    const matchingUsers = candidates.filter(
+      (candidate) =>
+        candidate.passwordCredential &&
+        verifyPassword(
+          password,
+          candidate.passwordCredential.passwordHash,
+          candidate.passwordCredential.passwordSalt,
+        ),
+    )
+    const user = matchingUsers.length === 1 ? matchingUsers[0] : undefined
 
     if (
       !user?.passwordCredential ||
@@ -126,6 +152,144 @@ export class AuthService {
       data: { revokedAt: new Date() },
     })
   }
+
+  async resetPasswordByIdentity(
+    body: ResetPasswordByIdentityDto,
+    request: {
+      ip?: string | undefined
+      requestId: string
+      userAgent?: string | undefined
+    },
+  ): Promise<void> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ApiHttpException(HttpStatus.FORBIDDEN, {
+        code: ERROR_CODES.FORBIDDEN,
+        message: '请使用已绑定邮箱或联系管理员重置密码',
+      })
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        realNameNormalized: normalizeIdentifier(body.realName),
+        studentId: body.studentId.trim(),
+        status: UserStatus.ACTIVE,
+      },
+      include: { memberships: { where: { status: 'ACTIVE' } } },
+      take: 2,
+    })
+    const user = users.length === 1 ? users[0] : undefined
+    const membership = user?.memberships[0]
+    if (!user || !membership) {
+      throw new ApiHttpException(HttpStatus.UNAUTHORIZED, {
+        code: ERROR_CODES.UNAUTHORIZED,
+        message: '姓名与学号不匹配',
+      })
+    }
+
+    const password = hashPassword(body.newPassword)
+    await this.prisma.$transaction([
+      this.prisma.passwordCredential.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          passwordHash: password.hash,
+          passwordSalt: password.salt,
+          algorithm: password.algorithm,
+        },
+        update: {
+          passwordHash: password.hash,
+          passwordSalt: password.salt,
+          algorithm: password.algorithm,
+        },
+      }),
+      this.prisma.userSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          organizationId: membership.organizationId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'SELF_PASSWORD_RESET',
+          targetType: 'User',
+          targetId: user.id,
+          reason: '本地演示身份校验',
+          requestId: request.requestId,
+          ipAddress: request.ip ?? null,
+          userAgent: request.userAgent?.slice(0, 512) ?? null,
+          source: 'LOCAL_DEMO_RECOVERY',
+        },
+      }),
+    ])
+  }
+
+  async listOrganizationIdentities(
+    authorization: string | undefined,
+    request: {
+      ip?: string | undefined
+      requestId: string
+      userAgent?: string | undefined
+    },
+  ): Promise<AdminIdentityDto[]> {
+    const session = await this.requireSession(authorization)
+    const isOrganizationAdmin = session.user.roles.some(
+      (assignment) =>
+        assignment.role === 'ORGANIZATION_ADMIN' &&
+        assignment.scopeType === 'ORGANIZATION' &&
+        assignment.scopeId === session.organizationId,
+    )
+    const isPlatformAdmin = session.user.roles.some(
+      (assignment) => assignment.role === 'PLATFORM_ADMIN',
+    )
+    if (!isOrganizationAdmin && !isPlatformAdmin) {
+      throw new ApiHttpException(HttpStatus.FORBIDDEN, {
+        code: ERROR_CODES.FORBIDDEN,
+        message: '仅组织管理员可查看实名账号目录',
+      })
+    }
+
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { organizationId: session.organizationId, status: 'ACTIVE' },
+      include: {
+        user: {
+          include: { roleAssignments: { where: { revokedAt: null } } },
+        },
+      },
+      orderBy: [{ user: { realName: 'asc' } }, { user: { displayName: 'asc' } }],
+    })
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: session.organizationId,
+        actorType: AuditActorType.ADMIN,
+        actorUserId: session.userId,
+        actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+          role,
+          scopeType,
+          scopeId,
+        })),
+        action: 'IDENTITY_DIRECTORY_VIEWED',
+        targetType: 'Organization',
+        targetId: session.organizationId,
+        reason: '管理员实名目录查看',
+        requestId: request.requestId,
+        ipAddress: request.ip ?? null,
+        userAgent: request.userAgent?.slice(0, 512) ?? null,
+        source: 'API',
+      },
+    })
+
+    return memberships.filter(({ user }) => user.studentId !== null).map(({ user }) => ({
+      id: user.id,
+      username: user.loginNameNormalized ?? '',
+      displayName: user.displayName,
+      realName: user.realName,
+      studentId: user.studentId,
+      email: user.email,
+      verificationLevel: user.verificationLevel,
+      roles: user.roleAssignments.map((assignment) => assignment.role),
+    }))
+  }
 }
 
 const userInclude = {
@@ -139,6 +303,9 @@ function mapAuthUser(user: {
   id: string
   loginNameNormalized: string | null
   displayName: string
+  realName: string | null
+  studentId: string | null
+  email: string | null
   bio: string | null
   verificationLevel: string
   playerProfile: { id: string; displayName: string; position: string | null } | null
@@ -148,6 +315,9 @@ function mapAuthUser(user: {
     id: user.id,
     username: user.loginNameNormalized ?? '',
     displayName: user.displayName,
+    realName: user.realName,
+    studentId: user.studentId,
+    email: user.email,
     bio: user.bio,
     verificationLevel: user.verificationLevel,
     roles: user.roleAssignments.map((assignment) => ({
@@ -163,6 +333,10 @@ function mapAuthUser(user: {
         }
       : null,
   }
+}
+
+function normalizeIdentifier(value: string): string {
+  return value.trim().toLocaleLowerCase('zh-CN')
 }
 
 function hashToken(token: string): string {

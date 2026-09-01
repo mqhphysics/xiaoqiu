@@ -3,10 +3,14 @@ import { Transform } from 'class-transformer'
 import { IsString, Length } from 'class-validator'
 
 export class LoginDto {
-  @ApiProperty({ type: String, example: 'student' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @ApiProperty({
+    type: String,
+    description: '用户名、昵称、真实姓名、学号或绑定邮箱',
+    example: '20249990001',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @Length(3, 120)
+  @Length(2, 254)
   username!: string
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
@@ -48,6 +52,15 @@ export class AuthUserDto {
   displayName!: string
 
   @ApiProperty({ type: String, required: false, nullable: true })
+  realName!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  studentId!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  email!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
   bio!: string | null
 
   @ApiProperty({ type: String, example: 'STUDENT_VERIFIED' })
@@ -69,4 +82,49 @@ export class LoginResponseDto {
 
   @ApiProperty({ type: () => AuthUserDto })
   user!: AuthUserDto
+}
+
+export class ResetPasswordByIdentityDto {
+  @ApiProperty({ type: String, example: '林知夏' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(2, 120)
+  realName!: string
+
+  @ApiProperty({ type: String, example: '20249990001' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(6, 32)
+  studentId!: string
+
+  @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
+  @IsString()
+  @Length(8, 128)
+  newPassword!: string
+}
+
+export class AdminIdentityDto {
+  @ApiProperty({ type: String })
+  id!: string
+
+  @ApiProperty({ type: String })
+  username!: string
+
+  @ApiProperty({ type: String })
+  displayName!: string
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  realName!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  studentId!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  email!: string | null
+
+  @ApiProperty({ type: String })
+  verificationLevel!: string
+
+  @ApiProperty({ type: [String] })
+  roles!: string[]
 }

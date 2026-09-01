@@ -11,6 +11,10 @@ const scheduleMigrationPath = resolve(
   process.cwd(),
   '../../prisma/migrations/20260624110000_p1_schedule_slice/migration.sql',
 )
+const identityMigrationPath = resolve(
+  process.cwd(),
+  '../../prisma/migrations/20260901110000_identity_login/migration.sql',
+)
 const apiSourcePath = resolve(process.cwd(), 'src')
 
 test('initial migration enforces organization and idempotency uniqueness', async () => {
@@ -102,4 +106,15 @@ test('P1 schedule migration creates required tables and uniqueness constraints',
   assert.match(migration, /FOREIGN KEY \("organization_id"\) REFERENCES "organizations"\("id"\)/)
   assert.match(migration, /CREATE INDEX "matches_organization_id_scheduled_start_at_idx"/)
   assert.match(migration, /CREATE INDEX "matches_tournament_id_status_scheduled_start_at_idx"/)
+})
+
+test('identity migration keeps full student IDs restricted and uniquely addressable', async () => {
+  const migration = await readFile(identityMigrationPath, 'utf8')
+
+  assert.match(migration, /ADD COLUMN "real_name" VARCHAR\(120\)/)
+  assert.match(migration, /ADD COLUMN "student_id" VARCHAR\(32\)/)
+  assert.match(migration, /ADD COLUMN "email_normalized" VARCHAR\(254\)/)
+  assert.match(migration, /CREATE UNIQUE INDEX "app_users_student_id_key"/)
+  assert.match(migration, /CREATE UNIQUE INDEX "app_users_email_normalized_key"/)
+  assert.match(migration, /CREATE UNIQUE INDEX "player_profiles_organization_id_student_id_key"/)
 })

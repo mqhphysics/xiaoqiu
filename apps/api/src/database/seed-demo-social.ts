@@ -1,20 +1,9 @@
 import { createHash } from 'node:crypto'
 
-import {
-  MembershipStatus,
-  PostStatus,
-  Prisma,
-  RoleScopeType,
-  UserStatus,
-} from '../generated/prisma/client'
+import { MembershipStatus, PostStatus, RoleScopeType, UserStatus } from '../generated/prisma/client'
+import type { Prisma } from '../generated/prisma/client'
 import { hashPassword } from '../auth/password'
-import {
-  DEMO_ACCOUNTS,
-  DEMO_PASSWORD,
-  DEMO_PLAYERS,
-  DEMO_POSTS,
-  fixtureId,
-} from './demo-fixture'
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, DEMO_PLAYERS, DEMO_POSTS, fixtureId } from './demo-fixture'
 
 export async function seedDemoAccountsAndCommunity(
   tx: Prisma.TransactionClient,
@@ -37,6 +26,11 @@ export async function seedDemoAccountsAndCommunity(
         id: userId,
         loginNameNormalized: account.username,
         displayName: account.displayName,
+        realName: account.realName,
+        realNameNormalized: account.realName.trim().toLowerCase(),
+        studentId: account.studentId,
+        email: account.email,
+        emailNormalized: account.email.toLowerCase(),
         bio: account.bio,
         verificationLevel: account.verificationLevel,
         playerProfileId: linkedPlayer?.id ?? null,
@@ -45,6 +39,11 @@ export async function seedDemoAccountsAndCommunity(
       update: {
         loginNameNormalized: account.username,
         displayName: account.displayName,
+        realName: account.realName,
+        realNameNormalized: account.realName.trim().toLowerCase(),
+        studentId: account.studentId,
+        email: account.email,
+        emailNormalized: account.email.toLowerCase(),
         bio: account.bio,
         verificationLevel: account.verificationLevel,
         playerProfileId: linkedPlayer?.id ?? null,

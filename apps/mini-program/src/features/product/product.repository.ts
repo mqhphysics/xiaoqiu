@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 
 import { clearSession, readSession, saveSession } from './session'
 import type {
+  AdminIdentity,
   AuthSession,
   AuthUser,
   CompetitionDataResponse,
@@ -54,17 +55,14 @@ export const productRepository = {
     ),
 
   getMatch: (matchId: string) =>
-    request<MatchExperienceResponse>(
-      `/public/matches/${encodeURIComponent(matchId)}/experience`,
-    ),
+    request<MatchExperienceResponse>(`/public/matches/${encodeURIComponent(matchId)}/experience`),
 
-  getPost: (postId: string) =>
-    request<PostDetail>(`/public/posts/${encodeURIComponent(postId)}`),
+  getPost: (postId: string) => request<PostDetail>(`/public/posts/${encodeURIComponent(postId)}`),
 
-  login: async (username: string, password: string) => {
+  login: async (identifier: string, password: string) => {
     const session = await request<AuthSession>('/auth/login', {
       method: 'POST',
-      data: { username: username.trim().toLowerCase(), password },
+      data: { username: identifier.trim(), password },
       authenticated: false,
     })
     saveSession(session)
@@ -72,6 +70,15 @@ export const productRepository = {
   },
 
   getMe: () => request<AuthUser>('/auth/me'),
+
+  resetPasswordByIdentity: (realName: string, studentId: string, newPassword: string) =>
+    request<void>('/auth/password/reset-by-identity', {
+      method: 'POST',
+      authenticated: false,
+      data: { realName, studentId, newPassword },
+    }),
+
+  getAdminIdentities: () => request<AdminIdentity[]>('/admin/identities'),
 
   logout: async () => {
     try {
@@ -132,7 +139,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     if (response.statusCode === 401 && options.authenticated !== false) clearSession()
-    throw new ProductApiError(readErrorMessage(response.data, response.statusCode), response.statusCode)
+    throw new ProductApiError(
+      readErrorMessage(response.data, response.statusCode),
+      response.statusCode,
+    )
   }
   return response.data
 }
@@ -140,10 +150,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 function getApiBaseUrl(): string {
   const configured = process.env.TARO_APP_API_BASE_URL?.trim()
   if (!configured) {
-    throw new ProductApiError(
-      '尚未配置 API 地址。请使用 TARO_APP_API_BASE_URL 启动客户端。',
-      0,
-    )
+    throw new ProductApiError('尚未配置 API 地址。请使用 TARO_APP_API_BASE_URL 启动客户端。', 0)
   }
   const normalized = configured.replace(/\/+$/, '')
   return normalized.endsWith('/api') ? normalized : `${normalized}/api`

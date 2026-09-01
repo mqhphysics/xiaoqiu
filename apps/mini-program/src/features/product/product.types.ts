@@ -83,6 +83,9 @@ export interface AuthUser {
   id: string
   username: string
   displayName: string
+  realName: string | null
+  studentId: string | null
+  email: string | null
   bio: string | null
   verificationLevel: string
   roles: AuthRole[]
@@ -91,6 +94,17 @@ export interface AuthUser {
     displayName: string
     position: string | null
   } | null
+}
+
+export interface AdminIdentity {
+  id: string
+  username: string
+  displayName: string
+  realName: string | null
+  studentId: string | null
+  email: string | null
+  verificationLevel: string
+  roles: string[]
 }
 
 export interface AuthSession {

@@ -8,7 +8,10 @@ export interface PasswordDigest {
   salt: string
 }
 
-export function hashPassword(password: string, salt = randomBytes(16).toString('hex')): PasswordDigest {
+export function hashPassword(
+  password: string,
+  salt = randomBytes(16).toString('hex'),
+): PasswordDigest {
   return {
     algorithm: 'scrypt-v1',
     hash: scryptSync(password, salt, KEY_LENGTH).toString('hex'),

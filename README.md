@@ -62,16 +62,31 @@ pnpm check
 
 ## 应用
 
-| 路径 | 用途 |
-| --- | --- |
-| `apps/api` | NestJS REST API |
-| `apps/worker` | NestJS 异步任务 Worker |
-| `apps/mini-program` | Taro 微信小程序与 H5 |
-| `apps/admin-web` | React 管理后台 |
+| 路径                | 用途                   |
+| ------------------- | ---------------------- |
+| `apps/api`          | NestJS REST API        |
+| `apps/worker`       | NestJS 异步任务 Worker |
+| `apps/mini-program` | Taro 微信小程序与 H5   |
+| `apps/admin-web`    | React 管理后台         |
+
+## 目录地图
+
+日常开发只需要关注下面五个目录：
+
+| 路径        | 内容                                             |
+| ----------- | ------------------------------------------------ |
+| `apps/`     | API、H5/微信小程序、管理后台和 Worker 的运行代码 |
+| `packages/` | 多端共享契约、纯领域工具和生成的 API Client      |
+| `prisma/`   | PostgreSQL 数据模型、迁移和 Seed 入口            |
+| `infra/`    | Docker Compose、镜像和部署配置                   |
+| `docs/`     | 当前文档入口；过期材料统一在 `docs/archive/`     |
+
+`private-data/` 仅保存本机报名表和解析中间件，已被 Git 忽略；`node_modules/`、`.pnpm-store/` 和构建目录均为生成内容。根目录的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json` 等是工具链入口，不能移入子目录。
 
 ## 重要文档
 
 - [产品与技术架构最终版](docs/architecture/晓球产品与技术架构最终版.md)
+- [文档索引](docs/README.md)
 - [演示验收手册](docs/testing/演示验收手册.md)
 - [协作规范](AGENTS.md)
 - [贡献说明](CONTRIBUTING.md)

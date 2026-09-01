@@ -5,7 +5,6 @@ import {
   DataQualityStatus,
   MatchEventType,
   MatchStatus,
-  Prisma,
   RosterSubmissionStatus,
   SchedulePlanStatus,
   ScheduleRevisionStatus,
@@ -13,6 +12,7 @@ import {
   TeamRegistrationStatus,
   TournamentStatus,
 } from '../generated/prisma/client'
+import type { Prisma } from '../generated/prisma/client'
 import {
   DEMO_MATCHES,
   DEMO_PLAYERS,
@@ -487,7 +487,8 @@ async function seedMatchFacts(
       const assister = players[6 + ((matchIndex + goalIndex * 2) % 4)]!
       const minute = Math.min(
         matchMinutes,
-        12 + ((matchIndex * 11 + goalIndex * 23 + pair.minuteOffset) % Math.max(20, matchMinutes - 8)),
+        12 +
+          ((matchIndex * 11 + goalIndex * 23 + pair.minuteOffset) % Math.max(20, matchMinutes - 8)),
       )
       events.push({
         id: fixtureId(`event:${definition.code}:goal:${pair.teamIndex}:${goalIndex}`),

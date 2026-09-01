@@ -1,17 +1,16 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 
-import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
+import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
-import {
-  MatchEventType,
-  MatchStatus,
-  PostStatus,
-  PostType,
-  type Prisma,
-} from '../generated/prisma/client'
-import type { CreateCommentDto, CreatePostDto, SearchQueryDto, UpdateTeamPreferencesDto } from './experience.dto'
+import { MatchEventType, MatchStatus, PostStatus, PostType } from '../generated/prisma/client'
+import type {
+  CreateCommentDto,
+  CreatePostDto,
+  SearchQueryDto,
+  UpdateTeamPreferencesDto,
+} from './experience.dto'
 import { calculateStandings } from './ranking'
 
 const FEATURED_TOURNAMENT_CODE = 'DEMO-GREEN-CUP-2026'
@@ -61,7 +60,10 @@ export class ExperienceService {
         teamCount: registrations.length,
         matchCount: matches.length,
       },
-      announcements: posts.filter((post) => post.type === PostType.OFFICIAL).slice(0, 3).map(mapPost),
+      announcements: posts
+        .filter((post) => post.type === PostType.OFFICIAL)
+        .slice(0, 3)
+        .map(mapPost),
       focusMatches: [...live, ...upcoming, ...finished].slice(0, 5).map(mapMatch),
       teams: registrations.map((registration) => ({
         ...mapTeam(registration.team),
@@ -81,7 +83,11 @@ export class ExperienceService {
     const [players, teams, matches, posts] = await Promise.all([
       wants('PLAYER')
         ? this.prisma.playerProfile.findMany({
-            where: { organizationId, isDemo: true, displayName: { contains: query, mode: 'insensitive' } },
+            where: {
+              organizationId,
+              isDemo: true,
+              displayName: { contains: query, mode: 'insensitive' },
+            },
             include: {
               snapshotEntries: {
                 where: { rosterSnapshot: { tournamentId: tournament.id } },
@@ -267,7 +273,10 @@ export class ExperienceService {
       })),
     }))
 
-    const bracketRounds = new Map<string, { id: string; name: string; number: number; matches: unknown[] }>()
+    const bracketRounds = new Map<
+      string,
+      { id: string; name: string; number: number; matches: unknown[] }
+    >()
     for (const match of matches.filter((item) => item.stage?.type === 'KNOCKOUT')) {
       const roundKey = match.round?.id ?? `round-${match.title}`
       const round = bracketRounds.get(roundKey) ?? {
@@ -362,7 +371,9 @@ export class ExperienceService {
       }),
     ])
     const stats = calculateTeamRecord(team.id, matches)
-    const playerStats = new Map(buildPlayerStats(events, appearances).map((item) => [item.id, item]))
+    const playerStats = new Map(
+      buildPlayerStats(events, appearances).map((item) => [item.id, item]),
+    )
     const now = Date.now()
 
     return {
@@ -377,12 +388,19 @@ export class ExperienceService {
       },
       stats,
       recentMatches: matches
-        .filter((match) => (match.scheduledStartAt?.getTime() ?? 0) <= now || match.status === MatchStatus.FINISHED)
+        .filter(
+          (match) =>
+            (match.scheduledStartAt?.getTime() ?? 0) <= now ||
+            match.status === MatchStatus.FINISHED,
+        )
         .slice(-5)
         .reverse()
         .map(mapMatch),
       upcomingMatches: matches
-        .filter((match) => (match.scheduledStartAt?.getTime() ?? 0) > now && match.status !== MatchStatus.FINISHED)
+        .filter(
+          (match) =>
+            (match.scheduledStartAt?.getTime() ?? 0) > now && match.status !== MatchStatus.FINISHED,
+        )
         .slice(0, 5)
         .map(mapMatch),
       roster: roster.map((entry) => {
@@ -430,11 +448,11 @@ export class ExperienceService {
         },
         include: { player: true, relatedPlayer: true, team: true },
       }),
-        this.prisma.matchAppearance.findMany({
-          where: { organizationId, playerId, match: { tournamentId: selectedTournamentId } },
-          include: { player: true, team: true, match: { include: matchSummaryInclude } },
-          orderBy: { match: { scheduledStartAt: 'desc' } },
-        }),
+      this.prisma.matchAppearance.findMany({
+        where: { organizationId, playerId, match: { tournamentId: selectedTournamentId } },
+        include: { player: true, team: true, match: { include: matchSummaryInclude } },
+        orderBy: { match: { scheduledStartAt: 'desc' } },
+      }),
     ])
     const stats = buildPlayerStats(events, appearances).find((item) => item.id === playerId)
     const snapshot = player.snapshotEntries[0]
@@ -579,15 +597,14 @@ export class ExperienceService {
       primaryTeam: preferences.find((item) => item.isPrimary)?.team
         ? mapTeam(preferences.find((item) => item.isPrimary)!.team)
         : null,
-      followedTeams: preferences.filter((item) => !item.isPrimary).map((item) => mapTeam(item.team)),
+      followedTeams: preferences
+        .filter((item) => !item.isPrimary)
+        .map((item) => mapTeam(item.team)),
       availableTeams: available.map(mapTeam),
     }
   }
 
-  async updateTeamPreferences(
-    authorization: string | undefined,
-    input: UpdateTeamPreferencesDto,
-  ) {
+  async updateTeamPreferences(authorization: string | undefined, input: UpdateTeamPreferencesDto) {
     const session = await this.authService.requireSession(authorization)
     const requestedIds = [...new Set([input.primaryTeamId, ...input.followedTeamIds])]
     const teams = await this.prisma.team.findMany({
@@ -661,11 +678,7 @@ export class ExperienceService {
     }
   }
 
-  async createComment(
-    authorization: string | undefined,
-    postId: string,
-    input: CreateCommentDto,
-  ) {
+  async createComment(authorization: string | undefined, postId: string, input: CreateCommentDto) {
     const session = await this.authService.requireSession(authorization)
     const post = await this.prisma.post.findFirst({
       where: { id: postId, organizationId: session.organizationId, status: PostStatus.PUBLISHED },
@@ -838,12 +851,12 @@ function buildPlayerStats(
     return row
   }
 
-    for (const appearance of appearances) {
-      const row = ensure(
-        appearance.playerId,
-        appearance.player?.displayName ?? '',
-        appearance.team ? mapTeam(appearance.team) : null,
-      )
+  for (const appearance of appearances) {
+    const row = ensure(
+      appearance.playerId,
+      appearance.player?.displayName ?? '',
+      appearance.team ? mapTeam(appearance.team) : null,
+    )
     row.appearances += 1
     row.starts += appearance.starter ? 1 : 0
     row.minutes += appearance.minutesPlayed
