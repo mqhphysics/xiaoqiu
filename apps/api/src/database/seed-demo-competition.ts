@@ -39,6 +39,14 @@ export function isDemoMatchStarter(playerIndex: number): boolean {
   return playerIndex < DEMO_STARTERS_PER_TEAM
 }
 
+export function getDemoMinutesPlayed(playerIndex: number, matchMinutes: number): number {
+  if (playerIndex < 6) return matchMinutes
+  const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
+  if (playerIndex < 8) return substitutionMinute
+  if (playerIndex < 10) return matchMinutes - substitutionMinute
+  return 0
+}
+
 export async function seedDemoTournament(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -456,7 +464,7 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
-        ? '16 支球队进入单败淘汰赛，依次进行十六强、八强、半决赛和决赛；三四名赛为独立支线。'
+        ? '前 8 支球队的小组赛记录作为历史数据保留；为完整演示淘汰树，淘汰阶段假设 16 支球队均已入围并使用演示签位，不表示由现存小组赛成绩自然晋级。冠军主线依次进行十六强、八强、半决赛和决赛，三四名赛为独立支线。'
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
@@ -494,12 +502,7 @@ async function seedMatchFacts(
         playerId: player.id,
         shirtNumber: player.shirtNumber,
         starter: isDemoMatchStarter(index),
-        minutesPlayed:
-          index < 8
-            ? matchMinutes
-            : index < 11
-              ? Math.min(matchMinutes, 68 + index * 2)
-              : Math.max(0, matchMinutes - (68 + (index - 11) * 6)),
+        minutesPlayed: getDemoMinutesPlayed(index, matchMinutes),
       }))
     }),
   })
@@ -512,7 +515,7 @@ async function seedMatchFacts(
   for (const pair of scorePairs) {
     const players = DEMO_PLAYERS.filter((player) => player.teamIndex === pair.teamIndex)
     for (let goalIndex = 0; goalIndex < pair.score; goalIndex += 1) {
-      const scorer = players[10 + ((matchIndex + goalIndex) % 4)]!
+      const scorer = players[4 + ((matchIndex + goalIndex) % 6)]!
       const assister = players[6 + ((matchIndex + goalIndex * 2) % 4)]!
       const minute = Math.min(
         matchMinutes,

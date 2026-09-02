@@ -1037,8 +1037,8 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
   {
     key: 'official-round-two',
     type: PostType.OFFICIAL,
-    title: '16 队淘汰赛签位确认',
-    body: '2026 绿茵杯 16 队淘汰赛签位已经确认。十六强、八强、半决赛与决赛的完整晋级路径已同步到数据页。',
+    title: '16 队演示淘汰赛签位确认',
+    body: '为完整演示淘汰树，本页按 16 队均已入围的假设生成演示签位。前 8 队的历史小组赛仍予保留，但演示签位不表示球队由小组赛成绩自然晋级。十六强、八强、半决赛与决赛路径已同步到数据页。',
     publishedAt: '2026-08-30T21:30:00+08:00',
   },
   {
@@ -1067,7 +1067,7 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
     type: PostType.COMMUNITY,
     authorUsername: 'reporter',
     body: '第二场半决赛信息台将在开赛前 30 分钟开放。首场半决赛评分与比赛事件已经可以在详情页查看。',
-    publishedAt: '2026-09-01T12:20:00+08:00',
+    publishedAt: '2026-09-01T22:10:00+08:00',
   },
   {
     key: 'community-player',

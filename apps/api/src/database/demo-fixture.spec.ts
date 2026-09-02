@@ -1,8 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { DEMO_MATCHES, DEMO_PLAYERS, DEMO_TEAMS, type DemoMatchDefinition } from './demo-fixture'
-import { DEMO_STARTERS_PER_TEAM, isDemoMatchStarter } from './seed-demo-competition'
+import {
+  DEMO_MATCHES,
+  DEMO_PLAYERS,
+  DEMO_POSTS,
+  DEMO_TEAMS,
+  type DemoMatchDefinition,
+} from './demo-fixture'
+import {
+  DEMO_STARTERS_PER_TEAM,
+  getDemoMinutesPlayed,
+  isDemoMatchStarter,
+} from './seed-demo-competition'
+import { DEMO_MATCH_REVIEWS } from './seed-demo-social'
 
 test('2026 demo fixture contains 16 teams and 14 stable demo players per team', () => {
   assert.equal(DEMO_TEAMS.length, 16)
@@ -64,6 +75,10 @@ test('2026 knockout facts form a 16-team champion path with an independent third
 
 test('every team with seeded appearances has exactly 8 starters per match', () => {
   assert.equal(DEMO_STARTERS_PER_TEAM, 8)
+  assert.deepEqual(
+    Array.from({ length: 14 }, (_, playerIndex) => getDemoMinutesPlayed(playerIndex, 90)),
+    [90, 90, 90, 90, 90, 90, 60, 60, 30, 30, 0, 0, 0, 0],
+  )
 
   const matchesWithAppearances = DEMO_MATCHES.filter(
     (match) =>
@@ -78,13 +93,42 @@ test('every team with seeded appearances has exactly 8 starters per match', () =
   for (const match of matchesWithAppearances) {
     for (const teamIndex of [match.homeTeamIndex!, match.awayTeamIndex!]) {
       const teamPlayers = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
+      const matchMinutes = match.status === 'LIVE' ? 64 : 90
+      const seededMinutes = teamPlayers.map((_, playerIndex) =>
+        getDemoMinutesPlayed(playerIndex, matchMinutes),
+      )
       assert.equal(
         teamPlayers.filter((_, playerIndex) => isDemoMatchStarter(playerIndex)).length,
         8,
         `${match.code} team ${teamIndex} should seed exactly 8 starters`,
       )
+      assert.equal(
+        seededMinutes.reduce((total, minutes) => total + minutes, 0),
+        matchMinutes * 8,
+        `${match.code} team ${teamIndex} should preserve eight-a-side player minutes`,
+      )
+      assert.ok(
+        seededMinutes.every(
+          (minutes, playerIndex) => isDemoMatchStarter(playerIndex) || minutes < matchMinutes,
+        ),
+        `${match.code} team ${teamIndex} substitutes must not play the full match`,
+      )
     }
   }
+})
+
+test('SF-01 community facts are published after the rescheduled semifinal', () => {
+  const semifinal = DEMO_MATCHES.find((match) => match.code === 'GC26-SF-01')
+  assert.ok(semifinal?.scheduledStartAt)
+  const fullTime = Date.parse(semifinal.scheduledStartAt) + 90 * 60 * 1000
+
+  const reporterPost = DEMO_POSTS.find((post) => post.key === 'community-reporter')
+  assert.ok(reporterPost)
+  assert.ok(Date.parse(reporterPost.publishedAt) > fullTime)
+
+  const reviews = DEMO_MATCH_REVIEWS.filter((review) => review.matchCode === semifinal.code)
+  assert.equal(reviews.length, 3)
+  assert.ok(reviews.every((review) => Date.parse(review.createdAt) > fullTime))
 })
 
 function assertProgression(
