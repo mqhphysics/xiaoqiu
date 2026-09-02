@@ -122,7 +122,8 @@ export default function PostDetailPage() {
           >
             <View className="post-detail__author">
               <UserAvatar name={state.post.author.displayName} />
-              <View>
+              <View className="post-detail__author-copy">
+                <Text className="post-detail__author-label">动态作者</Text>
                 <View className="post-detail__author-row">
                   <Text>{state.post.author.displayName}</Text>
                   <Text>{verificationLabel(state.post.author.verificationLevel)}</Text>
@@ -137,34 +138,53 @@ export default function PostDetailPage() {
             <Text className="post-detail__body">{state.post.body}</Text>
             <View className="post-detail__actions">
               <Button
-                className={state.post.likedByMe ? 'post-detail__liked' : ''}
+                className={
+                  'post-detail__like ' + (state.post.likedByMe ? 'post-detail__liked' : '')
+                }
                 onClick={() => void toggleLike()}
               >
-                {state.post.likedByMe ? '已赞' : '点赞'} · {state.post.likeCount}
+                <Text className="post-detail__action-icon">{state.post.likedByMe ? '♥' : '♡'}</Text>
+                <Text>
+                  {state.post.likedByMe ? '已赞' : '点赞'} {state.post.likeCount}
+                </Text>
               </Button>
-              <Text>评论 · {state.post.commentCount}</Text>
+              <View className="post-detail__comment-count">
+                <Text className="post-detail__action-icon">◌</Text>
+                <Text>评论 {state.post.commentCount}</Text>
+              </View>
             </View>
           </View>
 
           <View className="comment-panel">
             <Text className="comment-panel__title">评论</Text>
-            <View className="comment-composer">
-              <Textarea
-                className="comment-composer__input"
-                maxlength={300}
-                placeholder={readSession() ? '写下你的看法' : '登录后参与评论'}
-                value={comment}
-                onInput={(event) => setComment(event.detail.value)}
-              />
+            {readSession() ? (
+              <View className="comment-composer">
+                <Textarea
+                  className="comment-composer__input"
+                  maxlength={300}
+                  placeholder="写下你的看法"
+                  value={comment}
+                  onInput={(event) => setComment(event.detail.value)}
+                />
+                <Button
+                  className="button button--primary comment-composer__submit"
+                  disabled={comment.trim().length < 2 || submitting}
+                  loading={submitting}
+                  onClick={() => void submitComment()}
+                >
+                  <Text className="comment-composer__submit-icon">↗</Text>
+                  <Text>发布</Text>
+                </Button>
+              </View>
+            ) : (
               <Button
-                className="button button--primary comment-composer__submit"
-                disabled={comment.trim().length < 2 || submitting}
-                loading={submitting}
-                onClick={() => void submitComment()}
+                className="comment-composer__login"
+                onClick={() => void Taro.reLaunch({ url: '/pages/login/index' })}
               >
-                发布评论
+                <Text className="post-detail__action-icon">◌</Text>
+                <Text>登录后参与评论</Text>
               </Button>
-            </View>
+            )}
             <View className="comment-list">
               {state.post.comments.length === 0 && (
                 <Text className="comment-list__empty">还没有评论</Text>
