@@ -3,12 +3,18 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { openMessaging } from '../../components/messaging-drawer'
+import { ReportModal } from '../../components/report-modal'
 import { DataState } from '../../components/public-ui'
 import { UserAvatar } from '../../components/product-ui'
 import { formatRelativeTime, verificationLabel } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { createClientActionId, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
-import type { PostDetail } from '../../features/product/product.types'
+import type {
+  PostComment,
+  PostDetail,
+  ReportTargetType,
+} from '../../features/product/product.types'
 
 import './index.scss'
 
@@ -22,6 +28,15 @@ export default function PostDetailPage() {
   const [state, setState] = useState<PageState>({ phase: 'loading' })
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [pendingComment, setPendingComment] = useState<{ id: string; signature: string } | null>(
+    null,
+  )
+  const [replyTo, setReplyTo] = useState<PostComment | null>(null)
+  const [report, setReport] = useState<{
+    type: ReportTargetType
+    id: string
+    title: string
+  } | null>(null)
 
   const load = useCallback(async () => {
     if (!postId) {
@@ -55,7 +70,7 @@ export default function PostDetailPage() {
       return
     }
     try {
-      const result = await productRepository.toggleLike(state.post.id)
+      const result = await productRepository.setLike(state.post.id, !state.post.likedByMe)
       setState({
         ...state,
         post: { ...state.post, likedByMe: result.liked, likeCount: result.likeCount },
@@ -76,8 +91,19 @@ export default function PostDetailPage() {
       return
     }
     setSubmitting(true)
+    const signature = `${state.post.id}\n${replyTo?.id ?? ''}\n${comment.trim()}`
+    const request =
+      pendingComment?.signature === signature
+        ? pendingComment
+        : { id: createClientActionId('comment'), signature }
+    setPendingComment(request)
     try {
-      const created = await productRepository.createComment(state.post.id, comment.trim())
+      const created = await productRepository.createComment(
+        state.post.id,
+        comment.trim(),
+        request.id,
+        replyTo?.id,
+      )
       setState({
         ...state,
         post: {
@@ -87,6 +113,8 @@ export default function PostDetailPage() {
         },
       })
       setComment('')
+      setReplyTo(null)
+      setPendingComment(null)
       await Taro.showToast({ title: '评论已发布', icon: 'success' })
     } catch (error) {
       await Taro.showToast({
@@ -121,7 +149,10 @@ export default function PostDetailPage() {
             }
           >
             <View className="post-detail__author">
-              <UserAvatar name={state.post.author.displayName} />
+              <UserAvatar
+                avatarUrl={state.post.author.avatarUrl}
+                name={state.post.author.displayName}
+              />
               <View className="post-detail__author-copy">
                 <Text className="post-detail__author-label">动态作者</Text>
                 <View className="post-detail__author-row">
@@ -152,6 +183,30 @@ export default function PostDetailPage() {
                 <Text className="post-detail__action-icon">◌</Text>
                 <Text>评论 {state.post.commentCount}</Text>
               </View>
+              {readSession() && state.post.author.messageable && (
+                <Button
+                  className="post-detail__secondary-action"
+                  onClick={() =>
+                    openMessaging({
+                      id: state.post.author.id,
+                      displayName: state.post.author.displayName,
+                      avatarUrl: state.post.author.avatarUrl,
+                    })
+                  }
+                >
+                  私聊作者
+                </Button>
+              )}
+              {readSession() && (
+                <Button
+                  className="post-detail__secondary-action"
+                  onClick={() =>
+                    setReport({ type: 'POST', id: state.post.id, title: '投诉这条动态' })
+                  }
+                >
+                  投诉
+                </Button>
+              )}
             </View>
           </View>
 
@@ -162,10 +217,22 @@ export default function PostDetailPage() {
                 <Textarea
                   className="comment-composer__input"
                   maxlength={300}
-                  placeholder="写下你的看法"
+                  placeholder={
+                    replyTo
+                      ? `回复 ${replyTo.author.displayName}`
+                      : '写下你的看法，也可以输入常用表情符号'
+                  }
                   value={comment}
                   onInput={(event) => setComment(event.detail.value)}
                 />
+                {replyTo && (
+                  <Button
+                    className="comment-composer__cancel-reply"
+                    onClick={() => setReplyTo(null)}
+                  >
+                    取消回复
+                  </Button>
+                )}
                 <Button
                   className="button button--primary comment-composer__submit"
                   disabled={comment.trim().length < 2 || submitting}
@@ -191,18 +258,58 @@ export default function PostDetailPage() {
               )}
               {state.post.comments.map((item) => (
                 <View className="comment-item" key={item.id}>
-                  <UserAvatar name={item.author.displayName} size="small" />
+                  <UserAvatar
+                    avatarUrl={item.author.avatarUrl}
+                    name={item.author.displayName}
+                    size="small"
+                  />
                   <View className="comment-item__copy">
                     <View>
                       <Text>{item.author.displayName}</Text>
                       <Text>{formatRelativeTime(item.createdAt)}</Text>
                     </View>
                     <Text>{item.body}</Text>
+                    {item.parentCommentId && (
+                      <Text className="comment-item__reply-label">回复评论</Text>
+                    )}
+                    {readSession() && (
+                      <View className="comment-item__actions">
+                        <Button onClick={() => setReplyTo(item)}>回复</Button>
+                        {item.author.messageable && (
+                          <Button
+                            onClick={() =>
+                              openMessaging({
+                                id: item.author.id,
+                                displayName: item.author.displayName,
+                                avatarUrl: item.author.avatarUrl,
+                              })
+                            }
+                          >
+                            私聊
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() =>
+                            setReport({ type: 'COMMENT', id: item.id, title: '投诉这条评论' })
+                          }
+                        >
+                          投诉
+                        </Button>
+                      </View>
+                    )}
                   </View>
                 </View>
               ))}
             </View>
           </View>
+          {report && (
+            <ReportModal
+              targetId={report.id}
+              targetType={report.type}
+              title={report.title}
+              onClose={() => setReport(null)}
+            />
+          )}
         </View>
       )}
     </PublicShell>

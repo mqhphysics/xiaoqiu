@@ -31,7 +31,8 @@
     "class-transformer": "latest",
     "class-validator": "latest",
     "reflect-metadata": "latest",
-    "rxjs": "latest"
+    "rxjs": "latest",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@nestjs/testing": "11.1.26",

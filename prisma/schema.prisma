@@ -221,73 +221,141 @@ enum PostStatus {
   @@map("post_status")
 }
 
+enum TeamMembershipStatus {
+  ACTIVE
+  REMOVED
+
+  @@map("team_membership_status")
+}
+
+enum TeamJoinApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("team_join_application_status")
+}
+
+enum NotificationType {
+  POST_LIKED
+  POST_COMMENTED
+  COMMENT_REPLIED
+  TEAM_APPLICATION
+  TEAM_APPLICATION_DECIDED
+  REPORT_CREATED
+  REPORT_UPDATED
+  DIRECT_MESSAGE
+
+  @@map("notification_type")
+}
+
+enum ReportTargetType {
+  POST
+  COMMENT
+  MATCH_REVIEW
+  DIRECT_MESSAGE
+  USER
+  FEEDBACK
+
+  @@map("report_target_type")
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+
+  @@map("report_status")
+}
+
 model Organization {
-  id                 String                   @id @default(uuid()) @db.Uuid
-  slug               String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
-  name               String                   @db.VarChar(120)
-  status             OrganizationStatus       @default(ACTIVE)
-  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  memberships        OrganizationMembership[]
-  roleAssignments    RoleAssignment[]
-  auditLogs          AuditLog[]
-  idempotencyRecords IdempotencyRecord[]
-  outboxJobs         OutboxJob[]
-  seasons            Season[]
-  tournaments        Tournament[]
-  teams              Team[]
-  playerProfiles     PlayerProfile[]
-  venues             Venue[]
-  schedulePlans      SchedulePlan[]
-  scheduleRevisions  ScheduleRevision[]
-  matches            Match[]
-  teamRegistrations  TeamRegistration[]
-  rosterSubmissions  RosterSubmission[]
-  rosterEntries      RosterEntry[]
-  rosterSnapshots    RosterSnapshot[]
-  snapshotEntries    RosterSnapshotEntry[]
-  importBatches      ImportBatch[]
-  teamPreferences    UserTeamPreference[]
-  matchEvents        MatchEvent[]
-  matchAppearances   MatchAppearance[]
-  matchReviews       MatchReview[]
-  posts              Post[]
-  postLikes          PostLike[]
-  postComments       PostComment[]
+  id                  String                   @id @default(uuid()) @db.Uuid
+  slug                String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
+  name                String                   @db.VarChar(120)
+  status              OrganizationStatus       @default(ACTIVE)
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships         OrganizationMembership[]
+  userSessions        UserSession[]
+  roleAssignments     RoleAssignment[]
+  auditLogs           AuditLog[]
+  idempotencyRecords  IdempotencyRecord[]
+  outboxJobs          OutboxJob[]
+  seasons             Season[]
+  tournaments         Tournament[]
+  teams               Team[]
+  playerProfiles      PlayerProfile[]
+  venues              Venue[]
+  schedulePlans       SchedulePlan[]
+  scheduleRevisions   ScheduleRevision[]
+  matches             Match[]
+  teamRegistrations   TeamRegistration[]
+  rosterSubmissions   RosterSubmission[]
+  rosterEntries       RosterEntry[]
+  rosterSnapshots     RosterSnapshot[]
+  snapshotEntries     RosterSnapshotEntry[]
+  importBatches       ImportBatch[]
+  teamPreferences     UserTeamPreference[]
+  matchEvents         MatchEvent[]
+  matchAppearances    MatchAppearance[]
+  matchReviews        MatchReview[]
+  posts               Post[]
+  postLikes           PostLike[]
+  postComments        PostComment[]
+  playerFollows       UserPlayerFollow[]
+  teamMemberships     TeamMembership[]
+  teamApplications    TeamJoinApplication[]
+  notifications       UserNotification[]
+  reports             ContentReport[]
+  directConversations DirectConversation[]
+  directMessages      DirectMessage[]
 
   @@map("organizations")
 }
 
 model User {
-  id                  String                   @id @default(uuid()) @db.Uuid
-  loginNameNormalized String?                  @map("login_name_normalized") @db.VarChar(120)
-  displayName         String                   @map("display_name") @db.VarChar(120)
-  realName            String?                  @map("real_name") @db.VarChar(120)
-  realNameNormalized  String?                  @map("real_name_normalized") @db.VarChar(120)
-  studentId           String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
-  email               String?                  @db.VarChar(254)
-  emailNormalized     String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
-  avatarUrl           String?                  @map("avatar_url") @db.VarChar(512)
-  bio                 String?                  @db.VarChar(280)
-  verificationLevel   VerificationLevel        @default(UNVERIFIED) @map("verification_level")
-  playerProfileId     String?                  @unique(map: "app_users_player_profile_id_key") @map("player_profile_id") @db.Uuid
-  status              UserStatus               @default(ACTIVE)
-  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  memberships         OrganizationMembership[]
-  wechatIdentities    WechatIdentity[]
-  sessions            UserSession[]
-  roleAssignments     RoleAssignment[]         @relation("RoleAssignmentUser")
-  grantedAssignments  RoleAssignment[]         @relation("RoleAssignmentGrantor")
-  auditLogs           AuditLog[]
-  idempotencyRecords  IdempotencyRecord[]
-  passwordCredential  PasswordCredential?
-  playerProfile       PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
-  teamPreferences     UserTeamPreference[]
-  posts               Post[]                   @relation("PostAuthor")
-  postLikes           PostLike[]
-  postComments        PostComment[]
-  matchReviews        MatchReview[]
+  id                   String                   @id @default(uuid()) @db.Uuid
+  loginNameNormalized  String?                  @map("login_name_normalized") @db.VarChar(120)
+  displayName          String                   @map("display_name") @db.VarChar(120)
+  realName             String?                  @map("real_name") @db.VarChar(120)
+  realNameNormalized   String?                  @map("real_name_normalized") @db.VarChar(120)
+  studentId            String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
+  email                String?                  @db.VarChar(254)
+  emailNormalized      String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
+  avatarUrl            String?                  @map("avatar_url") @db.VarChar(512)
+  bio                  String?                  @db.VarChar(280)
+  verificationLevel    VerificationLevel        @default(UNVERIFIED) @map("verification_level")
+  playerProfileId      String?                  @unique(map: "app_users_player_profile_id_key") @map("player_profile_id") @db.Uuid
+  status               UserStatus               @default(ACTIVE)
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships          OrganizationMembership[]
+  wechatIdentities     WechatIdentity[]
+  sessions             UserSession[]
+  roleAssignments      RoleAssignment[]         @relation("RoleAssignmentUser")
+  grantedAssignments   RoleAssignment[]         @relation("RoleAssignmentGrantor")
+  auditLogs            AuditLog[]
+  idempotencyRecords   IdempotencyRecord[]
+  passwordCredential   PasswordCredential?
+  playerProfile        PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
+  teamPreferences      UserTeamPreference[]
+  posts                Post[]                   @relation("PostAuthor")
+  postLikes            PostLike[]
+  postComments         PostComment[]
+  matchReviews         MatchReview[]
+  playerFollows        UserPlayerFollow[]
+  teamMemberships      TeamMembership[]
+  teamApplications     TeamJoinApplication[]    @relation("TeamApplicationApplicant")
+  reviewedApplications TeamJoinApplication[]    @relation("TeamApplicationReviewer")
+  notifications        UserNotification[]       @relation("NotificationRecipient")
+  notificationActions  UserNotification[]       @relation("NotificationActor")
+  reports              ContentReport[]          @relation("ReportReporter")
+  handledReports       ContentReport[]          @relation("ReportHandler")
+  conversationsAsOne   DirectConversation[]     @relation("ConversationUserOne")
+  conversationsAsTwo   DirectConversation[]     @relation("ConversationUserTwo")
+  directMessages       DirectMessage[]          @relation("DirectMessageSender")
 
   @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
@@ -339,19 +407,22 @@ model WechatIdentity {
 }
 
 model UserSession {
-  id               String    @id @default(uuid()) @db.Uuid
-  userId           String    @map("user_id") @db.Uuid
-  refreshTokenHash String    @unique(map: "user_sessions_refresh_token_hash_key") @map("refresh_token_hash") @db.VarChar(128)
-  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
-  lastSeenAt       DateTime? @map("last_seen_at") @db.Timestamptz(3)
-  ipAddress        String?   @map("ip_address") @db.Inet
-  userAgent        String?   @map("user_agent") @db.VarChar(512)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String       @id @default(uuid()) @db.Uuid
+  userId           String       @map("user_id") @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  refreshTokenHash String       @unique(map: "user_sessions_refresh_token_hash_key") @map("refresh_token_hash") @db.VarChar(128)
+  expiresAt        DateTime     @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime?    @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt       DateTime?    @map("last_seen_at") @db.Timestamptz(3)
+  ipAddress        String?      @map("ip_address") @db.Inet
+  userAgent        String?      @map("user_agent") @db.VarChar(512)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([userId, revokedAt, expiresAt], map: "user_sessions_user_id_revoked_at_expires_at_idx")
+  @@index([organizationId, revokedAt, expiresAt], map: "user_sessions_organization_id_revoked_at_expires_at_idx")
   @@map("user_sessions")
 }
 
@@ -573,27 +644,30 @@ model CompetitionRound {
 }
 
 model Team {
-  id              String               @id @default(uuid()) @db.Uuid
-  organizationId  String               @map("organization_id") @db.Uuid
-  teamCode        String               @map("team_code") @db.VarChar(64)
-  name            String               @db.VarChar(160)
-  shortName       String?              @map("short_name") @db.VarChar(80)
-  collegeName     String?              @map("college_name") @db.VarChar(160)
-  description     String?              @db.VarChar(600)
-  motto           String?              @db.VarChar(160)
-  primaryColor    String?              @map("primary_color") @db.VarChar(16)
-  secondaryColor  String?              @map("secondary_color") @db.VarChar(16)
-  foundedYear     Int?                 @map("founded_year")
-  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  homeMatches     Match[]              @relation("MatchHomeTeam")
-  awayMatches     Match[]              @relation("MatchAwayTeam")
-  registrations   TeamRegistration[]
-  rosterSnapshots RosterSnapshot[]
-  preferences     UserTeamPreference[]
-  matchEvents     MatchEvent[]
-  appearances     MatchAppearance[]
+  id               String                @id @default(uuid()) @db.Uuid
+  organizationId   String                @map("organization_id") @db.Uuid
+  teamCode         String                @map("team_code") @db.VarChar(64)
+  name             String                @db.VarChar(160)
+  shortName        String?               @map("short_name") @db.VarChar(80)
+  collegeName      String?               @map("college_name") @db.VarChar(160)
+  description      String?               @db.VarChar(600)
+  motto            String?               @db.VarChar(160)
+  primaryColor     String?               @map("primary_color") @db.VarChar(16)
+  secondaryColor   String?               @map("secondary_color") @db.VarChar(16)
+  foundedYear      Int?                  @map("founded_year")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  homeMatches      Match[]               @relation("MatchHomeTeam")
+  awayMatches      Match[]               @relation("MatchAwayTeam")
+  registrations    TeamRegistration[]
+  rosterSnapshots  RosterSnapshot[]
+  preferences      UserTeamPreference[]
+  matchEvents      MatchEvent[]
+  appearances      MatchAppearance[]
+  posts            Post[]
+  memberships      TeamMembership[]
+  joinApplications TeamJoinApplication[]
 
   @@unique([organizationId, teamCode], map: "teams_organization_id_team_code_key")
   @@unique([id, organizationId], map: "teams_id_organization_id_key")
@@ -619,6 +693,7 @@ model PlayerProfile {
   hometown          String?               @db.VarChar(120)
   bio               String?               @db.VarChar(600)
   profileColor      String?               @map("profile_color") @db.VarChar(16)
+  avatarUrl         String?               @map("avatar_url") @db.VarChar(512)
   isDemo            Boolean               @default(false) @map("is_demo")
   createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -629,6 +704,9 @@ model PlayerProfile {
   scoredEvents      MatchEvent[]          @relation("MatchEventPlayer")
   assistedEvents    MatchEvent[]          @relation("MatchEventRelatedPlayer")
   appearances       MatchAppearance[]
+  followers         UserPlayerFollow[]
+  teamMemberships   TeamMembership[]
+  joinApplications  TeamJoinApplication[]
 
   // PostgreSQL partial uniqueness for non-null source_key is enforced by migration SQL.
   @@unique([id, organizationId], map: "player_profiles_id_organization_id_key")
@@ -805,6 +883,69 @@ model UserTeamPreference {
   @@map("user_team_preferences")
 }
 
+model UserPlayerFollow {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  playerProfileId String        @map("player_profile_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playerProfile   PlayerProfile @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Cascade, map: "user_player_follows_player_organization_fkey")
+
+  @@unique([userId, playerProfileId], map: "user_player_follows_user_id_player_profile_id_key")
+  @@index([organizationId, userId, createdAt], map: "user_player_follows_org_user_created_at_idx")
+  @@map("user_player_follows")
+}
+
+model TeamMembership {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  teamId          String               @map("team_id") @db.Uuid
+  userId          String?              @map("user_id") @db.Uuid
+  playerProfileId String?              @map("player_profile_id") @db.Uuid
+  position        PlayerPosition?
+  status          TeamMembershipStatus @default(ACTIVE)
+  joinedAt        DateTime             @default(now()) @map("joined_at") @db.Timestamptz(3)
+  removedAt       DateTime?            @map("removed_at") @db.Timestamptz(3)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team            Team                 @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_memberships_team_organization_fkey")
+  user            User?                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  playerProfile   PlayerProfile?       @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_memberships_player_organization_fkey")
+
+  @@unique([teamId, userId], map: "team_memberships_team_id_user_id_key")
+  @@unique([teamId, playerProfileId], map: "team_memberships_team_id_player_profile_id_key")
+  @@index([organizationId, teamId, status], map: "team_memberships_org_team_status_idx")
+  @@map("team_memberships")
+}
+
+model TeamJoinApplication {
+  id                String                    @id @default(uuid()) @db.Uuid
+  organizationId    String                    @map("organization_id") @db.Uuid
+  teamId            String                    @map("team_id") @db.Uuid
+  userId            String                    @map("user_id") @db.Uuid
+  playerProfileId   String?                   @map("player_profile_id") @db.Uuid
+  requestedPosition PlayerPosition?           @map("requested_position")
+  message           String?                   @db.VarChar(500)
+  status            TeamJoinApplicationStatus @default(PENDING)
+  reviewedByUserId  String?                   @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt        DateTime?                 @map("reviewed_at") @db.Timestamptz(3)
+  decisionNote      String?                   @map("decision_note") @db.VarChar(500)
+  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team              Team                      @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_join_applications_team_organization_fkey")
+  user              User                      @relation("TeamApplicationApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  playerProfile     PlayerProfile?            @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_join_applications_player_organization_fkey")
+  reviewedByUser    User?                     @relation("TeamApplicationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([teamId, userId], map: "team_join_applications_team_id_user_id_key")
+  @@index([organizationId, teamId, status, createdAt], map: "team_join_applications_org_team_status_created_idx")
+  @@map("team_join_applications")
+}
+
 model MatchEvent {
   id              String         @id @default(uuid()) @db.Uuid
   organizationId  String         @map("organization_id") @db.Uuid
@@ -856,6 +997,8 @@ model Post {
   organizationId String        @map("organization_id") @db.Uuid
   tournamentId   String?       @map("tournament_id") @db.Uuid
   authorUserId   String?       @map("author_user_id") @db.Uuid
+  clientPostId   String?       @map("client_post_id") @db.VarChar(120)
+  teamId         String?       @map("team_id") @db.Uuid
   type           PostType      @default(COMMUNITY)
   status         PostStatus    @default(PUBLISHED)
   title          String?       @db.VarChar(180)
@@ -867,11 +1010,14 @@ model Post {
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   tournament     Tournament?   @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
   author         User?         @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  team           Team?         @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "posts_team_organization_fkey")
   likes          PostLike[]
   comments       PostComment[]
 
+  @@unique([authorUserId, clientPostId], map: "posts_author_user_id_client_post_id_key")
   @@index([organizationId, status, publishedAt], map: "posts_org_status_published_at_idx")
   @@index([tournamentId, status, publishedAt], map: "posts_tournament_status_published_at_idx")
+  @@index([teamId, status, publishedAt], map: "posts_team_status_published_at_idx")
   @@map("posts")
 }
 
@@ -891,19 +1037,112 @@ model PostLike {
 }
 
 model PostComment {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  postId         String       @map("post_id") @db.Uuid
-  userId         String       @map("user_id") @db.Uuid
-  body           String       @db.VarChar(500)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  post           Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  postId          String        @map("post_id") @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  parentCommentId String?       @map("parent_comment_id") @db.Uuid
+  clientCommentId String?       @map("client_comment_id") @db.VarChar(120)
+  body            String        @db.VarChar(500)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  hiddenAt        DateTime?     @map("hidden_at") @db.Timestamptz(3)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment   PostComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: SetNull)
+  replies         PostComment[] @relation("CommentReplies")
 
+  @@unique([userId, clientCommentId], map: "post_comments_user_id_client_comment_id_key")
   @@index([postId, createdAt], map: "post_comments_post_id_created_at_idx")
   @@index([organizationId, userId, createdAt], map: "post_comments_org_user_created_at_idx")
+  @@index([parentCommentId, createdAt], map: "post_comments_parent_created_at_idx")
   @@map("post_comments")
+}
+
+model UserNotification {
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  recipientUserId  String           @map("recipient_user_id") @db.Uuid
+  actorUserId      String?          @map("actor_user_id") @db.Uuid
+  type             NotificationType
+  title            String           @db.VarChar(160)
+  body             String?          @db.VarChar(500)
+  linkPath         String?          @map("link_path") @db.VarChar(512)
+  metadata         Json?            @db.JsonB
+  deduplicationKey String?          @map("deduplication_key") @db.VarChar(200)
+  readAt           DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recipient        User             @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  actor            User?            @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([recipientUserId, deduplicationKey], map: "user_notifications_recipient_deduplication_key")
+  @@index([organizationId, recipientUserId, readAt, createdAt], map: "user_notifications_org_recipient_read_created_idx")
+  @@map("user_notifications")
+}
+
+model ContentReport {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  reporterUserId  String           @map("reporter_user_id") @db.Uuid
+  clientReportId  String?          @map("client_report_id") @db.VarChar(120)
+  targetType      ReportTargetType @map("target_type")
+  targetId        String?          @map("target_id") @db.Uuid
+  reason          String           @db.VarChar(120)
+  details         String?          @db.VarChar(1000)
+  status          ReportStatus     @default(OPEN)
+  handledByUserId String?          @map("handled_by_user_id") @db.Uuid
+  resolution      String?          @db.VarChar(1000)
+  actionTaken     String?          @map("action_taken") @db.VarChar(120)
+  handledAt       DateTime?        @map("handled_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reporter        User             @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  handledBy       User?            @relation("ReportHandler", fields: [handledByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([reporterUserId, clientReportId], map: "content_reports_reporter_client_report_id_key")
+  @@index([organizationId, status, createdAt], map: "content_reports_org_status_created_idx")
+  @@index([reporterUserId, createdAt], map: "content_reports_reporter_created_idx")
+  @@map("content_reports")
+}
+
+model DirectConversation {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  userOneId      String          @map("user_one_id") @db.Uuid
+  userTwoId      String          @map("user_two_id") @db.Uuid
+  lastMessageAt  DateTime?       @map("last_message_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userOne        User            @relation("ConversationUserOne", fields: [userOneId], references: [id], onDelete: Cascade)
+  userTwo        User            @relation("ConversationUserTwo", fields: [userTwoId], references: [id], onDelete: Cascade)
+  messages       DirectMessage[]
+
+  @@unique([organizationId, userOneId, userTwoId], map: "direct_conversations_org_user_one_user_two_key")
+  @@unique([id, organizationId], map: "direct_conversations_id_organization_id_key")
+  @@index([organizationId, lastMessageAt], map: "direct_conversations_org_last_message_at_idx")
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id              String             @id @default(uuid()) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  conversationId  String             @map("conversation_id") @db.Uuid
+  senderUserId    String             @map("sender_user_id") @db.Uuid
+  clientMessageId String             @map("client_message_id") @db.VarChar(120)
+  body            String             @db.VarChar(2000)
+  readAt          DateTime?          @map("read_at") @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  conversation    DirectConversation @relation(fields: [conversationId, organizationId], references: [id, organizationId], onDelete: Cascade, map: "direct_messages_conversation_organization_fkey")
+  sender          User               @relation("DirectMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, senderUserId, clientMessageId], map: "direct_messages_conversation_sender_client_key")
+  @@index([conversationId, createdAt], map: "direct_messages_conversation_created_at_idx")
+  @@index([organizationId, senderUserId, createdAt], map: "direct_messages_org_sender_created_at_idx")
+  @@map("direct_messages")
 }
 
 model RosterSubmission {

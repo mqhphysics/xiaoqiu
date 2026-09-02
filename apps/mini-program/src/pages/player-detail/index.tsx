@@ -73,7 +73,12 @@ function PlayerContent({
     <View>
       <View className="player-hero" style={{ borderColor: player.profileColor ?? '#1f6b45' }}>
         <View className="player-hero__identity">
-          <UserAvatar name={player.displayName} color={player.profileColor} size="large" />
+          <UserAvatar
+            avatarUrl={player.avatarUrl}
+            name={player.displayName}
+            color={player.profileColor}
+            size="large"
+          />
           <View className="player-hero__copy">
             <Text className="player-hero__eyebrow">PLAYER PROFILE</Text>
             <Text className="player-hero__name">{player.displayName}</Text>

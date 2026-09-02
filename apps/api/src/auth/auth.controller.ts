@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Headers, HttpCode, Inject, Ip, Post, Req } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Inject,
+  Ip,
+  Patch,
+  Post,
+  Req,
+} from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiBody,
@@ -20,6 +31,7 @@ import {
   LoginResponseDto,
   RegisterDto,
   ResetPasswordByIdentityDto,
+  UpdateProfileDto,
 } from './auth.dto'
 import { AuthService } from './auth.service'
 
@@ -34,11 +46,21 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
-  login(@Body() body: LoginDto, @Ip() ip: string, @Req() request: Request) {
-    return this.authService.login(body.username, body.password, {
-      ip,
-      userAgent: request.headers['user-agent'],
-    })
+  login(
+    @Body() body: LoginDto,
+    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Ip() ip: string,
+    @Req() request: Request,
+  ) {
+    return this.authService.login(
+      body.username,
+      body.password,
+      organizationId?.trim() || DEMO_ORGANIZATION_ID,
+      {
+        ip,
+        userAgent: request.headers['user-agent'],
+      },
+    )
   }
 
   @Post('register')
@@ -83,6 +105,24 @@ export class AuthController {
   @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
   async me(@Headers('authorization') authorization: string | undefined) {
     return (await this.authService.requireSession(authorization)).user
+  }
+
+  @Patch('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '更新当前用户的公开昵称、绑定邮箱与简介' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiOkResponse({ type: AuthUserDto })
+  updateMe(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: UpdateProfileDto,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ) {
+    return this.authService.updateProfile(authorization, body, {
+      ip,
+      requestId: getRequestId(request),
+      userAgent: request.headers['user-agent'],
+    })
   }
 
   @Post('logout')

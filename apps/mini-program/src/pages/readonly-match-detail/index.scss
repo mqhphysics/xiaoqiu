@@ -589,3 +589,17 @@
     left: 48px;
   }
 }
+.match-review__actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+}
+.match-review__actions button {
+  min-height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  background: #f1f4f2;
+  color: #627068;
+  font-size: 8px;
+  line-height: 28px;
+}

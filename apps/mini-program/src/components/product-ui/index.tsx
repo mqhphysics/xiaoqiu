@@ -1,4 +1,4 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Image, Text, View } from '@tarojs/components'
 import type { BaseEventOrig } from '@tarojs/components/types/common'
 
 import {
@@ -10,6 +10,7 @@ import {
   verificationLabel,
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
+import { resolveMediaUrl } from '../../features/product/product.repository'
 
 import './index.scss'
 
@@ -37,13 +38,23 @@ export function TeamCrest({
 export function UserAvatar({
   name,
   color,
+  avatarUrl,
   size = 'medium',
 }: {
   name: string
   color?: string | null
+  avatarUrl?: string | null
   size?: 'small' | 'medium' | 'large'
 }) {
-  return (
+  const source = resolveMediaUrl(avatarUrl)
+  return source ? (
+    <Image
+      aria-label={`${name}的头像`}
+      className={`user-avatar user-avatar--${size}`}
+      mode="aspectFill"
+      src={source}
+    />
+  ) : (
     <Text
       className={`user-avatar user-avatar--${size}`}
       style={{ backgroundColor: color ?? avatarColor(name) }}
@@ -95,19 +106,26 @@ export function PostCard({
   post,
   onOpen,
   onLike,
+  onMessageAuthor,
 }: {
   post: PostSummary
   onOpen: () => void
   onLike?: () => void
+  onMessageAuthor?: () => void
 }) {
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
     onLike?.()
   }
+  const stopAndMessage = (event: BaseEventOrig) => {
+    if (!onMessageAuthor) return
+    event.stopPropagation()
+    onMessageAuthor()
+  }
   return (
     <View className="post-card" onClick={onOpen}>
       <View className="post-card__author">
-        <UserAvatar name={post.author.displayName} size="small" />
+        <UserAvatar avatarUrl={post.author.avatarUrl} name={post.author.displayName} size="small" />
         <View className="post-card__identity">
           <View className="post-card__name-row">
             <Text className="post-card__name">{post.author.displayName}</Text>
@@ -117,6 +135,15 @@ export function PostCard({
           </View>
           <Text className="post-card__time">{formatRelativeTime(post.publishedAt)}</Text>
         </View>
+        {onMessageAuthor && (
+          <Button
+            aria-label={`私聊${post.author.displayName}`}
+            className="post-card__message-author"
+            onClick={stopAndMessage}
+          >
+            私聊
+          </Button>
+        )}
       </View>
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>

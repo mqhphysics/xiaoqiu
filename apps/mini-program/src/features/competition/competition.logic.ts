@@ -61,8 +61,8 @@ export function teamDetailUrl(
   teamId: string | null | undefined,
   tournamentId: string,
 ): string | null {
-  event.stopPropagation()
   if (!teamId) return null
+  event.stopPropagation()
   return (
     '/pages/readonly-team-detail/index?teamId=' +
     encodeURIComponent(teamId) +

@@ -142,7 +142,7 @@
 
 .public-nav__item--switching,
 .mobile-tabbar__item--switching {
-  animation: public-nav-hop 190ms ease-out;
+  animation: public-nav-hop 160ms ease-out;
 }
 
 .public-team-nav {
@@ -182,7 +182,7 @@
 
 .public-team-nav--switching,
 .mobile-team-tab--switching {
-  animation: public-team-hop 190ms ease-out;
+  animation: public-team-hop 160ms ease-out;
 }
 
 .public-account-wrap {
@@ -359,7 +359,7 @@
 }
 
 .public-content {
-  animation: public-content-enter 190ms ease-out;
+  animation: public-content-enter 160ms ease-out;
 }
 
 @keyframes public-content-enter {

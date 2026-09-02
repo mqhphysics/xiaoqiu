@@ -303,3 +303,46 @@
     width: 100%;
   }
 }
+.post-detail__secondary-action {
+  min-height: 34px;
+  margin: 0 0 0 5px;
+  padding: 0 9px;
+  border: 1px solid #dce3de;
+  border-radius: 17px;
+  background: #fff;
+  color: #5d6a62;
+  font-size: 9px;
+  line-height: 34px;
+}
+.comment-composer__cancel-reply {
+  min-height: 30px;
+  margin: 0;
+  padding: 0 8px;
+  background: #f2f4f2;
+  color: #6f7b73;
+  font-size: 8px;
+  line-height: 30px;
+}
+.comment-item__reply-label {
+  display: inline-block !important;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #eef3ef;
+  color: #6f7b73 !important;
+  font-size: 8px !important;
+}
+.comment-item__actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 7px;
+}
+.comment-item__actions button {
+  min-height: 28px;
+  margin: 0;
+  padding: 0 7px;
+  background: transparent;
+  color: #607168;
+  font-size: 8px;
+  line-height: 28px;
+}

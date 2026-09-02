@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
+import { openMessaging } from '../../components/messaging-drawer'
+import { ReportModal } from '../../components/report-modal'
 import {
   eventLabel,
   formatLongDate,
@@ -315,6 +317,7 @@ function RatingsPanel({
   onSubmit: () => void
 }) {
   const session = readSession()
+  const [reportId, setReportId] = useState<string | null>(null)
   return (
     <View className="ratings-layout match-tab-content">
       <View className="rating-overview surface">
@@ -379,7 +382,11 @@ function RatingsPanel({
           <View className="match-review-list">
             {match.reviews.comments.map((review) => (
               <View className="match-review surface" key={review.id}>
-                <UserAvatar name={review.author.displayName} size="small" />
+                <UserAvatar
+                  avatarUrl={review.author.avatarUrl}
+                  name={review.author.displayName}
+                  size="small"
+                />
                 <View className="match-review__copy">
                   <View className="match-review__heading">
                     <Text>{review.author.displayName}</Text>
@@ -387,12 +394,38 @@ function RatingsPanel({
                     <Text>{formatRelativeTime(review.createdAt)}</Text>
                   </View>
                   <Text className="match-review__body">{review.body}</Text>
+                  {session && (
+                    <View className="match-review__actions">
+                      {review.author.messageable && (
+                        <Button
+                          onClick={() =>
+                            openMessaging({
+                              id: review.author.id,
+                              displayName: review.author.displayName,
+                              avatarUrl: review.author.avatarUrl,
+                            })
+                          }
+                        >
+                          私聊
+                        </Button>
+                      )}
+                      <Button onClick={() => setReportId(review.id)}>投诉</Button>
+                    </View>
+                  )}
                 </View>
               </View>
             ))}
           </View>
         )}
       </View>
+      {reportId && (
+        <ReportModal
+          targetId={reportId}
+          targetType="MATCH_REVIEW"
+          title="投诉这条观赛评论"
+          onClose={() => setReportId(null)}
+        />
+      )}
     </View>
   )
 }

@@ -494,16 +494,23 @@ async function seedMatchFacts(
   await tx.matchAppearance.createMany({
     data: teamIndexes.flatMap((teamIndex) => {
       const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
-      return players.map((player, index) => ({
-        id: fixtureId(`appearance:${definition.code}:${player.id}`),
-        organizationId,
-        matchId,
-        teamId: teams[teamIndex]!.id,
-        playerId: player.id,
-        shirtNumber: player.shirtNumber,
-        starter: isDemoMatchStarter(index),
-        minutesPlayed: getDemoMinutesPlayed(index, matchMinutes),
-      }))
+      return players.flatMap((player, index) => {
+        const minutesPlayed = getDemoMinutesPlayed(index, matchMinutes)
+        return minutesPlayed > 0
+          ? [
+              {
+                id: fixtureId(`appearance:${definition.code}:${player.id}`),
+                organizationId,
+                matchId,
+                teamId: teams[teamIndex]!.id,
+                playerId: player.id,
+                shirtNumber: player.shirtNumber,
+                starter: isDemoMatchStarter(index),
+                minutesPlayed,
+              },
+            ]
+          : []
+      })
     }),
   })
 

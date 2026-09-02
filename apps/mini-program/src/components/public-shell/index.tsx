@@ -6,6 +6,8 @@ import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type { TeamSummary } from '../../features/product/product.types'
 import type { PublicDataSource } from '../../features/readonly-schedule/readonly-schedule.types'
+import { MessagingDrawer, openMessaging } from '../messaging-drawer'
+import { ReportModal } from '../report-modal'
 
 import './index.scss'
 
@@ -28,6 +30,15 @@ const navItems: Array<{ key: PublicSection; label: string; shortLabel: string }>
 ]
 
 const primaryTeamCache = new Map<string, TeamSummary | null>()
+const primaryTeamListeners = new Set<(key: string, team: TeamSummary | null) => void>()
+
+export function updatePrimaryTeamCache(team: TeamSummary | null): void {
+  const session = readSession()
+  if (!session) return
+  const key = `${session.user.id}:${session.expiresAt}`
+  primaryTeamCache.set(key, team)
+  for (const listener of primaryTeamListeners) listener(key, team)
+}
 
 export function PublicShell({
   active,
@@ -40,6 +51,7 @@ export function PublicShell({
   const session = readSession()
   const teamCacheKey = session ? `${session.user.id}:${session.expiresAt}` : null
   const [menuOpen, setMenuOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [primaryTeam, setPrimaryTeam] = useState<TeamSummary | null>(() =>
     teamCacheKey && primaryTeamCache.has(teamCacheKey)
       ? (primaryTeamCache.get(teamCacheKey) ?? null)
@@ -77,6 +89,16 @@ export function PublicShell({
     }
   }, [session?.accessToken, teamCacheKey])
 
+  useEffect(() => {
+    const listener = (key: string, team: TeamSummary | null) => {
+      if (key === teamCacheKey) setPrimaryTeam(team)
+    }
+    primaryTeamListeners.add(listener)
+    return () => {
+      primaryTeamListeners.delete(listener)
+    }
+  }, [teamCacheKey])
+
   const closeMenu = () => setMenuOpen(false)
   const navigateToSection = async (section: PublicSection) => {
     const targetPath = getSectionPath(section, tournamentId)
@@ -88,7 +110,7 @@ export function PublicShell({
     closeMenu()
     setNavigatingTo(section)
     try {
-      if (!prefersReducedMotion()) await wait(130)
+      if (!prefersReducedMotion()) await wait(160)
       await goToSection(section, tournamentId)
     } catch {
       await Taro.showToast({ title: '页面切换失败，请重试', icon: 'none' })
@@ -99,8 +121,19 @@ export function PublicShell({
   const logout = async () => {
     closeMenu()
     primaryTeamCache.clear()
-    await productRepository.logout()
-    await Taro.reLaunch({ url: '/pages/login/index' })
+    try {
+      await productRepository.logout()
+    } finally {
+      await Taro.reLaunch({ url: '/pages/login/index' })
+    }
+  }
+  const openFeedback = async () => {
+    closeMenu()
+    if (!session) {
+      await Taro.reLaunch({ url: '/pages/login/index' })
+      return
+    }
+    setFeedbackOpen(true)
   }
 
   return (
@@ -187,11 +220,19 @@ export function PublicShell({
                     登录或注册
                   </Button>
                 )}
-                <Button className="public-account-menu__item" onClick={() => void showFeedback()}>
+                {session && (
+                  <Button
+                    className="public-account-menu__item"
+                    onClick={() => {
+                      closeMenu()
+                      openMessaging()
+                    }}
+                  >
+                    消息与私信
+                  </Button>
+                )}
+                <Button className="public-account-menu__item" onClick={() => void openFeedback()}>
                   问题反馈
-                </Button>
-                <Button className="public-account-menu__item" onClick={() => void showContact()}>
-                  联系赛事组
                 </Button>
                 <View className="public-account-menu__version">
                   <Text>晓球 V1.0.0</Text>
@@ -256,6 +297,14 @@ export function PublicShell({
           ),
         )}
       </View>
+      {session && <MessagingDrawer />}
+      {feedbackOpen && (
+        <ReportModal
+          targetType="FEEDBACK"
+          title="问题反馈"
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
     </View>
   )
 }
@@ -317,16 +366,4 @@ function prefersReducedMotion(): boolean {
 
 function wait(duration: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, duration))
-}
-
-async function showFeedback() {
-  await Taro.showToast({ title: '反馈工单将在下一版本接入', icon: 'none', duration: 2200 })
-}
-
-async function showContact() {
-  await Taro.showModal({
-    title: '联系赛事组',
-    content: '请联系绿茵杯赛事工作组；正式联系方式将在上线前补充。',
-    showCancel: false,
-  })
 }

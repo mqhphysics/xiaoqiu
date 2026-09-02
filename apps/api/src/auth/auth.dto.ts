@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsEmail, IsString, Length, Matches } from 'class-validator'
+import { IsEmail, IsOptional, IsString, Length, Matches } from 'class-validator'
 
 export class LoginDto {
   @ApiProperty({
@@ -78,11 +78,17 @@ export class LinkedPlayerDto {
 
   @ApiProperty({ type: String, required: false, nullable: true })
   position!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  avatarUrl!: string | null
 }
 
 export class AuthUserDto {
   @ApiProperty({ type: String })
   id!: string
+
+  @ApiProperty({ type: String, format: 'uuid', description: '当前会话绑定的组织' })
+  organizationId!: string
 
   @ApiProperty({ type: String })
   username!: string
@@ -101,6 +107,9 @@ export class AuthUserDto {
 
   @ApiProperty({ type: String, required: false, nullable: true })
   bio!: string | null
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  avatarUrl!: string | null
 
   @ApiProperty({ type: String, example: 'STUDENT_VERIFIED' })
   verificationLevel!: string
@@ -140,6 +149,37 @@ export class ResetPasswordByIdentityDto {
   @IsString()
   @Length(8, 128)
   newPassword!: string
+}
+
+export class UpdateProfileDto {
+  @ApiProperty({ type: String, description: '公开昵称' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(2, 120)
+  displayName!: string
+
+  @ApiProperty({ type: String, format: 'email', description: '绑定邮箱' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsEmail()
+  @Length(5, 254)
+  email!: string
+
+  @ApiProperty({ type: String, required: false, nullable: true, description: '公开简介' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @Length(0, 280)
+  bio?: string
+}
+
+export class UploadAvatarDto {
+  @ApiProperty({
+    type: String,
+    description: '浏览器裁剪压缩后的 data URL；最大约 72 KiB 原始文件',
+  })
+  @IsString()
+  @Length(100, 100_000)
+  dataUrl!: string
 }
 
 export class AdminIdentityDto {

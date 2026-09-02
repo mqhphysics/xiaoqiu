@@ -41,20 +41,45 @@ export class UpdateTeamPreferencesDto {
 }
 
 export class CreatePostDto {
+  @ApiProperty({ type: String, description: '客户端生成的动态发布幂等键' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(8, 120)
+  clientPostId!: string
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', description: '以球队成员身份发布球队动态' })
+  @IsOptional()
+  @IsUUID()
+  teamId?: string
+
   @ApiPropertyOptional({ type: String })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsOptional()
   @IsString()
   @Length(2, 180)
   title?: string
 
   @ApiProperty({ type: String })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @Length(2, 1000)
   body!: string
 }
 
 export class CreateCommentDto {
+  @ApiProperty({ type: String, description: '客户端生成的评论幂等键' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(8, 120)
+  clientCommentId!: string
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', description: '回复的评论 ID' })
+  @IsOptional()
+  @IsUUID()
+  parentCommentId?: string
+
   @ApiProperty({ type: String })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @Length(1, 300)
   body!: string
@@ -68,6 +93,7 @@ export class CreateMatchReviewDto {
   rating!: number
 
   @ApiPropertyOptional({ type: String, maxLength: 500 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsOptional()
   @IsString()
   @Length(1, 500)

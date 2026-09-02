@@ -10,7 +10,11 @@ export function readSession(): AuthSession | null {
   try {
     Taro.removeStorageSync(LEGACY_SESSION_KEY)
     const value = Taro.getStorageSync<AuthSession | undefined>(SESSION_KEY)
-    if (!value?.accessToken || new Date(value.expiresAt).getTime() <= Date.now()) {
+    if (
+      !value?.accessToken ||
+      !value.user?.organizationId ||
+      new Date(value.expiresAt).getTime() <= Date.now()
+    ) {
       if (value) Taro.removeStorageSync(SESSION_KEY)
       return null
     }

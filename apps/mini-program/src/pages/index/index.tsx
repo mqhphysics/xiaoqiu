@@ -3,6 +3,8 @@ import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { useOverlayFocus } from '../../components/overlay-focus'
+import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
 import {
   MatchStatus,
@@ -12,7 +14,7 @@ import {
   UserAvatar,
 } from '../../components/product-ui'
 import { formatDate, formatTime } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { createClientActionId, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
   HomeResponse,
@@ -48,21 +50,10 @@ export default function IndexPage() {
   const [composerOpen, setComposerOpen] = useState(false)
   const [postBody, setPostBody] = useState('')
   const [publishing, setPublishing] = useState(false)
+  const [pendingPost, setPendingPost] = useState<{ id: string; body: string } | null>(null)
   const searchRequestId = useRef(0)
 
-  useEffect(() => {
-    if (!composerOpen || typeof document === 'undefined') return
-    const previousOverflow = document.body.style.overflow
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setComposerOpen(false)
-    }
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [composerOpen])
+  useOverlayFocus(composerOpen, '.composer-dialog', () => setComposerOpen(false))
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -92,6 +83,7 @@ export default function IndexPage() {
     }
     setSearching(true)
     setSearchError(null)
+    setSearchResult(null)
     try {
       const result = await productRepository.search(query, category)
       if (requestId === searchRequestId.current) setSearchResult(result)
@@ -132,7 +124,7 @@ export default function IndexPage() {
       return
     }
     try {
-      const result = await productRepository.toggleLike(post.id)
+      const result = await productRepository.setLike(post.id, !post.likedByMe)
       setState((current) => {
         if (current.phase !== 'ready') return current
         return {
@@ -167,15 +159,19 @@ export default function IndexPage() {
   const publishPost = async () => {
     const body = postBody.trim()
     if (body.length < 2 || publishing) return
+    const request =
+      pendingPost?.body === body ? pendingPost : { id: createClientActionId('post'), body }
+    setPendingPost(request)
     setPublishing(true)
     try {
-      const post = await productRepository.createPost(body)
+      const post = await productRepository.createPost(body, request.id)
       setState((current) =>
         current.phase === 'ready'
           ? { phase: 'ready', data: { ...current.data, posts: [post, ...current.data.posts] } }
           : current,
       )
       setPostBody('')
+      setPendingPost(null)
       setComposerOpen(false)
       await Taro.showToast({ title: '已发布', icon: 'success' })
     } catch (error) {
@@ -317,7 +313,11 @@ function HomeContent({
       <View className="community-column">
         <ProductSection kicker="CAMPUS FEED" title="绿茵动态" note="全校社区" />
         <Button className="composer-entry" onClick={onOpenComposer}>
-          <UserAvatar name={data.viewer?.displayName ?? '访客'} size="small" />
+          <UserAvatar
+            avatarUrl={data.viewer?.avatarUrl ?? null}
+            name={data.viewer?.displayName ?? '访客'}
+            size="small"
+          />
           <Text className="composer-entry__placeholder">说点什么，记录此刻的校园足球</Text>
           <Text className="composer-entry__action">发布</Text>
         </Button>
@@ -329,6 +329,16 @@ function HomeContent({
                 post={post}
                 onLike={() => onLike(post)}
                 onOpen={() => void goToPost(post.id)}
+                {...(post.author.messageable && readSession()
+                  ? {
+                      onMessageAuthor: () =>
+                        openMessaging({
+                          id: post.author.id,
+                          displayName: post.author.displayName,
+                          avatarUrl: post.author.avatarUrl,
+                        }),
+                    }
+                  : {})}
               />
             ))
           ) : (
@@ -366,7 +376,11 @@ function HomeContent({
               </Button>
             </View>
             <View className="composer-dialog__identity">
-              <UserAvatar name={data.viewer?.displayName ?? '我'} size="small" />
+              <UserAvatar
+                avatarUrl={data.viewer?.avatarUrl ?? null}
+                name={data.viewer?.displayName ?? '我'}
+                size="small"
+              />
               <Text>{data.viewer?.displayName ?? '发布动态'}</Text>
             </View>
             <Textarea
@@ -544,7 +558,12 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
           key={player.id}
           onClick={() => void goToPlayer(player.id, tournamentId)}
         >
-          <UserAvatar name={player.displayName} color={player.profileColor} size="small" />
+          <UserAvatar
+            avatarUrl={player.avatarUrl}
+            name={player.displayName}
+            color={player.profileColor}
+            size="small"
+          />
           <View className="search-result-row__copy">
             <Text>{player.displayName}</Text>
             <Text>{player.team?.name ?? '暂无球队'} · 球员</Text>

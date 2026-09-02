@@ -1,13 +1,23 @@
-import { Text, View } from '@tarojs/components'
+import { Button, Input, Picker, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
-import { MatchCard, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
+import {
+  MatchCard,
+  PostCard,
+  ProductSection,
+  TeamCrest,
+  UserAvatar,
+} from '../../components/product-ui'
 import { positionLabel } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
-import type { TeamDashboardResponse } from '../../features/product/product.types'
+import { readSession } from '../../features/product/session'
+import type {
+  TeamDashboardResponse,
+  TeamRelationshipResponse,
+} from '../../features/product/product.types'
 
 import './index.scss'
 
@@ -22,6 +32,12 @@ type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
   | { phase: 'ready'; team: TeamDashboardResponse; tournamentId: string }
+
+type RelationshipState =
+  | { phase: 'guest' }
+  | { phase: 'loading' }
+  | { phase: 'failed'; message: string }
+  | { phase: 'ready'; value: TeamRelationshipResponse }
 
 export default function TeamDetailPage() {
   const params = getCurrentInstance().router?.params
@@ -80,6 +96,55 @@ function TeamContent({
   data: TeamDashboardResponse
   tournamentId: string
 }) {
+  const authenticated = Boolean(readSession())
+  const [relationship, setRelationship] = useState<RelationshipState>(
+    authenticated ? { phase: 'loading' } : { phase: 'guest' },
+  )
+  const [position, setPosition] = useState('MIDFIELDER')
+  const [message, setMessage] = useState('')
+  const [applying, setApplying] = useState(false)
+  const loadRelationship = useCallback(async () => {
+    if (!readSession()) {
+      setRelationship({ phase: 'guest' })
+      return
+    }
+    setRelationship({ phase: 'loading' })
+    try {
+      setRelationship({
+        phase: 'ready',
+        value: await productRepository.getTeamRelationship(data.team.id),
+      })
+    } catch (error) {
+      setRelationship({
+        phase: 'failed',
+        message: error instanceof Error ? error.message : '球队关系加载失败',
+      })
+    }
+  }, [data.team.id])
+  useEffect(() => {
+    void loadRelationship()
+  }, [loadRelationship])
+  const apply = async () => {
+    if (!readSession()) {
+      await Taro.reLaunch({ url: '/pages/login/index' })
+      return
+    }
+    setApplying(true)
+    try {
+      setRelationship({
+        phase: 'ready',
+        value: await productRepository.applyToTeam(data.team.id, position, message),
+      })
+      await Taro.showToast({ title: '申请已提交', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '申请提交失败',
+        icon: 'none',
+      })
+    } finally {
+      setApplying(false)
+    }
+  }
   const knownPositions = new Set<string>(POSITION_GROUPS.map((group) => group.key))
   const rosterGroups = [
     ...POSITION_GROUPS.map((group) => ({
@@ -121,6 +186,103 @@ function TeamContent({
             <Text>教练</Text>
             <Text>{data.team.coachName ?? '未设置'}</Text>
           </View>
+          <View className="team-join-action">
+            {relationship.phase === 'guest' ? (
+              <Button onClick={() => void Taro.reLaunch({ url: '/pages/login/index' })}>
+                登录后申请加入
+              </Button>
+            ) : relationship.phase === 'loading' ? (
+              <Text>正在读取球队关系…</Text>
+            ) : relationship.phase === 'failed' ? (
+              <View>
+                <Text>{relationship.message}</Text>
+                <Button onClick={() => void loadRelationship()}>重试</Button>
+              </View>
+            ) : relationship.value.isCaptain ? (
+              <Button
+                onClick={() =>
+                  void Taro.reLaunch({
+                    url: `/pages/my-team/index?tournamentId=${encodeURIComponent(tournamentId)}&teamId=${encodeURIComponent(data.team.id)}`,
+                  })
+                }
+              >
+                进入球队管理
+              </Button>
+            ) : relationship.value.membershipStatus === 'ACTIVE' ? (
+              <Text>已是球队成员</Text>
+            ) : relationship.value.application?.status === 'PENDING' ? (
+              <Text>入队申请待审批</Text>
+            ) : (
+              <>
+                <Picker
+                  mode="selector"
+                  range={POSITION_GROUPS.map((item) => item.label)}
+                  value={Math.max(
+                    0,
+                    POSITION_GROUPS.findIndex((item) => item.key === position),
+                  )}
+                  onChange={(event) =>
+                    setPosition(POSITION_GROUPS[Number(event.detail.value)]?.key ?? 'MIDFIELDER')
+                  }
+                >
+                  <Button>选择位置 · {positionLabel(position)}</Button>
+                </Picker>
+                <Input
+                  maxlength={500}
+                  placeholder="给队长留言（选填）"
+                  value={message}
+                  onInput={(event) => setMessage(event.detail.value)}
+                />
+                <Button loading={applying} onClick={() => void apply()}>
+                  申请加入
+                </Button>
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+
+      <View className="public-team-section">
+        <ProductSection
+          kicker="MATCHES"
+          title="近期比赛"
+          actionLabel="全部赛程"
+          onAction={() =>
+            void Taro.reLaunch({
+              url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(tournamentId)}`,
+            })
+          }
+        />
+        <View className="public-team-match-grid">
+          {[...data.recentMatches.slice(0, 1), ...data.upcomingMatches.slice(0, 1)].map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              onClick={() =>
+                void Taro.navigateTo({
+                  url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
+                })
+              }
+            />
+          ))}
+        </View>
+      </View>
+
+      <View className="public-team-section">
+        <ProductSection kicker="TEAM FEED" title="球队动态" note={`${data.posts.length} 条`} />
+        <View className="public-team-posts">
+          {data.posts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onOpen={() =>
+                void Taro.navigateTo({
+                  url: `/pages/post-detail/index?postId=${encodeURIComponent(post.id)}`,
+                })
+              }
+            />
+          ))}
+          {data.posts.length === 0 && <Text className="public-team-empty">暂无球队动态</Text>}
         </View>
       </View>
 
@@ -139,23 +301,6 @@ function TeamContent({
         <Text className="public-team-about__founded">
           {data.team.foundedYear ? '成立于 ' + data.team.foundedYear + ' 年' : ''}
         </Text>
-      </View>
-
-      <View className="public-team-section">
-        <ProductSection kicker="MATCHES" title="球队赛程" note="近期与待进行" />
-        <View className="public-team-match-grid">
-          {[...data.upcomingMatches, ...data.recentMatches].slice(0, 6).map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              onClick={() =>
-                void Taro.navigateTo({
-                  url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
-                })
-              }
-            />
-          ))}
-        </View>
       </View>
 
       <View className="public-team-section">
@@ -193,6 +338,7 @@ function TeamContent({
                     <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
                     <View className="public-roster__player">
                       <UserAvatar
+                        avatarUrl={player.avatarUrl}
                         name={player.displayName}
                         color={player.profileColor}
                         size="small"

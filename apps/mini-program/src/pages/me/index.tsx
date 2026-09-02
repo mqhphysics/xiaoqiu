@@ -1,14 +1,23 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { AvatarCropper } from '../../components/avatar-cropper'
+import { openMessaging } from '../../components/messaging-drawer'
+import { ReportModal } from '../../components/report-modal'
 import { DataState } from '../../components/public-ui'
 import { ProductSection, UserAvatar } from '../../components/product-ui'
 import { positionLabel, roleLabel, verificationLabel } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
-import type { AdminIdentity, AuthUser, HomeResponse } from '../../features/product/product.types'
+import type {
+  AdminIdentity,
+  AuthUser,
+  HomeResponse,
+  NotificationResponse,
+  ReportItem,
+} from '../../features/product/product.types'
 
 import './index.scss'
 
@@ -61,17 +70,65 @@ export default function MePage() {
         />
       )}
       {state.phase === 'ready' && (
-        <ProfilePanel tournamentId={state.home.tournament.id} user={state.user} />
+        <ProfilePanel
+          tournamentId={state.home.tournament.id}
+          user={state.user}
+          onUserChange={(user) =>
+            setState((current) => (current.phase === 'ready' ? { ...current, user } : current))
+          }
+        />
       )}
     </PublicShell>
   )
 }
 
-function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: AuthUser }) {
+function ProfilePanel({
+  tournamentId,
+  user,
+  onUserChange,
+}: {
+  tournamentId: string
+  user: AuthUser
+  onUserChange: (user: AuthUser) => void
+}) {
   const [loggingOut, setLoggingOut] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [displayName, setDisplayName] = useState(user.displayName)
+  const [email, setEmail] = useState(user.email ?? '')
+  const [bio, setBio] = useState(user.bio ?? '')
   const roleNames = user.roles.map((item) => roleLabel(item.role))
-  const isReporter = user.roles.some((item) => item.role === 'MATCH_REPORTER')
-  const isOrganizationAdmin = user.roles.some((item) => item.role === 'ORGANIZATION_ADMIN')
+  const isOrganizationAdmin = user.roles.some(
+    (item) =>
+      item.role === 'PLATFORM_ADMIN' ||
+      (item.role === 'ORGANIZATION_ADMIN' &&
+        item.scopeType === 'ORGANIZATION' &&
+        item.scopeId === user.organizationId),
+  )
+
+  const saveProfile = async () => {
+    if (savingProfile) return
+    setSavingProfile(true)
+    try {
+      const updated = await productRepository.updateProfile(
+        displayName.trim(),
+        email.trim(),
+        bio.trim(),
+      )
+      onUserChange(updated)
+      setEditing(false)
+      await Taro.showToast({ title: '资料已保存', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '保存失败',
+        icon: 'none',
+      })
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   const logout = async () => {
     if (loggingOut) return
@@ -84,13 +141,10 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
     setLoggingOut(true)
     try {
       await productRepository.logout()
+    } catch {
+      // 本地会话已由 repository 的 finally 清除，仍需离开受保护页面。
+    } finally {
       await Taro.reLaunch({ url: '/pages/login/index' })
-    } catch (error) {
-      await Taro.showToast({
-        title: error instanceof Error ? error.message : '退出失败',
-        icon: 'none',
-      })
-      setLoggingOut(false)
     }
   }
 
@@ -98,7 +152,14 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
     <View>
       <View className="profile-header">
         <View className="profile-header__main">
-          <UserAvatar name={user.displayName} size="large" />
+          <Button
+            aria-label="更换头像"
+            className="profile-avatar-action"
+            onClick={() => setAvatarOpen(true)}
+          >
+            <UserAvatar avatarUrl={user.avatarUrl} name={user.displayName} size="large" />
+            <Text className="profile-avatar-action__label">更换头像</Text>
+          </Button>
           <View className="profile-header__copy">
             <Text className="profile-header__eyebrow">ACCOUNT PROFILE</Text>
             <View className="profile-header__name-row">
@@ -116,15 +177,54 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
             </View>
           </View>
         </View>
-        <Button
-          className="profile-header__logout"
-          disabled={loggingOut}
-          loading={loggingOut}
-          onClick={() => void logout()}
-        >
-          退出登录
-        </Button>
+        <View className="profile-header__actions">
+          <Button className="profile-header__edit" onClick={() => setEditing((value) => !value)}>
+            {editing ? '收起编辑' : '编辑资料'}
+          </Button>
+          <Button
+            className="profile-header__logout"
+            disabled={loggingOut}
+            loading={loggingOut}
+            onClick={() => void logout()}
+          >
+            退出登录
+          </Button>
+        </View>
       </View>
+
+      {editing && (
+        <View className="profile-editor surface">
+          <View>
+            <Text>昵称</Text>
+            <Input
+              maxlength={120}
+              value={displayName}
+              onInput={(event) => setDisplayName(event.detail.value)}
+            />
+          </View>
+          <View>
+            <Text>绑定邮箱</Text>
+            <Input
+              type="text"
+              maxlength={254}
+              value={email}
+              onInput={(event) => setEmail(event.detail.value)}
+            />
+          </View>
+          <View className="profile-editor__bio">
+            <Text>个人简介</Text>
+            <Textarea maxlength={280} value={bio} onInput={(event) => setBio(event.detail.value)} />
+          </View>
+          <Button
+            className="button button--primary"
+            disabled={displayName.trim().length < 2 || !email.includes('@') || savingProfile}
+            loading={savingProfile}
+            onClick={() => void saveProfile()}
+          >
+            保存资料
+          </Button>
+        </View>
+      )}
 
       <View className="identity-summary__heading">
         <Text>仅本人可见的账户信息</Text>
@@ -183,6 +283,16 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
               })
             }
           />
+          <ServiceItem
+            title="消息与私信"
+            note="点赞、回复与校内私聊"
+            action={() => openMessaging()}
+          />
+          <ServiceItem
+            title="问题反馈"
+            note="提交后可查看处理回复"
+            action={() => setFeedbackOpen(true)}
+          />
           {user.linkedPlayer && (
             <ServiceItem
               title="球员档案"
@@ -201,24 +311,334 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
         </View>
       </View>
 
-      {isReporter && (
-        <View className="profile-section">
-          <ProductSection kicker="WORKSPACE" title="赛事工作台" note="按权限显示" />
-          <View className="workspace-list surface">
-            <View
-              className="workspace-item"
-              onClick={() => void Taro.navigateTo({ url: '/pages/quick-report/index' })}
-            >
-              <Text>快速比赛报告</Text>
-              <Text>录入比分与比赛事件</Text>
-              <Text>进入</Text>
-            </View>
+      <NotificationsPanel />
+      <MyReportsPanel />
+
+      {isOrganizationAdmin && <AdminReportPanel />}
+      {isOrganizationAdmin && <AdminIdentityDirectory />}
+      {avatarOpen && (
+        <AvatarCropper
+          onCancel={() => setAvatarOpen(false)}
+          onConfirm={async (dataUrl) => {
+            const result = await productRepository.uploadAvatar(dataUrl)
+            onUserChange(result.user)
+            setAvatarOpen(false)
+            await Taro.showToast({ title: '头像已更新', icon: 'success' })
+          }}
+        />
+      )}
+      {feedbackOpen && (
+        <ReportModal
+          targetType="FEEDBACK"
+          title="问题反馈"
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
+    </View>
+  )
+}
+
+function NotificationsPanel() {
+  const [data, setData] = useState<NotificationResponse | null>(null)
+  const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState(false)
+  const load = useCallback(async () => {
+    try {
+      setData(await productRepository.getNotifications())
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '消息加载失败')
+    }
+  }, [])
+  const openNotification = async (item: NotificationResponse['items'][number]) => {
+    try {
+      setData(await productRepository.readNotification(item.id))
+      if (item.type === 'REPORT_CREATED' || item.type === 'REPORT_UPDATED') {
+        await Taro.pageScrollTo({
+          duration: 240,
+          selector: item.type === 'REPORT_CREATED' ? '#admin-reports' : '#my-reports',
+        })
+        return
+      }
+      if (!item.linkPath) return
+      const conversationId = readConversationId(item.linkPath)
+      if (conversationId) {
+        openMessaging({ conversationId })
+        return
+      }
+      if (item.linkPath.startsWith('/pages/me/index')) return
+      if (item.linkPath.startsWith('/pages/')) {
+        await Taro.navigateTo({ url: item.linkPath })
+      }
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '消息打开失败',
+        icon: 'none',
+      })
+    }
+  }
+  const markAllRead = async () => {
+    try {
+      setData(await productRepository.readAllNotifications())
+    } catch (reason) {
+      await Taro.showToast({
+        title: reason instanceof Error ? reason.message : '全部已读操作失败',
+        icon: 'none',
+      })
+    }
+  }
+  useEffect(() => {
+    void load()
+  }, [load])
+  return (
+    <View className="profile-section">
+      <ProductSection
+        kicker="NOTIFICATIONS"
+        title="消息"
+        {...(data ? { note: `${data.unreadCount} 条未读` } : {})}
+      />
+      {error && (
+        <DataState
+          kind="error"
+          title="消息不可用"
+          description={error}
+          onRetry={() => void load()}
+        />
+      )}
+      {data && (
+        <View className="notification-list surface">
+          <View className="notification-list__head">
+            <Text>点赞、回复、申请与处理结果</Text>
+            <Button disabled={data.unreadCount === 0} onClick={() => void markAllRead()}>
+              全部已读
+            </Button>
           </View>
+          {(expanded ? data.items : data.items.slice(0, 20)).map((item) => (
+            <View
+              className={`notification-item ${item.readAt ? '' : 'notification-item--unread'}`}
+              key={item.id}
+              onClick={() => void openNotification(item)}
+            >
+              <UserAvatar
+                avatarUrl={item.actor?.avatarUrl ?? null}
+                name={item.actor?.displayName ?? '晓球'}
+                size="small"
+              />
+              <View>
+                <Text>{item.title}</Text>
+                <Text>{item.body ?? '点击查看'}</Text>
+              </View>
+              {!item.readAt && <Text className="notification-item__dot" />}
+            </View>
+          ))}
+          {data.items.length > 20 && (
+            <Button
+              className="notification-list__more"
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? '收起较早消息' : `查看其余 ${data.items.length - 20} 条`}
+            </Button>
+          )}
+          {data.items.length === 0 && <Text className="profile-empty">暂时没有新消息</Text>}
         </View>
       )}
-
-      {isOrganizationAdmin && <AdminIdentityDirectory />}
     </View>
+  )
+}
+
+function readConversationId(linkPath: string): string | null {
+  const match = /[?&]conversationId=([^&]+)/.exec(linkPath)
+  if (!match?.[1]) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return null
+  }
+}
+
+function MyReportsPanel() {
+  const [items, setItems] = useState<ReportItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      setItems((await productRepository.getMyReports()).items)
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '投诉记录加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    void load()
+  }, [load])
+  return (
+    <View className="profile-section" id="my-reports">
+      <ProductSection kicker="REPORTS" title="我的反馈与投诉" note={`${items.length} 条`} />
+      {loading && <DataState kind="loading" title="正在读取投诉记录" />}
+      {error && !loading && (
+        <DataState
+          kind="error"
+          title="投诉记录不可用"
+          description={error}
+          onRetry={() => void load()}
+        />
+      )}
+      {!loading && !error && (
+        <View className="report-list surface">
+          {items.map((item) => (
+            <View className="report-row" key={item.id}>
+              <View>
+                <Text>{item.reason}</Text>
+                <Text>{item.details ?? '无补充说明'}</Text>
+              </View>
+              <View>
+                <Text>{reportStatusLabel(item.status)}</Text>
+                <Text>{item.resolution ?? '等待管理员处理'}</Text>
+              </View>
+            </View>
+          ))}
+          {items.length === 0 && <Text className="profile-empty">暂无反馈或投诉记录</Text>}
+        </View>
+      )}
+    </View>
+  )
+}
+
+function AdminReportPanel() {
+  const [items, setItems] = useState<ReportItem[]>([])
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      setItems((await productRepository.getAdminReports()).items)
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '投诉处理台加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    void load()
+  }, [load])
+  const resolve = async (item: ReportItem, hideContent: boolean) => {
+    const resolution = drafts[item.id]?.trim() ?? ''
+    if (resolution.length < 2) {
+      await Taro.showToast({ title: '请先填写至少 2 个字的处理回复', icon: 'none' })
+      return
+    }
+    const result = await Taro.showModal({
+      title: hideContent ? '处理并隐藏内容' : '回复提交者',
+      content: hideContent
+        ? '确认隐藏被投诉内容并把回复发给提交者？'
+        : '确认把处理回复发给提交者？',
+      confirmText: '确认处理',
+    })
+    if (!result.confirm) return
+    try {
+      const data = await productRepository.reviewReport(
+        item.id,
+        'RESOLVED',
+        resolution,
+        hideContent,
+      )
+      setItems(data.items)
+      await Taro.showToast({ title: '处理结果已发送', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '处理失败',
+        icon: 'none',
+      })
+    }
+  }
+  return (
+    <View className="profile-section" id="admin-reports">
+      <ProductSection
+        kicker="ADMIN REPORTS"
+        title="投诉处理台"
+        note={`${items.filter((item) => item.status === 'OPEN').length} 条待处理`}
+      />
+      {loading && <DataState kind="loading" title="正在读取投诉处理台" />}
+      {error && !loading && (
+        <DataState
+          kind="error"
+          title="投诉处理台不可用"
+          description={error}
+          onRetry={() => void load()}
+        />
+      )}
+      {!loading && !error && (
+        <View className="admin-report-list">
+          {items.map((item) => (
+            <View className="admin-report-card surface" key={item.id}>
+              <View>
+                <Text>
+                  {item.reporter?.displayName ?? '用户'} · {item.targetType}
+                </Text>
+                <Text>{item.reason}</Text>
+                <Text>{item.details ?? '无补充说明'}</Text>
+              </View>
+              {item.targetPreview && (
+                <View className="admin-report-card__target">
+                  <Text>{item.targetPreview.title}</Text>
+                  <Text>{item.targetPreview.body ?? '内容不可预览'}</Text>
+                  {item.targetPreview.linkPath && (
+                    <Button
+                      onClick={() => void Taro.navigateTo({ url: item.targetPreview!.linkPath! })}
+                    >
+                      查看被投诉内容
+                    </Button>
+                  )}
+                </View>
+              )}
+              {item.status === 'OPEN' || item.status === 'IN_REVIEW' ? (
+                <>
+                  <Input
+                    className="admin-report-card__input"
+                    maxlength={1000}
+                    placeholder="填写给提交者的处理回复"
+                    value={drafts[item.id] ?? ''}
+                    onInput={(event) =>
+                      setDrafts((current) => ({ ...current, [item.id]: event.detail.value }))
+                    }
+                  />
+                  <View className="admin-report-card__actions">
+                    <Button onClick={() => void resolve(item, false)}>回复并解决</Button>
+                    {(item.targetType === 'POST' || item.targetType === 'COMMENT') && (
+                      <Button
+                        className="admin-report-card__danger"
+                        onClick={() => void resolve(item, true)}
+                      >
+                        删除内容并回复
+                      </Button>
+                    )}
+                  </View>
+                </>
+              ) : (
+                <Text className="admin-report-card__resolved">{item.resolution}</Text>
+              )}
+            </View>
+          ))}
+          {items.length === 0 && <Text className="profile-empty">暂无投诉或反馈</Text>}
+        </View>
+      )}
+    </View>
+  )
+}
+
+function reportStatusLabel(status: string): string {
+  return (
+    (
+      { OPEN: '待处理', IN_REVIEW: '处理中', RESOLVED: '已解决', REJECTED: '已驳回' } as Record<
+        string,
+        string
+      >
+    )[status] ?? status
   )
 }
 

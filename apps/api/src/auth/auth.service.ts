@@ -8,6 +8,7 @@ import { PrismaService } from '../database/prisma.service'
 import {
   AuditActorType,
   MembershipStatus,
+  OrganizationStatus,
   UserStatus,
   VerificationLevel,
 } from '../generated/prisma/client'
@@ -17,6 +18,7 @@ import type {
   LoginResponseDto,
   RegisterDto,
   ResetPasswordByIdentityDto,
+  UpdateProfileDto,
 } from './auth.dto'
 import { hashPassword, verifyPassword } from './password'
 
@@ -36,12 +38,29 @@ export class AuthService {
   async login(
     identifier: string,
     password: string,
+    organizationId: string,
     request: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<LoginResponseDto> {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, status: OrganizationStatus.ACTIVE },
+      select: { id: true },
+    })
+    if (!organization) {
+      throw new ApiHttpException(HttpStatus.FORBIDDEN, {
+        code: ERROR_CODES.FORBIDDEN,
+        message: '当前组织不可用',
+      })
+    }
     const normalizedIdentifier = normalizeIdentifier(identifier)
     const candidates = await this.prisma.user.findMany({
       where: {
         status: UserStatus.ACTIVE,
+        memberships: {
+          some: {
+            organizationId,
+            status: MembershipStatus.ACTIVE,
+          },
+        },
         OR: [
           { loginNameNormalized: normalizedIdentifier },
           { displayName: { equals: identifier.trim(), mode: 'insensitive' } },
@@ -78,7 +97,9 @@ export class AuthService {
       })
     }
 
-    const membership = user.memberships.find((item) => item.status === 'ACTIVE')
+    const membership = user.memberships.find(
+      (item) => item.status === MembershipStatus.ACTIVE && item.organizationId === organizationId,
+    )
     if (!membership) {
       throw new ApiHttpException(HttpStatus.FORBIDDEN, {
         code: ERROR_CODES.FORBIDDEN,
@@ -91,6 +112,7 @@ export class AuthService {
     await this.prisma.userSession.create({
       data: {
         userId: user.id,
+        organizationId,
         refreshTokenHash: hashToken(token),
         expiresAt,
         lastSeenAt: new Date(),
@@ -102,7 +124,7 @@ export class AuthService {
     return {
       accessToken: token,
       expiresAt: expiresAt.toISOString(),
-      user: mapAuthUser(user),
+      user: mapAuthUser(user, organizationId),
     }
   }
 
@@ -200,7 +222,7 @@ export class AuthService {
       })
     })
 
-    return this.login(username, body.password, request)
+    return this.login(username, body.password, organizationId, request)
   }
 
   async getSession(authorization: string | undefined): Promise<AuthenticatedSession | null> {
@@ -209,18 +231,25 @@ export class AuthService {
 
     const session = await this.prisma.userSession.findUnique({
       where: { refreshTokenHash: hashToken(token) },
-      include: { user: { include: userInclude } },
+      include: {
+        organization: { select: { status: true } },
+        user: { include: userInclude },
+      },
     })
     if (
       !session ||
       session.revokedAt ||
       session.expiresAt.getTime() <= Date.now() ||
+      session.organization.status !== OrganizationStatus.ACTIVE ||
       session.user.status !== UserStatus.ACTIVE
     ) {
       return null
     }
 
-    const membership = session.user.memberships.find((item) => item.status === 'ACTIVE')
+    const membership = session.user.memberships.find(
+      (item) =>
+        item.status === MembershipStatus.ACTIVE && item.organizationId === session.organizationId,
+    )
     if (!membership) return null
 
     void this.prisma.userSession
@@ -230,8 +259,8 @@ export class AuthService {
     return {
       sessionId: session.id,
       userId: session.user.id,
-      organizationId: membership.organizationId,
-      user: mapAuthUser(session.user),
+      organizationId: session.organizationId,
+      user: mapAuthUser(session.user, session.organizationId),
     }
   }
 
@@ -254,6 +283,72 @@ export class AuthService {
       where: { refreshTokenHash: hashToken(token), revokedAt: null },
       data: { revokedAt: new Date() },
     })
+  }
+
+  async updateProfile(
+    authorization: string | undefined,
+    body: UpdateProfileDto,
+    request: { ip?: string | undefined; requestId: string; userAgent?: string | undefined },
+  ): Promise<AuthUserDto> {
+    const session = await this.requireSession(authorization)
+    const email = body.email.trim()
+    const emailNormalized = normalizeIdentifier(email)
+    const duplicate = await this.prisma.user.findFirst({
+      where: { emailNormalized, id: { not: session.userId } },
+      select: { id: true },
+    })
+    if (duplicate) {
+      throw new ApiHttpException(HttpStatus.CONFLICT, {
+        code: ERROR_CODES.CONFLICT,
+        message: '该邮箱已被其他账号绑定',
+      })
+    }
+
+    const before = {
+      displayName: session.user.displayName,
+      email: session.user.email,
+      bio: session.user.bio,
+    }
+    const user = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: session.userId },
+        data: {
+          displayName: body.displayName.trim(),
+          email,
+          emailNormalized,
+          bio: body.bio?.trim() || null,
+        },
+        include: userInclude,
+      })
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          actorType: AuditActorType.USER,
+          actorUserId: session.userId,
+          actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+            role,
+            scopeType,
+            scopeId,
+          })),
+          action: 'PROFILE_UPDATED',
+          targetType: 'User',
+          targetId: session.userId,
+          beforeSummary: before,
+          afterSummary: {
+            displayName: updated.displayName,
+            email: updated.email,
+            bio: updated.bio,
+          },
+          reason: '用户修改个人资料',
+          requestId: request.requestId,
+          ipAddress: request.ip ?? null,
+          userAgent: request.userAgent?.slice(0, 512) ?? null,
+          source: 'API',
+        },
+      })
+      return updated
+    })
+    return mapAuthUser(user, session.organizationId)
   }
 
   async resetPasswordByIdentity(
@@ -356,7 +451,17 @@ export class AuthService {
       where: { organizationId: session.organizationId, status: 'ACTIVE' },
       include: {
         user: {
-          include: { roleAssignments: { where: { revokedAt: null } } },
+          include: {
+            roleAssignments: {
+              where: {
+                revokedAt: null,
+                OR: [
+                  { organizationId: session.organizationId },
+                  { organizationId: null, role: 'PLATFORM_ADMIN' },
+                ],
+              },
+            },
+          },
         },
       },
       orderBy: [{ user: { realName: 'asc' } }, { user: { displayName: 'asc' } }],
@@ -404,37 +509,62 @@ const userInclude = {
   roleAssignments: { where: { revokedAt: null } },
 } as const
 
-function mapAuthUser(user: {
-  id: string
-  loginNameNormalized: string | null
-  displayName: string
-  realName: string | null
-  studentId: string | null
-  email: string | null
-  bio: string | null
-  verificationLevel: string
-  playerProfile: { id: string; displayName: string; position: string | null } | null
-  roleAssignments: Array<{ role: string; scopeType: string; scopeId: string }>
-}): AuthUserDto {
+function mapAuthUser(
+  user: {
+    id: string
+    loginNameNormalized: string | null
+    displayName: string
+    realName: string | null
+    studentId: string | null
+    email: string | null
+    bio: string | null
+    avatarUrl: string | null
+    verificationLevel: string
+    playerProfile: {
+      id: string
+      organizationId: string
+      displayName: string
+      position: string | null
+      avatarUrl: string | null
+    } | null
+    roleAssignments: Array<{
+      organizationId: string | null
+      role: string
+      scopeType: string
+      scopeId: string
+    }>
+  },
+  organizationId: string,
+): AuthUserDto {
+  const roles = user.roleAssignments.filter(
+    (assignment) =>
+      assignment.organizationId === organizationId ||
+      (assignment.role === 'PLATFORM_ADMIN' && assignment.organizationId === null),
+  )
+  const linkedPlayer =
+    user.playerProfile?.organizationId === organizationId ? user.playerProfile : null
   return {
     id: user.id,
+    organizationId,
     username: user.loginNameNormalized ?? '',
     displayName: user.displayName,
     realName: user.realName,
     studentId: user.studentId,
     email: user.email,
     bio: user.bio,
+    avatarUrl: user.avatarUrl,
     verificationLevel: user.verificationLevel,
-    roles: user.roleAssignments.map((assignment) => ({
+    roles: roles.map((assignment) => ({
       role: assignment.role,
       scopeType: assignment.scopeType,
       scopeId: assignment.scopeId,
     })),
-    linkedPlayer: user.playerProfile
+    linkedPlayer: linkedPlayer
       ? {
-          id: user.playerProfile.id,
-          displayName: user.playerProfile.displayName,
-          position: user.playerProfile.position,
+          id: linkedPlayer.id,
+          displayName: linkedPlayer.displayName,
+          position: linkedPlayer.position,
+          avatarUrl: linkedPlayer.avatarUrl,
         }
       : null,
   }

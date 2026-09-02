@@ -6,23 +6,32 @@ import type {
   AuthSession,
   AuthUser,
   CompetitionDataResponse,
+  CaptainWorkspaceResponse,
+  ConversationListResponse,
   HomeResponse,
   LikeResponse,
+  MessageListResponse,
+  MessageUser,
   MatchExperienceResponse,
   PlayerDetailResponse,
+  PlayerFollowsResponse,
   PostComment,
   PostDetail,
   PostSummary,
   RegisterInput,
   SearchCategory,
   SearchResponse,
+  NotificationResponse,
+  ReportListResponse,
+  ReportTargetType,
   TeamDashboardResponse,
   TeamPreferencesResponse,
+  TeamRelationshipResponse,
 } from './product.types'
 
 const DEFAULT_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001'
 
-class ProductApiError extends Error {
+export class ProductApiError extends Error {
   constructor(
     message: string,
     readonly statusCode: number,
@@ -82,6 +91,24 @@ export const productRepository = {
 
   getMe: () => request<AuthUser>('/auth/me'),
 
+  updateProfile: async (displayName: string, email: string, bio: string) => {
+    const user = await request<AuthUser>('/auth/me', {
+      method: 'PATCH',
+      data: { displayName, email, bio },
+    })
+    refreshStoredUser(user)
+    return user
+  },
+
+  uploadAvatar: async (dataUrl: string) => {
+    const result = await request<{ user: AuthUser; avatar: { avatarUrl: string } }>('/me/avatar', {
+      method: 'PUT',
+      data: { dataUrl },
+    })
+    refreshStoredUser(result.user)
+    return result
+  },
+
   resetPasswordByIdentity: (realName: string, studentId: string, newPassword: string) =>
     request<void>('/auth/password/reset-by-identity', {
       method: 'POST',
@@ -114,26 +141,125 @@ export const productRepository = {
       data: { primaryTeamId, followedTeamIds },
     }),
 
-  createPost: (body: string, title?: string) =>
+  createPost: (body: string, clientPostId: string, title?: string, teamId?: string) =>
     request<PostSummary>('/community/posts', {
       method: 'POST',
-      data: { body, ...(title ? { title } : {}) },
+      data: {
+        body,
+        clientPostId,
+        ...(title ? { title } : {}),
+        ...(teamId ? { teamId } : {}),
+      },
     }),
 
-  toggleLike: (postId: string) =>
+  setLike: (postId: string, liked: boolean) =>
     request<LikeResponse>(`/community/posts/${encodeURIComponent(postId)}/like`, {
-      method: 'POST',
+      method: liked ? 'PUT' : 'DELETE',
     }),
 
-  createComment: (postId: string, body: string) =>
+  createComment: (
+    postId: string,
+    body: string,
+    clientCommentId: string,
+    parentCommentId?: string,
+  ) =>
     request<PostComment>(`/community/posts/${encodeURIComponent(postId)}/comments`, {
       method: 'POST',
-      data: { body },
+      data: { body, clientCommentId, ...(parentCommentId ? { parentCommentId } : {}) },
+    }),
+
+  getPlayerFollows: () => request<PlayerFollowsResponse>('/me/player-follows'),
+  followPlayer: (playerId: string) =>
+    request<PlayerFollowsResponse>(`/me/player-follows/${encodeURIComponent(playerId)}`, {
+      method: 'PUT',
+    }),
+  unfollowPlayer: (playerId: string) =>
+    request<PlayerFollowsResponse>(`/me/player-follows/${encodeURIComponent(playerId)}`, {
+      method: 'DELETE',
+    }),
+
+  getTeamRelationship: (teamId: string) =>
+    request<TeamRelationshipResponse>(`/teams/${encodeURIComponent(teamId)}/relationship`),
+  applyToTeam: (teamId: string, requestedPosition: string, message: string) =>
+    request<TeamRelationshipResponse>(`/teams/${encodeURIComponent(teamId)}/join-applications`, {
+      method: 'POST',
+      data: {
+        ...(requestedPosition ? { requestedPosition } : {}),
+        ...(message.trim() ? { message: message.trim() } : {}),
+      },
+    }),
+  getCaptainWorkspace: (teamId: string) =>
+    request<CaptainWorkspaceResponse>(`/captain/teams/${encodeURIComponent(teamId)}`),
+  reviewTeamApplication: (teamId: string, applicationId: string, decision: string, note = '') =>
+    request<CaptainWorkspaceResponse>(
+      `/captain/teams/${encodeURIComponent(teamId)}/applications/${encodeURIComponent(applicationId)}`,
+      { method: 'PUT', data: { decision, ...(note.trim() ? { note: note.trim() } : {}) } },
+    ),
+  updateTeamMember: (teamId: string, membershipId: string, position: string) =>
+    request<CaptainWorkspaceResponse>(
+      `/captain/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(membershipId)}`,
+      { method: 'PUT', data: { position } },
+    ),
+  removeTeamMember: (teamId: string, membershipId: string) =>
+    request<CaptainWorkspaceResponse>(
+      `/captain/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(membershipId)}`,
+      { method: 'DELETE' },
+    ),
+
+  getNotifications: () => request<NotificationResponse>('/me/notifications'),
+  readNotification: (notificationId: string) =>
+    request<NotificationResponse>(`/me/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'PUT',
+    }),
+  readAllNotifications: () =>
+    request<NotificationResponse>('/me/notifications/read-all', { method: 'PUT' }),
+
+  createReport: (
+    targetType: ReportTargetType,
+    reason: string,
+    details: string,
+    clientReportId: string,
+    targetId?: string,
+  ) =>
+    request('/reports', {
+      method: 'POST',
+      data: {
+        clientReportId,
+        targetType,
+        reason,
+        ...(details.trim() ? { details: details.trim() } : {}),
+        ...(targetId ? { targetId } : {}),
+      },
+    }),
+  getMyReports: () => request<ReportListResponse>('/me/reports'),
+  getAdminReports: () => request<ReportListResponse>('/admin/reports'),
+  reviewReport: (reportId: string, status: string, resolution: string, hideContent: boolean) =>
+    request<ReportListResponse>(`/admin/reports/${encodeURIComponent(reportId)}`, {
+      method: 'PUT',
+      data: { status, resolution, hideContent },
+    }),
+
+  getMessageDirectory: (query = '') =>
+    request<{ items: MessageUser[] }>(
+      `/messages/directory${query.trim() ? `?query=${encodeURIComponent(query.trim())}` : ''}`,
+    ),
+  getConversations: () => request<ConversationListResponse>('/messages/conversations'),
+  getMessages: (conversationId: string) =>
+    request<MessageListResponse>(`/messages/conversations/${encodeURIComponent(conversationId)}`),
+  readConversation: (conversationId: string) =>
+    request<MessageListResponse>(
+      `/messages/conversations/${encodeURIComponent(conversationId)}/read`,
+      { method: 'PUT' },
+    ),
+  sendMessage: (recipientUserId: string, body: string, clientMessageId: string) =>
+    request<{ conversationId: string }>(`/messages/direct/${encodeURIComponent(recipientUserId)}`, {
+      method: 'POST',
+      data: { body, clientMessageId },
     }),
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   data?: unknown
   authenticated?: boolean
 }
@@ -147,7 +273,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     header: {
       'content-type': 'application/json',
       'x-dev-organization-id':
-        process.env.TARO_APP_ORGANIZATION_ID?.trim() || DEFAULT_ORGANIZATION_ID,
+        (session?.user.organizationId ?? process.env.TARO_APP_ORGANIZATION_ID?.trim()) ||
+        DEFAULT_ORGANIZATION_ID,
       ...(options.authenticated !== false && session?.accessToken
         ? { Authorization: `Bearer ${session.accessToken}` }
         : {}),
@@ -172,6 +299,25 @@ function getApiBaseUrl(): string {
   }
   const normalized = configured.replace(/\/+$/, '')
   return normalized.endsWith('/api') ? normalized : `${normalized}/api`
+}
+
+export function resolveMediaUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:'))
+    return path
+  const base = getApiBaseUrl()
+  return path.startsWith('/api/')
+    ? `${base.replace(/\/api$/, '')}${path}`
+    : `${base}/${path.replace(/^\/+/, '')}`
+}
+
+export function createClientActionId(scope: string): string {
+  return `${scope}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function refreshStoredUser(user: AuthUser): void {
+  const session = readSession()
+  if (session) saveSession({ ...session, user })
 }
 
 function readErrorMessage(data: unknown, statusCode: number): string {

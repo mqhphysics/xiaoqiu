@@ -48,6 +48,8 @@ export interface PostAuthor {
   id: string
   displayName: string
   verificationLevel: string
+  avatarUrl: string | null
+  messageable: boolean
 }
 
 export interface PostSummary {
@@ -57,6 +59,7 @@ export interface PostSummary {
   body: string
   publishedAt: string
   author: PostAuthor
+  team: TeamSummary | null
   likeCount: number
   commentCount: number
   likedByMe: boolean
@@ -65,6 +68,7 @@ export interface PostSummary {
 export interface PostComment {
   id: string
   body: string
+  parentCommentId: string | null
   createdAt: string
   author: PostAuthor
 }
@@ -81,18 +85,21 @@ export interface AuthRole {
 
 export interface AuthUser {
   id: string
+  organizationId: string
   username: string
   displayName: string
   realName: string | null
   studentId: string | null
   email: string | null
   bio: string | null
+  avatarUrl: string | null
   verificationLevel: string
   roles: AuthRole[]
   linkedPlayer: {
     id: string
     displayName: string
     position: string | null
+    avatarUrl: string | null
   } | null
 }
 
@@ -223,6 +230,7 @@ export interface TeamDashboardResponse {
     points: number
     goalDifference: number
   }
+  posts: PostSummary[]
   recentMatches: MatchSummary[]
   upcomingMatches: MatchSummary[]
   roster: Array<{
@@ -235,6 +243,7 @@ export interface TeamDashboardResponse {
     academicYear: string | null
     heightCm: number | null
     profileColor: string | null
+    avatarUrl: string | null
     appearances: number
     goals: number
     assists: number
@@ -255,6 +264,7 @@ export interface PlayerDetailResponse {
   hometown: string | null
   bio: string | null
   profileColor: string | null
+  avatarUrl: string | null
   team: TeamSummary | null
   tournamentName: string | null
   stats: PlayerStats
@@ -316,6 +326,7 @@ export interface SearchResponse {
     position: string | null
     academicYear: string | null
     profileColor: string | null
+    avatarUrl: string | null
     team: TeamSummary | null
   }>
   teams: TeamSummary[]
@@ -326,4 +337,127 @@ export interface SearchResponse {
 export interface LikeResponse {
   liked: boolean
   likeCount: number
+}
+
+export interface PlayerFollowItem {
+  id: string
+  displayName: string
+  position: string | null
+  avatarUrl: string | null
+  profileColor: string | null
+  team: TeamSummary | null
+}
+
+export interface PlayerFollowsResponse {
+  items: PlayerFollowItem[]
+}
+
+export interface TeamRelationshipResponse {
+  isCaptain: boolean
+  membershipStatus: string | null
+  application: {
+    id: string
+    status: string
+    requestedPosition: string | null
+    message: string | null
+    decisionNote: string | null
+    updatedAt: string
+  } | null
+}
+
+export interface CaptainWorkspaceResponse {
+  team: TeamSummary
+  members: Array<{
+    id: string
+    userId: string | null
+    playerId: string | null
+    displayName: string
+    avatarUrl: string | null
+    position: string | null
+    isCaptain: boolean
+  }>
+  applications: Array<{
+    id: string
+    applicant: { id: string; displayName: string; avatarUrl: string | null }
+    player: { id: string; displayName: string; avatarUrl: string | null } | null
+    requestedPosition: string | null
+    message: string | null
+    status: string
+    decisionNote: string | null
+    createdAt: string
+  }>
+}
+
+export interface NotificationResponse {
+  unreadCount: number
+  items: Array<{
+    id: string
+    type: string
+    title: string
+    body: string | null
+    linkPath: string | null
+    readAt: string | null
+    createdAt: string
+    actor: { id: string; displayName: string; avatarUrl: string | null } | null
+  }>
+}
+
+export type ReportTargetType =
+  | 'POST'
+  | 'COMMENT'
+  | 'MATCH_REVIEW'
+  | 'DIRECT_MESSAGE'
+  | 'USER'
+  | 'FEEDBACK'
+
+export interface ReportItem {
+  id: string
+  targetType: ReportTargetType
+  targetId: string | null
+  reason: string
+  details: string | null
+  status: string
+  resolution: string | null
+  actionTaken: string | null
+  createdAt: string
+  updatedAt: string
+  targetPreview?: {
+    title: string
+    body: string | null
+    linkPath: string | null
+  } | null
+  reporter?: { id: string; displayName: string; avatarUrl: string | null }
+  handledBy?: { id: string; displayName: string } | null
+}
+
+export interface ReportListResponse {
+  items: ReportItem[]
+}
+
+export interface MessageUser {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export interface ConversationListResponse {
+  items: Array<{
+    id: string
+    counterpart: MessageUser
+    lastMessageAt: string | null
+    latestMessage: { id: string; body: string; isMine: boolean; createdAt: string } | null
+    unreadCount: number
+  }>
+}
+
+export interface MessageListResponse {
+  conversation: { id: string; counterpart: MessageUser }
+  items: Array<{
+    id: string
+    clientMessageId: string
+    body: string
+    isMine: boolean
+    readAt: string | null
+    createdAt: string
+  }>
 }

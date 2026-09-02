@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -12,15 +13,17 @@ import {
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiCreatedResponse,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger'
 
 import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
-import type {
+import {
   CreateCommentDto,
   CreateMatchReviewDto,
   CreatePostDto,
@@ -48,6 +51,7 @@ export class ExperienceController {
   @Get('public/search')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '按球员、球队、比赛和动态搜索' })
+  @ApiQuery({ type: SearchQueryDto })
   search(
     @Headers('x-dev-organization-id') organizationId: string | undefined,
     @Query() query: SearchQueryDto,
@@ -80,6 +84,7 @@ export class ExperienceController {
   @ApiOperation({ summary: '读取球队战绩、赛程与完整名单' })
   teamDashboard(
     @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
     @Param('teamId') teamId: string,
     @Query('tournamentId') tournamentId: string | undefined,
   ) {
@@ -87,6 +92,7 @@ export class ExperienceController {
       resolveOrganizationId(organizationId),
       teamId,
       tournamentId,
+      authorization,
     )
   }
 
@@ -125,6 +131,7 @@ export class ExperienceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '提交或更新当前用户的比赛评分' })
   @ApiOkResponse({ description: '更新后的比赛体验数据' })
+  @ApiBody({ type: CreateMatchReviewDto })
   reviewMatch(
     @Headers('authorization') authorization: string | undefined,
     @Param('matchId') matchId: string,
@@ -168,6 +175,7 @@ export class ExperienceController {
   @Put('me/team-preferences')
   @ApiBearerAuth()
   @ApiOperation({ summary: '保存当前用户主队与关注球队' })
+  @ApiBody({ type: UpdateTeamPreferencesDto })
   updateTeamPreferences(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: UpdateTeamPreferencesDto,
@@ -179,6 +187,7 @@ export class ExperienceController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '发布社区动态' })
   @ApiCreatedResponse({ description: '已发布动态' })
+  @ApiBody({ type: CreatePostDto })
   createPost(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: CreatePostDto,
@@ -186,20 +195,32 @@ export class ExperienceController {
     return this.experienceService.createPost(authorization, body)
   }
 
-  @Post('community/posts/:postId/like')
+  @Put('community/posts/:postId/like')
   @HttpCode(200)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '切换动态点赞状态' })
+  @ApiOperation({ summary: '将动态设为已点赞（可安全重试）' })
   like(
     @Headers('authorization') authorization: string | undefined,
     @Param('postId') postId: string,
   ) {
-    return this.experienceService.toggleLike(authorization, postId)
+    return this.experienceService.setLike(authorization, postId, true)
+  }
+
+  @Delete('community/posts/:postId/like')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '将动态设为未点赞（可安全重试）' })
+  unlike(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+  ) {
+    return this.experienceService.setLike(authorization, postId, false)
   }
 
   @Post('community/posts/:postId/comments')
   @ApiBearerAuth()
   @ApiOperation({ summary: '发表评论' })
+  @ApiBody({ type: CreateCommentDto })
   createComment(
     @Headers('authorization') authorization: string | undefined,
     @Param('postId') postId: string,

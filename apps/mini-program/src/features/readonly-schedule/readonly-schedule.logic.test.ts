@@ -130,7 +130,7 @@ test('schedule card and team areas resolve separate destinations and stop bubbli
   )
   assert.equal(stopped, 1)
   assert.equal(teamDetailUrl(event, null, 'tournament / 1'), null)
-  assert.equal(stopped, 2)
+  assert.equal(stopped, 1)
 })
 
 test('bracket layout connects a 16-team champion path and isolates third place', () => {
