@@ -5,6 +5,37 @@ import type { Prisma } from '../generated/prisma/client'
 import { hashPassword } from '../auth/password'
 import { DEMO_ACCOUNTS, DEMO_PASSWORD, DEMO_PLAYERS, DEMO_POSTS, fixtureId } from './demo-fixture'
 
+export const DEMO_MATCH_REVIEWS = [
+  {
+    matchCode: 'GC26-SF-01',
+    username: 'student',
+    rating: 5,
+    body: '淘汰赛强度一下就上来了，双方最后二十分钟都踢得很有内容。',
+    createdAt: '2026-09-01T21:20:00+08:00',
+  },
+  {
+    matchCode: 'GC26-SF-01',
+    username: 'player',
+    rating: 4,
+    body: '攻防转换很快，一队对第二落点的控制是胜负关键。',
+    createdAt: '2026-09-01T21:35:00+08:00',
+  },
+  {
+    matchCode: 'GC26-SF-01',
+    username: 'reporter',
+    rating: 5,
+    body: '现场节奏和看台氛围都很好，比赛事件已经完成复核。',
+    createdAt: '2026-09-01T21:50:00+08:00',
+  },
+  {
+    matchCode: 'GC26-A-R1-01',
+    username: 'captain',
+    rating: 4,
+    body: '德比踢得很艰苦，感谢两边同学在赛后互相致意。',
+    createdAt: '2026-08-24T20:30:00+08:00',
+  },
+] as const
+
 export async function seedDemoAccountsAndCommunity(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -187,43 +218,17 @@ export async function seedDemoAccountsAndCommunity(
     })
   }
 
-  const reviewFixtures = [
-    {
-      matchCode: 'GC26-SF-01',
-      username: 'student',
-      rating: 5,
-      body: '淘汰赛强度一下就上来了，双方最后二十分钟都踢得很有内容。',
-    },
-    {
-      matchCode: 'GC26-SF-01',
-      username: 'player',
-      rating: 4,
-      body: '攻防转换很快，一队对第二落点的控制是胜负关键。',
-    },
-    {
-      matchCode: 'GC26-SF-01',
-      username: 'reporter',
-      rating: 5,
-      body: '现场节奏和看台氛围都很好，比赛事件已经完成复核。',
-    },
-    {
-      matchCode: 'GC26-A-R1-01',
-      username: 'captain',
-      rating: 4,
-      body: '德比踢得很艰苦，感谢两边同学在赛后互相致意。',
-    },
-  ] as const
   const reviewMatches = await tx.match.findMany({
     where: {
       organizationId,
       tournamentId,
-      matchCode: { in: [...new Set(reviewFixtures.map((review) => review.matchCode))] },
+      matchCode: { in: [...new Set(DEMO_MATCH_REVIEWS.map((review) => review.matchCode))] },
     },
     select: { id: true, matchCode: true },
   })
   const matchesByCode = new Map(reviewMatches.map((match) => [match.matchCode, match.id]))
 
-  for (const [index, review] of reviewFixtures.entries()) {
+  for (const review of DEMO_MATCH_REVIEWS) {
     const matchId = matchesByCode.get(review.matchCode)
     const userId = usersByUsername.get(review.username)
     if (!matchId || !userId) continue
@@ -236,9 +241,13 @@ export async function seedDemoAccountsAndCommunity(
         userId,
         rating: review.rating,
         body: review.body,
-        createdAt: new Date(`2026-08-31T${18 + index}:15:00+08:00`),
+        createdAt: new Date(review.createdAt),
       },
-      update: { rating: review.rating, body: review.body },
+      update: {
+        rating: review.rating,
+        body: review.body,
+        createdAt: new Date(review.createdAt),
+      },
     })
   }
 }

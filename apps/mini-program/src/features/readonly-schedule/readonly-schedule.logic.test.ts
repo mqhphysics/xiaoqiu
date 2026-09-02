@@ -12,6 +12,13 @@ import {
   sortMatchesByStartAt,
 } from './readonly-schedule.logic.ts'
 import type { ReadonlyMatch, ReadonlyTeamSummary } from './readonly-schedule.types.ts'
+import {
+  createBracketLayout,
+  filterAndSortSchedule,
+  matchDetailUrl,
+  teamDetailUrl,
+} from '../competition/competition.logic.ts'
+import type { MatchSummary } from '../product/product.types.ts'
 
 const matches: ReadonlyMatch[] = [
   createMatch('m-3', '2026-07-02T09:00:00+08:00', '八强赛', 'CANCELLED'),
@@ -86,6 +93,81 @@ test('focus match prefers live then the next scheduled match', () => {
   assert.equal(findFocusMatch(withoutLive, new Date('2026-07-01T08:00:00+08:00'))?.id, 'm-2')
 })
 
+test('competition schedule keeps all, upcoming and finished filters deterministic', () => {
+  const competitionMatches = [
+    createCompetitionMatch('finished', '2026-09-01T12:00:00+08:00', 'FINISHED'),
+    createCompetitionMatch('confirmed', '2026-09-02T12:00:00+08:00', 'CONFIRMED'),
+    createCompetitionMatch('scheduled', '2026-09-03T12:00:00+08:00', 'SCHEDULED'),
+    createCompetitionMatch('postponed', '2026-09-04T12:00:00+08:00', 'POSTPONED'),
+    createCompetitionMatch('live', '2026-09-05T12:00:00+08:00', 'LIVE'),
+  ]
+
+  assert.deepEqual(
+    filterAndSortSchedule(competitionMatches, 'all', 'asc').map((match) => match.id),
+    ['finished', 'confirmed', 'scheduled', 'postponed', 'live'],
+  )
+  assert.deepEqual(
+    filterAndSortSchedule(competitionMatches, 'upcoming', 'asc').map((match) => match.id),
+    ['scheduled', 'postponed'],
+  )
+  assert.deepEqual(
+    filterAndSortSchedule(competitionMatches, 'finished', 'desc').map((match) => match.id),
+    ['confirmed', 'finished'],
+  )
+})
+
+test('schedule card and team areas resolve separate destinations and stop bubbling', () => {
+  assert.equal(
+    matchDetailUrl('match / 1'),
+    '/pages/readonly-match-detail/index?matchId=match%20%2F%201',
+  )
+
+  let stopped = 0
+  const event = { stopPropagation: () => (stopped += 1) }
+  assert.equal(
+    teamDetailUrl(event, 'team / 1', 'tournament / 1'),
+    '/pages/readonly-team-detail/index?teamId=team%20%2F%201&tournamentId=tournament%20%2F%201',
+  )
+  assert.equal(stopped, 1)
+  assert.equal(teamDetailUrl(event, null, 'tournament / 1'), null)
+  assert.equal(stopped, 2)
+})
+
+test('bracket layout connects a 16-team champion path and isolates third place', () => {
+  const rounds = [
+    bracketRound('r16', '十六强', 8),
+    bracketRound('qf', '八强', 4),
+    bracketRound('sf', '半决赛', 2),
+    {
+      id: 'finals',
+      name: '决赛日',
+      matches: [
+        { id: 'final-1', matchCode: 'GC26-FINAL' },
+        { id: 'third-1', matchCode: 'GC26-THIRD' },
+      ],
+    },
+  ]
+  const layout = createBracketLayout(rounds)
+
+  assert.deepEqual(
+    layout.rounds.map((round) => round.name),
+    ['十六强', '八强', '半决赛', '决赛日'],
+  )
+  assert.equal(layout.nodes.filter((node) => node.roundIndex === 0).length, 8)
+  assert.equal(layout.nodes.filter((node) => node.roundIndex === 1).length, 4)
+  assert.equal(layout.nodes.filter((node) => node.roundIndex === 2).length, 2)
+  assert.equal(layout.nodes.find((node) => node.matchId === 'third-1')?.placement, true)
+  assert.equal(
+    layout.connectors.some((connector) => connector.targetMatchId === 'third-1'),
+    false,
+  )
+
+  for (const connector of layout.connectors) {
+    assert.ok(connector.width >= 0)
+    assert.ok(connector.height >= 0)
+  }
+})
+
 function createMatch(
   id: string,
   scheduledStartAt: string,
@@ -123,5 +205,39 @@ function createTeam(
     registrationStatus: 'APPROVED',
     rosterStatus: 'LOCKED',
     rosterPlayerCount: 18,
+  }
+}
+
+function createCompetitionMatch(
+  id: string,
+  scheduledStartAt: string,
+  status: MatchSummary['status'],
+): MatchSummary {
+  return {
+    id,
+    tournamentId: 'tournament-1',
+    matchCode: id,
+    title: id,
+    status,
+    scheduledStartAt,
+    homeTeam: null,
+    awayTeam: null,
+    homeScore: null,
+    awayScore: null,
+    homePenaltyScore: null,
+    awayPenaltyScore: null,
+    statusReason: null,
+    venue: null,
+  }
+}
+
+function bracketRound(id: string, name: string, count: number) {
+  return {
+    id,
+    name,
+    matches: Array.from({ length: count }, (_, index) => ({
+      id: `${id}-${index + 1}`,
+      matchCode: `GC26-${id.toUpperCase()}-${String(index + 1).padStart(2, '0')}`,
+    })),
   }
 }

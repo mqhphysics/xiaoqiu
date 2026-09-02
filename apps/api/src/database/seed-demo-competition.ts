@@ -33,6 +33,20 @@ export interface SeedTournamentFixture {
   rounds: Record<string, string>
 }
 
+export const DEMO_STARTERS_PER_TEAM = 8
+
+export function isDemoMatchStarter(playerIndex: number): boolean {
+  return playerIndex < DEMO_STARTERS_PER_TEAM
+}
+
+export function getDemoMinutesPlayed(playerIndex: number, matchMinutes: number): number {
+  if (playerIndex < 6) return matchMinutes
+  const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
+  if (playerIndex < 8) return substitutionMinute
+  if (playerIndex < 10) return matchMinutes - substitutionMinute
+  return 0
+}
+
 export async function seedDemoTournament(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -174,7 +188,8 @@ export async function seedDemoTournament(
     }
   }
 
-  const knockoutRoundNames = year === '2026' ? ['半决赛', '决赛日'] : ['八强赛', '半决赛', '决赛日']
+  const knockoutRoundNames =
+    year === '2026' ? ['十六强', '八强赛', '半决赛', '决赛日'] : ['八强赛', '半决赛', '决赛日']
   for (const [index, name] of knockoutRoundNames.entries()) {
     const number = index + 1
     const id = fixtureId(`round:${year}:knockout:${number}`)
@@ -240,7 +255,26 @@ export async function seedDemoRosters(
   fixture: SeedTournamentFixture,
   teams: Array<{ id: string }>,
 ): Promise<void> {
-  for (const [teamIndex, team] of teams.entries()) {
+  const participatingTeams = fixture.year === '2026' ? teams : teams.slice(0, 8)
+  const coachSurnames = [
+    '王',
+    '李',
+    '赵',
+    '冯',
+    '陆',
+    '秦',
+    '顾',
+    '严',
+    '沈',
+    '江',
+    '陶',
+    '白',
+    '杜',
+    '夏',
+    '乔',
+    '孟',
+  ]
+  for (const [teamIndex, team] of participatingTeams.entries()) {
     const definition = DEMO_TEAMS[teamIndex]!
     const teamPlayers = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
     const registrationId = fixtureId(`registration:${fixture.year}:${definition.code}`)
@@ -249,6 +283,11 @@ export async function seedDemoRosters(
     const sourceFileHash = createHash('sha256')
       .update(`DEMO_FIXTURE:${fixture.year}:${definition.code}`)
       .digest('hex')
+    const groupId =
+      fixture.year === '2026' && teamIndex < 8
+        ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null)
+        : null
+    const coachDisplayName = `${coachSurnames[teamIndex] ?? '林'}教练`
 
     await tx.teamRegistration.upsert({
       where: { tournamentId_teamId: { tournamentId: fixture.id, teamId: team.id } },
@@ -257,19 +296,17 @@ export async function seedDemoRosters(
         organizationId,
         tournamentId: fixture.id,
         teamId: team.id,
-        groupId:
-          fixture.year === '2026' ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null) : null,
+        groupId,
         status: TeamRegistrationStatus.APPROVED,
         leaderDisplayName: teamPlayers[6]!.displayName,
-        coachDisplayName: `${['王', '李', '赵', '冯', '陆', '秦', '顾', '严'][teamIndex]}教练`,
+        coachDisplayName,
         approvedAt: new Date(`${fixture.year}-04-15T10:00:00+08:00`),
       },
       update: {
-        groupId:
-          fixture.year === '2026' ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null) : null,
+        groupId,
         status: TeamRegistrationStatus.APPROVED,
         leaderDisplayName: teamPlayers[6]!.displayName,
-        coachDisplayName: `${['王', '李', '赵', '冯', '陆', '秦', '顾', '严'][teamIndex]}教练`,
+        coachDisplayName,
         approvedAt: new Date(`${fixture.year}-04-15T10:00:00+08:00`),
       },
     })
@@ -427,7 +464,7 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
-        ? '8 支球队分为 2 组，小组前 2 名进入半决赛；胜 3 分、平 1 分、负 0 分。'
+        ? '前 8 支球队的小组赛记录作为历史数据保留；为完整演示淘汰树，淘汰阶段假设 16 支球队均已入围并使用演示签位，不表示由现存小组赛成绩自然晋级。冠军主线依次进行十六强、八强、半决赛和决赛，三四名赛为独立支线。'
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
@@ -464,13 +501,8 @@ async function seedMatchFacts(
         teamId: teams[teamIndex]!.id,
         playerId: player.id,
         shirtNumber: player.shirtNumber,
-        starter: index < 11,
-        minutesPlayed:
-          index < 8
-            ? matchMinutes
-            : index < 11
-              ? Math.min(matchMinutes, 68 + index * 2)
-              : Math.max(0, matchMinutes - (68 + (index - 11) * 6)),
+        starter: isDemoMatchStarter(index),
+        minutesPlayed: getDemoMinutesPlayed(index, matchMinutes),
       }))
     }),
   })
@@ -483,7 +515,7 @@ async function seedMatchFacts(
   for (const pair of scorePairs) {
     const players = DEMO_PLAYERS.filter((player) => player.teamIndex === pair.teamIndex)
     for (let goalIndex = 0; goalIndex < pair.score; goalIndex += 1) {
-      const scorer = players[10 + ((matchIndex + goalIndex) % 4)]!
+      const scorer = players[4 + ((matchIndex + goalIndex) % 6)]!
       const assister = players[6 + ((matchIndex + goalIndex * 2) % 4)]!
       const minute = Math.min(
         matchMinutes,

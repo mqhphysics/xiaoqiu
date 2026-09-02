@@ -1,10 +1,11 @@
 import { Button, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
+import { createBracketLayout } from '../../features/competition/competition.logic'
 import { formatDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import type {
@@ -106,6 +107,11 @@ export default function DataCenterPage() {
                 {view.label}
               </Button>
             ))}
+          </View>
+
+          <View className="data-context-note">
+            <Text>胜 3 分 · 平 1 分 · 同分优先比较净胜球</Text>
+            <Text>数据更新于 {formatDataTimestamp(state.data.updatedAt)}</Text>
           </View>
 
           {mode === 'overview' && (
@@ -281,7 +287,7 @@ function StandingTableRow({ row }: { row: StandingRow }) {
           className="standing-table__color"
           style={{ backgroundColor: row.primaryColor ?? '#758079' }}
         />
-        <Text>{row.shortName}</Text>
+        <Text>{row.teamName}</Text>
       </View>
       <Text>{row.played}</Text>
       <Text>
@@ -294,76 +300,100 @@ function StandingTableRow({ row }: { row: StandingRow }) {
 }
 
 function Bracket({ data }: { data: CompetitionDataResponse }) {
+  const layout = useMemo(() => createBracketLayout(data.bracket), [data.bracket])
+  const matches = useMemo(
+    () => new Map(data.bracket.flatMap((round) => round.matches).map((match) => [match.id, match])),
+    [data.bracket],
+  )
   if (data.bracket.length === 0) {
     return (
       <DataState kind="empty" title="暂无淘汰赛对阵" description="晋级席位确认后将在这里显示。" />
     )
   }
+  const openingRound = data.bracket[0]
+  const openingTeams =
+    openingRound?.matches.filter((match) => !match.matchCode.includes('THIRD')).length ?? 0
   return (
     <View className="bracket-page">
-      <ProductSection kicker="BRACKET" title="淘汰赛晋级树" note="从半决赛通往决赛" />
+      <ProductSection
+        kicker="BRACKET"
+        title="淘汰赛晋级树"
+        note={`${openingTeams} 场首轮 · 三四名赛独立支线`}
+      />
       <View className="bracket-scroll">
-        {data.bracket.map((round, roundIndex) => {
-          const orderedMatches = [...round.matches].sort((left, right) => {
-            const leftThird = left.matchCode.includes('THIRD') ? 1 : 0
-            const rightThird = right.matchCode.includes('THIRD') ? 1 : 0
-            return leftThird - rightThird
-          })
-          return (
-            <View className={`bracket-round bracket-round--${roundIndex}`} key={round.id}>
-              <Text className="bracket-round__title">
-                {roundIndex === 0 ? '半决赛' : '决赛阶段'}
-              </Text>
-              <View className="bracket-round__matches">
-                {orderedMatches.map((match) => {
-                  const isThirdPlace = match.matchCode.includes('THIRD')
-                  const slotClass = isThirdPlace
-                    ? 'bracket-match-slot bracket-match-slot--third'
-                    : roundIndex > 0
-                      ? 'bracket-match-slot bracket-match-slot--final'
-                      : 'bracket-match-slot'
-                  return (
-                    <View className={slotClass} key={match.id}>
-                      {roundIndex > 0 && (
-                        <Text className="bracket-match__label">
-                          {isThirdPlace ? '三四名决赛' : '冠军决赛'}
-                        </Text>
-                      )}
-                      <View
-                        className="bracket-match"
-                        onClick={() =>
-                          void Taro.navigateTo({
-                            url:
-                              '/pages/readonly-match-detail/index?matchId=' +
-                              encodeURIComponent(match.id),
-                          })
-                        }
-                      >
-                        <View className="bracket-match__meta">
-                          <Text>
-                            {formatDate(match.scheduledStartAt)}{' '}
-                            {formatTime(match.scheduledStartAt)}
-                          </Text>
-                          <MatchStatus status={match.status} />
-                        </View>
-                        <BracketTeam
-                          team={match.homeTeam}
-                          placeholder={match.homePlaceholder}
-                          score={match.homeScore}
-                        />
-                        <BracketTeam
-                          team={match.awayTeam}
-                          placeholder={match.awayPlaceholder}
-                          score={match.awayScore}
-                        />
-                      </View>
-                    </View>
-                  )
-                })}
+        <View
+          className="bracket-canvas"
+          style={{ width: `${layout.width}px`, height: `${layout.height}px` }}
+        >
+          {layout.rounds.map((round) => (
+            <Text
+              className="bracket-round__title"
+              key={round.id}
+              style={{ left: `${round.x}px`, width: `${round.width}px` }}
+            >
+              {round.name}
+            </Text>
+          ))}
+          {layout.connectors.map((connector) => (
+            <View
+              className={`bracket-connector bracket-connector--${connector.orientation}`}
+              key={connector.id}
+              style={{
+                left: `${connector.x}px`,
+                top: `${connector.y}px`,
+                width: `${connector.width}px`,
+                height: `${connector.height}px`,
+              }}
+            />
+          ))}
+          {layout.nodes.map((node) => {
+            const match = matches.get(node.matchId)
+            if (!match) return null
+            return (
+              <View
+                className={`bracket-match-slot ${node.placement ? 'bracket-match-slot--third' : ''}`}
+                key={node.id}
+                style={{
+                  left: `${node.x}px`,
+                  top: `${node.y}px`,
+                  width: `${node.width}px`,
+                  height: `${node.height}px`,
+                }}
+              >
+                {node.placement && (
+                  <Text className="bracket-match__label">三四名赛 · 独立支线</Text>
+                )}
+                <View
+                  className="bracket-match"
+                  onClick={() =>
+                    void Taro.navigateTo({
+                      url:
+                        '/pages/readonly-match-detail/index?matchId=' +
+                        encodeURIComponent(match.id),
+                    })
+                  }
+                >
+                  <View className="bracket-match__meta">
+                    <Text>
+                      {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
+                    </Text>
+                    <MatchStatus status={match.status} />
+                  </View>
+                  <BracketTeam
+                    team={match.homeTeam}
+                    placeholder={match.homePlaceholder}
+                    score={match.homeScore}
+                  />
+                  <BracketTeam
+                    team={match.awayTeam}
+                    placeholder={match.awayPlaceholder}
+                    score={match.awayScore}
+                  />
+                </View>
               </View>
-            </View>
-          )
-        })}
+            )
+          })}
+        </View>
       </View>
     </View>
   )
@@ -381,7 +411,7 @@ function BracketTeam({
   return (
     <View className="bracket-match__team">
       <TeamCrest team={team} size="small" />
-      <Text>{team?.shortName ?? placeholder ?? '待定'}</Text>
+      <Text>{team?.name ?? placeholder ?? '待定'}</Text>
       <Text>{score ?? '-'}</Text>
     </View>
   )
@@ -420,41 +450,59 @@ function Leaders({
           </Button>
         </View>
       </View>
-      <View className="leader-table surface">
-        <View className="leader-table__head">
-          <Text>排名</Text>
-          <Text>球员</Text>
-          <Text>球队</Text>
-          <Text>出场</Text>
-          <Text>{active === 'scorers' ? '进球' : '助攻'}</Text>
-        </View>
-        {rows.map((player, index) => (
-          <View
-            className="leader-table__row"
-            key={player.id}
-            onClick={() =>
-              void Taro.navigateTo({
-                url:
-                  '/pages/player-detail/index?playerId=' +
-                  encodeURIComponent(player.id) +
-                  '&tournamentId=' +
-                  encodeURIComponent(tournamentId),
-              })
-            }
-          >
-            <Text className="leader-table__rank">{index + 1}</Text>
-            <View className="leader-table__player">
-              <UserAvatar name={player.displayName} size="small" />
-              <Text>{player.displayName}</Text>
-            </View>
-            <Text>{player.team?.shortName ?? '-'}</Text>
-            <Text>{player.appearances}</Text>
-            <Text className="leader-table__value">
-              {active === 'scorers' ? player.goals : player.assists}
-            </Text>
+      {rows.length === 0 ? (
+        <DataState
+          kind="empty"
+          title={active === 'scorers' ? '暂无射手数据' : '暂无助攻数据'}
+          description="已结束比赛产生统计后将在这里显示。"
+        />
+      ) : (
+        <View className="leader-table surface">
+          <View className="leader-table__head">
+            <Text>排名</Text>
+            <Text>球员</Text>
+            <Text>球队</Text>
+            <Text>出场</Text>
+            <Text>{active === 'scorers' ? '进球' : '助攻'}</Text>
           </View>
-        ))}
-      </View>
+          {rows.map((player, index) => (
+            <View
+              className="leader-table__row"
+              key={player.id}
+              onClick={() =>
+                void Taro.navigateTo({
+                  url:
+                    '/pages/player-detail/index?playerId=' +
+                    encodeURIComponent(player.id) +
+                    '&tournamentId=' +
+                    encodeURIComponent(tournamentId),
+                })
+              }
+            >
+              <Text className="leader-table__rank">{index + 1}</Text>
+              <View className="leader-table__player">
+                <UserAvatar name={player.displayName} size="small" />
+                <Text>{player.displayName}</Text>
+              </View>
+              <Text>{player.team?.shortName ?? '-'}</Text>
+              <Text>{player.appearances}</Text>
+              <Text className="leader-table__value">
+                {active === 'scorers' ? player.goals : player.assists}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   )
+}
+
+function formatDataTimestamp(value: string): string {
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
