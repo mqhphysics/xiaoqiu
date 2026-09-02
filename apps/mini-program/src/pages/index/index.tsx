@@ -1,11 +1,10 @@
 import { Button, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import {
-  MatchCard,
   MatchStatus,
   PostCard,
   ProductSection,
@@ -17,6 +16,7 @@ import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
   HomeResponse,
+  MatchSummary,
   PostSummary,
   SearchCategory,
   SearchResponse,
@@ -41,11 +41,28 @@ export default function IndexPage() {
   const [state, setState] = useState<PageState>({ phase: 'loading' })
   const [searchText, setSearchText] = useState('')
   const [searchCategory, setSearchCategory] = useState<SearchCategory>('ALL')
+  const [searchMode, setSearchMode] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
   const [postBody, setPostBody] = useState('')
   const [publishing, setPublishing] = useState(false)
+  const searchRequestId = useRef(0)
+
+  useEffect(() => {
+    if (!composerOpen || typeof document === 'undefined') return
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setComposerOpen(false)
+    }
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [composerOpen])
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -63,23 +80,49 @@ export default function IndexPage() {
     void load()
   }, [load])
 
-  const handleSearch = async () => {
+  const handleSearch = async (category: SearchCategory = searchCategory) => {
     const query = searchText.trim()
+    const requestId = ++searchRequestId.current
+    setSearchMode(true)
     if (!query) {
+      setSearching(false)
       setSearchResult(null)
+      setSearchError(null)
       return
     }
     setSearching(true)
+    setSearchError(null)
     try {
-      setSearchResult(await productRepository.search(query, searchCategory))
+      const result = await productRepository.search(query, category)
+      if (requestId === searchRequestId.current) setSearchResult(result)
     } catch (error) {
-      await Taro.showToast({
-        title: error instanceof Error ? error.message : '搜索失败',
-        icon: 'none',
-      })
+      if (requestId === searchRequestId.current) {
+        setSearchError(error instanceof Error ? error.message : '搜索失败，请稍后重试。')
+      }
     } finally {
-      setSearching(false)
+      if (requestId === searchRequestId.current) setSearching(false)
     }
+  }
+
+  const handleCategoryChange = (category: SearchCategory) => {
+    setSearchCategory(category)
+    if (searchText.trim()) void handleSearch(category)
+  }
+
+  const handleSearchTextChange = (value: string) => {
+    setSearchText(value)
+    if (value.trim()) return
+    searchRequestId.current += 1
+    setSearching(false)
+    setSearchError(null)
+    setSearchResult(null)
+  }
+
+  const exitSearch = () => {
+    searchRequestId.current += 1
+    setSearchMode(false)
+    setSearching(false)
+    setSearchError(null)
   }
 
   const handleLike = async (post: PostSummary) => {
@@ -148,7 +191,7 @@ export default function IndexPage() {
   const tournamentId = state.phase === 'ready' ? state.data.tournament.id : undefined
 
   return (
-    <PublicShell active="home" tournamentId={tournamentId}>
+    <PublicShell active="home" tournamentId={tournamentId} onActiveReselect={exitSearch}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在进入晓球" />}
       {state.phase === 'failed' && (
         <DataState
@@ -158,26 +201,34 @@ export default function IndexPage() {
           onRetry={() => void load()}
         />
       )}
-      {state.phase === 'ready' && (
-        <HomeContent
-          composerOpen={composerOpen}
-          data={state.data}
-          postBody={postBody}
-          publishing={publishing}
-          searchCategory={searchCategory}
-          searching={searching}
-          searchResult={searchResult}
-          searchText={searchText}
-          onCategoryChange={setSearchCategory}
-          onCloseComposer={() => setComposerOpen(false)}
-          onLike={(post) => void handleLike(post)}
-          onOpenComposer={() => void openComposer()}
-          onPostBodyChange={setPostBody}
-          onPublish={() => void publishPost()}
-          onSearch={() => void handleSearch()}
-          onSearchTextChange={setSearchText}
-        />
-      )}
+      {state.phase === 'ready' &&
+        (searchMode ? (
+          <SearchExperience
+            category={searchCategory}
+            error={searchError}
+            query={searchText}
+            result={searchResult}
+            searching={searching}
+            tournamentId={state.data.tournament.id}
+            onBack={exitSearch}
+            onCategoryChange={handleCategoryChange}
+            onQueryChange={handleSearchTextChange}
+            onSearch={() => void handleSearch()}
+          />
+        ) : (
+          <HomeContent
+            composerOpen={composerOpen}
+            data={state.data}
+            postBody={postBody}
+            publishing={publishing}
+            onCloseComposer={() => setComposerOpen(false)}
+            onEnterSearch={() => setSearchMode(true)}
+            onLike={(post) => void handleLike(post)}
+            onOpenComposer={() => void openComposer()}
+            onPostBodyChange={setPostBody}
+            onPublish={() => void publishPost()}
+          />
+        ))}
     </PublicShell>
   )
 }
@@ -187,37 +238,25 @@ function HomeContent({
   data,
   postBody,
   publishing,
-  searchCategory,
-  searching,
-  searchResult,
-  searchText,
-  onCategoryChange,
   onCloseComposer,
+  onEnterSearch,
   onLike,
   onOpenComposer,
   onPostBodyChange,
   onPublish,
-  onSearch,
-  onSearchTextChange,
 }: {
   composerOpen: boolean
   data: HomeResponse
   postBody: string
   publishing: boolean
-  searchCategory: SearchCategory
-  searching: boolean
-  searchResult: SearchResponse | null
-  searchText: string
-  onCategoryChange: (category: SearchCategory) => void
   onCloseComposer: () => void
+  onEnterSearch: () => void
   onLike: (post: PostSummary) => void
   onOpenComposer: () => void
   onPostBodyChange: (value: string) => void
   onPublish: () => void
-  onSearch: () => void
-  onSearchTextChange: (value: string) => void
 }) {
-  const focus = data.focusMatches[0]
+  const focusMatches = selectFocusMatches(data.focusMatches)
   return (
     <View>
       <View className="experience-hero">
@@ -226,61 +265,35 @@ function HomeContent({
           <Text className="experience-hero__title">{data.tournament.name}</Text>
           <Text className="experience-hero__season">{data.tournament.seasonName}</Text>
         </View>
-        {focus && (
-          <View className="hero-scoreboard" onClick={() => void goToMatch(focus.id)}>
-            <View className="hero-scoreboard__meta">
-              <MatchStatus status={focus.status} />
-              <Text>
-                {formatDate(focus.scheduledStartAt)} {formatTime(focus.scheduledStartAt)}
-              </Text>
-            </View>
-            <View className="hero-scoreboard__teams">
-              <View className="hero-scoreboard__team">
-                <TeamCrest team={focus.homeTeam} size="large" />
-                <Text>{focus.homeTeam?.name ?? '主队待定'}</Text>
-              </View>
-              <View className="hero-scoreboard__score">
-                <Text>
-                  {focus.homeScore ?? '-'} : {focus.awayScore ?? '-'}
-                </Text>
-                <Text className="hero-scoreboard__stage">{focus.title}</Text>
-              </View>
-              <View className="hero-scoreboard__team">
-                <TeamCrest team={focus.awayTeam} size="large" />
-                <Text>{focus.awayTeam?.name ?? '客队待定'}</Text>
-              </View>
-            </View>
-            <Text className="hero-scoreboard__venue">{focus.venue?.name ?? '场地待定'}</Text>
-          </View>
-        )}
       </View>
 
-      <View className="global-search">
-        <View className="global-search__categories">
-          {searchCategories.map((item) => (
-            <Button
-              className={`search-category ${searchCategory === item.key ? 'search-category--active' : ''}`}
-              key={item.key}
-              onClick={() => onCategoryChange(item.key)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </View>
-        <View className="global-search__bar">
-          <Input
-            className="global-search__input"
-            confirmType="search"
-            placeholder="搜索球员、球队、比赛或动态"
-            value={searchText}
-            onConfirm={onSearch}
-            onInput={(event) => onSearchTextChange(event.detail.value)}
-          />
-          <Button className="global-search__submit" loading={searching} onClick={onSearch}>
-            搜索
-          </Button>
-        </View>
-        {searchResult && <SearchResults result={searchResult} tournamentId={data.tournament.id} />}
+      <View className="home-search-entry" onClick={onEnterSearch}>
+        <Text className="home-search-entry__icon">⌕</Text>
+        <Input
+          className="home-search-entry__input"
+          confirmType="search"
+          placeholder="搜索球员、球队、比赛或动态"
+          onFocus={onEnterSearch}
+        />
+        <Text className="home-search-entry__action">搜索</Text>
+      </View>
+
+      <View className="home-product-section">
+        <ProductSection
+          kicker="MATCH CENTRE"
+          title="焦点赛事"
+          actionLabel="查看全部"
+          onAction={() => void goToSchedule(data.tournament.id)}
+        />
+        {focusMatches.length > 0 ? (
+          <View className="focus-match-grid">
+            {focusMatches.map((match) => (
+              <CompactMatchCard match={match} key={match.id} />
+            ))}
+          </View>
+        ) : (
+          <DataState kind="empty" title="暂无焦点赛事" description="完整赛程发布后将在这里展示。" />
+        )}
       </View>
 
       {data.announcements.length > 0 && (
@@ -301,96 +314,218 @@ function HomeContent({
         </View>
       )}
 
-      <View className="home-product-section">
-        <ProductSection
-          kicker="MATCH CENTRE"
-          title="焦点赛事"
-          note={`${data.tournament.matchCount} 场赛程`}
-        />
-        <View className="focus-match-grid">
-          {data.focusMatches.map((match) => (
-            <MatchCard match={match} key={match.id} onClick={() => void goToMatch(match.id)} />
-          ))}
-        </View>
-      </View>
-
-      <View className="home-product-layout">
-        <View className="community-column">
-          <ProductSection kicker="CAMPUS FEED" title="绿茵动态" note="全校社区" />
-          <View className="community-feed surface">
-            {composerOpen && (
-              <View className="post-composer">
-                <View className="post-composer__head">
-                  <UserAvatar name={data.viewer?.displayName ?? '我'} size="small" />
-                  <Text>{data.viewer?.displayName ?? '发布动态'}</Text>
-                  <Button className="post-composer__close" onClick={onCloseComposer}>
-                    关闭
-                  </Button>
-                </View>
-                <Textarea
-                  className="post-composer__input"
-                  maxlength={500}
-                  placeholder="记录此刻的校园足球"
-                  value={postBody}
-                  onInput={(event) => onPostBodyChange(event.detail.value)}
-                />
-                <View className="post-composer__footer">
-                  <Text>{postBody.length}/500</Text>
-                  <Button
-                    className="button button--primary post-composer__submit"
-                    disabled={postBody.trim().length < 2 || publishing}
-                    loading={publishing}
-                    onClick={onPublish}
-                  >
-                    发布
-                  </Button>
-                </View>
-              </View>
-            )}
-            {data.posts.map((post) => (
+      <View className="community-column">
+        <ProductSection kicker="CAMPUS FEED" title="绿茵动态" note="全校社区" />
+        <Button className="composer-entry" onClick={onOpenComposer}>
+          <UserAvatar name={data.viewer?.displayName ?? '访客'} size="small" />
+          <Text className="composer-entry__placeholder">说点什么，记录此刻的校园足球</Text>
+          <Text className="composer-entry__action">发布</Text>
+        </Button>
+        <View className="community-feed">
+          {data.posts.length > 0 ? (
+            data.posts.map((post) => (
               <PostCard
                 key={post.id}
                 post={post}
                 onLike={() => onLike(post)}
                 onOpen={() => void goToPost(post.id)}
               />
-            ))}
-          </View>
-        </View>
-
-        <View className="team-column">
-          <ProductSection
-            kicker="TEAMS"
-            title="参赛球队"
-            note={`${data.tournament.teamCount} 支`}
-          />
-          <View className="team-directory surface">
-            {data.teams.map((team) => (
-              <View
-                className="team-directory__item"
-                key={team.id}
-                onClick={() => void goToTeam(team.id, data.tournament.id)}
-              >
-                <TeamCrest team={team} />
-                <View className="team-directory__copy">
-                  <Text className="team-directory__name">{team.name}</Text>
-                  <Text className="team-directory__college">{team.collegeName}</Text>
-                </View>
-                <Text className="team-directory__group">{team.groupName}</Text>
-              </View>
-            ))}
-          </View>
+            ))
+          ) : (
+            <DataState
+              kind="empty"
+              title="还没有绿茵动态"
+              description="登录后可以发布第一条动态。"
+            />
+          )}
         </View>
       </View>
 
-      {!composerOpen && (
-        <Button className="floating-publish" onClick={onOpenComposer}>
-          <Text className="floating-publish__plus">+</Text>
-          <Text className="floating-publish__label">发布</Text>
-        </Button>
+      {composerOpen && (
+        <View className="composer-scrim" onClick={onCloseComposer}>
+          <View
+            aria-labelledby="composer-dialog-title"
+            aria-modal="true"
+            className="composer-dialog"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <View className="composer-dialog__head">
+              <View>
+                <Text className="composer-dialog__eyebrow">CREATE POST</Text>
+                <Text className="composer-dialog__title" id="composer-dialog-title">
+                  发布绿茵动态
+                </Text>
+              </View>
+              <Button
+                aria-label="关闭发布窗口"
+                className="composer-dialog__close"
+                onClick={onCloseComposer}
+              >
+                ×
+              </Button>
+            </View>
+            <View className="composer-dialog__identity">
+              <UserAvatar name={data.viewer?.displayName ?? '我'} size="small" />
+              <Text>{data.viewer?.displayName ?? '发布动态'}</Text>
+            </View>
+            <Textarea
+              focus
+              className="composer-dialog__input"
+              maxlength={500}
+              placeholder="记录此刻的校园足球，emoji 也可以正常使用 ⚽"
+              value={postBody}
+              onInput={(event) => onPostBodyChange(event.detail.value)}
+            />
+            <View className="composer-dialog__footer">
+              <Text>{postBody.length}/500</Text>
+              <View className="composer-dialog__actions">
+                <Button className="composer-dialog__cancel" onClick={onCloseComposer}>
+                  取消
+                </Button>
+                <Button
+                  className="composer-dialog__submit"
+                  disabled={postBody.trim().length < 2 || publishing}
+                  loading={publishing}
+                  onClick={onPublish}
+                >
+                  发布动态
+                </Button>
+              </View>
+            </View>
+          </View>
+        </View>
       )}
     </View>
   )
+}
+
+function SearchExperience({
+  category,
+  error,
+  query,
+  result,
+  searching,
+  tournamentId,
+  onBack,
+  onCategoryChange,
+  onQueryChange,
+  onSearch,
+}: {
+  category: SearchCategory
+  error: string | null
+  query: string
+  result: SearchResponse | null
+  searching: boolean
+  tournamentId: string
+  onBack: () => void
+  onCategoryChange: (category: SearchCategory) => void
+  onQueryChange: (query: string) => void
+  onSearch: () => void
+}) {
+  return (
+    <View className="search-experience">
+      <View className="search-experience__head">
+        <Button aria-label="退出搜索" className="search-experience__back" onClick={onBack}>
+          ←
+        </Button>
+        <Text className="search-experience__title">全站搜索</Text>
+        <Button className="search-experience__exit" onClick={onBack}>
+          退出
+        </Button>
+      </View>
+      <View className="search-experience__bar">
+        <Input
+          focus
+          className="search-experience__input"
+          confirmType="search"
+          placeholder="搜索球员、球队、比赛或动态"
+          value={query}
+          onConfirm={onSearch}
+          onInput={(event) => onQueryChange(event.detail.value)}
+        />
+        <Button className="search-experience__submit" loading={searching} onClick={onSearch}>
+          搜索
+        </Button>
+      </View>
+      <View className="global-search__categories">
+        {searchCategories.map((item) => (
+          <Button
+            className={`search-category ${category === item.key ? 'search-category--active' : ''}`}
+            key={item.key}
+            onClick={() => onCategoryChange(item.key)}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </View>
+      {error && (
+        <DataState kind="error" title="搜索暂时不可用" description={error} onRetry={onSearch} />
+      )}
+      {!error && !result && !searching && (
+        <View className="search-experience__empty">
+          <Text>输入关键词，查找晓球里的球员、球队、比赛和动态。</Text>
+        </View>
+      )}
+      {!error && result && <SearchResults result={result} tournamentId={tournamentId} />}
+    </View>
+  )
+}
+
+function CompactMatchCard({ match }: { match: MatchSummary }) {
+  const hasScore = match.homeScore !== null && match.awayScore !== null
+  return (
+    <View className="compact-match" onClick={() => void goToMatch(match.id)}>
+      <View className="compact-match__meta">
+        <MatchStatus status={match.status} />
+        <Text>
+          {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
+        </Text>
+      </View>
+      <View className="compact-match__line">
+        <Text className="compact-match__team">
+          {match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}
+        </Text>
+        <Text className="compact-match__score">
+          {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'vs'}
+        </Text>
+        <Text className="compact-match__team compact-match__team--away">
+          {match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}
+        </Text>
+      </View>
+      <Text className="compact-match__stage">
+        {match.title} · {match.venue?.name ?? '场地待定'}
+      </Text>
+    </View>
+  )
+}
+
+function selectFocusMatches(matches: MatchSummary[]): MatchSummary[] {
+  const live = matches
+    .filter((match) => match.status === 'LIVE')
+    .sort(
+      (left, right) =>
+        upcomingDateValue(left.scheduledStartAt) - upcomingDateValue(right.scheduledStartAt),
+    )
+  const finished = matches
+    .filter((match) => match.status === 'FINISHED')
+    .sort((left, right) => dateValue(right.scheduledStartAt) - dateValue(left.scheduledStartAt))
+  const upcoming = matches
+    .filter((match) => match.status !== 'LIVE' && match.status !== 'FINISHED')
+    .sort(
+      (left, right) =>
+        upcomingDateValue(left.scheduledStartAt) - upcomingDateValue(right.scheduledStartAt),
+    )
+  const selected = [...live, ...finished.slice(0, 1), ...upcoming].slice(0, 3)
+  return selected.length > 0 ? selected : matches.slice(0, 3)
+}
+
+function dateValue(value: string | null): number {
+  return value ? new Date(value).getTime() : 0
+}
+
+function upcomingDateValue(value: string | null): number {
+  return value ? new Date(value).getTime() : Number.MAX_SAFE_INTEGER
 }
 
 function SearchResults({ result, tournamentId }: { result: SearchResponse; tournamentId: string }) {
@@ -458,6 +593,12 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
 async function goToMatch(matchId: string) {
   await Taro.navigateTo({
     url: `/pages/readonly-match-detail/index?matchId=${encodeURIComponent(matchId)}`,
+  })
+}
+
+async function goToSchedule(tournamentId: string) {
+  await Taro.redirectTo({
+    url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(tournamentId)}`,
   })
 }
 

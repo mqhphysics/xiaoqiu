@@ -11,7 +11,11 @@ interface DataStateProps {
 
 export function DataState({ kind, title, description, onRetry }: DataStateProps) {
   return (
-    <View className={`data-state data-state--${kind}`}>
+    <View
+      aria-live={kind === 'loading' ? 'polite' : 'assertive'}
+      className={`data-state data-state--${kind}`}
+    >
+      <Text className="data-state__indicator" />
       <Text className="data-state__eyebrow">
         {kind === 'loading' ? 'LOADING' : kind === 'error' ? 'LOAD FAILED' : 'NO DATA'}
       </Text>
