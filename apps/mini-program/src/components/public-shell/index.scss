@@ -8,7 +8,7 @@
 
 .public-topbar__inner {
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) auto minmax(180px, 1fr);
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
   align-items: center;
   width: calc(100% - 48px);
   max-width: 1240px;
@@ -43,8 +43,17 @@
   background: #ffffff;
   border: 1px solid #cfd7d1;
   border-radius: 50%;
-  font-size: 32px;
-  line-height: 36px;
+  line-height: 1;
+}
+
+.public-back__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .public-back::after,
@@ -131,6 +140,11 @@
   background: #183f2a;
 }
 
+.public-nav__item--switching,
+.mobile-tabbar__item--switching {
+  animation: public-nav-hop 190ms ease-out;
+}
+
 .public-team-nav {
   display: flex;
   align-items: center;
@@ -166,6 +180,11 @@
   box-shadow: 0 0 0 3px #e2eadf;
 }
 
+.public-team-nav--switching,
+.mobile-team-tab--switching {
+  animation: public-team-hop 190ms ease-out;
+}
+
 .public-account-wrap {
   position: relative;
   display: flex;
@@ -176,7 +195,8 @@
 .public-account {
   justify-content: flex-start;
   gap: 9px;
-  min-width: 164px;
+  width: fit-content;
+  min-width: 0;
   min-height: 46px;
   margin: 0;
   padding: 4px 0 4px 18px;
@@ -209,25 +229,13 @@
 }
 
 .public-account__name {
-  max-width: 92px;
+  max-width: 132px;
   overflow: hidden;
   color: #17231a;
   font-size: 13px;
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.public-account__hint {
-  margin-top: 3px;
-  color: #7a837c;
-  font-size: 10px;
-}
-
-.public-account__caret {
-  margin-left: auto;
-  color: #6c776e;
-  font-size: 16px;
 }
 
 .public-account-menu {
@@ -350,20 +358,71 @@
   font-size: 13px;
 }
 
+.public-content {
+  animation: public-content-enter 190ms ease-out;
+}
+
+@keyframes public-content-enter {
+  from {
+    opacity: 0.72;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes public-nav-hop {
+  0% {
+    transform: translateY(0);
+  }
+
+  48% {
+    transform: translateY(-5px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes public-team-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  48% {
+    transform: translateY(-6px) scale(1.03);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 1040px) {
   .public-topbar__inner {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .public-brand__caption,
-  .public-account__copy,
-  .public-account__caret {
+  .public-account__copy {
     display: none;
   }
 
   .public-account {
     min-width: 0;
     padding-left: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-content,
+  .public-nav__item--switching,
+  .mobile-tabbar__item--switching,
+  .public-team-nav--switching,
+  .mobile-team-tab--switching {
+    animation: none;
   }
 }
 

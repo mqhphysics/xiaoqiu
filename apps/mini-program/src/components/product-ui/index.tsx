@@ -13,7 +13,13 @@ import type { MatchSummary, PostSummary, TeamSummary } from '../../features/prod
 
 import './index.scss'
 
-export function TeamCrest({ team, size = 'medium' }: { team: TeamSummary | null; size?: 'small' | 'medium' | 'large' }) {
+export function TeamCrest({
+  team,
+  size = 'medium',
+}: {
+  team: TeamSummary | null
+  size?: 'small' | 'medium' | 'large'
+}) {
   const label = team ? team.shortName.slice(0, 2) : '待定'
   return (
     <Text
@@ -28,7 +34,15 @@ export function TeamCrest({ team, size = 'medium' }: { team: TeamSummary | null;
   )
 }
 
-export function UserAvatar({ name, color, size = 'medium' }: { name: string; color?: string | null; size?: 'small' | 'medium' | 'large' }) {
+export function UserAvatar({
+  name,
+  color,
+  size = 'medium',
+}: {
+  name: string
+  color?: string | null
+  size?: 'small' | 'medium' | 'large'
+}) {
   return (
     <Text
       className={`user-avatar user-avatar--${size}`}
@@ -108,13 +122,22 @@ export function PostCard({
       <Text className="post-card__body">{post.body}</Text>
       <View className="post-card__actions">
         <Button
+          aria-label={`${post.likedByMe ? '取消点赞' : '点赞'}，当前 ${post.likeCount} 赞`}
+          aria-pressed={post.likedByMe}
           className={`post-card__action ${post.likedByMe ? 'post-card__action--active' : ''}`}
           disabled={!onLike}
           onClick={stopAndLike}
         >
-          {post.likedByMe ? '已赞' : '赞'} {post.likeCount}
+          <Text className="post-card__action-icon">{post.likedByMe ? '♥' : '♡'}</Text>
+          <Text>{post.likeCount}</Text>
         </Button>
-        <Text className="post-card__action post-card__action--plain">评论 {post.commentCount}</Text>
+        <Text
+          aria-label={`评论 ${post.commentCount} 条`}
+          className="post-card__action post-card__action--plain"
+        >
+          <Text className="post-card__comment-icon" />
+          <Text>{post.commentCount}</Text>
+        </Text>
         <Text className="post-card__open">查看详情</Text>
       </View>
     </View>
@@ -125,10 +148,14 @@ export function ProductSection({
   kicker,
   title,
   note,
+  actionLabel,
+  onAction,
 }: {
   kicker: string
   title: string
   note?: string
+  actionLabel?: string
+  onAction?: () => void
 }) {
   return (
     <View className="product-section-heading">
@@ -136,7 +163,13 @@ export function ProductSection({
         <Text className="product-section-heading__kicker">{kicker}</Text>
         <Text className="product-section-heading__title">{title}</Text>
       </View>
-      {note && <Text className="product-section-heading__note">{note}</Text>}
+      {onAction && actionLabel ? (
+        <Button className="product-section-heading__action" onClick={onAction}>
+          {actionLabel} →
+        </Button>
+      ) : (
+        note && <Text className="product-section-heading__note">{note}</Text>
+      )}
     </View>
   )
 }

@@ -77,13 +77,16 @@ button {
 }
 
 .button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   margin: 0;
   padding: 0 20px;
   border-radius: 6px;
   font-size: 15px;
   font-weight: 850;
-  line-height: 44px;
+  line-height: 1;
 }
 
 .button::after {
