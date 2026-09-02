@@ -21,7 +21,17 @@ corepack prepare pnpm@11.5.2 --activate
 pnpm install
 ```
 
-## 开发命令
+## 本地演示启动
+
+依赖已经安装时，可直接运行一键启动脚本。脚本不依赖全局 `pnpm`，会准备数据库、恢复五个演示账号并打开 API 与 H5：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-local-demo.ps1
+```
+
+浏览器访问 `http://127.0.0.1:10087/`，完整账号与逐页步骤见[演示验收手册](docs/testing/演示验收手册.md)。
+
+## 手动开发命令
 
 首次启动演示数据库：
 
@@ -29,22 +39,24 @@ pnpm install
 Copy-Item infra/.env.example infra/.env
 docker compose --env-file infra/.env -f infra/compose.yaml up -d postgres
 $env:DATABASE_URL = 'postgresql://xiaoqiu:xiaoqiu-local-only@localhost:5432/xiaoqiu'
-pnpm --filter @xiaoqiu/api db:migrate:deploy
-pnpm --filter @xiaoqiu/api db:seed
+npm --prefix apps/api run db:migrate:deploy
+npm --prefix apps/api run db:seed
 ```
 
 终端一启动 API，终端二启动 H5：
 
 ```powershell
 $env:DATABASE_URL = 'postgresql://xiaoqiu:xiaoqiu-local-only@localhost:5432/xiaoqiu'
-pnpm dev:api
+$env:API_PORT = '3001'
+npm --prefix apps/api run dev
 ```
 
 ```powershell
-pnpm dev:h5
+$env:TARO_APP_API_BASE_URL = 'http://127.0.0.1:3001'
+npm --prefix apps/mini-program run dev:h5
 ```
 
-浏览器访问 `http://127.0.0.1:10087/`，API 文档位于 `http://127.0.0.1:3001/api/docs`。完整账号与逐页步骤见[演示验收手册](docs/testing/演示验收手册.md)。
+API 文档位于 `http://127.0.0.1:3001/api/docs`。
 
 其他开发命令：
 
