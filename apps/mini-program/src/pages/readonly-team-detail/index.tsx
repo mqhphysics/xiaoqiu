@@ -11,6 +11,13 @@ import type { TeamDashboardResponse } from '../../features/product/product.types
 
 import './index.scss'
 
+const POSITION_GROUPS = [
+  { key: 'FORWARD', label: '前锋' },
+  { key: 'MIDFIELDER', label: '中场' },
+  { key: 'DEFENDER', label: '后卫' },
+  { key: 'GOALKEEPER', label: '门将' },
+] as const
+
 type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
@@ -73,6 +80,21 @@ function TeamContent({
   data: TeamDashboardResponse
   tournamentId: string
 }) {
+  const knownPositions = new Set<string>(POSITION_GROUPS.map((group) => group.key))
+  const rosterGroups = [
+    ...POSITION_GROUPS.map((group) => ({
+      ...group,
+      players: data.roster.filter((player) => player.position === group.key),
+    })),
+    {
+      key: 'OTHER',
+      label: '其他',
+      players: data.roster.filter(
+        (player) => !player.position || !knownPositions.has(player.position),
+      ),
+    },
+  ].filter((group) => group.players.length > 0)
+
   return (
     <View>
       <View
@@ -138,40 +160,54 @@ function TeamContent({
 
       <View className="public-team-section">
         <ProductSection kicker="SQUAD" title="完整阵容" note={data.roster.length + ' 名球员'} />
-        <View className="public-roster surface">
-          <View className="public-roster__head">
-            <Text>号码</Text>
-            <Text>球员</Text>
-            <Text>位置 / 年级</Text>
-            <Text>出场</Text>
-            <Text>进球</Text>
-            <Text>助攻</Text>
-          </View>
-          {data.roster.map((player) => (
-            <View
-              className="public-roster__row"
-              key={player.id}
-              onClick={() =>
-                void Taro.navigateTo({
-                  url:
-                    '/pages/player-detail/index?playerId=' +
-                    encodeURIComponent(player.id) +
-                    '&tournamentId=' +
-                    encodeURIComponent(tournamentId),
-                })
-              }
-            >
-              <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
-              <View className="public-roster__player">
-                <UserAvatar name={player.displayName} color={player.profileColor} size="small" />
-                <Text>{player.displayName}</Text>
+        <View className="public-roster-groups">
+          {rosterGroups.map((group) => (
+            <View className="public-roster-group surface" key={group.key}>
+              <View className="public-roster-group__heading">
+                <Text>{group.label}</Text>
+                <Text>{group.players.length} 人</Text>
               </View>
-              <Text>
-                {positionLabel(player.position)} · {player.academicYear}
-              </Text>
-              <Text>{player.appearances}</Text>
-              <Text>{player.goals}</Text>
-              <Text>{player.assists}</Text>
+              <View className="public-roster">
+                <View className="public-roster__head">
+                  <Text>号码</Text>
+                  <Text>球员</Text>
+                  <Text>位置 / 年级</Text>
+                  <Text>出场</Text>
+                  <Text>进球</Text>
+                  <Text>助攻</Text>
+                </View>
+                {group.players.map((player) => (
+                  <View
+                    className="public-roster__row"
+                    key={player.id}
+                    onClick={() =>
+                      void Taro.navigateTo({
+                        url:
+                          '/pages/player-detail/index?playerId=' +
+                          encodeURIComponent(player.id) +
+                          '&tournamentId=' +
+                          encodeURIComponent(tournamentId),
+                      })
+                    }
+                  >
+                    <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
+                    <View className="public-roster__player">
+                      <UserAvatar
+                        name={player.displayName}
+                        color={player.profileColor}
+                        size="small"
+                      />
+                      <Text>{player.displayName}</Text>
+                    </View>
+                    <Text>
+                      {positionLabel(player.position)} · {player.academicYear}
+                    </Text>
+                    <Text>{player.appearances}</Text>
+                    <Text>{player.goals}</Text>
+                    <Text>{player.assists}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ))}
         </View>

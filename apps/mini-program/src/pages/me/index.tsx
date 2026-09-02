@@ -1,4 +1,4 @@
-import { Text, View } from '@tarojs/components'
+import { Button, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -68,34 +68,68 @@ export default function MePage() {
 }
 
 function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: AuthUser }) {
+  const [loggingOut, setLoggingOut] = useState(false)
   const roleNames = user.roles.map((item) => roleLabel(item.role))
   const isReporter = user.roles.some((item) => item.role === 'MATCH_REPORTER')
-  const isAdmin = user.roles.some((item) =>
-    ['TOURNAMENT_ADMIN', 'ORGANIZATION_ADMIN'].includes(item.role),
-  )
   const isOrganizationAdmin = user.roles.some((item) => item.role === 'ORGANIZATION_ADMIN')
+
+  const logout = async () => {
+    if (loggingOut) return
+    const confirmation = await Taro.showModal({
+      title: '退出登录',
+      content: '退出后仍可使用游客模式浏览公开赛事数据。',
+      confirmText: '退出',
+    })
+    if (!confirmation.confirm) return
+    setLoggingOut(true)
+    try {
+      await productRepository.logout()
+      await Taro.reLaunch({ url: '/pages/login/index' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '退出失败',
+        icon: 'none',
+      })
+      setLoggingOut(false)
+    }
+  }
 
   return (
     <View>
       <View className="profile-header">
-        <UserAvatar name={user.displayName} size="large" />
-        <View className="profile-header__copy">
-          <View className="profile-header__name-row">
-            <Text className="profile-header__name">{user.displayName}</Text>
-            <Text className="profile-header__verified">
-              {verificationLabel(user.verificationLevel)}
-            </Text>
-          </View>
-          <Text className="profile-header__username">@{user.username}</Text>
-          <Text className="profile-header__bio">{user.bio ?? '这位用户暂时没有填写简介。'}</Text>
-          <View className="profile-header__roles">
-            {(roleNames.length > 0 ? roleNames : ['普通用户']).map((role) => (
-              <Text key={role}>{role}</Text>
-            ))}
+        <View className="profile-header__main">
+          <UserAvatar name={user.displayName} size="large" />
+          <View className="profile-header__copy">
+            <Text className="profile-header__eyebrow">ACCOUNT PROFILE</Text>
+            <View className="profile-header__name-row">
+              <Text className="profile-header__name">{user.displayName}</Text>
+              <Text className="profile-header__verified">
+                {verificationLabel(user.verificationLevel)}
+              </Text>
+            </View>
+            <Text className="profile-header__username">@{user.username}</Text>
+            <Text className="profile-header__bio">{user.bio ?? '这位用户暂时没有填写简介。'}</Text>
+            <View className="profile-header__roles">
+              {(roleNames.length > 0 ? roleNames : ['普通用户']).map((role) => (
+                <Text key={role}>{role}</Text>
+              ))}
+            </View>
           </View>
         </View>
+        <Button
+          className="profile-header__logout"
+          disabled={loggingOut}
+          loading={loggingOut}
+          onClick={() => void logout()}
+        >
+          退出登录
+        </Button>
       </View>
 
+      <View className="identity-summary__heading">
+        <Text>仅本人可见的账户信息</Text>
+        <Text>实名资料不会出现在公开球队与社区页面</Text>
+      </View>
       <View className="identity-summary">
         <View>
           <Text className="identity-summary__label">真实姓名</Text>
@@ -149,62 +183,36 @@ function ProfilePanel({ tournamentId, user }: { tournamentId: string; user: Auth
               })
             }
           />
-          <ServiceItem
-            title={user.linkedPlayer ? '球员档案' : '认领球员'}
-            note={user.linkedPlayer ? '数据与出场记录' : '关联校园球员身份'}
-            action={() =>
-              user.linkedPlayer
-                ? void Taro.navigateTo({
-                    url:
-                      '/pages/player-detail/index?playerId=' +
-                      encodeURIComponent(user.linkedPlayer.id) +
-                      '&tournamentId=' +
-                      encodeURIComponent(tournamentId),
-                  })
-                : void showUnavailable('该身份暂无待认领球员')
-            }
-          />
-          <ServiceItem
-            title="加入球队"
-            note="查看球队与关注关系"
-            action={() =>
-              void Taro.reLaunch({
-                url: '/pages/my-team/index?tournamentId=' + encodeURIComponent(tournamentId),
-              })
-            }
-          />
-          <ServiceItem
-            title="意见反馈"
-            note="向赛事组提交建议"
-            action={() => void showUnavailable('反馈工单将在下一版本接入')}
-          />
+          {user.linkedPlayer && (
+            <ServiceItem
+              title="球员档案"
+              note="数据与出场记录"
+              action={() =>
+                void Taro.navigateTo({
+                  url:
+                    '/pages/player-detail/index?playerId=' +
+                    encodeURIComponent(user.linkedPlayer!.id) +
+                    '&tournamentId=' +
+                    encodeURIComponent(tournamentId),
+                })
+              }
+            />
+          )}
         </View>
       </View>
 
-      {(isReporter || isAdmin) && (
+      {isReporter && (
         <View className="profile-section">
           <ProductSection kicker="WORKSPACE" title="赛事工作台" note="按权限显示" />
           <View className="workspace-list surface">
-            {isReporter && (
-              <View
-                className="workspace-item"
-                onClick={() => void Taro.navigateTo({ url: '/pages/quick-report/index' })}
-              >
-                <Text>快速比赛报告</Text>
-                <Text>录入比分与比赛事件</Text>
-                <Text>进入</Text>
-              </View>
-            )}
-            {isAdmin && (
-              <View
-                className="workspace-item"
-                onClick={() => void showUnavailable('赛事后台请在桌面管理端打开')}
-              >
-                <Text>赛事管理</Text>
-                <Text>赛程、名单与数据修正</Text>
-                <Text>管理端</Text>
-              </View>
-            )}
+            <View
+              className="workspace-item"
+              onClick={() => void Taro.navigateTo({ url: '/pages/quick-report/index' })}
+            >
+              <Text>快速比赛报告</Text>
+              <Text>录入比分与比赛事件</Text>
+              <Text>进入</Text>
+            </View>
           </View>
         </View>
       )}
@@ -290,8 +298,4 @@ function ServiceItem({ title, note, action }: { title: string; note: string; act
       <Text className="service-item__open">进入</Text>
     </View>
   )
-}
-
-async function showUnavailable(message: string) {
-  await Taro.showToast({ title: message, icon: 'none', duration: 2200 })
 }

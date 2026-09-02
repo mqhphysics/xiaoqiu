@@ -1,15 +1,21 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Input, ScrollView, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchCard, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
-import { positionLabel } from '../../features/product/product.format'
+import {
+  formatDate,
+  formatTime,
+  matchStatusLabel,
+  positionLabel,
+} from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
   HomeResponse,
+  MatchSummary,
   TeamDashboardResponse,
   TeamPreferencesResponse,
   TeamSummary,
@@ -25,30 +31,57 @@ type PageState =
       home: HomeResponse
       preferences: TeamPreferencesResponse | null
       dashboard: TeamDashboardResponse | null
+      schedule: MatchSummary[]
     }
+
+const POSITION_GROUPS = [
+  { key: 'FORWARD', label: '前锋' },
+  { key: 'MIDFIELDER', label: '中场' },
+  { key: 'DEFENDER', label: '后卫' },
+  { key: 'GOALKEEPER', label: '门将' },
+] as const
 
 export default function MyTeamPage() {
   const [state, setState] = useState<PageState>({ phase: 'loading' })
   const [editing, setEditing] = useState(false)
   const [primaryId, setPrimaryId] = useState('')
   const [followedIds, setFollowedIds] = useState<string[]>([])
+  const [teamQuery, setTeamQuery] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
     try {
-      const home = await productRepository.getHome()
+      const homeData = await productRepository.getHome()
       if (!readSession()) {
-        setState({ phase: 'ready', home, preferences: null, dashboard: null })
+        setState({
+          phase: 'ready',
+          home: homeData,
+          preferences: null,
+          dashboard: null,
+          schedule: [],
+        })
         return
       }
-      const preferences = await productRepository.getTeamPreferences()
+      const [preferences, competition] = await Promise.all([
+        productRepository.getTeamPreferences(),
+        productRepository.getCompetitionData(homeData.tournament.id),
+      ])
       const dashboard = preferences.primaryTeam
-        ? await productRepository.getTeamDashboard(preferences.primaryTeam.id, home.tournament.id)
+        ? await productRepository.getTeamDashboard(
+            preferences.primaryTeam.id,
+            homeData.tournament.id,
+          )
         : null
       setPrimaryId(preferences.primaryTeam?.id ?? '')
       setFollowedIds(preferences.followedTeams.map((team) => team.id))
-      setState({ phase: 'ready', home, preferences, dashboard })
+      setState({
+        phase: 'ready',
+        home: homeData,
+        preferences,
+        dashboard,
+        schedule: competition.schedule,
+      })
       if (!preferences.primaryTeam) setEditing(true)
     } catch (error) {
       setState({
@@ -62,6 +95,22 @@ export default function MyTeamPage() {
     void load()
   }, [load])
 
+  const openEditor = () => {
+    if (state.phase !== 'ready' || !state.preferences) return
+    setPrimaryId(state.preferences.primaryTeam?.id ?? '')
+    setFollowedIds(state.preferences.followedTeams.map((team) => team.id))
+    setTeamQuery('')
+    setEditing(true)
+  }
+
+  const cancelEditing = () => {
+    if (state.phase !== 'ready' || !state.preferences) return
+    setPrimaryId(state.preferences.primaryTeam?.id ?? '')
+    setFollowedIds(state.preferences.followedTeams.map((team) => team.id))
+    setTeamQuery('')
+    if (state.dashboard) setEditing(false)
+  }
+
   const savePreferences = async () => {
     if (!primaryId || saving || state.phase !== 'ready') return
     setSaving(true)
@@ -74,12 +123,49 @@ export default function MyTeamPage() {
         primaryId,
         state.home.tournament.id,
       )
+      setPrimaryId(preferences.primaryTeam?.id ?? '')
+      setFollowedIds(preferences.followedTeams.map((team) => team.id))
       setState({ ...state, preferences, dashboard })
       setEditing(false)
-      await Taro.showToast({ title: '主队已保存', icon: 'success' })
+      setTeamQuery('')
+      await Taro.showToast({ title: '主队与关注已保存', icon: 'success' })
     } catch (error) {
       await Taro.showToast({
         title: error instanceof Error ? error.message : '保存失败',
+        icon: 'none',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeFollowedTeam = async (team: TeamSummary) => {
+    if (
+      saving ||
+      state.phase !== 'ready' ||
+      !state.preferences ||
+      !primaryId ||
+      team.id === primaryId
+    ) {
+      return
+    }
+    const confirmation = await Taro.showModal({
+      title: '取消关注',
+      content: `确认不再关注“${team.name}”吗？`,
+      confirmText: '取消关注',
+    })
+    if (!confirmation.confirm) return
+
+    const nextFollowedIds = followedIds.filter((id) => id !== team.id)
+    setSaving(true)
+    try {
+      const preferences = await productRepository.updateTeamPreferences(primaryId, nextFollowedIds)
+      setFollowedIds(preferences.followedTeams.map((item) => item.id))
+      setState({ ...state, preferences })
+      await Taro.showToast({ title: '已取消关注', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({
+        title: error instanceof Error ? error.message : '取消关注失败',
         icon: 'none',
       })
     } finally {
@@ -107,22 +193,31 @@ export default function MyTeamPage() {
             <TeamSelector
               followedIds={followedIds}
               primaryId={primaryId}
+              query={teamQuery}
               saving={saving}
               teams={state.preferences.availableTeams}
-              onCancel={() => state.dashboard && setEditing(false)}
+              onCancel={cancelEditing}
               onFollowedChange={setFollowedIds}
               onPrimaryChange={(id) => {
                 setPrimaryId(id)
                 setFollowedIds((current) => current.filter((item) => item !== id))
               }}
+              onQueryChange={setTeamQuery}
               onSave={() => void savePreferences()}
             />
           ) : (
             <TeamDashboard
               data={state.dashboard}
               followedTeams={state.preferences.followedTeams}
+              saving={saving}
+              teamMatches={state.schedule.filter(
+                (match) =>
+                  match.homeTeam?.id === state.dashboard?.team.id ||
+                  match.awayTeam?.id === state.dashboard?.team.id,
+              )}
               tournamentId={state.home.tournament.id}
-              onEdit={() => setEditing(true)}
+              onEdit={openEditor}
+              onRemoveFollow={(team) => void removeFollowedTeam(team)}
             />
           )}
         </View>
@@ -131,7 +226,7 @@ export default function MyTeamPage() {
   )
 }
 
-function VisitorTeamView({ home }: { home: HomeResponse }) {
+function VisitorTeamView({ home: homeData }: { home: HomeResponse }) {
   return (
     <View>
       <View className="team-guest-header">
@@ -146,11 +241,11 @@ function VisitorTeamView({ home }: { home: HomeResponse }) {
         </Button>
       </View>
       <View className="team-guest-grid">
-        {home.teams.map((team) => (
+        {homeData.teams.map((team) => (
           <View
             className="team-guest-card"
             key={team.id}
-            onClick={() => void goToTeam(team.id, home.tournament.id)}
+            onClick={() => void goToTeam(team.id, homeData.tournament.id)}
           >
             <TeamCrest team={team} size="large" />
             <Text className="team-guest-card__name">{team.name}</Text>
@@ -166,22 +261,36 @@ function VisitorTeamView({ home }: { home: HomeResponse }) {
 function TeamSelector({
   followedIds,
   primaryId,
+  query,
   saving,
   teams,
   onCancel,
   onFollowedChange,
   onPrimaryChange,
+  onQueryChange,
   onSave,
 }: {
   followedIds: string[]
   primaryId: string
+  query: string
   saving: boolean
   teams: TeamSummary[]
   onCancel: () => void
   onFollowedChange: (ids: string[]) => void
   onPrimaryChange: (id: string) => void
+  onQueryChange: (value: string) => void
   onSave: () => void
 }) {
+  const filteredTeams = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase('zh-CN')
+    if (!normalized) return teams
+    return teams.filter((team) =>
+      [team.name, team.shortName, team.collegeName]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toLocaleLowerCase('zh-CN').includes(normalized)),
+    )
+  }, [query, teams])
+
   const toggleFollow = (teamId: string) => {
     if (teamId === primaryId) return
     onFollowedChange(
@@ -190,52 +299,71 @@ function TeamSelector({
         : [...followedIds, teamId],
     )
   }
+
   return (
     <View className="team-selector">
-      <View className="page-intro">
+      <View className="page-intro team-selector__intro">
         <View>
           <Text className="page-intro__eyebrow">TEAM PREFERENCES</Text>
-          <Text className="page-intro__title">主队与关注</Text>
+          <Text className="page-intro__title">管理主队与关注</Text>
         </View>
-        <Text className="page-intro__copy">主队固定在首位，关注队伍用于快速查看。</Text>
+        <Text className="page-intro__copy">每个账号保留一支主队，也可以关注多支球队。</Text>
       </View>
-      <View className="team-selector__grid">
-        {teams.map((team) => {
-          const isPrimary = team.id === primaryId
-          const isFollowed = followedIds.includes(team.id)
-          return (
-            <View
-              className={'team-choice ' + (isPrimary ? 'team-choice--primary' : '')}
-              key={team.id}
-            >
-              <View className="team-choice__identity">
-                <TeamCrest team={team} />
-                <View>
-                  <Text>{team.name}</Text>
-                  <Text>{team.collegeName}</Text>
+      <View className="team-selector__search">
+        <Input
+          className="team-selector__search-input"
+          confirmType="search"
+          placeholder="按球队名或学院搜索"
+          value={query}
+          onInput={(event) => onQueryChange(event.detail.value)}
+        />
+        {query && (
+          <Button className="team-selector__clear" onClick={() => onQueryChange('')}>
+            清空
+          </Button>
+        )}
+      </View>
+      {filteredTeams.length === 0 ? (
+        <DataState kind="empty" title="没有匹配的球队" description="换个球队名或学院试试。" />
+      ) : (
+        <View className="team-selector__grid">
+          {filteredTeams.map((team) => {
+            const isPrimary = team.id === primaryId
+            const isFollowed = followedIds.includes(team.id)
+            return (
+              <View
+                className={'team-choice ' + (isPrimary ? 'team-choice--primary' : '')}
+                key={team.id}
+              >
+                <View className="team-choice__identity">
+                  <TeamCrest team={team} />
+                  <View>
+                    <Text>{team.name}</Text>
+                    <Text>{team.collegeName}</Text>
+                  </View>
+                </View>
+                <View className="team-choice__actions">
+                  <Button
+                    className={isPrimary ? 'team-choice__primary-active' : ''}
+                    onClick={() => onPrimaryChange(team.id)}
+                  >
+                    {isPrimary ? '当前主队' : '设为主队'}
+                  </Button>
+                  <Button
+                    className={isFollowed ? 'team-choice__follow-active' : ''}
+                    disabled={isPrimary}
+                    onClick={() => toggleFollow(team.id)}
+                  >
+                    {isPrimary ? '主队已关注' : isFollowed ? '取消关注' : '关注'}
+                  </Button>
                 </View>
               </View>
-              <View className="team-choice__actions">
-                <Button
-                  className={isPrimary ? 'team-choice__primary-active' : ''}
-                  onClick={() => onPrimaryChange(team.id)}
-                >
-                  {isPrimary ? '当前主队' : '设为主队'}
-                </Button>
-                <Button
-                  className={isFollowed ? 'team-choice__follow-active' : ''}
-                  disabled={isPrimary}
-                  onClick={() => toggleFollow(team.id)}
-                >
-                  {isPrimary ? '主队已关注' : isFollowed ? '已关注' : '关注'}
-                </Button>
-              </View>
-            </View>
-          )
-        })}
-      </View>
+            )
+          })}
+        </View>
+      )}
       <View className="team-selector__footer">
-        <Button className="button button--outline" onClick={onCancel}>
+        <Button className="button button--outline" disabled={saving} onClick={onCancel}>
           取消
         </Button>
         <Button
@@ -254,16 +382,39 @@ function TeamSelector({
 function TeamDashboard({
   data,
   followedTeams,
+  saving,
+  teamMatches,
   tournamentId,
   onEdit,
+  onRemoveFollow,
 }: {
   data: TeamDashboardResponse
   followedTeams: TeamSummary[]
+  saving: boolean
+  teamMatches: MatchSummary[]
   tournamentId: string
   onEdit: () => void
+  onRemoveFollow: (team: TeamSummary) => void
 }) {
+  const [showAllMatches, setShowAllMatches] = useState(false)
+  const upcoming = teamMatches.find((match) => !isCompletedMatch(match))
+  const recent = [...teamMatches].reverse().find(isCompletedMatch)
+  const highlights = [upcoming, recent].filter(
+    (match, index, items): match is MatchSummary =>
+      Boolean(match) && items.findIndex((item) => item?.id === match?.id) === index,
+  )
+
   return (
     <View>
+      <TeamFollowBar
+        followedTeams={followedTeams}
+        primaryTeam={data.team}
+        saving={saving}
+        tournamentId={tournamentId}
+        onEdit={onEdit}
+        onRemoveFollow={onRemoveFollow}
+      />
+
       <View className="my-team-hero" style={{ borderColor: data.team.primaryColor ?? '#1f6b45' }}>
         <View className="my-team-hero__identity">
           <TeamCrest team={data.team} size="large" />
@@ -276,106 +427,254 @@ function TeamDashboard({
             <Text className="my-team-hero__motto">{data.team.motto}</Text>
           </View>
         </View>
-        <Button className="my-team-hero__edit" onClick={onEdit}>
-          管理关注
-        </Button>
       </View>
 
-      <View className="team-record">
-        <Record value={data.stats.played} label="比赛" />
-        <Record value={data.stats.won} label="胜" />
-        <Record value={data.stats.drawn} label="平" />
-        <Record value={data.stats.lost} label="负" />
-        <Record value={data.stats.goalsFor + ':' + data.stats.goalsAgainst} label="进失球" />
-        <Record value={data.stats.points} label="积分" accent />
-      </View>
-
-      <View className="my-team-grid">
-        <View className="my-team-main">
-          <ProductSection kicker="FIXTURES" title="球队比赛" note="近期与下一场" />
-          <View className="my-team-match-grid">
-            {[...data.upcomingMatches, ...data.recentMatches].slice(0, 4).map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                onClick={() =>
-                  void Taro.navigateTo({
-                    url:
-                      '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(match.id),
-                  })
-                }
-              />
-            ))}
+      <View className="team-glance surface">
+        <View className="team-glance__head">
+          <View>
+            <Text className="team-glance__kicker">MATCH SNAPSHOT</Text>
+            <Text className="team-glance__title">近期与下一场</Text>
           </View>
+          <Button className="team-glance__all" onClick={() => setShowAllMatches((value) => !value)}>
+            {showAllMatches ? '收起全部' : '查看全部'}
+          </Button>
         </View>
-        <View className="my-team-aside">
-          <ProductSection kicker="PROFILE" title="球队信息" />
-          <View className="team-profile surface">
-            <ProfileRow label="队长" value={data.team.captainName ?? '未设置'} />
-            <ProfileRow label="教练" value={data.team.coachName ?? '未设置'} />
-            <ProfileRow
-              label="成立"
-              value={data.team.foundedYear ? data.team.foundedYear + ' 年' : '未填写'}
+        <View className="team-glance__rows">
+          {highlights.map((match) => (
+            <CompactMatchRow
+              key={match.id}
+              label={isCompletedMatch(match) ? '最近一场' : '下一场'}
+              match={match}
             />
-            <ProfileRow label="简介" value={data.team.description ?? '暂无简介'} multiline />
-          </View>
-        </View>
-      </View>
-
-      <View className="team-roster-section">
-        <ProductSection kicker="SQUAD" title="球队阵容" note={data.roster.length + ' 名球员'} />
-        <View className="team-roster-grid">
-          {data.roster.map((player) => (
-            <View
-              className="squad-player"
-              key={player.id}
-              onClick={() =>
-                void Taro.navigateTo({
-                  url:
-                    '/pages/player-detail/index?playerId=' +
-                    encodeURIComponent(player.id) +
-                    '&tournamentId=' +
-                    encodeURIComponent(tournamentId),
-                })
-              }
-            >
-              <Text className="squad-player__number">{player.shirtNumber ?? '-'}</Text>
-              <UserAvatar name={player.displayName} color={player.profileColor} />
-              <View className="squad-player__copy">
-                <Text>{player.displayName}</Text>
-                <Text>
-                  {positionLabel(player.position)} · {player.academicYear}
-                </Text>
-              </View>
-              <View className="squad-player__stats">
-                <Text>{player.appearances} 场</Text>
-                <Text>
-                  {player.goals} 球 · {player.assists} 助
-                </Text>
-              </View>
-            </View>
           ))}
+          {highlights.length === 0 && <Text className="team-glance__empty">暂无球队赛程</Text>}
         </View>
       </View>
 
-      {followedTeams.length > 0 && (
-        <View className="followed-team-section">
-          <ProductSection kicker="FOLLOWING" title="其他关注" note={followedTeams.length + ' 支'} />
-          <View className="followed-team-list">
-            {followedTeams.map((team) => (
-              <View
-                className="followed-team"
-                key={team.id}
-                onClick={() => void goToTeam(team.id, tournamentId)}
-              >
-                <TeamCrest team={team} />
-                <Text>{team.name}</Text>
-                <Text>查看</Text>
-              </View>
+      {showAllMatches && (
+        <View className="my-team-section">
+          <ProductSection
+            kicker="FIXTURES"
+            title="全部球队赛程"
+            note={`${teamMatches.length} 场`}
+          />
+          <View className="my-team-match-grid">
+            {teamMatches.map((match) => (
+              <MatchCard key={match.id} match={match} onClick={() => void goToMatch(match.id)} />
             ))}
           </View>
         </View>
       )}
+
+      <View className="my-team-section">
+        <ProductSection kicker="TEAM DATA" title="球队数据" note="来自比赛事实" />
+        <View className="team-record">
+          <Record value={data.stats.played} label="比赛" />
+          <Record value={data.stats.won} label="胜" />
+          <Record value={data.stats.drawn} label="平" />
+          <Record value={data.stats.lost} label="负" />
+          <Record value={data.stats.goalsFor + ':' + data.stats.goalsAgainst} label="进失球" />
+          <Record value={data.stats.points} label="积分" accent />
+        </View>
+      </View>
+
+      <View className="my-team-section">
+        <ProductSection kicker="PROFILE" title="球队信息" />
+        <View className="team-profile surface">
+          <ProfileRow label="队长" value={data.team.captainName ?? '未设置'} />
+          <ProfileRow label="教练" value={data.team.coachName ?? '未设置'} />
+          <ProfileRow
+            label="成立"
+            value={data.team.foundedYear ? data.team.foundedYear + ' 年' : '未填写'}
+          />
+          <ProfileRow label="简介" value={data.team.description ?? '暂无简介'} multiline />
+        </View>
+      </View>
+
+      <View className="team-roster-section">
+        <ProductSection kicker="SQUAD" title="全部球员" note={data.roster.length + ' 名'} />
+        <GroupedRoster roster={data.roster} tournamentId={tournamentId} />
+      </View>
+    </View>
+  )
+}
+
+function TeamFollowBar({
+  followedTeams,
+  primaryTeam,
+  saving,
+  tournamentId,
+  onEdit,
+  onRemoveFollow,
+}: {
+  followedTeams: TeamSummary[]
+  primaryTeam: TeamSummary
+  saving: boolean
+  tournamentId: string
+  onEdit: () => void
+  onRemoveFollow: (team: TeamSummary) => void
+}) {
+  return (
+    <View className="team-follow-bar surface">
+      <View className="team-follow-bar__label">
+        <Text>我的关注</Text>
+        <Text>长按或右键可快捷取消</Text>
+      </View>
+      <ScrollView className="team-follow-bar__scroll" scrollX>
+        <View className="team-follow-bar__list">
+          <FollowedTeamChip
+            isPrimary
+            team={primaryTeam}
+            tournamentId={tournamentId}
+            onRemove={() => undefined}
+          />
+          {followedTeams.map((team) => (
+            <FollowedTeamChip
+              key={team.id}
+              team={team}
+              tournamentId={tournamentId}
+              onRemove={() => onRemoveFollow(team)}
+            />
+          ))}
+        </View>
+      </ScrollView>
+      <Button
+        aria-label="管理主队与关注"
+        className="team-follow-bar__add"
+        disabled={saving}
+        onClick={onEdit}
+      >
+        +
+      </Button>
+    </View>
+  )
+}
+
+function FollowedTeamChip({
+  isPrimary = false,
+  team,
+  tournamentId,
+  onRemove,
+}: {
+  isPrimary?: boolean
+  team: TeamSummary
+  tournamentId: string
+  onRemove: () => void
+}) {
+  const contextMenuProps = isPrimary
+    ? {}
+    : {
+        onContextMenu: (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onRemove()
+        },
+      }
+
+  return (
+    <View
+      {...contextMenuProps}
+      className={'followed-team-chip ' + (isPrimary ? 'followed-team-chip--primary' : '')}
+      onClick={() => void goToTeam(team.id, tournamentId)}
+      onLongPress={() => {
+        if (!isPrimary) onRemove()
+      }}
+    >
+      <TeamCrest team={team} size="small" />
+      <View className="followed-team-chip__copy">
+        <Text>{team.shortName}</Text>
+        <Text>{isPrimary ? '主队' : '已关注'}</Text>
+      </View>
+      {!isPrimary && (
+        <Button
+          aria-label={`取消关注${team.name}`}
+          className="followed-team-chip__remove"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+        >
+          取消
+        </Button>
+      )}
+    </View>
+  )
+}
+
+function CompactMatchRow({ label, match }: { label: string; match: MatchSummary }) {
+  const hasScore = match.homeScore !== null && match.awayScore !== null
+  return (
+    <View className="compact-match-row" onClick={() => void goToMatch(match.id)}>
+      <Text className="compact-match-row__label">{label}</Text>
+      <Text className="compact-match-row__teams">
+        {match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}
+        <Text className="compact-match-row__score">
+          {hasScore ? ` ${match.homeScore} : ${match.awayScore} ` : ' vs '}
+        </Text>
+        {match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}
+      </Text>
+      <Text className="compact-match-row__time">
+        {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
+      </Text>
+      <Text className="compact-match-row__status">{matchStatusLabel(match.status)}</Text>
+    </View>
+  )
+}
+
+function GroupedRoster({
+  roster,
+  tournamentId,
+}: {
+  roster: TeamDashboardResponse['roster']
+  tournamentId: string
+}) {
+  const knownPositions = new Set<string>(POSITION_GROUPS.map((group) => group.key))
+  const groups = [
+    ...POSITION_GROUPS.map((group) => ({
+      ...group,
+      players: roster.filter((player) => player.position === group.key),
+    })),
+    {
+      key: 'OTHER',
+      label: '其他',
+      players: roster.filter((player) => !player.position || !knownPositions.has(player.position)),
+    },
+  ].filter((group) => group.players.length > 0)
+
+  return (
+    <View className="grouped-roster">
+      {groups.map((group) => (
+        <View className="squad-group" key={group.key}>
+          <View className="squad-group__heading">
+            <Text>{group.label}</Text>
+            <Text>{group.players.length} 人</Text>
+          </View>
+          <View className="team-roster-grid">
+            {group.players.map((player) => (
+              <View
+                className="squad-player"
+                key={player.id}
+                onClick={() => void goToPlayer(player.id, tournamentId)}
+              >
+                <Text className="squad-player__number">{player.shirtNumber ?? '-'}</Text>
+                <UserAvatar name={player.displayName} color={player.profileColor} />
+                <View className="squad-player__copy">
+                  <Text>{player.displayName}</Text>
+                  <Text>
+                    {positionLabel(player.position)} · {player.academicYear}
+                  </Text>
+                </View>
+                <View className="squad-player__stats">
+                  <Text>{player.appearances} 场</Text>
+                  <Text>
+                    {player.goals} 球 · {player.assists} 助
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
   )
 }
@@ -414,11 +713,31 @@ function ProfileRow({
   )
 }
 
+function isCompletedMatch(match: MatchSummary): boolean {
+  return match.status === 'FINISHED' || match.status === 'CONFIRMED'
+}
+
+async function goToMatch(matchId: string) {
+  await Taro.navigateTo({
+    url: '/pages/readonly-match-detail/index?matchId=' + encodeURIComponent(matchId),
+  })
+}
+
 async function goToTeam(teamId: string, tournamentId: string) {
   await Taro.navigateTo({
     url:
       '/pages/readonly-team-detail/index?teamId=' +
       encodeURIComponent(teamId) +
+      '&tournamentId=' +
+      encodeURIComponent(tournamentId),
+  })
+}
+
+async function goToPlayer(playerId: string, tournamentId: string) {
+  await Taro.navigateTo({
+    url:
+      '/pages/player-detail/index?playerId=' +
+      encodeURIComponent(playerId) +
       '&tournamentId=' +
       encodeURIComponent(tournamentId),
   })
