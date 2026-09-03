@@ -23,13 +23,16 @@ pnpm install
 
 ## 本地演示启动
 
-依赖已经安装时，可直接运行一键启动脚本。脚本不依赖全局 `pnpm`，会准备数据库、恢复五个演示账号并打开 API 与 H5：
+依赖已安装后，在任意普通 PowerShell 窗口粘贴以下两行，不必先打开仓库文件夹。这里指向主仓库，不是 `.worktrees/` 中的开发副本：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-local-demo.ps1
+Set-Location -LiteralPath 'D:\MuDevSpace\其他\华师绿茵纪'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-local-demo.ps1'
 ```
 
-浏览器访问 `http://127.0.0.1:10087/`，完整账号与逐页步骤见[演示验收手册](docs/testing/演示验收手册.md)。
+脚本会按需启动 Docker Desktop，等待数据库就绪、执行迁移、后台启动 API/H5，最后自动打开 `http://127.0.0.1:10087/`。启动成功后可以关闭此 PowerShell 窗口；电脑重启后再运行一次。已运行且健康的服务会复用，普通启动不会重置你测试时修改的数据。
+
+仅首次初始化或明确要恢复演示数据时追加 `-Seed`，它会重写演示账号及部分数据；平时不要添加。日志位于被 Git 忽略的 `private-data/runtime/`。脚本不负责安装 Node.js、依赖或 Docker Desktop；更换电脑/仓库路径后先完成环境准备并修改上述路径。完整账号与逐页步骤见[演示验收手册](docs/testing/演示验收手册.md)。
 
 ## 手动开发命令
 
@@ -83,7 +86,7 @@ pnpm check
 
 ## 目录地图
 
-日常开发只需要关注下面五个目录：
+日常开发主要关注下面六个目录：
 
 | 路径        | 内容                                             |
 | ----------- | ------------------------------------------------ |
@@ -92,6 +95,7 @@ pnpm check
 | `prisma/`   | PostgreSQL 数据模型、迁移和 Seed 入口            |
 | `infra/`    | Docker Compose、镜像和部署配置                   |
 | `docs/`     | 当前文档入口；过期材料统一在 `docs/archive/`     |
+| `scripts/`  | 本地一键启动等辅助脚本                           |
 
 `private-data/` 仅保存本机报名表和解析中间件，已被 Git 忽略；`node_modules/`、`.pnpm-store/` 和构建目录均为生成内容。根目录的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json` 等是工具链入口，不能移入子目录。
 
@@ -125,4 +129,10 @@ pnpm check
 
 ## 当前阶段
 
-P0、P1 和 P2 的工程、赛程、名单与公开读取切片已经合并。当前 V1 已具备独立登录/注册页、五个核心入口、完整 8 队演示赛事、淘汰赛晋级树、比赛评分评论和多角色账户体验。
+P0、P1、P2 以及 P4 体验完善已合入主仓库。当前是可本地体验的 V1：独立登录/注册、五入口、16 队/224 球员/跨两赛季共 36 场比赛、淘汰树、评分评论、关注、队长管理、消息私信与投诉处理。微信端保持可构建，但尚未完成开发者工具和真机验收；当前不等同于可直接上线的正式版。
+
+### 自行推送与分支收尾
+
+GitHub Desktop 选择主仓库及 `main`：有本地修改先检查并 Commit，再点 `Push origin`；不需要逐个推送已合入 main 的开发分支。更换 GitHub 登录账号不会自动更换仓库远端地址，推送前在 Repository Settings 中核对 Remote。
+
+P4 开发分支已合并后，可在验收及推送完成后清理。先关闭对应开发任务/服务，逐个检查 `git -C .worktrees/<目录> status --short` 无输出，再执行 `git worktree remove .worktrees/<目录>`，最后 `git branch -d <分支名>`。不要直接删文件夹，不使用 `--force` 或 `-D` 绕过保护；命令拒绝时先保留。归档 Codex 任务与删除 Git worktree 是两回事。
