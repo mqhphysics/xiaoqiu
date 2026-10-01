@@ -464,7 +464,21 @@ test(
           await request(server)
             .post(`/api/admin/tournaments/${tournament.id}/rule-versions`)
             .set('authorization', scopedToken)
-            .send({ version: 1, name: 'FICTIONAL_TEST 规则', rules: { teamSize: 11 } })
+            .send({
+              version: 1,
+              name: 'FICTIONAL_TEST 规则',
+              rules: {
+                teamSize: 11,
+                results: {
+                  points: { win: 3, draw: 1, loss: 0 },
+                  tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR'],
+                  headToHead: { criteria: [], reapplyToRemainingTeams: false },
+                  groupShootout: 'REJECT',
+                  knockoutShootout: 'ALLOWED',
+                  forfeit: { winnerGoals: 3, loserGoals: 0, loserPoints: 0, both: null },
+                },
+              },
+            })
             .expect(201)
         },
       )
@@ -544,7 +558,6 @@ test(
             `/api/public/tournaments/${tournament.id}/schedule`,
             `/api/public/tournaments/${tournament.id}/competition-data`,
             `/api/public/teams/${team.id}/dashboard?tournamentId=${tournament.id}`,
-            `/api/public/players/${player.id}?tournamentId=${tournament.id}`,
             `/api/public/matches/${match.id}/experience`,
             `/api/public/posts?tournamentId=${prior.id}`,
           ]) {
@@ -556,6 +569,10 @@ test(
             for (const privateValue of [student.studentId!, student.email!, player.studentId!])
               assert.ok(!json.includes(privateValue))
           }
+          await request(server)
+            .get(`/api/public/players/${player.id}?tournamentId=${tournament.id}`)
+            .set('x-organization-id', organization.id)
+            .expect(404) // No approved locked roster yet; the later search case publishes it.
           await request(server)
             .get('/api/public/search')
             .query({ query: 'FICTIONAL_TEST', tournamentId: prior.id })
@@ -917,6 +934,56 @@ test(
               matchIds: [scoredDraft.id],
             })
             .expect(409)
+          for (const protection of [
+            { reportVersion: 1 },
+            { reportVersion: 1, confirmedReportVersion: 1 },
+          ]) {
+            const protectedDraft = await prisma.match.create({
+              data: {
+                organizationId: organization.id,
+                tournamentId: tournament.id,
+                matchCode: `REPORT-DRAFT-${randomUUID()}`,
+                title: 'FICTIONAL_TEST 报告绑定的空比分草案',
+              },
+            })
+            const protectedPlan = await request(server)
+              .post('/api/admin/schedule-plans')
+              .set('authorization', adminToken)
+              .send({
+                tournamentId: tournament.id,
+                name: 'FICTIONAL_TEST 报告绑定保护',
+                matchIds: [protectedDraft.id],
+              })
+              .expect(201)
+            await prisma.match.update({ where: { id: protectedDraft.id }, data: protection })
+            await request(server)
+              .post('/api/admin/schedule-plans')
+              .set('authorization', adminToken)
+              .send({
+                tournamentId: tournament.id,
+                name: 'FICTIONAL_TEST 不可重排',
+                matchIds: [protectedDraft.id],
+              })
+              .expect(409)
+            await request(server)
+              .post(`/api/admin/schedule-plans/${protectedPlan.body.id}/publish`)
+              .set('authorization', adminToken)
+              .expect(409)
+            assert.equal(
+              await prisma.scheduleRevision.count({
+                where: { schedulePlanId: protectedPlan.body.id },
+              }),
+              0,
+            )
+            const retained = await prisma.match.findUniqueOrThrow({
+              where: { id: protectedDraft.id },
+            })
+            assert.equal(retained.status, 'DRAFT')
+            assert.equal(retained.homeScore, null)
+            assert.equal(retained.awayScore, null)
+            assert.equal(retained.reportVersion, protection.reportVersion ?? 0)
+            assert.equal(retained.confirmedReportVersion, protection.confirmedReportVersion ?? null)
+          }
           await prisma.tournament.update({
             where: { id: tournament.id },
             data: { status: 'DRAFT' },

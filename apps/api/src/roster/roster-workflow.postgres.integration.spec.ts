@@ -286,9 +286,14 @@ test('roster HTTP workflow: real roles, isolation, immutable revisions, retries 
     current = (
       await command(captainToken, 'SUBMIT', current.version, { players: roster }).expect(200)
     ).body
-    await prisma.competitionRuleVersion.update({
-      where: { id: rules.id },
-      data: { rules: { roster: { ...policy, maxPlayers: 19 } } },
+    await prisma.competitionRuleVersion.create({
+      data: {
+        organizationId: organization.id,
+        tournamentId: tournament.id,
+        version: 2,
+        name: 'FICTIONAL_TEST revised roster policy',
+        rules: { roster: { ...policy, maxPlayers: 19 } },
+      },
     })
     await command(adminToken, 'APPROVE', current.version).expect(409)
     current = (
@@ -311,9 +316,14 @@ test('roster HTTP workflow: real roles, isolation, immutable revisions, retries 
         reason: 'DEMO_FIXTURE 批准补报一名新球员',
       }).expect(200)
     ).body
-    await prisma.competitionRuleVersion.update({
-      where: { id: rules.id },
-      data: { rules: { roster: { ...policy, submissionDeadline: '2000-01-01T00:00:00Z' } } },
+    await prisma.competitionRuleVersion.create({
+      data: {
+        organizationId: organization.id,
+        tournamentId: tournament.id,
+        version: 3,
+        name: 'FICTIONAL_TEST expired initial deadline',
+        rules: { roster: { ...policy, submissionDeadline: '2000-01-01T00:00:00Z' } },
+      },
     })
     current = (
       await command(captainToken, 'SAVE', current.version, { players: roster.slice(0, 13) }).expect(
@@ -393,9 +403,12 @@ test('roster HTTP workflow: real roles, isolation, immutable revisions, retries 
         })),
       ),
     })
-    await prisma.competitionRuleVersion.update({
-      where: { id: rules.id },
+    await prisma.competitionRuleVersion.create({
       data: {
+        organizationId: organization.id,
+        tournamentId: tournament.id,
+        version: 4,
+        name: 'FICTIONAL_TEST supplemental eligible players',
         rules: {
           roster: {
             ...policy,
@@ -404,6 +417,10 @@ test('roster HTTP workflow: real roles, isolation, immutable revisions, retries 
         },
       },
     })
+    assert.deepEqual(
+      (await prisma.competitionRuleVersion.findUniqueOrThrow({ where: { id: rules.id } })).rules,
+      { roster: policy },
+    )
     const sharedRoster = shared.map((player, index) => ({
       playerId: player.id,
       shirtNumber: String(index + 30),

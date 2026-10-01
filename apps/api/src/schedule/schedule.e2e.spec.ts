@@ -137,6 +137,8 @@ class FakePrisma {
     create: async ({ data }: { data: Row }) => {
       const match = this.create(this.matches, {
         status: 'DRAFT',
+        reportVersion: 0,
+        confirmedReportVersion: null,
         schedulePlanId: null,
         scheduleRevisionId: null,
         homeScore: null,

@@ -82,7 +82,17 @@ test(
           tournamentId: tournament.id,
           version: 1,
           name: 'FICTIONAL_TEST 规程',
-          rules: { fixture: 'FICTIONAL_TEST' },
+          rules: {
+            fixture: 'FICTIONAL_TEST',
+            results: {
+              points: { win: 3, draw: 1, loss: 0 },
+              tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR'],
+              headToHead: { criteria: [], reapplyToRemainingTeams: false },
+              groupShootout: 'REJECT',
+              knockoutShootout: 'ALLOWED',
+              forfeit: { winnerGoals: 3, loserGoals: 0, loserPoints: 0, both: null },
+            },
+          },
         },
       })
       const home = await prisma.team.create({
@@ -679,7 +689,26 @@ test(
           assert.equal(await prisma.matchAppearance.count({ where: { matchId: target.id } }), 1)
         },
       )
-      await t.test('未知弃权规程禁止确认；合法弃权必须与绑定规程判定比分一致', async () => {
+      await t.test('缺少阶段或完整规程禁止保存；合法弃权必须与绑定规程判定比分一致', async () => {
+        const noStage = await createExtraMatch('NO_STAGE')
+        await prisma.match.update({ where: { id: noStage.id }, data: { stageId: null } })
+        const blocked = await request(server)
+          .get(`/api/matches/${noStage.id}/report`)
+          .set('authorization', bearer(admin.id))
+          .expect(200)
+        assert.equal(blocked.body.permissions.canEdit, false)
+        assert.ok(blocked.body.blockingReasons.some((reason: string) => reason.includes('阶段')))
+        await postExtra(noStage, admin.id, content(0, report, 'SAVE')).expect(409)
+        assert.equal(await prisma.matchReportRevision.count({ where: { matchId: noStage.id } }), 0)
+        const incompleteRule = await prisma.competitionRuleVersion.create({
+          data: {
+            organizationId: organization.id,
+            tournamentId: tournament.id,
+            version: 2,
+            name: 'FICTIONAL_TEST 未配置完整赛果规程',
+            rules: { fixture: 'FICTIONAL_TEST' },
+          },
+        })
         const unknown = await createExtraMatch('UNKNOWN_FORFEIT')
         const forfeit = {
           ...report,
@@ -690,9 +719,10 @@ test(
         }
         await postExtra(unknown, admin.id, {
           ...content(0, forfeit, 'SUBMIT'),
+          ruleVersionId: incompleteRule.id,
           reason: 'FICTIONAL_TEST 客队弃权',
-        }).expect(200)
-        await postExtra(unknown, admin.id, review(1, 'CONFIRM')).expect(400)
+        }).expect(409)
+        assert.equal(await prisma.matchReportRevision.count({ where: { matchId: unknown.id } }), 0)
         assert.equal(
           (await prisma.match.findUniqueOrThrow({ where: { id: unknown.id } }))
             .confirmedReportVersion,
@@ -702,7 +732,7 @@ test(
           data: {
             organizationId: organization.id,
             tournamentId: tournament.id,
-            version: 2,
+            version: 3,
             name: 'FICTIONAL_TEST 明示3比0弃权判罚',
             rules: {
               results: {

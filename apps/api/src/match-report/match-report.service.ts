@@ -6,6 +6,7 @@ import { AccessPolicyService } from '../auth/access-policy.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
 import { Prisma, type MatchReportRevision } from '../generated/prisma/client'
+import { parseResultsRules } from '../results/parse-rules'
 import type {
   ReportFieldsDto,
   ReportHistoryQueryDto,
@@ -177,6 +178,9 @@ export class MatchReportService {
           const context = await this.context(tx, match, binding)
           if (!context.home || !context.away || !context.rule)
             throw conflict('双方名单必须锁定且对应本比赛，赛事必须有已发布规程版本')
+          const blockingReasons = this.blockingReasons(match, context)
+          if (body.action !== 'RETURN' && blockingReasons.length)
+            throw conflict(blockingReasons.join('；'))
           const fields = reviewing ? parseFields(previous!.fields) : body.fields!
           try {
             validateReportFields(
@@ -252,11 +256,15 @@ export class MatchReportService {
                   abandoned || !fields.homePenaltyScore ? null : Number(fields.homePenaltyScore),
                 awayPenaltyScore:
                   abandoned || !fields.awayPenaltyScore ? null : Number(fields.awayPenaltyScore),
-                summary: fields.notes || null,
                 statusReason:
                   fields.outcome === 'FINISHED'
                     ? null
-                    : reason || previous?.reason || '比赛中止或弃权，详见已确认报告',
+                    : {
+                        ABANDONED: '比赛中止',
+                        HOME_FORFEIT: '主队弃权',
+                        AWAY_FORFEIT: '客队弃权',
+                        BOTH_FORFEIT: '双方弃权',
+                      }[fields.outcome],
               },
             })
             await tx.matchEvent.deleteMany({
@@ -664,6 +672,8 @@ export class MatchReportService {
     const latest = await this.latest(tx, match)
     if (latest) this.requireUnchangedMatchContext(match, latest)
     const context = await this.context(tx, match, latest ?? undefined)
+    const blockingReasons = this.blockingReasons(match, context)
+    const ready = blockingReasons.length === 0
     const editable = !latest || latest.status === 'DRAFT' || latest.status === 'RETURNED'
     const authors = await this.authors(tx, latest ? [latest] : [])
     return {
@@ -687,13 +697,14 @@ export class MatchReportService {
         players: context.away?.entries.map(playerView) ?? [],
       },
       permissions: {
-        canEdit: editable,
-        canSubmit: editable,
+        canEdit: ready && editable,
+        canSubmit: ready && editable,
         canViewHistory: true,
-        canCorrect: privilege.administrator && latest?.status === 'CONFIRMED',
-        canConfirm: privilege.administrator && latest?.status === 'SUBMITTED',
+        canCorrect: ready && privilege.administrator && latest?.status === 'CONFIRMED',
+        canConfirm: ready && privilege.administrator && latest?.status === 'SUBMITTED',
         canReturn: privilege.administrator && latest?.status === 'SUBMITTED',
       },
+      blockingReasons,
       latest: latest ? this.revisionView(latest, authors) : null,
       reviewNote: latest?.status === 'RETURNED' ? latest.reason : null,
       officialResult: {
@@ -711,6 +722,29 @@ export class MatchReportService {
       select: { id: true, displayName: true },
     })
     return new Map(users.map((user) => [user.id, user.displayName]))
+  }
+  private blockingReasons(
+    match: ReportMatch,
+    context: Awaited<ReturnType<MatchReportService['context']>>,
+  ) {
+    const reasons: string[] = []
+    if (
+      !match.stageId ||
+      !match.stage ||
+      match.stage.organizationId !== match.organizationId ||
+      match.stage.tournamentId !== match.tournamentId
+    )
+      reasons.push('比赛尚未绑定本赛事赛制阶段，请先完成赛事配置')
+    if (!context.home || !context.away) reasons.push('双方报名名单尚未锁定')
+    if (!context.rule) reasons.push('赛事没有可用的已发布规程')
+    else {
+      try {
+        parseResultsRules(context.rule.id, context.rule.rules)
+      } catch {
+        reasons.push('赛事尚未配置完整的赛果规程，无法保存或确认正式报告')
+      }
+    }
+    return reasons
   }
   private revisionView(revision: MatchReportRevision, authors: Map<string, string>) {
     return {

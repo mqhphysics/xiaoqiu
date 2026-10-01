@@ -7,7 +7,7 @@ import { ApiHttpException } from './api-http.exception'
 
 /** Selection is explicit, deployment configured, then newest published season. */
 export async function selectPublicTournament(
-  prisma: PrismaService,
+  prisma: Pick<PrismaService, 'tournament'>,
   organizationId: string,
   tournamentId?: string,
 ) {

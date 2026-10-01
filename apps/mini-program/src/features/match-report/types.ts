@@ -1,4 +1,4 @@
-// Internal adapter proposal. The integrator owns the eventual public API contract.
+// H5 view types adapted from the authoritative MatchReportController DTO source.
 export type Side = 'HOME' | 'AWAY'
 export type Outcome = 'FINISHED' | 'HOME_FORFEIT' | 'AWAY_FORFEIT' | 'ABANDONED'
 export type EventKind = 'GOAL' | 'OWN_GOAL' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION'
@@ -65,6 +65,7 @@ export interface ReportWorkspace {
   }
   latest: ReportRevision | null
   reviewNote: string | null
+  blockingReasons?: string[]
 }
 
 export interface SaveReportCommand {

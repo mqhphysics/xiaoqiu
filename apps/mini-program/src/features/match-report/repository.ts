@@ -159,7 +159,12 @@ function parseWorkspace(value: unknown): ReportWorkspace {
       (key) => typeof (value.permissions as Record<string, unknown>)[key] === 'boolean',
     ) ||
     !(value.latest === null || isRevision(value.latest)) ||
-    !(value.reviewNote === null || typeof value.reviewNote === 'string')
+    !(value.reviewNote === null || typeof value.reviewNote === 'string') ||
+    !(
+      value.blockingReasons === undefined ||
+      (Array.isArray(value.blockingReasons) &&
+        value.blockingReasons.every((reason) => typeof reason === 'string'))
+    )
   )
     throw invalidResponse()
   return value as unknown as ReportWorkspace

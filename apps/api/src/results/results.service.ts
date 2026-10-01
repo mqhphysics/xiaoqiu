@@ -82,65 +82,70 @@ export class ResultsService {
     }
   }
 
-  async readTournamentResults(organizationId: string, tournamentId: string) {
+  async readTournamentResults(
+    organizationId: string,
+    tournamentId: string,
+    transaction?: ResultsTransaction,
+  ) {
     tournamentId = tournamentId.toLowerCase()
-    await selectPublicTournament(this.prisma, organizationId, tournamentId)
-    return this.prisma.$transaction(
-      async (tx) => {
-        const { row, engine } = await this.rules(tx, organizationId, tournamentId)
-        const [fixtures, participants, groups] = await Promise.all([
-          loadResultFixtures(tx, organizationId, tournamentId),
-          loadParticipants(tx, organizationId, tournamentId),
-          loadGroups(tx, organizationId, tournamentId),
-        ])
-        try {
-          const facts = fixtures
-            .map(confirmedResultFact)
-            .filter((fact): fact is ResultFact & { ruleVersionId: string } => fact !== null)
+    await selectPublicTournament(transaction ?? this.prisma, organizationId, tournamentId)
+    const read = async (tx: ResultsTransaction) => {
+      const { row, engine } = await this.rules(tx, organizationId, tournamentId)
+      const [allFixtures, participants, groups] = await Promise.all([
+        loadResultFixtures(tx, organizationId, tournamentId),
+        loadParticipants(tx, organizationId, tournamentId),
+        loadGroups(tx, organizationId, tournamentId),
+      ])
+      const fixtures = allFixtures.filter((fixture) => fixture.status !== 'DRAFT')
+      try {
+        const facts = fixtures
+          .map(confirmedResultFact)
+          .filter((fact): fact is ResultFact & { ruleVersionId: string } => fact !== null)
+        requireRule(
+          facts.every((fact) => fact.ruleVersionId === row.id),
+          'CONFIRMED_RULE_VERSION_MISMATCH',
+        )
+        for (const fact of facts.filter((item) => item.decision !== 'PLAYED')) {
+          const score = resolveScore(fact, engine)
           requireRule(
-            facts.every((fact) => fact.ruleVersionId === row.id),
-            'CONFIRMED_RULE_VERSION_MISMATCH',
+            fact.homeScore === score.homeGoals && fact.awayScore === score.awayGoals,
+            'CONFIRMED_FORFEIT_SCORE_MISMATCH',
           )
-          for (const fact of facts.filter((item) => item.decision !== 'PLAYED')) {
-            const score = resolveScore(fact, engine)
-            requireRule(
-              fact.homeScore === score.homeGoals && fact.awayScore === score.awayGoals,
-              'CONFIRMED_FORFEIT_SCORE_MISMATCH',
-            )
-          }
-          return {
-            tournamentId,
-            ruleVersionId: row.id,
-            mode: 'OFFICIAL' as const,
-            groups: groups.map((group) => ({
-              id: group.id,
-              standings: calculateResultStandings(
-                { organizationId, tournamentId, stageId: group.stageId, groupId: group.id },
-                participants.filter((team) => team.groupId === group.id).map((team) => team.teamId),
-                facts.filter((fact) => fact.groupId === group.id),
-                engine,
-                'OFFICIAL',
-              ),
-            })),
-            confirmedResults: facts.map((fact) => {
-              const score = fact.status === 'VOID' ? null : resolveScore(fact, engine)
-              return {
-                ...fact,
-                homeScore: score?.homeGoals ?? fact.homeScore,
-                awayScore: score?.awayGoals ?? fact.awayScore,
-                playedAt: fact.playedAt.toISOString(),
-              }
-            }),
-            sourceVersions: Object.fromEntries(
-              fixtures.map((fixture) => [fixture.id, fixture.confirmedReportVersion ?? 0]),
-            ),
-          }
-        } catch (error) {
-          this.ruleFailure(error)
         }
-      },
-      { isolationLevel: 'RepeatableRead' },
-    )
+        return {
+          tournamentId,
+          ruleVersionId: row.id,
+          mode: 'OFFICIAL' as const,
+          groups: groups.map((group) => ({
+            id: group.id,
+            standings: calculateResultStandings(
+              { organizationId, tournamentId, stageId: group.stageId, groupId: group.id },
+              participants.filter((team) => team.groupId === group.id).map((team) => team.teamId),
+              facts.filter((fact) => fact.groupId === group.id),
+              engine,
+              'OFFICIAL',
+            ),
+          })),
+          confirmedResults: facts.map((fact) => {
+            const score = fact.status === 'VOID' ? null : resolveScore(fact, engine)
+            return {
+              ...fact,
+              homeScore: score?.homeGoals ?? fact.homeScore,
+              awayScore: score?.awayGoals ?? fact.awayScore,
+              playedAt: fact.playedAt.toISOString(),
+            }
+          }),
+          sourceVersions: Object.fromEntries(
+            fixtures.map((fixture) => [fixture.id, fixture.confirmedReportVersion ?? 0]),
+          ),
+        }
+      } catch (error) {
+        this.ruleFailure(error)
+      }
+    }
+    return transaction
+      ? read(transaction)
+      : this.prisma.$transaction(read, { isolationLevel: 'RepeatableRead' })
   }
 
   async preview(
@@ -301,7 +306,7 @@ export class ResultsService {
       const boundLineups = await tx.$queryRawUnsafe<Array<{ matchId: string }>>(
         `SELECT DISTINCT match_id AS "matchId" FROM team_lineup_plans
         WHERE organization_id = $1::uuid AND tournament_id = $2::uuid AND match_id = ANY($3::uuid[])
-          AND kind = 'MATCH_LINEUP' AND roster_snapshot_id IS NOT NULL AND version > 0`,
+          AND kind = 'MATCH_LINEUP' AND roster_snapshot_id IS NOT NULL`,
         organizationId,
         tournamentId,
         targets,

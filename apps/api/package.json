@@ -11,7 +11,7 @@
     "start": "node dist/main.js",
     "pretypecheck": "npm run contracts:build && npm run prisma:generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "npm run contracts:build && npm run prisma:generate",
+    "pretest": "npm run contracts:build && npm run prisma:generate && npm --prefix ../worker run build",
     "test": "tsc -p tsconfig.test.json && node scripts/copy-prisma-engine.mjs dist/test/generated/prisma && node --test \"dist/test/**/*.spec.js\"",
     "prisma:validate": "prisma validate --schema ../../prisma/schema.prisma",
     "prisma:format": "prisma format --schema ../../prisma/schema.prisma",

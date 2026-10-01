@@ -84,7 +84,8 @@ export function MatchReportWorkspace({
   const missingContext =
     !workspace?.homeTeam.rosterSnapshotId ||
     !workspace?.awayTeam.rosterSnapshotId ||
-    !workspace?.ruleVersionId
+    !workspace?.ruleVersionId ||
+    !!workspace?.blockingReasons?.length
   const locked =
     busy ||
     !!pending ||
@@ -565,10 +566,12 @@ export function MatchReportWorkspace({
       )}
       {missingContext && (
         <div className="mr-banner mr-banner--warning">
-          需要双方锁定名单和已发布赛事规程才能保存。请先联系赛事管理员补齐。
+          {workspace.blockingReasons?.length
+            ? workspace.blockingReasons.join('；')
+            : '需要双方锁定名单和完整的已发布赛事规程才能保存。请先联系赛事管理员补齐。'}
         </div>
       )}
-      {!workspace.permissions.canEdit && !correction && (
+      {!workspace.permissions.canEdit && !correction && !missingContext && (
         <div className="mr-banner">
           <span>当前报告为只读。录入或修正需要赛事管理员授权。</span>
         </div>

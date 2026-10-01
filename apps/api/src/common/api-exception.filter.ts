@@ -40,6 +40,22 @@ function isApiHttpExceptionBody(value: unknown): value is ApiHttpExceptionBody {
   return isErrorCode(candidate.code) && typeof candidate.message === 'string'
 }
 
+function internalErrorCodes(exception: unknown): string[] {
+  if (typeof exception !== 'object' || exception === null) return []
+
+  const candidate = exception as { code?: unknown; meta?: unknown }
+  const nestedCode =
+    typeof candidate.meta === 'object' && candidate.meta !== null
+      ? (candidate.meta as { code?: unknown }).code
+      : undefined
+  return [...new Set([candidate.code, nestedCode])].filter(
+    (code): code is string =>
+      typeof code === 'string' &&
+      code.length === 5 &&
+      /^(?:P\d{4}|(?:\d{2}|F0|HV|P0|XX)[0-9A-Z]{3})$/.test(code),
+  )
+}
+
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(ApiExceptionFilter.name)
@@ -65,15 +81,16 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const internalCodes = internalErrorCodes(exception)
       this.logger.error(
         JSON.stringify({
-          error: exception instanceof Error ? exception.message : 'unknown error',
+          code,
           method: request.method,
           path: getSafeRequestPath(request),
           requestId,
           status,
+          ...(internalCodes.length ? { internalCodes } : {}),
         }),
-        exception instanceof Error ? exception.stack : undefined,
       )
     }
 

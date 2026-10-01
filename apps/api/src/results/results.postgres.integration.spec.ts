@@ -379,7 +379,18 @@ test(
       await t.test(
         'public reads newest confirmation with no projection and excludes restricted fields',
         async () => {
+          const privateFixture = await prisma.match.create({
+            data: {
+              organizationId: org.id,
+              tournamentId: tournament.id,
+              matchCode: `PRIVATE-DRAFT-${suffix}`,
+              title: 'FICTIONAL_TEST unpublished fixture',
+              status: 'DRAFT',
+            },
+          })
           const response = await read().expect(200)
+          assert.equal(Object.hasOwn(response.body.sourceVersions, privateFixture.id), false)
+          assert.equal(JSON.stringify(response.body).includes(privateFixture.id), false)
           assert.equal(response.body.confirmedResults[0].revision, 2)
           assert.equal(response.body.confirmedResults[0].awayScore, 3)
           assert.equal(response.body.groups[0].standings.rows[0].teamId, teams[1]!.id)
@@ -1008,9 +1019,9 @@ test(
               tournamentId: tournament.id,
               matchId: target.id,
               rosterSnapshotId: snapshots[1]!,
-              name: 'FICTIONAL_TEST Bound Lineup',
+              name: 'FICTIONAL_TEST Newly Saved Bound Lineup',
               kind: 'MATCH_LINEUP',
-              version: 1,
+              version: 0,
               payload: { format: 11, formation: '4-3-3', slots: [], benchPlayerIds: [] },
             },
           })
