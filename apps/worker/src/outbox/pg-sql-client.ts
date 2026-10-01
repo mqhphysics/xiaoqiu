@@ -6,6 +6,8 @@ export interface PgQueryable {
 }
 export interface PgConnection extends PgQueryable {
   release(error?: Error): void
+  on?(event: 'error', handler: (error: Error) => void): unknown
+  removeListener?(event: 'error', handler: (error: Error) => void): unknown
 }
 export interface PgPool extends PgQueryable {
   connect(): Promise<PgConnection>
@@ -32,8 +34,22 @@ export class PgSqlClient implements TransactionalSqlClient {
     let acceptingQueries = true
     let destroyed = false
     let timer: NodeJS.Timeout | undefined
+    let rejectConnection!: (error: Error) => void
+    const connectionFailure = new Promise<never>((_resolve, reject) => {
+      rejectConnection = reject
+    })
+    const onConnectionError = (error: Error): void => {
+      acceptingQueries = false
+      if (!destroyed) {
+        destroyed = true
+        client.release(error)
+      }
+      rejectConnection(error)
+    }
+    client.on?.('error', onConnectionError)
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
+        if (destroyed) return
         acceptingQueries = false
         destroyed = true
         // Destroy the dedicated connection: PostgreSQL rolls back its transaction.
@@ -64,7 +80,7 @@ export class PgSqlClient implements TransactionalSqlClient {
       return result
     }
     try {
-      return await Promise.race([transaction(), timeout])
+      return await Promise.race([transaction(), timeout, connectionFailure])
     } catch (error) {
       acceptingQueries = false
       if (!destroyed) {
@@ -81,6 +97,7 @@ export class PgSqlClient implements TransactionalSqlClient {
     } finally {
       if (timer) clearTimeout(timer)
       acceptingQueries = false
+      client.removeListener?.('error', onConnectionError)
       if (!destroyed) client.release()
     }
   }

@@ -1,20 +1,29 @@
-import { Injectable, Logger, type OnApplicationBootstrap, type OnModuleDestroy } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from '@nestjs/common'
+
+import { createWorkerRuntime, type WorkerRuntime } from './worker-runtime'
 
 @Injectable()
 export class WorkerService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(WorkerService.name)
-  private heartbeat?: NodeJS.Timeout
+  private runtime: WorkerRuntime | undefined
 
-  onApplicationBootstrap(): void {
-    this.logger.log('Worker skeleton is ready')
-    this.heartbeat = setInterval(() => {
-      this.logger.debug('Worker heartbeat')
-    }, 30_000)
+  async onApplicationBootstrap(): Promise<void> {
+    this.runtime = createWorkerRuntime(process.env, (code) => this.logger.error(code))
+    try {
+      await this.runtime.start()
+    } catch {
+      await this.runtime.stop()
+      throw new Error('WORKER_START_FAILED')
+    }
+    this.logger.log('Worker consuming confirmed match reports')
   }
 
-  onModuleDestroy(): void {
-    if (this.heartbeat) {
-      clearInterval(this.heartbeat)
-    }
+  async onModuleDestroy(): Promise<void> {
+    await this.runtime?.stop()
   }
 }

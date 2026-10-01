@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
-import { type SqlExecutor, type TransactionalSqlClient } from './outbox-store'
+import { PgSqlClient, type PgPool } from './pg-sql-client'
 
 interface PrismaSql {
   $queryRawUnsafe<T>(sql: string, ...parameters: unknown[]): Promise<T>
@@ -34,20 +34,14 @@ const { PrismaClient } = clientLoader(clientModule) as {
   PrismaClient: new (options: unknown) => TestPrismaClient
 }
 export const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
-const executor = (client: PrismaSql): SqlExecutor => ({
-  query: <T>(sql: string, parameters: unknown[]) => client.$queryRawUnsafe<T[]>(sql, ...parameters),
-})
-export const db: TransactionalSqlClient = {
-  ...executor(prisma),
-  transaction: (work, timeoutMs) =>
-    prisma.$transaction(
-      async (tx) => {
-        await tx.$queryRawUnsafe(
-          "SELECT set_config('statement_timeout', $1, true)",
-          String(timeoutMs),
-        )
-        return work(executor(tx))
-      },
-      { timeout: timeoutMs, maxWait: timeoutMs },
-    ),
+const pgModule = process.env.WORKER_TEST_PG_MODULE ?? 'pg'
+const { Pool } = clientLoader(pgModule) as {
+  Pool: new (config: unknown) => PgPool & { on(event: 'error', listener: () => void): void }
+}
+const pool = new Pool({ connectionString: databaseUrl, max: 20, connectionTimeoutMillis: 5000 })
+pool.on('error', () => {}) // Tests inspect failures; never print driver errors or credentials.
+export const db = new PgSqlClient(pool)
+export async function closeTestDatabase(): Promise<void> {
+  await db.close()
+  await prisma.$disconnect()
 }

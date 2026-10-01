@@ -37,7 +37,10 @@ export class PostgresResultProjectionRepository implements ResultProjectionRepos
     const rows = await tx.query<ConfirmedRevision>(
       `SELECT revision.organization_id AS "organizationId", revision.match_id AS "matchId",
       fixture.tournament_id AS "tournamentId", revision.version, revision.id AS "revisionId",
-      revision.rule_version_id AS "ruleVersionId", revision.status::text AS status, revision.fields
+      revision.rule_version_id AS "ruleVersionId", revision.status::text AS status, revision.fields,
+      fixture.stage_id AS "stageId", fixture.group_id AS "groupId",
+      fixture.home_team_id AS "homeTeamId", fixture.away_team_id AS "awayTeamId",
+      coalesce(fixture.scheduled_start_at, revision.created_at) AS "playedAt"
       FROM match_report_revisions revision
       JOIN matches fixture ON fixture.id = revision.match_id AND fixture.organization_id = revision.organization_id
       WHERE revision.organization_id = $1::uuid AND revision.match_id = $2::uuid AND revision.version = $3 AND revision.status = 'CONFIRMED'`,

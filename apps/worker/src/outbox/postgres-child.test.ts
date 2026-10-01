@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 
 import { PostgresOutboxStore } from './outbox-store'
-import { db, prisma } from './postgres-test-client.test'
+import { closeTestDatabase, db } from './postgres-test-client.test'
 
 async function run(): Promise<void> {
   const topic = process.env.WORKER_TEST_TOPIC
@@ -26,11 +26,11 @@ async function run(): Promise<void> {
   }
   process.stdout.write(JSON.stringify({ acquired: job !== null }) + '\n')
   if (mode === 'CLAIM_AND_EXIT') process.exit(0) // Process dies with PROCESSING state, no graceful disconnect.
-  await prisma.$disconnect()
+  await closeTestDatabase()
 }
 
 void run().catch(async () => {
   process.stderr.write('POSTGRES_TEST_CHILD_FAILED\n')
-  await prisma.$disconnect()
+  await closeTestDatabase()
   process.exitCode = 1
 })

@@ -63,7 +63,7 @@ pnpm test:postgres
 
 ## 公共文件建议
 
-由 integrator 独占处理：确认版本/投影/晋级预览模型和约束、contracts、生成 Client、新模块接线、必要索引与统一依赖安装/锁文件。现有 Outbox deduplicationKey 没有唯一约束；应按组织+消费者+源版本确定去重约束。大量读取还需独立验收查询计划、分页/索引、投影滞后及网站负载；本段没有声称完成容量测试。
+由 integrator 独占处理：确认版本/投影/晋级预览模型和约束、contracts、生成 Client、新模块接线、必要索引与统一依赖安装/锁文件。初始迁移已创建 `outbox_jobs_deduplication_key_key`，对非空 deduplicationKey 提供全局 partial UNIQUE；Prisma schema 未表达该索引不代表数据库没有约束。本报告此前误称无约束，现已核实迁移并更正，不增加重复索引。大量读取还需独立验收查询计划、分页/索引、投影滞后及网站负载；本段没有声称完成容量测试。
 
 ## 第二段接口准备（RESULTS-CONTRACT-01）
 

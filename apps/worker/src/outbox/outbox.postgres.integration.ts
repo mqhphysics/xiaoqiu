@@ -11,7 +11,7 @@ import {
   type ClaimedJob,
   type SqlExecutor,
 } from './outbox-store'
-import { clientLoader, db, prisma } from './postgres-test-client.test'
+import { clientLoader, closeTestDatabase, db, prisma } from './postgres-test-client.test'
 const store = new PostgresOutboxStore(db)
 const ids: string[] = []
 
@@ -147,6 +147,24 @@ test('real PostgreSQL Outbox claim, fencing, rollback, retries and restart behav
       await store.complete(acquired[0]!, effect, 10000)
       assert.equal((await state(id)).effects, 1)
     })
+
+    await t.test(
+      'real pg transaction timeout rolls back writes and leaves the pool usable',
+      async () => {
+        const topic = `results-test-${randomUUID()}`
+        const id = await enqueue(topic)
+        const job = (await store.claim([topic], 30000))!
+        await assert.rejects(
+          db.transaction(async (tx) => {
+            await effect(tx, job)
+            await tx.query('SELECT pg_sleep(0.2)', [])
+          }, 50),
+        )
+        assert.equal((await state(id)).effects, 0)
+        const rows = await db.query<{ ready: number }>('SELECT 1 AS ready', [])
+        assert.equal(rows[0]?.ready, 1)
+      },
+    )
 
     await t.test(
       'actual process exit after claim, then two new processes produce one committed effect',
@@ -380,7 +398,7 @@ test('real PostgreSQL Outbox claim, fencing, rollback, retries and restart behav
         await prisma.$executeRawUnsafe('DELETE FROM outbox_jobs WHERE id = $1::uuid', id)
       }
     } finally {
-      await prisma.$disconnect()
+      await closeTestDatabase()
     }
   }
 })

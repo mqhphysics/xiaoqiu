@@ -24,6 +24,11 @@ export interface ConfirmedRevision {
   ruleVersionId: string
   status: 'CONFIRMED'
   fields: unknown
+  stageId?: string | null
+  groupId?: string | null
+  homeTeamId?: string | null
+  awayTeamId?: string | null
+  playedAt?: Date | string
 }
 
 export interface ResultProjectionRepository {
@@ -105,7 +110,7 @@ export function createMatchReportHandler(
       event.matchId,
       event.confirmedReportVersion,
     )
-    rejectUnless(revision !== null, 'CONFIRMED_RESULT_REVISION_MISSING')
+    if (revision === null) throw new Error('CONFIRMED_RESULT_REVISION_MISSING')
     rejectUnless(
       revision.organizationId === job.organizationId &&
         revision.matchId === event.matchId &&
