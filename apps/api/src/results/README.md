@@ -1,92 +1,85 @@
-# V2 Results Worker：第一段实现与交接
+# V2 结果与 Worker 交付
 
-2026-10-02。任务分支 `codex/v2-results-worker`，共同基线 `e282f995bc627830512089f2c2dc9816de43ffb3`。本目录是独立规程计算与报告适配边界，尚未接入正式 API/数据库；`apps/worker/src/outbox` 是已在真实 PostgreSQL 验证的消费核心，正式 Worker 运行接线等待 integrator 的确认版本/事件/投影合同。
+2026-10-02。分支 `codex/v2-results-worker`，共同基线 `5612e776b13d05094f311e3264fa41c00de310a9`。稳定代码提交 `19e1e86630f9e8f79c76bf0bc8a2b9603f3c69e3` 已直接交给 Integrator 3；本报告更新只补文档。
 
-## 本段修改范围
+## 已完成与修改文件
 
-- `apps/api/src/results/competition-rules.ts`：内部规则与比赛事实校验、比分/弃权判定。
-- `apps/api/src/results/standings.ts`：正式/预览积分、同分小循环比较、晋级截止线检查。
-- `apps/api/src/results/knockout.ts`：单场淘汰赛胜者、点球/弃权与未决结果。
-- `apps/api/src/results/report-adapter.ts`：报告状态与赛果的显式适配。
-- 本目录的专属测试、独立类型检查配置及本报告。
-- `apps/worker/src/outbox/`：PostgreSQL 消费存储、有限并发消费器、服务级及独立数据库测试。
-- `apps/worker/package.json` / `tsconfig.build.json`：实际测试命令、生产构建排除集成测试；没有新增依赖。
+- `apps/api/src/results/`：显式规程解析、积分/同分/点球/弃权计算、最新确认事实读取、晋级来源 hash、ResultsService/Controller/DTO/Module 及专属测试。
+- `apps/worker/src/outbox/`：原子领取、租约 token/尝试次数保护、同连接事务、重试/永久失败、有限并发、超时回滚、进程恢复及专属测试。
+- `apps/worker/src/results/`：确认版本与固定上下文检查、安全赛果投影、已存在站内通知的幂等回执。
+- `apps/worker/src/worker-runtime.ts`、`worker.service.ts`：实际 pg Pool 消费生命周期、启动检查、停止等待在途事务及关闭连接。
+- `apps/worker/package.json`、`tsconfig.build.json`：显式测试入口，生产构建排除测试 helper。
 
-schema、迁移、contracts、API Client、根配置、锁文件、API app.module、experience.service/controller/dto、前端均未修改。
+本任务没有改 schema/迁移、contracts、生成 API Client、根配置/锁文件、API app.module、Experience、前端或微信文件。Prisma Client 在自己工作树生成，仅作为忽略的构建依赖；pg 及类型依赖版本来自 Integrator 的共同基线，未重新安装或升级。
 
-## 已实现的行为
+## 已满足的验收行为
 
-1. `OFFICIAL` 只纳入 `CONFIRMED`，`PREVIEW` 可以纳入进行中/待审并标记暂定。提交、退回、草稿不自动成为正式赛果。`ABANDONED` 映射为 `VOID`，不计算积分、不自动晋级；不推定双方弃权。
-2. 比赛比分包含加时，点球大战比分单独保存。点球决定单场淘汰赛胜者，不增加比赛进球。规则依据：[IFAB Law 10](https://www.theifab.com/laws/latest/determining-the-outcome-of-a-match/)。是否加时、同分排序、弃权判罚仍由具体赛事规程显式提供。
-3. 积分、同分比较顺序、同分队之间小循环的比较维度与是否重新比较剩余队伍均为必传参数。没有姓名决胜；完全相同时并列，稳定 ID 仅决定展示顺序。
-4. 晋级截止线穿过并列队伍、阶段未完成、暂定榜单均阻止自动选择；选出晋级集合不表示已经决定种子位顺序或持久化晋级。
-5. 弃权使用显式判罚比分/积分；双方弃权要求独立规则，淘汰赛仍须管理员裁定。不伪造球员进球或助攻。
-6. 组织/赛事/阶段/小组不匹配、组外球队、同队比赛、重复比赛 ID、无比分/非法比分、未决/不完整点球都会拒绝。更正从最新事实快照重算，不累计旧版本。
-7. Outbox 使用数据库时钟及 `FOR UPDATE SKIP LOCKED` 原子领取；只领取已注册 topic，一次只领取当前空闲执行槽可处理的任务。[PostgreSQL SELECT 文档](https://www.postgresql.org/docs/current/sql-select.html)明确将 SKIP LOCKED 用于多个消费者的队列场景；它不是普通一致性查询方式。
-8. 每次领取生成新 token，并以 token、attemptCount 和未过期租约限制成功/失败写入。Handler 的数据库副作用与 SUCCEEDED 同事务；失败或提交前租约失效均回滚副作用。
-9. 有限并发、重叠 tick 去重、停止等待在途事务；指数退避加抖动、最大尝试次数、过期租约回收和永久失败。仅存受限错误代码，不存可能包含个人资料或凭据的异常消息。
-10. lease/retry/事务时长严格限制到 PostgreSQL int4 / Node timer 范围，超过 `2147483647` 在发 SQL 前拒绝。
+1. 正式积分只纳入确认事实；进行中/待审数据使用单独的 PREVIEW 计算。没有确认版本时不把 FINISHED 推定成已审核。
+2. `rules.results` 必须显式提供积分、同分比较、小循环重新比较、点球与弃权政策；未知/缺失规程拒绝计算。完全同分保留并列，球队名称不决定晋级。
+3. 点球大战独立于普通比分/进球。绑定规程的弃权判罚须与已确认报告一致，不推定默认 3:0、不修改历史 ruleVersionId；ABANDONED 为 VOID，不计积分或自动晋级。点球依据见 [IFAB Law 10](https://www.theifab.com/laws/latest/determining-the-outcome-of-a-match/)。
+4. 每条事实的确认版本与计算规程一致；规则版本变化不追溯重解释旧比分，明确阻止并要求核查。
+5. 按报告分支的真实 `_matchContext` 验证组织、比赛、赛事、stage/group/round ID、双方球队、scheduledStartAt 九个字段；变化拒绝投影及晋级，不把旧内容套入新比赛。
+6. 投影只存安全 ResultFact 与 ruleVersionId；不存原始 fields、notes、操作者或冻结内部字段。公开读取从当前不可变确认行重建，缓存缺失/落后不返回旧赛果；只读同组织、ACTIVE 组织的 PUBLISHED 赛事。
+7. Worker 只领取已注册 topic，使用数据库时钟及 SKIP LOCKED、每次领取的新 token、尝试次数及有效租约。Handler 副作用与 SUCCEEDED 同一 pg client 事务；失败、提交前过期或总超时均回滚。参见 [node-postgres 事务文档](https://node-postgres.com/features/transactions)。
+8. 同一 job 重领有租约保护；不同旧 revision job 不能覆盖当前确认版。重试有抖动、次数上限及永久失败，异常消息不落库，安全错误代码保留。
+9. `match.report.notification` 回执核对已经存在的 revision、通知 ID、接收人、组织、metadata/type/dedup；不重复创建通知、不重置已读。合法空收件人列表可以确认回执，不声称存在外部推送。
+10. 晋级用明确的 `rules.progression` 来源/目标映射。GROUP_RANK 要求对应来源组比赛确认；同一 KNOCKOUT Stage 内 MATCH_WINNER/LOSER 只要求显式来源比赛完成，未来轮次不阻塞当前推进。
+11. 确认前重算来源 hash，纳入规程、确认版本（含未确认 version0）、参赛队/分组及来源对阵。并列未决、来源变化、同队对阵/重复晋级人选、目标已开赛/有报告/绑定阵容均拒绝新确认。事务更新签位、CAS、不可变历史、角色快照审计和 Outbox。
+12. 相同 key/内容的历史成功回执先回放，不重新改队；后来的来源更正、目标 LIVE/报告/阵容或上下文变化不破坏回执。不同内容 409，新 key 严格检查当前 hash/version/目标。
 
-## 验证命令与边界
+## API 与模型影响
+
+新增端点：
+
+- `GET /api/public/tournaments/:id/results`
+- `POST /api/admin/tournaments/:id/progression/preview`：`{ruleVersionId}`
+- `POST /api/admin/tournaments/:id/progression/confirm`：`{ruleVersionId,expectedVersion,sourceHash,reason}` 与 `Idempotency-Key`
+
+管理服务使用 fresh AuthService 会话和 `requireTournamentAdministrator`；不以客户端角色头授权。ResultsModule 导出 ResultsService，最终 AppModule/Experience 及共同只读事务接线由 Integrator 负责。
+
+消费 topic 为 `match.report / MatchReportConfirmed` 和 `match.report.notification / MatchReportNotificationCreated`。确认晋级另产 `tournament.progression / TournamentProgressionConfirmed`；它和其它未注册 topic 保留队列，未伪造消费成功。
+
+初始迁移已具有 `outbox_jobs_deduplication_key_key`：非空 deduplicationKey 的全局 partial UNIQUE。此前报告只看 Prisma schema 而误称无约束，已查迁移纠正；没有加重复索引。
+
+## 命令与实际结果
+
+Node 报告：**54 项定向单元、13 项真实 pg Pool/Outbox、14 项真实 Auth/Results HTTP 与生产 Worker 生命周期通过；合计 81 项通过、0 失败、0 跳过**。两个 PostgreSQL 报告包含外层测试；实际场景分别为 12、13 个。API/Worker 类型检查、API 测试编译、Worker 构建、范围 ESLint、格式和 diff 检查通过。
 
 ```powershell
-node node_modules/typescript/bin/tsc -p apps/api/src/results/tsconfig.json
+# 仓库根目录；Prisma Client 只生成在当前工作树
+node apps/api/node_modules/prisma/build/index.js generate --schema prisma/schema.prisma
+node node_modules/typescript/bin/tsc -p apps/api/tsconfig.json --noEmit
 node node_modules/typescript/bin/tsc -p apps/worker/tsconfig.json --noEmit
-node node_modules/eslint/bin/eslint.js apps/api/src/results apps/worker/src/outbox
-node apps/worker/node_modules/tsx/dist/cli.mjs --test apps/api/src/results/competition-rules.spec.ts apps/worker/src/outbox/outbox-consumer.spec.ts
 node node_modules/typescript/bin/tsc -p apps/worker/tsconfig.build.json
+node node_modules/typescript/bin/tsc -p apps/api/tsconfig.test.json
+node node_modules/eslint/bin/eslint.js apps/api/src/results apps/worker/src
+git diff --check
 
-# apps/worker/ 下，必须提供独立测试库；可使用 integrator 已生成的 Prisma client。
-# TEST_DATABASE_URL 只接受 xiaoqiu_results_test_*，不能等于 DATABASE_URL。
-# WORKER_TEST_PRISMA_CLIENT 可指向已生成的 client.js，仅用于测试。
+# apps/api/ 下：复制自己的引擎后执行实际 HTTP/Worker 测试
+node scripts/copy-prisma-engine.mjs dist/test/generated/prisma
+node --test dist/test/results/results.postgres.integration.spec.js
+
+# apps/worker/ 下：测试库必须是独立可弃库
+pnpm test
 pnpm test:postgres
 ```
 
-本轮数据库：`xiaoqiu_results_test_20261002_32c0`；部署现有 12 个迁移，不执行 Seed，不使用日常 `xiaoqiu` 或其他 worker 测试库。测试资料标为 `FICTIONAL_TEST`，随机 ID / topic；清理仅针对本测试生成的 ID。测试库中额外的 `results_worker_test_effects` 是副作用计数 fixture，不是新增生产模型。
+Worker 当前准确脚本：
 
-真实数据库检查覆盖并发领取、到期重领、旧租约拒绝、Handler 回滚、延期重试、次数耗尽、永久错误、取消/成功/未来任务排除与组织缺失拒绝。服务级可控故障测试与 PostgreSQL 证明分别保留。
-
-最终验证：规则纯函数/适配测试 26 项、消费器可控故障测试 7 项通过；PostgreSQL 包括 11 个真实场景，Node 测试报告 12 项通过（包含外层测试）。合计 Node 报告 45 项通过、0 失败、0 跳过。另有真实子进程在领取后直接退出、两个全新进程恢复/再次运行仍只提交一次数据库副作用的验证。类型检查、Worker 构建、范围 ESLint、Prettier 与 diff 检查通过。
-
-数据库消费核心通过不表示报告 HTTP、公开页面一致性、完整 Worker 运行链路、网站并发承载或生产部署已完成。
-
-## 未解决问题与集成协调
-
-- **报告确认版本**：请提供持久化的最后确认版本及更正/撤销语义。新建更正草稿或退回报告不应替换最后已确认事实；`report-adapter` 是内部输入，不替代公共契约。
-- **结果事件**：请统一 Outbox topic/eventType、组织/赛事/比赛标识、确认版本、规则版本、事件版本和幂等键。token fencing 只防同一 job 重领；不同旧 job 仍需业务 revision fencing。
-- **投影并发**：应按组织+赛事串行重算/提交，读取当前确认快照并拒绝旧版本覆盖；结果、榜单/统计、晋级预览和投影版本必须原子更新。重复不同 job 的同一确认事件也须无重复副作用。
-- **晋级冲突**：规则确定只能生成预览。结果更正改变晋级人选时，已锁定名单/已开赛下游场次不得自动换队，交给集成确定管理员复核状态及审计。
-- **规程解析**：真实 JSON 解析、赛事/阶段绑定和最终同分裁定由 integrator 固定。当前测试规程均为虚构，不是校园赛事已批准规则。未实现两回合总比分、客场进球、公平竞赛分、抽签或处罚撤队规则；不默认推测。
-- **公开读取**：experience.service/controller/dto 属于 auth worker；integrator 负责结果接线。旧 calculateStandings 和公开接口尚未切换，不能把新核心测试算作页面修复。
-- **Worker 运行时**：需要正式 SQL adapter/连接池依赖和 lifecycle/provider 接线。数据库事务 Handler 只能通过同一 tx 写入；外部邮件/HTTP/文件副作用不能靠此事务保证 exactly-once，须另用 Outbox。测试用的 Prisma adapter 不作为正式运行依赖。
-- **共享纯规则**：API 与 Worker 的构建/镜像应共同使用一个规则实现；需要 integrator 决定共享包及依赖安排，避免跨 app 随意导入或复制规则。
-
-## 公共文件建议
-
-由 integrator 独占处理：确认版本/投影/晋级预览模型和约束、contracts、生成 Client、新模块接线、必要索引与统一依赖安装/锁文件。初始迁移已创建 `outbox_jobs_deduplication_key_key`，对非空 deduplicationKey 提供全局 partial UNIQUE；Prisma schema 未表达该索引不代表数据库没有约束。本报告此前误称无约束，现已核实迁移并更正，不增加重复索引。大量读取还需独立验收查询计划、分页/索引、投影滞后及网站负载；本段没有声称完成容量测试。
-
-## 第二段接口准备（RESULTS-CONTRACT-01）
-
-第一段提交：`2e40e1af38d1057b404fc5085bcffe2f8ce883bb`。
-
-按 integrator 的合同预告新增：
-
-- `apps/worker/src/outbox/pg-sql-client.ts`：Pool 的同 client 事务适配器，连接取得后有总时限和数据库 statement/lock/idle 时限；超时销毁连接，拒绝迟到 Handler 再发 SQL。依据 [node-postgres 事务文档](https://node-postgres.com/features/transactions)及 [Pool 文档](https://node-postgres.com/apis/pool)。等待统一 pg 安装后做真实 Pool 测试及生产运行接线；现有 PostgreSQL Outbox 测试仍用测试专属 Prisma adapter。
-- `apps/worker/src/results/match-report-handler.ts`：严格解析已分配 `match.report / MatchReportConfirmed` 事件，验证组织与 aggregateId；持有 Match 锁读取当前 confirmedReportVersion，旧版本无害退出、未来版本重试、最新事件须匹配不可变确认 revision/规程版本。Repository 是待接生产 SQL 的接口，当前受控测试不冒充持久化实现。
-- `apps/api/src/results/progression-source.ts`：来源 hash 包含组织/赛事/阶段/规程、参赛队伍与分组，以及全部来源阶段场次的确认版本、双方队伍及小组。无确认报告的场次也纳入（version=0）；更正、增加场次、尚未比赛的新增队伍、换队/换组都能使旧预览失效。尚未作为公开 API 接入。
-- 对应专属测试及 Worker test 命令扩展；不新增依赖、不改共享文件。
-
-尚待：integrator 提供模型/迁移提交与可用 pg 路径、projection.payload 的具体语义、晋级端点与正式权限复用入口。收到后接生产 SQL repository、Worker lifecycle 与 results API；正式读取由 integrator 接 Experience。
-
-第二段定向检查：新增 13 项纯函数/受控生命周期及事件测试通过；当前完整定向单元集为 46 项通过，另有第一段真实 PostgreSQL 12 项通过。results/Worker 类型检查、Worker 构建、覆盖新目录的 ESLint、Prettier、diff 检查全部通过。未安装 pg 的阶段不把结构接口/受控 Pool 测试称为真实 pg 运行验证。
-
-```powershell
-node apps/worker/node_modules/tsx/dist/cli.mjs --test apps/api/src/results/competition-rules.spec.ts apps/api/src/results/progression-source.spec.ts apps/worker/src/outbox/outbox-consumer.spec.ts apps/worker/src/outbox/pg-sql-client.spec.ts apps/worker/src/results/match-report-handler.spec.ts
-node node_modules/eslint/bin/eslint.js apps/api/src/results apps/worker/src/outbox apps/worker/src/results
+```text
+test = tsx --test src/outbox/outbox-consumer.spec.ts src/outbox/pg-sql-client.spec.ts src/results/match-report-handler.spec.ts src/results/projection-payload.spec.ts
+test:postgres = tsx --test src/outbox/outbox.postgres.integration.ts
 ```
 
-## SQL repository 准备边界
+API PG 测试加载实际 Worker dist，清洁 checkout 必须先 build Worker。`TEST_DATABASE_URL` 必须指向可弃测试库；Worker fixture loader 可用 `WORKER_TEST_PRISMA_CLIENT` 指向**当前树**的 `apps/api/dist/test/generated/prisma/client.js`，不共用主目录 generated 源码。正常安装后 pg 从本包解析；`WORKER_TEST_PG_MODULE` 仅用于测试依赖路径。
 
-根据 integrator 的可读模型草案补充 `apps/worker/src/results/postgres-projection-repository.ts`：组织范围查询、锁定 Match、读取对应不可变确认 revision，以及 INSERT/ON CONFLICT 的 sourceReportVersion 条件更新。写入语句同时锁定并验证最新确认指针、revision 的组织/比赛/版本/状态/规则版本；重复同一版本不更新，低版本不覆盖高版本。payload builder 为必传函数，默认不复制报告 notes 等受限内容。未确认的 Match.confirmedReportVersion 为 null 时 Handler 等待确认，不产生投影。
+本轮测试库 `xiaoqiu_results_test_20261002_32c0`：部署共同基线全部 13 个迁移，不 Seed、不测试日常库。规程/账号/比赛是明确的 FICTIONAL_TEST；结果 fixture 直接构造确认行，用来验证本模块，不替代报告写入业务验收。锁定快照与不可变历史保留到测试库整体弃置，不绕保护删除。
 
-这部分目前只通过类型、构建、范围静态检查，以及 Handler 对 null 确认指针的受控回归；**未在新增生产表的正式迁移上验证 SQL，也未安装/验证 pg Pool 或启动正式消费**。当前 integrator 分支尚无包含新模型/迁移的稳定提交；待其交付后继续真实数据库验证。不得将第一段 Outbox 表测试结果套用到新增结果投影表。
+## 未做、公共建议与集成协调
+
+- Integrator 接 AppModule/Experience，生成 API Client，并补 API pretest 的 Worker 构建顺序；共用当前 RepeatableRead 事务的只读 adapter 由其处理。不要把本模块独立 HTTP 验收称为主网站已接通。
+- 正式报告/名单整轮、多角色 H5 浏览器、实际校园规程、生产部署、容量/压力测试、微信真机由对应任务/后续验收完成；本任务未做这些。
+- `playedAt` 使用排期时间；无排期时确认行创建时间用于排序，不冒称实际开球记录。真实资料的赛程完整性仍须验收。
+- 两回合总比分、客场进球、公平竞赛分/抽签、处罚撤队等未实现；配置不能静默冒充已支持。
+- 未注册 topic 的处理、失败告警/管理员重放、外部推送及生产监控属于后续运营接线。站内通知存在与回执成功不等于本人已看见。
+- Public model、发布规程冻结、依赖/锁文件和根接线继续由 Integrator 独占；本任务没有额外公共文件变更要求，没有 Push 或部署。
