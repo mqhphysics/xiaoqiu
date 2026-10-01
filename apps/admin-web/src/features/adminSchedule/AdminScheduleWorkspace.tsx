@@ -1,4 +1,4 @@
-import { Children, useEffect, useMemo, useState } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { AdminRosterWorkspace } from '../adminRoster/AdminRosterWorkspace'
@@ -17,15 +17,6 @@ import type {
   WorkbenchSection,
 } from './types'
 
-const organizations: OrganizationContext[] = [
-  {
-    organizationId: '00000000-0000-4000-8000-000000000001',
-    organizationName: '晓球开发组织',
-    userId: '00000000-0000-4000-8000-000000000002',
-    role: 'TOURNAMENT_ADMIN',
-  },
-]
-
 const emptySnapshot: AdminScheduleSnapshot = {
   seasons: [],
   tournaments: [],
@@ -36,51 +27,73 @@ const emptySnapshot: AdminScheduleSnapshot = {
   schedulePlans: [],
 }
 
-export function AdminScheduleWorkspace() {
+export function AdminScheduleWorkspace({
+  context,
+  displayName,
+  onLogout,
+}: {
+  context: OrganizationContext
+  displayName: string
+  onLogout: () => void
+}) {
   const repository = useMemo(() => createAdminScheduleRepository(), [])
   const [activeSection, setActiveSection] = useState<WorkbenchSection>('events')
-  const [context, setContext] = useState<OrganizationContext>(organizations[0]!)
   const [snapshot, setSnapshot] = useState<AdminScheduleSnapshot>(emptySnapshot)
   const [isLoading, setIsLoading] = useState(true)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const refreshVersion = useRef(0)
 
   const selectedTournamentId = snapshot.tournaments[0]?.id ?? ''
   const isRosterSection = activeSection === 'rosters'
   const workspaceCopy = isRosterSection
     ? {
-        eyebrow: 'P2-SB-12-03',
+        eyebrow: '名单管理',
         title: '球队与名单核对',
         description: '核对报名状态、名单人数、脱敏字段、数据质量告警和不可变快照版本。',
       }
     : {
-        eyebrow: 'P1-SB-11-02',
-        title: '后台赛事创建纵向切片',
-        description: '完成创建赛季、赛事、球队、场地、比赛、草案校验和发布的首个后台工作流。',
+        eyebrow: '赛事管理',
+        title: '赛事维护',
+        description: '维护获授权赛事的赛季、规则、球队、场地和赛程。',
       }
 
-  const refresh = async (successMessage?: string) => {
-    setIsLoading(true)
-    setError('')
-    try {
-      const nextSnapshot = await repository.loadSnapshot(context)
-      setSnapshot(nextSnapshot)
-      if (successMessage) {
-        setNotice(successMessage)
+  const refresh = useCallback(
+    async (successMessage?: string) => {
+      const version = ++refreshVersion.current
+      setIsLoading(true)
+      setError('')
+      try {
+        const nextSnapshot = await repository.loadSnapshot(context)
+        if (version !== refreshVersion.current) return
+        setSnapshot(nextSnapshot)
+        if (successMessage) {
+          setNotice(successMessage)
+        }
+      } catch (caught) {
+        if (version !== refreshVersion.current) return
+        setSnapshot(emptySnapshot)
+        setError(toMessage(caught))
+      } finally {
+        if (version === refreshVersion.current) setIsLoading(false)
       }
-    } catch (caught) {
-      setError(toMessage(caught))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    [repository, context],
+  )
 
   useEffect(() => {
     void refresh()
-  }, [context.organizationId])
+    return () => {
+      refreshVersion.current += 1
+    }
+  }, [refresh])
 
-  const runAction = async (actionName: string, action: () => Promise<unknown>, successMessage: string) => {
+  const runAction = async (
+    actionName: string,
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
     setPendingAction(actionName)
     setError('')
     setNotice('')
@@ -110,10 +123,16 @@ export function AdminScheduleWorkspace() {
           <NavButton active={activeSection === 'teams'} onClick={() => setActiveSection('teams')}>
             球队
           </NavButton>
-          <NavButton active={activeSection === 'rosters'} onClick={() => setActiveSection('rosters')}>
+          <NavButton
+            active={activeSection === 'rosters'}
+            onClick={() => setActiveSection('rosters')}
+          >
             球队与名单
           </NavButton>
-          <NavButton active={activeSection === 'schedule'} onClick={() => setActiveSection('schedule')}>
+          <NavButton
+            active={activeSection === 'schedule'}
+            onClick={() => setActiveSection('schedule')}
+          >
             赛程
           </NavButton>
         </nav>
@@ -126,41 +145,28 @@ export function AdminScheduleWorkspace() {
             <h2>{workspaceCopy.title}</h2>
             <p>{workspaceCopy.description}</p>
           </div>
-          <label className="field compact-field">
-            <span>当前组织</span>
-            <select
-              value={context.organizationId}
-              onChange={(event) => {
-                const next = organizations.find((organization) => organization.organizationId === event.target.value)
-                if (next) {
-                  setContext(next)
-                }
-              }}
-            >
-              {organizations.map((organization) => (
-                <option key={organization.organizationId} value={organization.organizationId}>
-                  {organization.organizationName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field compact-field">
+            <strong>{displayName}</strong>
+            <span>组织编号：{context.organizationId}</span>
+            <button type="button" className="secondary-button" onClick={onLogout}>
+              退出登录
+            </button>
+          </div>
         </header>
 
-        <section className="dev-banner" aria-label="开发期请求上下文">
-          <strong>{repository.mode === 'api' ? 'API 模式' : 'Mock 模式'}</strong>
+        <section className="dev-banner" aria-label="当前管理权限">
+          <strong>
+            {context.role === 'PLATFORM_ADMIN'
+              ? '平台管理员'
+              : context.role === 'ORGANIZATION_ADMIN'
+                ? '组织管理员'
+                : '赛事管理员'}
+          </strong>
           <span>
-            请求头：`x-dev-organization-id={context.organizationId}`、`x-dev-user-id={context.userId}`、`x-dev-role=
-            {context.role}`
+            {context.canManageOrganization
+              ? '你可以管理当前组织的赛事和基础资料。'
+              : '你只能管理获授权的赛事；组织级资料由组织管理员维护。'}
           </span>
-          {repository.mode === 'mock' ? (
-            <span>
-              {isRosterSection
-                ? '未设置 VITE_API_BASE_URL，球队与名单页面仅显示带开发标识的虚构 Mock 数据。'
-                : '未设置 VITE_API_BASE_URL，当前数据保存于浏览器 localStorage，仅用于本切片验收。'}
-            </span>
-          ) : (
-            <span>API Base URL：{repository.apiBaseUrl}</span>
-          )}
         </section>
 
         {(error || (!isRosterSection && notice)) && (
@@ -184,13 +190,22 @@ export function AdminScheduleWorkspace() {
         {activeSection === 'events' ? (
           <EventsSection
             snapshot={snapshot}
+            canManageOrganization={context.canManageOrganization}
             isBusy={isBusy}
             pendingAction={pendingAction}
             onCreateSeason={(input) =>
-              runAction('create-season', () => repository.createSeason(context, input), '赛季已创建。')
+              runAction(
+                'create-season',
+                () => repository.createSeason(context, input),
+                '赛季已创建。',
+              )
             }
             onCreateTournament={(input) =>
-              runAction('create-tournament', () => repository.createTournament(context, input), '赛事已创建。')
+              runAction(
+                'create-tournament',
+                () => repository.createTournament(context, input),
+                '赛事已创建。',
+              )
             }
             onPublishRuleVersion={(input) =>
               runAction(
@@ -205,13 +220,18 @@ export function AdminScheduleWorkspace() {
         {activeSection === 'teams' ? (
           <TeamsSection
             snapshot={snapshot}
+            canManageOrganization={context.canManageOrganization}
             isBusy={isBusy}
             pendingAction={pendingAction}
             onCreateTeam={(input) =>
               runAction('create-team', () => repository.createTeam(context, input), '球队已创建。')
             }
             onCreateVenue={(input) =>
-              runAction('create-venue', () => repository.createVenue(context, input), '场地已创建。')
+              runAction(
+                'create-venue',
+                () => repository.createVenue(context, input),
+                '场地已创建。',
+              )
             }
             onRefresh={() => refresh('列表已刷新。')}
           />
@@ -228,10 +248,18 @@ export function AdminScheduleWorkspace() {
             isBusy={isBusy}
             pendingAction={pendingAction}
             onCreateMatch={(input) =>
-              runAction('create-match', () => repository.createMatch(context, input), '比赛已创建。')
+              runAction(
+                'create-match',
+                () => repository.createMatch(context, input),
+                '比赛已创建。',
+              )
             }
             onCreateSchedulePlan={(input) =>
-              runAction('create-plan', () => repository.createSchedulePlan(context, input), '赛程草案已创建。')
+              runAction(
+                'create-plan',
+                () => repository.createSchedulePlan(context, input),
+                '赛程草案已创建。',
+              )
             }
             onValidateSchedulePlan={(plan) =>
               runAction(
@@ -256,6 +284,7 @@ export function AdminScheduleWorkspace() {
 
 function EventsSection(props: {
   snapshot: AdminScheduleSnapshot
+  canManageOrganization: boolean
   isBusy: boolean
   pendingAction: string | null
   onCreateSeason: (input: CreateSeasonInput) => void
@@ -280,8 +309,14 @@ function EventsSection(props: {
   })
 
   useEffect(() => {
-    setTournamentInput((current) => ({ ...current, seasonId: current.seasonId || props.snapshot.seasons[0]?.id || '' }))
-    setRuleInput((current) => ({ ...current, tournamentId: current.tournamentId || props.snapshot.tournaments[0]?.id || '' }))
+    setTournamentInput((current) => ({
+      ...current,
+      seasonId: current.seasonId || props.snapshot.seasons[0]?.id || '',
+    }))
+    setRuleInput((current) => ({
+      ...current,
+      tournamentId: current.tournamentId || props.snapshot.tournaments[0]?.id || '',
+    }))
   }, [props.snapshot.seasons, props.snapshot.tournaments])
 
   return (
@@ -294,8 +329,16 @@ function EventsSection(props: {
             props.onCreateSeason(seasonInput)
           }}
         >
-          <TextField label="赛季代码" value={seasonInput.code} onChange={(code) => setSeasonInput({ ...seasonInput, code })} />
-          <TextField label="赛季名称" value={seasonInput.name} onChange={(name) => setSeasonInput({ ...seasonInput, name })} />
+          <TextField
+            label="赛季代码"
+            value={seasonInput.code}
+            onChange={(code) => setSeasonInput({ ...seasonInput, code })}
+          />
+          <TextField
+            label="赛季名称"
+            value={seasonInput.name}
+            onChange={(name) => setSeasonInput({ ...seasonInput, name })}
+          />
           <label className="field">
             <span>年份</span>
             <input
@@ -304,10 +347,15 @@ function EventsSection(props: {
               min="2020"
               max="2100"
               value={seasonInput.year}
-              onChange={(event) => setSeasonInput({ ...seasonInput, year: Number(event.target.value) })}
+              onChange={(event) =>
+                setSeasonInput({ ...seasonInput, year: Number(event.target.value) })
+              }
             />
           </label>
-          <SubmitButton busy={props.pendingAction === 'create-season'} disabled={props.isBusy}>
+          <SubmitButton
+            busy={props.pendingAction === 'create-season'}
+            disabled={props.isBusy || !props.canManageOrganization}
+          >
             创建赛季
           </SubmitButton>
         </form>
@@ -324,7 +372,10 @@ function EventsSection(props: {
           <SelectField
             label="所属赛季"
             value={tournamentInput.seasonId}
-            options={props.snapshot.seasons.map((season) => ({ value: season.id, label: `${season.name}（${season.code}）` }))}
+            options={props.snapshot.seasons.map((season) => ({
+              value: season.id,
+              label: `${season.name}（${season.code}）`,
+            }))}
             onChange={(seasonId) => setTournamentInput({ ...tournamentInput, seasonId })}
           />
           <TextField
@@ -337,7 +388,10 @@ function EventsSection(props: {
             value={tournamentInput.name}
             onChange={(name) => setTournamentInput({ ...tournamentInput, name })}
           />
-          <SubmitButton busy={props.pendingAction === 'create-tournament'} disabled={props.isBusy || !tournamentInput.seasonId}>
+          <SubmitButton
+            busy={props.pendingAction === 'create-tournament'}
+            disabled={props.isBusy || !props.canManageOrganization || !tournamentInput.seasonId}
+          >
             创建赛事
           </SubmitButton>
         </form>
@@ -367,7 +421,9 @@ function EventsSection(props: {
               type="number"
               min="1"
               value={ruleInput.version}
-              onChange={(event) => setRuleInput({ ...ruleInput, version: Number(event.target.value) })}
+              onChange={(event) =>
+                setRuleInput({ ...ruleInput, version: Number(event.target.value) })
+              }
             />
           </label>
           <label className="field wide-field">
@@ -379,7 +435,10 @@ function EventsSection(props: {
               onChange={(event) => setRuleInput({ ...ruleInput, summary: event.target.value })}
             />
           </label>
-          <SubmitButton busy={props.pendingAction === 'publish-rule'} disabled={props.isBusy || !ruleInput.tournamentId}>
+          <SubmitButton
+            busy={props.pendingAction === 'publish-rule'}
+            disabled={props.isBusy || !ruleInput.tournamentId}
+          >
             发布规则版本
           </SubmitButton>
         </form>
@@ -400,6 +459,7 @@ function EventsSection(props: {
 
 function TeamsSection(props: {
   snapshot: AdminScheduleSnapshot
+  canManageOrganization: boolean
   isBusy: boolean
   pendingAction: string | null
   onCreateTeam: (input: CreateTeamInput) => void
@@ -430,7 +490,12 @@ function TeamsSection(props: {
   return (
     <div className="section-stack">
       <div className="panel-toolbar">
-        <button type="button" className="secondary-button" disabled={props.isBusy} onClick={props.onRefresh}>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={props.isBusy}
+          onClick={props.onRefresh}
+        >
           刷新列表
         </button>
       </div>
@@ -446,15 +511,30 @@ function TeamsSection(props: {
             }))}
             onChange={(tournamentId) => setTeamInput({ ...teamInput, tournamentId })}
           />
-          <TextField label="球队代码" value={teamInput.code} onChange={(code) => setTeamInput({ ...teamInput, code })} />
-          <TextField label="球队名称" value={teamInput.name} onChange={(name) => setTeamInput({ ...teamInput, name })} />
-          <TextField label="短名" value={teamInput.shortName} onChange={(shortName) => setTeamInput({ ...teamInput, shortName })} />
+          <TextField
+            label="球队代码"
+            value={teamInput.code}
+            onChange={(code) => setTeamInput({ ...teamInput, code })}
+          />
+          <TextField
+            label="球队名称"
+            value={teamInput.name}
+            onChange={(name) => setTeamInput({ ...teamInput, name })}
+          />
+          <TextField
+            label="短名"
+            value={teamInput.shortName}
+            onChange={(shortName) => setTeamInput({ ...teamInput, shortName })}
+          />
           <TextField
             label="队徽占位"
             value={teamInput.crestPlaceholder}
             onChange={(crestPlaceholder) => setTeamInput({ ...teamInput, crestPlaceholder })}
           />
-          <SubmitButton busy={props.pendingAction === 'create-team'} disabled={props.isBusy || !teamInput.tournamentId}>
+          <SubmitButton
+            busy={props.pendingAction === 'create-team'}
+            disabled={props.isBusy || !teamInput.tournamentId}
+          >
             创建球队
           </SubmitButton>
         </form>
@@ -462,11 +542,30 @@ function TeamsSection(props: {
 
       <Panel title="创建场地" description="场地会被比赛引用，首期只录入校区和位置。">
         <form className="form-grid" onSubmit={submitForm(() => props.onCreateVenue(venueInput))}>
-          <TextField label="场地代码" value={venueInput.code} onChange={(code) => setVenueInput({ ...venueInput, code })} />
-          <TextField label="场地名称" value={venueInput.name} onChange={(name) => setVenueInput({ ...venueInput, name })} />
-          <TextField label="校区" value={venueInput.campus} onChange={(campus) => setVenueInput({ ...venueInput, campus })} />
-          <TextField label="位置" value={venueInput.location} onChange={(location) => setVenueInput({ ...venueInput, location })} />
-          <SubmitButton busy={props.pendingAction === 'create-venue'} disabled={props.isBusy}>
+          <TextField
+            label="场地代码"
+            value={venueInput.code}
+            onChange={(code) => setVenueInput({ ...venueInput, code })}
+          />
+          <TextField
+            label="场地名称"
+            value={venueInput.name}
+            onChange={(name) => setVenueInput({ ...venueInput, name })}
+          />
+          <TextField
+            label="校区"
+            value={venueInput.campus}
+            onChange={(campus) => setVenueInput({ ...venueInput, campus })}
+          />
+          <TextField
+            label="位置"
+            value={venueInput.location}
+            onChange={(location) => setVenueInput({ ...venueInput, location })}
+          />
+          <SubmitButton
+            busy={props.pendingAction === 'create-venue'}
+            disabled={props.isBusy || !props.canManageOrganization}
+          >
             创建场地
           </SubmitButton>
         </form>
@@ -477,7 +576,9 @@ function TeamsSection(props: {
           {props.snapshot.teams.map((team) => (
             <li key={team.id}>
               <strong>{team.name}</strong>
-              <span>{team.shortName} / {team.code}</span>
+              <span>
+                {team.shortName} / {team.code}
+              </span>
               <small>队徽占位：{team.crestPlaceholder}</small>
             </li>
           ))}
@@ -487,7 +588,9 @@ function TeamsSection(props: {
             <li key={venue.id}>
               <strong>{venue.name}</strong>
               <span>{venue.code}</span>
-              <small>{venue.campus} / {venue.location}</small>
+              <small>
+                {venue.campus} / {venue.location}
+              </small>
             </li>
           ))}
         </RecordList>
@@ -527,10 +630,15 @@ function ScheduleSection(props: {
       awayTeamId: current.awayTeamId || props.snapshot.teams[1]?.id || '',
       venueId: current.venueId || props.snapshot.venues[0]?.id || '',
     }))
-    setPlanInput((current) => ({ ...current, tournamentId: current.tournamentId || props.selectedTournamentId }))
+    setPlanInput((current) => ({
+      ...current,
+      tournamentId: current.tournamentId || props.selectedTournamentId,
+    }))
   }, [props.selectedTournamentId, props.snapshot.teams, props.snapshot.venues])
 
-  const matchesForTournament = props.snapshot.matches.filter((match) => match.tournamentId === planInput.tournamentId)
+  const matchesForTournament = props.snapshot.matches.filter(
+    (match) => match.tournamentId === planInput.tournamentId,
+  )
 
   return (
     <div className="section-stack">
@@ -548,19 +656,28 @@ function ScheduleSection(props: {
           <SelectField
             label="主队"
             value={matchInput.homeTeamId}
-            options={props.snapshot.teams.map((team) => ({ value: team.id, label: `${team.name}（${team.code}）` }))}
+            options={props.snapshot.teams.map((team) => ({
+              value: team.id,
+              label: `${team.name}（${team.code}）`,
+            }))}
             onChange={(homeTeamId) => setMatchInput({ ...matchInput, homeTeamId })}
           />
           <SelectField
             label="客队"
             value={matchInput.awayTeamId}
-            options={props.snapshot.teams.map((team) => ({ value: team.id, label: `${team.name}（${team.code}）` }))}
+            options={props.snapshot.teams.map((team) => ({
+              value: team.id,
+              label: `${team.name}（${team.code}）`,
+            }))}
             onChange={(awayTeamId) => setMatchInput({ ...matchInput, awayTeamId })}
           />
           <SelectField
             label="场地"
             value={matchInput.venueId}
-            options={props.snapshot.venues.map((venue) => ({ value: venue.id, label: `${venue.name}（${venue.code}）` }))}
+            options={props.snapshot.venues.map((venue) => ({
+              value: venue.id,
+              label: `${venue.name}（${venue.code}）`,
+            }))}
             onChange={(venueId) => setMatchInput({ ...matchInput, venueId })}
           />
           <label className="field">
@@ -569,7 +686,9 @@ function ScheduleSection(props: {
               required
               type="datetime-local"
               value={matchInput.scheduledStartAt}
-              onChange={(event) => setMatchInput({ ...matchInput, scheduledStartAt: event.target.value })}
+              onChange={(event) =>
+                setMatchInput({ ...matchInput, scheduledStartAt: event.target.value })
+              }
             />
           </label>
           <SubmitButton
@@ -588,7 +707,10 @@ function ScheduleSection(props: {
       </Panel>
 
       <Panel title="创建赛程草案" description="草案可先校验；发布时后端会再次检查可发布条件。">
-        <form className="form-grid" onSubmit={submitForm(() => props.onCreateSchedulePlan(planInput))}>
+        <form
+          className="form-grid"
+          onSubmit={submitForm(() => props.onCreateSchedulePlan(planInput))}
+        >
           <SelectField
             label="所属赛事"
             value={planInput.tournamentId}
@@ -598,7 +720,11 @@ function ScheduleSection(props: {
             }))}
             onChange={(tournamentId) => setPlanInput({ ...planInput, tournamentId, matchIds: [] })}
           />
-          <TextField label="草案名称" value={planInput.name} onChange={(name) => setPlanInput({ ...planInput, name })} />
+          <TextField
+            label="草案名称"
+            value={planInput.name}
+            onChange={(name) => setPlanInput({ ...planInput, name })}
+          />
           <fieldset className="field checkbox-field wide-field">
             <legend>包含比赛</legend>
             {matchesForTournament.length === 0 ? <p>请先创建至少一场比赛。</p> : null}
@@ -620,7 +746,10 @@ function ScheduleSection(props: {
               </label>
             ))}
           </fieldset>
-          <SubmitButton busy={props.pendingAction === 'create-plan'} disabled={props.isBusy || planInput.matchIds.length === 0}>
+          <SubmitButton
+            busy={props.pendingAction === 'create-plan'}
+            disabled={props.isBusy || planInput.matchIds.length === 0}
+          >
             创建草案
           </SubmitButton>
         </form>
@@ -665,7 +794,11 @@ function ScheduleSection(props: {
 
 function NavButton(props: { active: boolean; children: string; onClick: () => void }) {
   return (
-    <button type="button" className={props.active ? 'nav-link active' : 'nav-link'} onClick={props.onClick}>
+    <button
+      type="button"
+      className={props.active ? 'nav-link active' : 'nav-link'}
+      onClick={props.onClick}
+    >
       {props.children}
     </button>
   )
@@ -696,7 +829,11 @@ function TextField(props: { label: string; value: string; onChange: (value: stri
   return (
     <label className="field">
       <span>{props.label}</span>
-      <input required value={props.value} onChange={(event) => props.onChange(event.target.value)} />
+      <input
+        required
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
     </label>
   )
 }
@@ -734,7 +871,13 @@ function RecordList(props: { title: string; emptyText: string; children: React.R
   return (
     <section className="record-list">
       <h3>{props.title}</h3>
-      <ul>{Children.count(props.children) > 0 ? props.children : <li className="empty-list">{props.emptyText}</li>}</ul>
+      <ul>
+        {Children.count(props.children) > 0 ? (
+          props.children
+        ) : (
+          <li className="empty-list">{props.emptyText}</li>
+        )}
+      </ul>
     </section>
   )
 }
@@ -764,7 +907,10 @@ function defaultDateTimeLocal(): string {
   return date.toISOString().slice(0, 16)
 }
 
-function describeMatch(match: { homeTeamId: string; awayTeamId: string; venueId: string; scheduledStartAt: string }, snapshot: AdminScheduleSnapshot): string {
+function describeMatch(
+  match: { homeTeamId: string; awayTeamId: string; venueId: string; scheduledStartAt: string },
+  snapshot: AdminScheduleSnapshot,
+): string {
   const home = snapshot.teams.find((team) => team.id === match.homeTeamId)?.shortName ?? '主队'
   const away = snapshot.teams.find((team) => team.id === match.awayTeamId)?.shortName ?? '客队'
   const venue = snapshot.venues.find((item) => item.id === match.venueId)?.name ?? '未定场地'

@@ -6,7 +6,9 @@ export interface OrganizationContext {
   organizationId: string
   organizationName: string
   userId: string
-  role: 'TOURNAMENT_ADMIN'
+  role: 'PLATFORM_ADMIN' | 'ORGANIZATION_ADMIN' | 'TOURNAMENT_ADMIN'
+  accessToken: string
+  canManageOrganization: boolean
 }
 
 export interface Season {
@@ -140,11 +142,17 @@ export interface AdminScheduleRepository {
   loadSnapshot(context: OrganizationContext): Promise<AdminScheduleSnapshot>
   createSeason(context: OrganizationContext, input: CreateSeasonInput): Promise<Season>
   createTournament(context: OrganizationContext, input: CreateTournamentInput): Promise<Tournament>
-  publishRuleVersion(context: OrganizationContext, input: PublishRuleVersionInput): Promise<RuleVersion>
+  publishRuleVersion(
+    context: OrganizationContext,
+    input: PublishRuleVersionInput,
+  ): Promise<RuleVersion>
   createTeam(context: OrganizationContext, input: CreateTeamInput): Promise<Team>
   createVenue(context: OrganizationContext, input: CreateVenueInput): Promise<Venue>
   createMatch(context: OrganizationContext, input: CreateMatchInput): Promise<Match>
-  createSchedulePlan(context: OrganizationContext, input: CreateSchedulePlanInput): Promise<SchedulePlan>
+  createSchedulePlan(
+    context: OrganizationContext,
+    input: CreateSchedulePlanInput,
+  ): Promise<SchedulePlan>
   validateSchedulePlan(context: OrganizationContext, planId: string): Promise<SchedulePlan>
   publishSchedulePlan(context: OrganizationContext, planId: string): Promise<SchedulePlan>
 }
