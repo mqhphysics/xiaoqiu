@@ -99,6 +99,12 @@ test('future event retries rather than inventing a confirmed result', async () =
     /CONFIRMED_RESULT_NOT_VISIBLE/,
   )
   assert.equal(repository.writes.length, 0)
+  repository.head = { ...head, confirmedReportVersion: null }
+  await assert.rejects(
+    createMatchReportHandler(repository)(tx, job),
+    /CONFIRMED_RESULT_NOT_VISIBLE/,
+  )
+  assert.equal(repository.writes.length, 0)
 })
 
 test('wrong organization, missing revision and mismatched immutable revision fail without writes', async () => {

@@ -84,3 +84,9 @@ pnpm test:postgres
 node apps/worker/node_modules/tsx/dist/cli.mjs --test apps/api/src/results/competition-rules.spec.ts apps/api/src/results/progression-source.spec.ts apps/worker/src/outbox/outbox-consumer.spec.ts apps/worker/src/outbox/pg-sql-client.spec.ts apps/worker/src/results/match-report-handler.spec.ts
 node node_modules/eslint/bin/eslint.js apps/api/src/results apps/worker/src/outbox apps/worker/src/results
 ```
+
+## SQL repository 准备边界
+
+根据 integrator 的可读模型草案补充 `apps/worker/src/results/postgres-projection-repository.ts`：组织范围查询、锁定 Match、读取对应不可变确认 revision，以及 INSERT/ON CONFLICT 的 sourceReportVersion 条件更新。写入语句同时锁定并验证最新确认指针、revision 的组织/比赛/版本/状态/规则版本；重复同一版本不更新，低版本不覆盖高版本。payload builder 为必传函数，默认不复制报告 notes 等受限内容。未确认的 Match.confirmedReportVersion 为 null 时 Handler 等待确认，不产生投影。
+
+这部分目前只通过类型、构建、范围静态检查，以及 Handler 对 null 确认指针的受控回归；**未在新增生产表的正式迁移上验证 SQL，也未安装/验证 pg Pool 或启动正式消费**。当前 integrator 分支尚无包含新模型/迁移的稳定提交；待其交付后继续真实数据库验证。不得将第一段 Outbox 表测试结果套用到新增结果投影表。

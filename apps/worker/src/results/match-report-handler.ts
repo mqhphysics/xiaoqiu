@@ -12,7 +12,7 @@ export interface ConfirmationHead {
   organizationId: string
   matchId: string
   tournamentId: string
-  confirmedReportVersion: number
+  confirmedReportVersion: number | null
 }
 
 export interface ConfirmedRevision {
@@ -94,6 +94,7 @@ export function createMatchReportHandler(
         head.tournamentId === event.tournamentId,
       'RESULT_SCOPE_MISMATCH',
     )
+    if (head.confirmedReportVersion === null) throw new Error('CONFIRMED_RESULT_NOT_VISIBLE')
     // Fences different jobs for the same match, independently of Outbox lease tokens.
     if (event.confirmedReportVersion < head.confirmedReportVersion) return
     if (event.confirmedReportVersion > head.confirmedReportVersion)
