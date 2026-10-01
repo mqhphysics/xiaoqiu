@@ -16,6 +16,7 @@ import {
 } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { MatchReportEntry } from '../../features/match-report/MatchReportEntry'
 import type { MatchExperienceResponse } from '../../features/product/product.types'
 
 import './index.scss'
@@ -160,6 +161,8 @@ function MatchContent({
           />
         </View>
       </View>
+
+      <MatchReportEntry matchId={match.id} />
 
       {(match.summary || match.statusReason) && (
         <View className="match-summary surface">
