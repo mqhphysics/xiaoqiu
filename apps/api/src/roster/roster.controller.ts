@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, Req } from '@nestjs/common'
+import { Controller, Get, Headers, Inject, Param, ParseUUIDPipe, Req } from '@nestjs/common'
 import {
   ApiForbiddenResponse,
   ApiHeader,
@@ -6,17 +6,12 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiBearerAuth,
 } from '@nestjs/swagger'
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
 import type { RequestWithId } from '../common/request-context'
-import {
-  P1_DEV_ORGANIZATION_HEADER,
-  P1_DEV_ROLE_HEADER,
-  P1_TOURNAMENT_ADMIN_ROLE,
-  requireP1DevAdminContext,
-  requireP1DevOrganizationId,
-} from '../schedule/dev-context'
+import { P1_DEV_ORGANIZATION_HEADER, requireP1DevOrganizationId } from '../schedule/dev-context'
 import {
   AdminTeamRegistrationDetailResponseDto,
   AdminTeamRegistrationListResponseDto,
@@ -24,11 +19,16 @@ import {
   PublicTournamentTeamListResponseDto,
 } from './roster.dto'
 import { RosterService } from './roster.service'
+import { RosterWorkflowService } from './roster-workflow.service'
+import { AuthorizeInApplicationService } from '../auth/application-authorization'
 
 @ApiTags('roster')
 @Controller()
 export class RosterController {
-  constructor(@Inject(RosterService) private readonly rosterService: RosterService) {}
+  constructor(
+    @Inject(RosterService) private readonly rosterService: RosterService,
+    @Inject(RosterWorkflowService) private readonly workflow: RosterWorkflowService,
+  ) {}
 
   @Get('public/tournaments/:tournamentId/teams')
   @P2PublicHeaders()
@@ -65,54 +65,38 @@ export class RosterController {
   }
 
   @Get('admin/tournaments/:tournamentId/team-registrations')
-  @P2AdminHeaders()
-  @ApiOperation({ summary: 'P2 开发期读取赛事球队报名与名单核对列表' })
+  @AuthorizeInApplicationService()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '管理员读取本组织获授权赛事的球队报名与名单核对列表' })
   @ApiOkResponse({ type: AdminTeamRegistrationListResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
-  listAdminTeamRegistrations(
-    @Req() request: RequestWithId,
-    @Param('tournamentId') tournamentId: string,
+  async listAdminTeamRegistrations(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('tournamentId', ParseUUIDPipe) tournamentId: string,
   ) {
-    const context = requireP1DevAdminContext(request)
+    const context = await this.workflow.requireAdminContext(authorization, tournamentId)
     return this.rosterService.listAdminTeamRegistrations(context.organizationId, tournamentId)
   }
 
   @Get('admin/tournaments/:tournamentId/team-registrations/:registrationId')
-  @P2AdminHeaders()
-  @ApiOperation({ summary: 'P2 开发期读取报名、数据质量和脱敏名单详情' })
+  @AuthorizeInApplicationService()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '管理员读取本组织获授权赛事的报名和脱敏名单详情' })
   @ApiOkResponse({ type: AdminTeamRegistrationDetailResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
-  getAdminTeamRegistration(
-    @Req() request: RequestWithId,
-    @Param('tournamentId') tournamentId: string,
-    @Param('registrationId') registrationId: string,
+  async getAdminTeamRegistration(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('tournamentId', ParseUUIDPipe) tournamentId: string,
+    @Param('registrationId', ParseUUIDPipe) registrationId: string,
   ) {
-    const context = requireP1DevAdminContext(request)
+    const context = await this.workflow.requireAdminContext(authorization, tournamentId)
     return this.rosterService.getAdminTeamRegistration(
       context.organizationId,
       tournamentId,
       registrationId,
     )
-  }
-}
-
-function P2AdminHeaders(): MethodDecorator {
-  const organizationHeader = ApiHeader({
-    name: P1_DEV_ORGANIZATION_HEADER,
-    description: 'P2 开发期组织上下文，后续由真实认证授权替换',
-    required: true,
-  })
-  const roleHeader = ApiHeader({
-    name: P1_DEV_ROLE_HEADER,
-    description: `P2 开发期临时角色，必须为 ${P1_TOURNAMENT_ADMIN_ROLE}`,
-    required: true,
-  })
-
-  return (target, propertyKey, descriptor) => {
-    organizationHeader(target, propertyKey, descriptor)
-    roleHeader(target, propertyKey, descriptor)
   }
 }
 

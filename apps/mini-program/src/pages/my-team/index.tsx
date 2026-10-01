@@ -709,7 +709,15 @@ function TeamDashboard({
       )}
       {captain && (
         <>
-          <CaptainRosterWorkflow teamId={data.team.id} tournamentId={tournamentId} captain={captain} roster={data.roster} />
+          {Taro.getEnv() === Taro.ENV_TYPE.WEB && (
+            <CaptainRosterWorkflow
+              teamId={data.team.id}
+              tournamentId={tournamentId}
+              captain={captain}
+              roster={data.roster}
+              matches={teamMatches}
+            />
+          )}
           <CaptainWorkspace teamId={data.team.id} data={captain} onChange={onCaptainChange} />
         </>
       )}
