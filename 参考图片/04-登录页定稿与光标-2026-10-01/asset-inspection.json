@@ -1,0 +1,218 @@
+{
+  "inspectedDate": "2026-10-01",
+  "method": "Read-only PNG decode and alpha inspection; no image edits",
+  "images": [
+    {
+      "file": "01-login-approved.png",
+      "width": 1536,
+      "height": 1024,
+      "bitDepth": 8,
+      "colorType": 2,
+      "alphaChannel": false,
+      "alphaCounts": {
+        "transparent": 0,
+        "partial": 0,
+        "opaque": 1572864
+      },
+      "transparentPercent": 0,
+      "alphaBuckets": {
+        "zero": 0,
+        "oneTo15": 0,
+        "sixteenTo127": 0,
+        "one28To239": 0,
+        "two40To254": 0,
+        "full": 1572864
+      },
+      "cornerAlphas": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "visibleBoundsByAlphaThreshold": {
+        "1": {
+          "x": 0,
+          "y": 0,
+          "width": 1536,
+          "height": 1024
+        },
+        "16": {
+          "x": 0,
+          "y": 0,
+          "width": 1536,
+          "height": 1024
+        },
+        "128": {
+          "x": 0,
+          "y": 0,
+          "width": 1536,
+          "height": 1024
+        }
+      },
+      "northwestHotspotCandidate": {
+        "x": 0,
+        "y": 0,
+        "status": "geometric candidate only; final hotspot requires cropped-size click test"
+      }
+    },
+    {
+      "file": "02-cursor-style-c.png",
+      "width": 1448,
+      "height": 1086,
+      "bitDepth": 8,
+      "colorType": 2,
+      "alphaChannel": false,
+      "alphaCounts": {
+        "transparent": 0,
+        "partial": 0,
+        "opaque": 1572528
+      },
+      "transparentPercent": 0,
+      "alphaBuckets": {
+        "zero": 0,
+        "oneTo15": 0,
+        "sixteenTo127": 0,
+        "one28To239": 0,
+        "two40To254": 0,
+        "full": 1572528
+      },
+      "cornerAlphas": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "visibleBoundsByAlphaThreshold": {
+        "1": {
+          "x": 0,
+          "y": 0,
+          "width": 1448,
+          "height": 1086
+        },
+        "16": {
+          "x": 0,
+          "y": 0,
+          "width": 1448,
+          "height": 1086
+        },
+        "128": {
+          "x": 0,
+          "y": 0,
+          "width": 1448,
+          "height": 1086
+        }
+      },
+      "northwestHotspotCandidate": {
+        "x": 0,
+        "y": 0,
+        "status": "geometric candidate only; final hotspot requires cropped-size click test"
+      }
+    },
+    {
+      "file": "03-cursor-strip-reference.png",
+      "width": 1237,
+      "height": 146,
+      "bitDepth": 8,
+      "colorType": 6,
+      "alphaChannel": true,
+      "alphaCounts": {
+        "transparent": 0,
+        "partial": 0,
+        "opaque": 180602
+      },
+      "transparentPercent": 0,
+      "alphaBuckets": {
+        "zero": 0,
+        "oneTo15": 0,
+        "sixteenTo127": 0,
+        "one28To239": 0,
+        "two40To254": 0,
+        "full": 180602
+      },
+      "cornerAlphas": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "visibleBoundsByAlphaThreshold": {
+        "1": {
+          "x": 0,
+          "y": 0,
+          "width": 1237,
+          "height": 146
+        },
+        "16": {
+          "x": 0,
+          "y": 0,
+          "width": 1237,
+          "height": 146
+        },
+        "128": {
+          "x": 0,
+          "y": 0,
+          "width": 1237,
+          "height": 146
+        }
+      },
+      "northwestHotspotCandidate": {
+        "x": 0,
+        "y": 0,
+        "status": "geometric candidate only; final hotspot requires cropped-size click test"
+      }
+    },
+    {
+      "file": "04-default-cursor-transparent-source.png",
+      "width": 1254,
+      "height": 1254,
+      "bitDepth": 8,
+      "colorType": 6,
+      "alphaChannel": true,
+      "alphaCounts": {
+        "transparent": 1458832,
+        "partial": 112484,
+        "opaque": 1200
+      },
+      "transparentPercent": 92.771,
+      "alphaBuckets": {
+        "zero": 1458832,
+        "oneTo15": 8253,
+        "sixteenTo127": 2733,
+        "one28To239": 1802,
+        "two40To254": 99696,
+        "full": 1200
+      },
+      "cornerAlphas": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "visibleBoundsByAlphaThreshold": {
+        "1": {
+          "x": 97,
+          "y": 21,
+          "width": 982,
+          "height": 1161
+        },
+        "16": {
+          "x": 407,
+          "y": 278,
+          "width": 481,
+          "height": 716
+        },
+        "128": {
+          "x": 408,
+          "y": 279,
+          "width": 479,
+          "height": 714
+        }
+      },
+      "northwestHotspotCandidate": {
+        "x": 417.5,
+        "y": 286.5,
+        "status": "geometric candidate only; final hotspot requires cropped-size click test"
+      }
+    }
+  ]
+}

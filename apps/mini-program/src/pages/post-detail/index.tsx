@@ -1,4 +1,4 @@
-import { Button, Text, Textarea, View } from '@tarojs/components'
+import { Button, Image, Text, Textarea, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -8,7 +8,11 @@ import { ReportModal } from '../../components/report-modal'
 import { DataState } from '../../components/public-ui'
 import { UserAvatar } from '../../components/product-ui'
 import { formatRelativeTime, verificationLabel } from '../../features/product/product.format'
-import { createClientActionId, productRepository } from '../../features/product/product.repository'
+import {
+  createClientActionId,
+  productRepository,
+  resolveMediaUrl,
+} from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
   PostComment,
@@ -166,6 +170,17 @@ export default function PostDetailPage() {
             </View>
             {state.post.type === 'OFFICIAL' && <Text className="post-detail__type">官方发布</Text>}
             {state.post.title && <Text className="post-detail__title">{state.post.title}</Text>}
+            {state.post.imageUrl && (
+              <Image
+                className="post-detail__image"
+                mode="widthFix"
+                src={resolveMediaUrl(state.post.imageUrl) ?? ''}
+                onClick={() => {
+                  const source = resolveMediaUrl(state.post.imageUrl)
+                  if (source) void Taro.previewImage({ urls: [source], current: source })
+                }}
+              />
+            )}
             <Text className="post-detail__body">{state.post.body}</Text>
             <View className="post-detail__actions">
               <Button

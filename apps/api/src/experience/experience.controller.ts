@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common'
 import {
   ApiBearerAuth,
@@ -23,6 +24,7 @@ import {
 } from '@nestjs/swagger'
 
 import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
+import { getRequestId, type RequestWithId } from '../common/request-context'
 import {
   CreateCommentDto,
   CreateMatchReviewDto,
@@ -191,8 +193,9 @@ export class ExperienceController {
   createPost(
     @Headers('authorization') authorization: string | undefined,
     @Body() body: CreatePostDto,
+    @Req() request: RequestWithId,
   ) {
-    return this.experienceService.createPost(authorization, body)
+    return this.experienceService.createPost(authorization, body, getRequestId(request))
   }
 
   @Put('community/posts/:postId/like')

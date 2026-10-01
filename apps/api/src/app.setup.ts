@@ -1,5 +1,7 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NextFunction, Request, Response } from 'express'
 
 import { ApiExceptionFilter } from './common/api-exception.filter'
 import { requestIdMiddleware } from './common/request-id.middleware'
@@ -8,6 +10,21 @@ import { createValidationPipe } from './common/validation'
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api')
+  const httpApp = app as NestExpressApplication
+  httpApp.useBodyParser('json', { limit: '6mb' })
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    if (
+      request.headers.authorization ||
+      /^\/api\/(?:auth|me|admin|captain|messages|reports)(?:\/|$)/.test(request.path)
+    ) {
+      response.setHeader('Cache-Control', 'private, no-store')
+      response.vary('Authorization')
+      // Private API consumers expect fresh JSON rather than a cached 304 body.
+      delete request.headers['if-none-match']
+      delete request.headers['if-modified-since']
+    }
+    next()
+  })
   app.enableCors({
     origin: resolveCorsOrigins(),
     allowedHeaders: [

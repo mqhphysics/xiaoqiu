@@ -141,7 +141,13 @@ export const productRepository = {
       data: { primaryTeamId, followedTeamIds },
     }),
 
-  createPost: (body: string, clientPostId: string, title?: string, teamId?: string) =>
+  createPost: (
+    body: string,
+    clientPostId: string,
+    title?: string,
+    teamId?: string,
+    imageDataUrl?: string,
+  ) =>
     request<PostSummary>('/community/posts', {
       method: 'POST',
       data: {
@@ -149,6 +155,7 @@ export const productRepository = {
         clientPostId,
         ...(title ? { title } : {}),
         ...(teamId ? { teamId } : {}),
+        ...(imageDataUrl ? { imageDataUrl } : {}),
       },
     }),
 

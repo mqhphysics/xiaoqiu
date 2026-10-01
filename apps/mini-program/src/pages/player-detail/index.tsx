@@ -1,4 +1,4 @@
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -6,7 +6,7 @@ import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchCard, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
 import { footLabel, positionLabel } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
 import type { PlayerDetailResponse } from '../../features/product/product.types'
 
 import './index.scss'
@@ -69,19 +69,31 @@ function PlayerContent({
   player: PlayerDetailResponse
   tournamentId: string
 }) {
+  const portrait = resolveMediaUrl(player.portraitUrl)
   return (
     <View>
       <View className="player-hero" style={{ borderColor: player.profileColor ?? '#1f6b45' }}>
         <View className="player-hero__identity">
-          <UserAvatar
-            avatarUrl={player.avatarUrl}
-            name={player.displayName}
-            color={player.profileColor}
-            size="large"
-          />
+          <View className="player-hero__photo">
+            {portrait ? (
+              <Image
+                aria-label={`${player.displayName}的档案照片示意`}
+                mode="aspectFill"
+                src={portrait}
+              />
+            ) : (
+              <UserAvatar
+                avatarUrl={player.avatarUrl}
+                name={player.displayName}
+                color={player.profileColor}
+                size="large"
+              />
+            )}
+          </View>
           <View className="player-hero__copy">
             <Text className="player-hero__eyebrow">PLAYER PROFILE</Text>
             <Text className="player-hero__name">{player.displayName}</Text>
+            {player.isDemo && <Text className="player-hero__demo">演示档案 · 照片为示意素材</Text>}
             <Text className="player-hero__meta">
               #{player.shirtNumber ?? '-'} · {positionLabel(player.position)}
               {player.secondaryPosition ? ' / ' + positionLabel(player.secondaryPosition) : ''}
@@ -121,6 +133,8 @@ function PlayerContent({
           value={player.stats.yellowCards + ' / ' + player.stats.redCards}
         />
       </View>
+
+      <PlayerAbilities abilities={player.abilities} isDemo={player.isDemo} />
 
       <View className="player-detail-grid">
         <View>
@@ -171,6 +185,65 @@ function PlayerContent({
             ))}
           </View>
         )}
+      </View>
+    </View>
+  )
+}
+
+function PlayerAbilities({
+  abilities,
+  isDemo,
+}: {
+  abilities: PlayerDetailResponse['abilities']
+  isDemo: boolean
+}) {
+  const dimensions = [
+    { key: 'shooting', label: '射门', value: abilities.shooting },
+    { key: 'speed', label: '速度', value: abilities.speed },
+    { key: 'dribbling', label: '盘带', value: abilities.dribbling },
+    { key: 'passing', label: '传球', value: abilities.passing },
+    { key: 'defending', label: '防守', value: abilities.defending },
+  ]
+  if (dimensions.every(({ value }) => value === null)) return null
+  const points = dimensions.map(({ value }, index) => {
+    const angle = ((-90 + index * 72) * Math.PI) / 180
+    const radius = (43 * Math.min(100, Math.max(0, value ?? 0))) / 100
+    return `${50 + Math.cos(angle) * radius}% ${50 + Math.sin(angle) * radius}%`
+  })
+  return (
+    <View className="player-abilities surface">
+      <View className="player-abilities__heading">
+        <View>
+          <Text className="player-abilities__eyebrow">PLAYER ATTRIBUTES</Text>
+          <Text className="player-abilities__title">五维能力</Text>
+        </View>
+        {isDemo && <Text className="player-abilities__note">演示生成值，非实际测评</Text>}
+      </View>
+      <View className="player-abilities__content">
+        <View className="player-radar" aria-label="射门、速度、盘带、传球、防守五维图">
+          <View className="player-radar__grid" />
+          <View className="player-radar__grid player-radar__grid--inner" />
+          <View
+            className="player-radar__shape"
+            style={{ clipPath: `polygon(${points.join(', ')})` }}
+          />
+          {dimensions.map(({ key, label }) => (
+            <Text className={`player-radar__label player-radar__label--${key}`} key={key}>
+              {label}
+            </Text>
+          ))}
+        </View>
+        <View className="player-abilities__list">
+          {dimensions.map(({ key, label, value }) => (
+            <View className="player-ability" key={key}>
+              <Text className="player-ability__label">{label}</Text>
+              <View className="player-ability__track">
+                <View style={{ width: `${value ?? 0}%` }} />
+              </View>
+              <Text className="player-ability__value">{value ?? '—'}</Text>
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   )

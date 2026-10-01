@@ -15,6 +15,22 @@ const MAX_AVATAR_BYTES = 72 * 1024
 const MIN_AVATAR_EDGE = 64
 const MAX_AVATAR_EDGE = 512
 const AVATAR_DIRECTORY = resolve(__dirname, '../../../../private-data/media/avatars')
+const DEMO_DIRECTORY = resolve(__dirname, '../../demo-media')
+const MAX_POST_IMAGE_BYTES = 4 * 1024 * 1024
+const MAX_POST_OUTPUT_BYTES = 768 * 1024
+
+function postDirectory(): string {
+  return (
+    process.env.POST_MEDIA_DIRECTORY || resolve(__dirname, '../../../../private-data/media/posts')
+  )
+}
+
+export interface StoredPostImage {
+  imageUrl: string
+  bytes: number
+  width: number
+  height: number
+}
 
 export interface StoredAvatar {
   avatarUrl: string
@@ -33,29 +49,80 @@ export class MediaService {
     @Inject(AuthService) private readonly authService: AuthService,
   ) {}
 
+  async storePostImage(
+    organizationId: string,
+    authorUserId: string,
+    dataUrl: string,
+  ): Promise<StoredPostImage> {
+    if (!isMediaScope(organizationId) || !isMediaScope(authorUserId))
+      throw badAvatar('图片所属账户无效')
+    const image = await normalizePostImage(dataUrl)
+    const fileName = `${createHash('sha256').update(image.body).digest('hex')}.webp`
+    const directory = resolve(postDirectory(), organizationId, authorUserId)
+    await mkdir(directory, { recursive: true })
+    try {
+      await writeFile(resolve(directory, fileName), image.body, { flag: 'wx' })
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error
+    }
+    return {
+      imageUrl: `/api/media/posts/${organizationId}/${authorUserId}/${fileName}`,
+      bytes: image.body.length,
+      width: image.width,
+      height: image.height,
+    }
+  }
+
+  async readPostImage(
+    organizationId: string,
+    authorUserId: string,
+    fileName: string,
+  ): Promise<{ body: Buffer; mimeType: string }> {
+    if (
+      !isMediaScope(organizationId) ||
+      !isMediaScope(authorUserId) ||
+      !/^[a-f0-9]{64}\.webp$/.test(fileName)
+    )
+      throw notFound('动态图片不存在')
+    const imageUrl = `/api/media/posts/${organizationId}/${authorUserId}/${fileName}`
+    const visiblePost = await this.prisma.post.findFirst({
+      where: { organizationId, authorUserId, imageUrl, status: 'PUBLISHED' },
+      select: { id: true },
+    })
+    if (!visiblePost) throw notFound('动态图片不存在')
+    try {
+      return {
+        body: await readFile(resolve(postDirectory(), organizationId, authorUserId, fileName)),
+        mimeType: 'image/webp',
+      }
+    } catch {
+      throw notFound('动态图片不存在')
+    }
+  }
+
+  async cleanupPostImageIfUnreferenced(imageUrl: string): Promise<void> {
+    const match = /^\/api\/media\/posts\/([a-f0-9-]+)\/([a-f0-9-]+)\/([a-f0-9]{64}\.webp)$/.exec(
+      imageUrl,
+    )
+    if (!match || !isMediaScope(match[1]!) || !isMediaScope(match[2]!)) return
+    if (await this.prisma.post.count({ where: { imageUrl } })) return
+    try {
+      await unlink(resolve(postDirectory(), match[1]!, match[2]!, match[3]!))
+    } catch {
+      // A failed publish may have no remaining file or may share content with another publish.
+    }
+  }
+
   async updateMyAvatar(authorization: string | undefined, dataUrl: string, requestId: string) {
     const session = await this.authService.requireSession(authorization)
     const stored = await this.storeAvatar(dataUrl)
-    const previousUrls = new Set(
-      [session.user.avatarUrl, session.user.linkedPlayer?.avatarUrl].filter(
-        (value): value is string => Boolean(value),
-      ),
-    )
+    const previousUrl = session.user.avatarUrl
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: session.userId },
           data: { avatarUrl: stored.avatarUrl },
         })
-        if (session.user.linkedPlayer) {
-          await tx.playerProfile.updateMany({
-            where: {
-              id: session.user.linkedPlayer.id,
-              organizationId: session.organizationId,
-            },
-            data: { avatarUrl: stored.avatarUrl },
-          })
-        }
         await tx.auditLog.create({
           data: {
             organizationId: session.organizationId,
@@ -71,9 +138,8 @@ export class MediaService {
             targetId: session.userId,
             afterSummary: {
               ...stored,
-              linkedPlayerId: session.user.linkedPlayer?.id ?? null,
             },
-            reason: '用户裁剪并上传头像，并同步本人球员档案',
+            reason: '用户裁剪并上传账户头像',
             requestId,
             source: 'API',
           },
@@ -83,9 +149,8 @@ export class MediaService {
       await this.cleanupAvatarIfUnreferenced(stored.avatarUrl)
       throw error
     }
-    for (const previousUrl of previousUrls) {
-      if (previousUrl !== stored.avatarUrl) await this.cleanupAvatarIfUnreferenced(previousUrl)
-    }
+    if (previousUrl && previousUrl !== stored.avatarUrl)
+      await this.cleanupAvatarIfUnreferenced(previousUrl)
     return {
       avatar: stored,
       user: (await this.authService.requireSession(authorization)).user,
@@ -170,6 +235,26 @@ export class MediaService {
     }
   }
 
+  async readDemoMedia(kind: string, fileName: string): Promise<{ body: Buffer; mimeType: string }> {
+    const extension =
+      kind === 'crests' ? 'png' : kind === 'portraits' ? 'jpg' : kind === 'photos' ? 'webp' : null
+    if (
+      !extension ||
+      !/^(0[1-9]|1[0-6])\.(png|jpg|webp)$/.test(fileName) ||
+      !fileName.endsWith(`.${extension}`)
+    )
+      throw notFound('演示图片不存在')
+    try {
+      return {
+        body: await readFile(resolve(DEMO_DIRECTORY, kind, fileName)),
+        mimeType:
+          extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg',
+      }
+    } catch {
+      throw notFound('演示图片不存在')
+    }
+  }
+
   private async storeAvatar(dataUrl: string): Promise<StoredAvatar> {
     const match = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
     if (!match) throw badAvatar('仅支持裁剪后生成的 WebP、PNG 或 JPEG 头像')
@@ -211,6 +296,50 @@ export class MediaService {
       // Missing or concurrently cleaned content-addressed files need no further action.
     }
   }
+}
+
+function isMediaScope(value: string): boolean {
+  return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value)
+}
+
+export async function normalizePostImage(
+  dataUrl: string,
+): Promise<{ body: Buffer; width: number; height: number }> {
+  const match = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
+  if (!match) throw badAvatar('动态图片仅支持 JPEG、PNG 或 WebP')
+  const input = Buffer.from(match[2]!, 'base64')
+  if (input.length < 100 || input.length > MAX_POST_IMAGE_BYTES)
+    throw badAvatar('动态图片需小于 4 MiB')
+  try {
+    const metadata = await sharp(input, {
+      failOn: 'error',
+      limitInputPixels: 24_000_000,
+    }).metadata()
+    if (metadata.format !== match[1]) throw badAvatar('动态图片内容与格式不一致')
+    if (
+      !metadata.width ||
+      !metadata.height ||
+      metadata.width < 64 ||
+      metadata.height < 64 ||
+      metadata.width > 8000 ||
+      metadata.height > 8000 ||
+      (metadata.pages ?? 1) > 1
+    )
+      throw badAvatar('请选择尺寸适中的静态照片')
+    for (const quality of [82, 68, 54]) {
+      const output = await sharp(input, { failOn: 'error', limitInputPixels: 24_000_000 })
+        .rotate()
+        .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality, effort: 4 })
+        .toBuffer({ resolveWithObject: true })
+      if (output.data.length <= MAX_POST_OUTPUT_BYTES)
+        return { body: output.data, width: output.info.width, height: output.info.height }
+    }
+  } catch (error) {
+    if (error instanceof ApiHttpException) throw error
+    throw badAvatar('动态图片无法完整解码，请重新选择')
+  }
+  throw badAvatar('动态图片过于复杂，请选择较小的照片')
 }
 
 export async function normalizeAvatarImage(

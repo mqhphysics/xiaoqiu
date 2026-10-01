@@ -1,0 +1,82 @@
+[
+  {
+    "file": "references/01-home-approved.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月25日 23_41_23.png",
+    "sha256": "DAEBC90ADC9E421128EC72DCA07985E4BFA5C19E7F5698982E6E91E4F77630E7",
+    "bytes": 1986121,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/02-brand-candidates.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月26日 01_16_23.png",
+    "sha256": "DE9160F3C3ACE81C4B83C73557D13BE8BE9E29AFDFB944F90A4A6A90FF5CE975",
+    "bytes": 1146665,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/03-team-button-candidates.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月26日 01_16_31.png",
+    "sha256": "B52592BAA859119E007B88827519E1A0EA488A77D409DF63C5A6C5A7A3F69553",
+    "bytes": 1857396,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/04-schedule-reference.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月26日 01_16_39.png",
+    "sha256": "9D0EE20B2122E51E52FCC1B9E02C9F3050999E2D3B8C3DA625C963047825551B",
+    "bytes": 1298679,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/05-profile-reference.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月26日 10_46_12.png",
+    "sha256": "3D34DF34C3F947A7411FFC0BF61FAC339347851AD8E71412D65F7853C5B6BBCD",
+    "bytes": 1713638,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/06-data-reference.png",
+    "source": "D:\\MuQinghan\\AppData\\WeChat\\WeChat Files\\wxid_ekltblxz6cu622\\FileStorage\\Temp\\8853ec81b59881d5c8165270104ed9c.png",
+    "sha256": "8945A0502CC9D89000E15E40A664917A59AFB5296C320315E122AC02C3BF6CCE",
+    "bytes": 1291174,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/07-stadium-oblique.png",
+    "source": "C:\\Users\\MUQING~1\\AppData\\Local\\Temp\\codex-clipboard-51959c36-c6da-499b-9ac8-37c36ec58b0d.png",
+    "sha256": "91E9AE3F8DC71DEE53DB3564EF40D52B8EAF7E6C2F4814AC9F3122EFD1D44816",
+    "bytes": 648579,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/08-stadium-front-older.png",
+    "source": "C:\\Users\\MUQING~1\\AppData\\Local\\Temp\\codex-clipboard-8b3bc248-993e-4bd7-b057-7e5e8748336a.png",
+    "sha256": "AB0BCDB8D23F6E9A47F68D4701A01F69CEBAC6445016DE35FF820A1CEDE1DD2A",
+    "bytes": 203073,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/09-stadium-front-clear.png",
+    "source": "C:\\Users\\MUQING~1\\AppData\\Local\\Temp\\codex-clipboard-d96f1984-e7c8-4ef4-a362-f83f698bbcea.png",
+    "sha256": "AC03D6083BFF0BFCC7F515FEE1F0DC23F07746E9CC99C47F00A36F48E4C3FD3D",
+    "bytes": 2331843,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  },
+  {
+    "file": "references/10-brand-current-transparent.png",
+    "source": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年9月26日 14_31_34.png",
+    "sha256": "EF9CDBB79EE21F9BB912BC9B391E228EBA3E1486E7EF7A76BE99F6E8BDE4153C",
+    "bytes": 453845,
+    "status": "copied-and-hash-verified",
+    "usage": "design-reference"
+  }
+]

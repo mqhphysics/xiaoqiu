@@ -4,11 +4,13 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { ApiHttpException } from '../common/api-http.exception'
+import { DEMO_ACCOUNTS, DEMO_ORGANIZATION_ID, fixtureId } from '../database/demo-fixture'
 import { PrismaService } from '../database/prisma.service'
 import {
   AuditActorType,
   MembershipStatus,
   OrganizationStatus,
+  Prisma,
   UserStatus,
   VerificationLevel,
 } from '../generated/prisma/client'
@@ -23,6 +25,8 @@ import type {
 import { hashPassword, verifyPassword } from './password'
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_ALIAS_CANDIDATES = 10
+const DEMO_ACCOUNT_IDS = DEMO_ACCOUNTS.map(({ username }) => fixtureId(`user:${username}`))
 
 export interface AuthenticatedSession {
   sessionId: string
@@ -52,26 +56,42 @@ export class AuthService {
       })
     }
     const normalizedIdentifier = normalizeIdentifier(identifier)
-    const candidates = await this.prisma.user.findMany({
+    const activeUserWhere = {
+      status: UserStatus.ACTIVE,
+      memberships: {
+        some: { organizationId, status: MembershipStatus.ACTIVE },
+      },
+    } as const
+    // Unique account identifiers take precedence over other people's display names.
+    // A numeric username can still collide with another account's student ID.
+    let candidates = await this.prisma.user.findMany({
       where: {
-        status: UserStatus.ACTIVE,
-        memberships: {
-          some: {
-            organizationId,
-            status: MembershipStatus.ACTIVE,
-          },
-        },
+        ...activeUserWhere,
         OR: [
           { loginNameNormalized: normalizedIdentifier },
-          { displayName: { equals: identifier.trim(), mode: 'insensitive' } },
-          { realNameNormalized: normalizedIdentifier },
           { studentId: identifier.trim() },
           { emailNormalized: normalizedIdentifier },
         ],
       },
       include: userInclude,
-      take: 10,
+      take: 4,
     })
+    if (candidates.length > 3) throw ambiguousIdentifier()
+    if (candidates.length === 0) {
+      candidates = await this.prisma.user.findMany({
+        where: {
+          ...activeUserWhere,
+          OR: [
+            { displayName: { equals: identifier.trim(), mode: 'insensitive' } },
+            { realNameNormalized: normalizedIdentifier },
+          ],
+        },
+        include: userInclude,
+        take: MAX_ALIAS_CANDIDATES + 1,
+      })
+      // Never authenticate using an incomplete subset of a larger same-name group.
+      if (candidates.length > MAX_ALIAS_CANDIDATES) throw ambiguousIdentifier()
+    }
     const matchingUsers = candidates.filter(
       (candidate) =>
         candidate.passwordCredential &&
@@ -83,14 +103,7 @@ export class AuthService {
     )
     const user = matchingUsers.length === 1 ? matchingUsers[0] : undefined
 
-    if (
-      !user?.passwordCredential ||
-      !verifyPassword(
-        password,
-        user.passwordCredential.passwordHash,
-        user.passwordCredential.passwordSalt,
-      )
-    ) {
+    if (!user?.passwordCredential) {
       throw new ApiHttpException(HttpStatus.UNAUTHORIZED, {
         code: ERROR_CODES.UNAUTHORIZED,
         message: '账号或密码不正确',
@@ -175,54 +188,58 @@ export class AuthService {
     }
 
     const credential = hashPassword(body.password)
-    await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          loginNameNormalized: username,
-          displayName: body.displayName.trim(),
-          realName: body.realName.trim(),
-          realNameNormalized: normalizeIdentifier(body.realName),
-          studentId,
-          email: body.email.trim(),
-          emailNormalized: email,
-          verificationLevel: VerificationLevel.UNVERIFIED,
-          status: UserStatus.ACTIVE,
-        },
+    await this.prisma
+      .$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            loginNameNormalized: username,
+            displayName: body.displayName.trim(),
+            realName: body.realName.trim(),
+            realNameNormalized: normalizeIdentifier(body.realName),
+            studentId,
+            email: body.email.trim(),
+            emailNormalized: email,
+            verificationLevel: VerificationLevel.UNVERIFIED,
+            status: UserStatus.ACTIVE,
+          },
+        })
+        await tx.passwordCredential.create({
+          data: {
+            userId: user.id,
+            passwordHash: credential.hash,
+            passwordSalt: credential.salt,
+            algorithm: credential.algorithm,
+          },
+        })
+        await tx.organizationMembership.create({
+          data: {
+            organizationId,
+            userId: user.id,
+            status: MembershipStatus.ACTIVE,
+            joinedAt: new Date(),
+          },
+        })
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actorType: AuditActorType.USER,
+            actorUserId: user.id,
+            action: 'ACCOUNT_REGISTERED',
+            targetType: 'User',
+            targetId: user.id,
+            reason: '用户自主注册',
+            requestId: request.requestId,
+            ipAddress: request.ip ?? null,
+            userAgent: request.userAgent?.slice(0, 512) ?? null,
+            source: 'API',
+          },
+        })
       })
-      await tx.passwordCredential.create({
-        data: {
-          userId: user.id,
-          passwordHash: credential.hash,
-          passwordSalt: credential.salt,
-          algorithm: credential.algorithm,
-        },
-      })
-      await tx.organizationMembership.create({
-        data: {
-          organizationId,
-          userId: user.id,
-          status: MembershipStatus.ACTIVE,
-          joinedAt: new Date(),
-        },
-      })
-      await tx.auditLog.create({
-        data: {
-          organizationId,
-          actorType: AuditActorType.USER,
-          actorUserId: user.id,
-          action: 'ACCOUNT_REGISTERED',
-          targetType: 'User',
-          targetId: user.id,
-          reason: '用户自主注册',
-          requestId: request.requestId,
-          ipAddress: request.ip ?? null,
-          userAgent: request.userAgent?.slice(0, 512) ?? null,
-          source: 'API',
-        },
-      })
-    })
+      .catch((error: unknown) => rethrowUniqueConflict(error, '用户名、学号或邮箱已被使用'))
 
-    return this.login(username, body.password, organizationId, request)
+    // The verified registration write owns this email; a numeric username may
+    // collide with another account's student ID and must not break auto-login.
+    return this.login(email, body.password, organizationId, request)
   }
 
   async getSession(authorization: string | undefined): Promise<AuthenticatedSession | null> {
@@ -252,9 +269,11 @@ export class AuthService {
     )
     if (!membership) return null
 
-    void this.prisma.userSession
-      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-      .catch(() => undefined)
+    if (!session.lastSeenAt || Date.now() - session.lastSeenAt.getTime() >= 60_000) {
+      void this.prisma.userSession
+        .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
+        .catch(() => undefined)
+    }
 
     return {
       sessionId: session.id,
@@ -309,45 +328,47 @@ export class AuthService {
       email: session.user.email,
       bio: session.user.bio,
     }
-    const user = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id: session.userId },
-        data: {
-          displayName: body.displayName.trim(),
-          email,
-          emailNormalized,
-          bio: body.bio?.trim() || null,
-        },
-        include: userInclude,
-      })
-      await tx.auditLog.create({
-        data: {
-          organizationId: session.organizationId,
-          actorType: AuditActorType.USER,
-          actorUserId: session.userId,
-          actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
-            role,
-            scopeType,
-            scopeId,
-          })),
-          action: 'PROFILE_UPDATED',
-          targetType: 'User',
-          targetId: session.userId,
-          beforeSummary: before,
-          afterSummary: {
-            displayName: updated.displayName,
-            email: updated.email,
-            bio: updated.bio,
+    const user = await this.prisma
+      .$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id: session.userId },
+          data: {
+            displayName: body.displayName.trim(),
+            email,
+            emailNormalized,
+            bio: body.bio?.trim() || null,
           },
-          reason: '用户修改个人资料',
-          requestId: request.requestId,
-          ipAddress: request.ip ?? null,
-          userAgent: request.userAgent?.slice(0, 512) ?? null,
-          source: 'API',
-        },
+          include: userInclude,
+        })
+        await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorType: AuditActorType.USER,
+            actorUserId: session.userId,
+            actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+              role,
+              scopeType,
+              scopeId,
+            })),
+            action: 'PROFILE_UPDATED',
+            targetType: 'User',
+            targetId: session.userId,
+            beforeSummary: before,
+            afterSummary: {
+              displayName: updated.displayName,
+              email: updated.email,
+              bio: updated.bio,
+            },
+            reason: '用户修改个人资料',
+            requestId: request.requestId,
+            ipAddress: request.ip ?? null,
+            userAgent: request.userAgent?.slice(0, 512) ?? null,
+            source: 'API',
+          },
+        })
+        return updated
       })
-      return updated
-    })
+      .catch((error: unknown) => rethrowUniqueConflict(error, '该邮箱已被其他账号绑定'))
     return mapAuthUser(user, session.organizationId)
   }
 
@@ -359,20 +380,32 @@ export class AuthService {
       userAgent?: string | undefined
     },
   ): Promise<void> {
-    if (process.env.NODE_ENV === 'production') {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      process.env.ENABLE_DEMO_IDENTITY_RECOVERY !== 'true'
+    ) {
       throw new ApiHttpException(HttpStatus.FORBIDDEN, {
         code: ERROR_CODES.FORBIDDEN,
-        message: '请使用已绑定邮箱或联系管理员重置密码',
+        message: '该找回方式当前未开放，请联系管理员处理',
       })
     }
 
     const users = await this.prisma.user.findMany({
       where: {
+        id: { in: DEMO_ACCOUNT_IDS },
         realNameNormalized: normalizeIdentifier(body.realName),
         studentId: body.studentId.trim(),
         status: UserStatus.ACTIVE,
       },
-      include: { memberships: { where: { status: 'ACTIVE' } } },
+      include: {
+        memberships: {
+          where: {
+            organizationId: DEMO_ORGANIZATION_ID,
+            status: MembershipStatus.ACTIVE,
+            organization: { status: OrganizationStatus.ACTIVE },
+          },
+        },
+      },
       take: 2,
     })
     const user = users.length === 1 ? users[0] : undefined
@@ -579,7 +612,19 @@ function hashToken(token: string): string {
 }
 
 function readBearerToken(authorization: string | undefined): string | undefined {
-  if (!authorization?.startsWith('Bearer ')) return undefined
-  const token = authorization.slice('Bearer '.length).trim()
-  return token || undefined
+  return authorization?.match(/^Bearer[ \t]+([^\s]+)[ \t]*$/i)?.[1]
+}
+
+function ambiguousIdentifier(): ApiHttpException {
+  return new ApiHttpException(HttpStatus.UNAUTHORIZED, {
+    code: ERROR_CODES.UNAUTHORIZED,
+    message: '登录标识无法唯一识别账号，请改用自己的用户名、学号或邮箱',
+  })
+}
+
+function rethrowUniqueConflict(error: unknown, message: string): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    throw new ApiHttpException(HttpStatus.CONFLICT, { code: ERROR_CODES.CONFLICT, message })
+  }
+  throw error
 }

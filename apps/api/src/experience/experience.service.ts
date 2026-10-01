@@ -4,7 +4,9 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
+import { MediaService } from '../media/media.service'
 import {
+  AuditActorType,
   MatchEventType,
   MatchStatus,
   NotificationType,
@@ -29,6 +31,7 @@ export class ExperienceService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuthService) private readonly authService: AuthService,
     @Inject(SocialService) private readonly socialService: SocialService,
+    @Inject(MediaService) private readonly mediaService: MediaService,
   ) {}
 
   async getHome(organizationId: string, authorization?: string) {
@@ -515,6 +518,15 @@ export class ExperienceService {
       bio: player.bio,
       profileColor: player.profileColor,
       avatarUrl: player.avatarUrl,
+      portraitUrl: player.portraitUrl,
+      isDemo: player.isDemo,
+      abilities: {
+        shooting: player.ratingShooting,
+        speed: player.ratingSpeed,
+        dribbling: player.ratingDribbling,
+        passing: player.ratingPassing,
+        defending: player.ratingDefending,
+      },
       team: snapshot ? mapTeam(snapshot.rosterSnapshot.team) : null,
       tournamentName: snapshot?.rosterSnapshot.tournament.name ?? null,
       stats: stats ?? emptyPlayerStats(player.id, player.displayName),
@@ -748,7 +760,7 @@ export class ExperienceService {
     return this.getTeamPreferences(authorization)
   }
 
-  async createPost(authorization: string | undefined, input: CreatePostDto) {
+  async createPost(authorization: string | undefined, input: CreatePostDto, requestId = 'unknown') {
     const session = await this.authService.requireSession(authorization)
     const tournament = await this.getFeaturedTournament(session.organizationId)
     if (input.teamId) {
@@ -793,37 +805,80 @@ export class ExperienceService {
     const title = input.title?.trim() || null
     const body = input.body.trim()
     const teamId = input.teamId ?? null
-    const post = await this.prisma.post.upsert({
-      where: {
-        authorUserId_clientPostId: {
-          authorUserId: session.userId,
-          clientPostId: input.clientPostId,
-        },
-      },
-      create: {
-        organizationId: session.organizationId,
-        tournamentId: tournament.id,
-        authorUserId: session.userId,
-        clientPostId: input.clientPostId,
-        teamId,
-        type: PostType.COMMUNITY,
-        status: PostStatus.PUBLISHED,
-        title,
-        body,
-      },
-      update: {},
-      include: postSummaryInclude(session.userId),
-    })
-    if (
-      post.organizationId !== session.organizationId ||
-      post.tournamentId !== tournament.id ||
-      post.teamId !== teamId ||
-      post.title !== title ||
-      post.body !== body
-    ) {
-      throw conflict('同一提交编号已用于其他动态内容，请重新发布')
+    const storedImage = input.imageDataUrl
+      ? await this.mediaService.storePostImage(
+          session.organizationId,
+          session.userId,
+          input.imageDataUrl,
+        )
+      : null
+    const imageUrl = storedImage?.imageUrl ?? null
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const inserted = await tx.post.createMany({
+          data: [
+            {
+              organizationId: session.organizationId,
+              tournamentId: tournament.id,
+              authorUserId: session.userId,
+              clientPostId: input.clientPostId,
+              teamId,
+              type: PostType.COMMUNITY,
+              status: PostStatus.PUBLISHED,
+              title,
+              body,
+              imageUrl,
+            },
+          ],
+          skipDuplicates: true,
+        })
+        const post = await tx.post.findUnique({
+          where: {
+            authorUserId_clientPostId: {
+              authorUserId: session.userId,
+              clientPostId: input.clientPostId,
+            },
+          },
+          include: postSummaryInclude(session.userId),
+        })
+        if (
+          !post ||
+          post.organizationId !== session.organizationId ||
+          post.tournamentId !== tournament.id ||
+          post.teamId !== teamId ||
+          post.title !== title ||
+          post.body !== body ||
+          post.imageUrl !== imageUrl
+        ) {
+          throw conflict('同一提交编号已用于其他动态内容，请重新发布')
+        }
+        if (inserted.count === 1) {
+          await tx.auditLog.create({
+            data: {
+              organizationId: session.organizationId,
+              actorType: AuditActorType.USER,
+              actorUserId: session.userId,
+              actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+                role,
+                scopeType,
+                scopeId,
+              })),
+              action: 'COMMUNITY_POST_CREATED',
+              targetType: 'Post',
+              targetId: post.id,
+              afterSummary: { title, teamId, hasImage: Boolean(imageUrl) },
+              reason: '用户发布校园足球动态',
+              requestId,
+              source: 'API',
+            },
+          })
+        }
+        return mapPost(post, session.userId)
+      })
+    } catch (error) {
+      if (imageUrl) await this.mediaService.cleanupPostImageIfUnreferenced(imageUrl)
+      throw error
     }
-    return mapPost(post, session.userId)
   }
 
   async setLike(authorization: string | undefined, postId: string, liked: boolean) {
@@ -988,6 +1043,7 @@ function mapTeam(team: {
   collegeName: string | null
   primaryColor: string | null
   secondaryColor: string | null
+  crestUrl?: string | null
 }) {
   return {
     id: team.id,
@@ -997,6 +1053,7 @@ function mapTeam(team: {
     collegeName: team.collegeName,
     primaryColor: team.primaryColor,
     secondaryColor: team.secondaryColor,
+    crestUrl: team.crestUrl ?? null,
   }
 }
 
@@ -1047,6 +1104,7 @@ function mapPost(
     type: PostType
     title: string | null
     body: string
+    imageUrl: string | null
     publishedAt: Date
     author: {
       id: string
@@ -1065,6 +1123,7 @@ function mapPost(
     type: post.type,
     title: post.title,
     body: post.body,
+    imageUrl: post.imageUrl,
     publishedAt: post.publishedAt.toISOString(),
     author: post.author
       ? {

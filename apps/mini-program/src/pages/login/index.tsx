@@ -3,7 +3,7 @@ import Taro from '@tarojs/taro'
 import { useEffect, useState } from 'react'
 
 import { productRepository } from '../../features/product/product.repository'
-import { enterGuestMode, isGuestMode, readSession } from '../../features/product/session'
+import { enterGuestMode, readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
 
 import './index.scss'
@@ -36,7 +36,7 @@ export default function LoginPage() {
   const [recoveryPassword, setRecoveryPassword] = useState('')
 
   useEffect(() => {
-    if (readSession() || isGuestMode()) {
+    if (readSession()) {
       void Taro.reLaunch({ url: '/pages/index/index' })
     }
   }, [])
@@ -282,7 +282,7 @@ export default function LoginPage() {
                   onChange={(value) => setRegistration({ ...registration, realName: value })}
                 />
                 <FormField
-                  label="学号"
+                  label="学号（10位数字）"
                   value={registration.studentId}
                   onChange={(value) => setRegistration({ ...registration, studentId: value })}
                 />
@@ -317,8 +317,10 @@ export default function LoginPage() {
           )}
 
           <View className="guest-entry">
-            <Text>暂时不登录？</Text>
-            <Button onClick={() => void enterAsGuest()}>以游客身份浏览</Button>
+            <Button className="guest-entry__button" onClick={() => void enterAsGuest()}>
+              以游客身份浏览
+            </Button>
+            <Text className="guest-entry__hint">无需注册，先看赛程、比分和球队</Text>
           </View>
           <Text className="auth-version">晓球 V1.0.0</Text>
         </View>
@@ -362,7 +364,7 @@ function canRegister(input: RegisterInput & { confirmPassword: string }): boolea
     input.username.trim().length >= 3 &&
     input.displayName.trim().length >= 2 &&
     input.realName.trim().length >= 2 &&
-    input.studentId.trim().length >= 6 &&
+    /^\d{10}$/.test(input.studentId.trim()) &&
     input.email.includes('@') &&
     input.password.length >= 8 &&
     input.confirmPassword.length >= 8,

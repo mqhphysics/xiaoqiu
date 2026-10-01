@@ -11,6 +11,7 @@ import {
   IsUUID,
   Length,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator'
 
@@ -64,6 +65,15 @@ export class CreatePostDto {
   @IsString()
   @Length(2, 1000)
   body!: string
+
+  @ApiPropertyOptional({
+    type: String,
+    description: '可选的单张 JPEG/PNG/WebP 图片 data URL，文件最大 4 MiB',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(5_600_000)
+  imageDataUrl?: string
 }
 
 export class CreateCommentDto {

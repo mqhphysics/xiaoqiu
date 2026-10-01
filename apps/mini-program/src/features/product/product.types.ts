@@ -19,6 +19,7 @@ export interface TeamSummary {
   collegeName: string | null
   primaryColor: string | null
   secondaryColor: string | null
+  crestUrl: string | null
   groupName?: string | null
 }
 export interface MatchSummary {
@@ -57,6 +58,7 @@ export interface PostSummary {
   type: 'OFFICIAL' | 'COMMUNITY'
   title: string | null
   body: string
+  imageUrl: string | null
   publishedAt: string
   author: PostAuthor
   team: TeamSummary | null
@@ -265,6 +267,15 @@ export interface PlayerDetailResponse {
   bio: string | null
   profileColor: string | null
   avatarUrl: string | null
+  portraitUrl: string | null
+  isDemo: boolean
+  abilities: {
+    shooting: number | null
+    speed: number | null
+    dribbling: number | null
+    passing: number | null
+    defending: number | null
+  }
   team: TeamSummary | null
   tournamentName: string | null
   stats: PlayerStats

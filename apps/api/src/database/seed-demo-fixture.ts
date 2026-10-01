@@ -17,7 +17,8 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
       })
 
       const teams = []
-      for (const team of DEMO_TEAMS) {
+      for (const [teamIndex, team] of DEMO_TEAMS.entries()) {
+        const crestUrl = `/api/media/demo/crests/${String(teamIndex + 1).padStart(2, '0')}.png`
         teams.push(
           await tx.team.upsert({
             where: {
@@ -37,6 +38,7 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
               motto: team.motto,
               primaryColor: team.primaryColor,
               secondaryColor: team.secondaryColor,
+              crestUrl,
               foundedYear: team.foundedYear,
             },
             update: {
@@ -47,6 +49,7 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
               motto: team.motto,
               primaryColor: team.primaryColor,
               secondaryColor: team.secondaryColor,
+              crestUrl,
               foundedYear: team.foundedYear,
             },
           }),
@@ -74,6 +77,13 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
             hometown: player.hometown,
             bio: player.bio,
             profileColor: player.profileColor,
+            avatarUrl: player.portraitUrl,
+            portraitUrl: player.portraitUrl,
+            ratingShooting: player.ratings.shooting,
+            ratingSpeed: player.ratings.speed,
+            ratingDribbling: player.ratings.dribbling,
+            ratingPassing: player.ratings.passing,
+            ratingDefending: player.ratings.defending,
             isDemo: true,
           },
           update: {
@@ -90,8 +100,18 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
             hometown: player.hometown,
             bio: player.bio,
             profileColor: player.profileColor,
+            portraitUrl: player.portraitUrl,
+            ratingShooting: player.ratings.shooting,
+            ratingSpeed: player.ratings.speed,
+            ratingDribbling: player.ratings.dribbling,
+            ratingPassing: player.ratings.passing,
+            ratingDefending: player.ratings.defending,
             isDemo: true,
           },
+        })
+        await tx.playerProfile.updateMany({
+          where: { id: player.id, organizationId: organization.id, avatarUrl: null },
+          data: { avatarUrl: player.portraitUrl },
         })
       }
 
@@ -148,5 +168,5 @@ export async function seedDemoFixture(prisma: PrismaClient): Promise<void> {
 }
 
 function maskStudentId(studentId: string): string {
-  return `${studentId.slice(0, 4)}*****${studentId.slice(-2)}`
+  return `${studentId.slice(0, 4)}${'*'.repeat(Math.max(0, studentId.length - 6))}${studentId.slice(-2)}`
 }

@@ -1,6 +1,7 @@
 node_modules/
 .pnpm-store/
 dist/
+dist-weapp/
 .taro/
 .swc/
 *.tsbuildinfo
@@ -15,5 +16,13 @@ Thumbs.db
 .vscode/
 .worktrees/
 /private-data/
+/工程配置/*.lnk
 apps/mini-program/project.private.config.json
+/tools/wechat-devtools/*.exe
+/tools/wechat-devtools/download-page.html
+/tools/wechat-devtools/winget-installer-manifest.yaml
+/tools/wechat-devtools/official-*.js
+/tools/wechat-devtools/official-*.html
+/tools/wechat-devtools/official-*.json
+/tools/wechat-devtools/install-receipt.json
 packages/api-client/src/generated/

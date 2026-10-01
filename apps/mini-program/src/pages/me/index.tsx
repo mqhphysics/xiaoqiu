@@ -169,6 +169,9 @@ function ProfilePanel({
               </Text>
             </View>
             <Text className="profile-header__username">@{user.username}</Text>
+            {user.email?.endsWith('@xiaoqiu.demo') && (
+              <Text className="profile-header__demo">演示账号 · 头像为示意素材</Text>
+            )}
             <Text className="profile-header__bio">{user.bio ?? '这位用户暂时没有填写简介。'}</Text>
             <View className="profile-header__roles">
               {(roleNames.length > 0 ? roleNames : ['普通用户']).map((role) => (
