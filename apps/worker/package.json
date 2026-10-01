@@ -13,10 +13,12 @@
     "@nestjs/common": "latest",
     "@nestjs/core": "latest",
     "reflect-metadata": "latest",
-    "rxjs": "latest"
+    "rxjs": "latest",
+    "pg": "8.16.3"
   },
   "devDependencies": {
     "@types/node": "latest",
-    "tsx": "latest"
+    "tsx": "latest",
+    "@types/pg": "8.15.5"
   }
 }

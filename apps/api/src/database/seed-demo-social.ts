@@ -359,7 +359,10 @@ export async function seedDemoAccountsAndCommunity(
       })),
     })
 
-    const commenter = DEMO_ACCOUNTS[(postIndex + 1) % DEMO_ACCOUNTS.length]!.username
+    const commenter =
+      post.key === 'community-derby'
+        ? 'reporter'
+        : DEMO_ACCOUNTS[(postIndex + 1) % DEMO_ACCOUNTS.length]!.username
     await tx.postComment.create({
       data: {
         id: fixtureId(`comment:${post.key}:${commenter}`),

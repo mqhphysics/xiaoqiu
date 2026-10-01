@@ -555,11 +555,10 @@ class ReportPrismaFake {
   }
 
   contentReport = {
-    upsert: async ({
-      create,
-      where,
+    createMany: async ({
+      data,
     }: {
-      create: {
+      data: Array<{
         clientReportId: string
         details: string | null
         organizationId: string
@@ -567,17 +566,15 @@ class ReportPrismaFake {
         reporterUserId: string
         targetId: string | null
         targetType: string
-      }
-      where: {
-        reporterUserId_clientReportId: { clientReportId: string; reporterUserId: string }
-      }
+      }>
     }) => {
-      const key = where.reporterUserId_clientReportId
+      const create = data[0]!
       const existing = this.reports.find(
         (item) =>
-          item.reporterUserId === key.reporterUserId && item.clientReportId === key.clientReportId,
+          item.reporterUserId === create.reporterUserId &&
+          item.clientReportId === create.clientReportId,
       )
-      if (existing) return existing
+      if (existing) return { count: 0 }
       const now = new Date('2026-09-02T08:00:00.000Z')
       const stored = {
         ...create,
@@ -589,8 +586,18 @@ class ReportPrismaFake {
         updatedAt: now,
       }
       this.reports.push(stored)
-      return stored
+      return { count: 1 }
     },
+    findUnique: async ({
+      where,
+    }: {
+      where: { reporterUserId_clientReportId: { clientReportId: string; reporterUserId: string } }
+    }) =>
+      this.reports.find(
+        (item) =>
+          item.reporterUserId === where.reporterUserId_clientReportId.reporterUserId &&
+          item.clientReportId === where.reporterUserId_clientReportId.clientReportId,
+      ) ?? null,
   }
 
   userNotification = {

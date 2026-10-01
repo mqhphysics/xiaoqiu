@@ -671,25 +671,31 @@ export class SocialService {
     const details = input.details?.trim() || null
     const administrators = await this.findAdministratorRecipients(session.organizationId)
     const report = await this.prisma.$transaction(async (tx) => {
-      const stored = await tx.contentReport.upsert({
+      await tx.contentReport.createMany({
+        data: [
+          {
+            id: randomUUID(),
+            organizationId: session.organizationId,
+            reporterUserId: session.userId,
+            clientReportId: input.clientReportId,
+            targetType: input.targetType as ReportTargetType,
+            targetId,
+            reason,
+            details,
+          },
+        ],
+        skipDuplicates: true,
+      })
+      const stored = await tx.contentReport.findUnique({
         where: {
           reporterUserId_clientReportId: {
             reporterUserId: session.userId,
             clientReportId: input.clientReportId,
           },
         },
-        create: {
-          organizationId: session.organizationId,
-          reporterUserId: session.userId,
-          clientReportId: input.clientReportId,
-          targetType: input.targetType as ReportTargetType,
-          targetId,
-          reason,
-          details,
-        },
-        update: {},
       })
       if (
+        !stored ||
         stored.organizationId !== session.organizationId ||
         stored.targetType !== input.targetType ||
         stored.targetId !== targetId ||
