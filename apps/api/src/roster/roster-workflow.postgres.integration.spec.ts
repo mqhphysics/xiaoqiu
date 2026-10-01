@@ -286,6 +286,19 @@ test('roster HTTP workflow: real roles, isolation, immutable revisions, retries 
     current = (
       await command(captainToken, 'SUBMIT', current.version, { players: roster }).expect(200)
     ).body
+    await prisma.competitionRuleVersion.update({
+      where: { id: rules.id },
+      data: { rules: { roster: { ...policy, maxPlayers: 19 } } },
+    })
+    await command(adminToken, 'APPROVE', current.version).expect(409)
+    current = (
+      await command(adminToken, 'RETURN', current.version, {
+        reason: 'DEMO_FIXTURE 规程改变需重新确认',
+      }).expect(200)
+    ).body
+    current = (
+      await command(captainToken, 'SUBMIT', current.version, { players: roster }).expect(200)
+    ).body
     current = (await command(adminToken, 'APPROVE', current.version).expect(200)).body
     current = (await command(adminToken, 'LOCK', current.version).expect(200)).body
     const firstSnapshot = await prisma.rosterSnapshot.findUniqueOrThrow({

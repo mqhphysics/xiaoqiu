@@ -8,6 +8,23 @@ import { validateLineupPlan } from './lineup-plan.rules'
 import { rosterError } from './roster-workflow.rules'
 import { RosterWorkflowService } from './roster-workflow.service'
 
+const planInclude = {
+  rosterSnapshot: {
+    include: {
+      entries: {
+        orderBy: { sortOrder: 'asc' as const },
+        include: { playerProfile: { select: { avatarUrl: true, position: true } } },
+      },
+    },
+  },
+} satisfies Prisma.TeamLineupPlanInclude
+type SnapshotPlayer = {
+  playerProfileId: string
+  displayName: string
+  shirtNumber: string | null
+  playerProfile: { avatarUrl: string | null; position: string | null }
+}
+
 @Injectable()
 export class LineupPlanService {
   constructor(
@@ -22,6 +39,7 @@ export class LineupPlanService {
       await this.access.authorize(tx, actor, '', teamId, false)
       await this.requireTeam(tx, actor.organizationId, teamId)
       const plans = await tx.teamLineupPlan.findMany({
+        include: planInclude,
         where: { organizationId: actor.organizationId, teamId },
         orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
         take: 100,
@@ -42,6 +60,7 @@ export class LineupPlanService {
     return this.prisma.$transaction(async (tx) => {
       await this.access.authorize(tx, actor, '', teamId, false)
       const plan = await tx.teamLineupPlan.findFirst({
+        include: planInclude,
         where: { id: planId, organizationId: actor.organizationId, teamId },
       })
       if (!plan) throw rosterError(404, '战术计划不存在')
@@ -251,6 +270,7 @@ export class LineupPlanService {
             })
             const result = this.view(
               await tx.teamLineupPlan.findFirstOrThrow({
+                include: planInclude,
                 where: { id, organizationId: actor.organizationId, teamId },
               }),
             )
@@ -307,6 +327,7 @@ export class LineupPlanService {
     version: number
     payload: Prisma.JsonValue
     updatedAt: Date
+    rosterSnapshot?: { entries: SnapshotPlayer[]; snapshotVersion: number } | null
   }) {
     return {
       id: plan.id,
@@ -319,6 +340,15 @@ export class LineupPlanService {
       version: plan.version,
       payload: plan.payload,
       updatedAt: plan.updatedAt.toISOString(),
+      rosterSnapshotVersion: plan.rosterSnapshot?.snapshotVersion ?? null,
+      snapshotPlayers:
+        plan.rosterSnapshot?.entries.map((entry) => ({
+          id: entry.playerProfileId,
+          displayName: entry.displayName,
+          shirtNumber: entry.shirtNumber,
+          avatarUrl: entry.playerProfile.avatarUrl,
+          position: entry.playerProfile.position,
+        })) ?? [],
     }
   }
 }

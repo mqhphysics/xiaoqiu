@@ -35,6 +35,12 @@ const registrationInclude = {
     },
   },
   rosterSnapshots: {
+    include: {
+      entries: {
+        orderBy: { sortOrder: 'asc' as const },
+        include: { playerProfile: { select: { avatarUrl: true, position: true } } },
+      },
+    },
     where: { lockedAt: { not: null } },
     orderBy: { snapshotVersion: 'desc' as const },
     take: 1,
@@ -180,8 +186,14 @@ export class RosterWorkflowService {
                 },
                 orderBy: { createdAt: 'desc' },
               })
-              const summary = priorAudit?.afterSummary as { ruleVersionId?: string } | null
-              if (summary?.ruleVersionId !== ruleVersion?.id)
+              const summary = priorAudit?.afterSummary as {
+                ruleVersionId?: string
+                ruleVersionHash?: string
+              } | null
+              if (
+                summary?.ruleVersionId !== ruleVersion?.id ||
+                summary?.ruleVersionHash !== hash(ruleVersion?.rules)
+              )
                 throw rosterError(409, '赛事规程已变化，请退回名单重新确认资格后提交')
             }
             const nextVersion = version + 1
@@ -286,6 +298,7 @@ export class RosterWorkflowService {
                   tournamentId,
                   teamId,
                   ruleVersionId: ruleVersion!.id,
+                  ruleVersionHash: hash(ruleVersion!.rules),
                 },
                 reason: command.reason?.trim() ?? null,
                 requestId,
@@ -525,7 +538,7 @@ export class RosterWorkflowService {
             0,
             500,
           ),
-          linkPath: `/pages/my-team/index?tournamentId=${registration.tournamentId}&teamId=${registration.teamId}`,
+          linkPath: `/pages/my-team/index?tournamentId=${registration.tournamentId}&teamId=${registration.teamId}${candidates.some((candidate) => candidate.userId === recipientUserId && candidate.role !== 'TEAM_CAPTAIN') ? '&review=roster' : ''}`,
           metadata: {
             submissionId,
             registrationId: registration.id,
@@ -569,6 +582,7 @@ export class RosterWorkflowService {
       tournamentId: registration.tournamentId,
       tournamentName: registration.tournament.name,
       teamId: registration.teamId,
+      teamName: registration.team.name,
       registrationId: registration.id,
       registrationStatus: registration.status,
       version: latest?.submissionVersion ?? 0,
@@ -587,6 +601,13 @@ export class RosterWorkflowService {
         ? {
             id: registration.rosterSnapshots[0].id,
             version: registration.rosterSnapshots[0].snapshotVersion,
+            players: registration.rosterSnapshots[0].entries.map((entry) => ({
+              id: entry.playerProfileId,
+              displayName: entry.displayName,
+              shirtNumber: entry.shirtNumber,
+              avatarUrl: entry.playerProfile.avatarUrl,
+              position: entry.playerProfile.position,
+            })),
           }
         : null,
       players:

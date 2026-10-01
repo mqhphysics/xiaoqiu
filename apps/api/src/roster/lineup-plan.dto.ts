@@ -5,6 +5,8 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsDefined,
+  IsObject,
   IsInt,
   IsNumber,
   IsOptional,
@@ -93,6 +95,8 @@ export class SaveLineupPlanDto {
   @IsUUID()
   rosterSnapshotId?: string | null
   @ApiProperty({ type: () => LineupPayloadDto })
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => LineupPayloadDto)
   payload!: LineupPayloadDto

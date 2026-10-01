@@ -10,8 +10,7 @@ import {
 } from '@nestjs/swagger'
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
-import type { RequestWithId } from '../common/request-context'
-import { P1_DEV_ORGANIZATION_HEADER, requireP1DevOrganizationId } from '../schedule/dev-context'
+import { getOrganizationId, type RequestWithId } from '../common/request-context'
 import {
   AdminTeamRegistrationDetailResponseDto,
   AdminTeamRegistrationListResponseDto,
@@ -40,10 +39,7 @@ export class RosterController {
     @Req() request: RequestWithId,
     @Param('tournamentId') tournamentId: string,
   ) {
-    return this.rosterService.listPublicTournamentTeams(
-      requireP1DevOrganizationId(request),
-      tournamentId,
-    )
+    return this.rosterService.listPublicTournamentTeams(getOrganizationId(request), tournamentId)
   }
 
   @Get('public/tournaments/:tournamentId/teams/:teamId')
@@ -58,7 +54,7 @@ export class RosterController {
     @Param('teamId') teamId: string,
   ) {
     return this.rosterService.getPublicTournamentTeam(
-      requireP1DevOrganizationId(request),
+      getOrganizationId(request),
       tournamentId,
       teamId,
     )
@@ -102,8 +98,8 @@ export class RosterController {
 
 function P2PublicHeaders(): MethodDecorator {
   return ApiHeader({
-    name: P1_DEV_ORGANIZATION_HEADER,
-    description: 'P2 开发期组织上下文，用于公开只读接口组织过滤',
-    required: true,
+    name: 'x-organization-id',
+    description: '公开组织选择；由服务端校验。登录会话须与所选组织一致',
+    required: false,
   })
 }

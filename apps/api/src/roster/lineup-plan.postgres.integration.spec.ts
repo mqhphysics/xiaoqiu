@@ -174,7 +174,7 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
       benchPlayerIds: [players[8]!.id],
     }
     const tactic = { name: 'DEMO_FIXTURE 边路推进', kind: 'TACTIC', expectedVersion: 0, payload }
-    const post = (input: unknown, key = randomUUID()) =>
+    const post = (input: object, key = randomUUID()) =>
       request(server)
         .post(path)
         .set('Authorization', authorization)
@@ -186,6 +186,16 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
       .set('Authorization', authorization)
       .expect(403)
     const key = randomUUID()
+    for (const malformed of [undefined, null, []])
+      await post({ ...tactic, payload: malformed }).expect(400)
+    assert.equal(await prisma.teamLineupPlan.count({ where: { organizationId: org.id } }), 0)
+    assert.equal(await prisma.teamLineupRevision.count({ where: { organizationId: org.id } }), 0)
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { organizationId: org.id, action: 'TEAM_LINEUP_SAVED' },
+      }),
+      0,
+    )
     const saved = await Promise.all([post(tactic, key), post(tactic, key)])
     assert.deepEqual(
       saved.map((result) => result.status),
@@ -194,6 +204,7 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     assert.deepEqual(saved[0]!.body, saved[1]!.body)
     const plan = saved[0]!.body
     assert.equal(plan.version, 1)
+    assert.deepEqual(plan.payload.benchPlayerIds, [players[8]!.id])
     assert.equal(await prisma.teamLineupRevision.count({ where: { planId: plan.id } }), 1)
     await post({ ...tactic, name: '不同名称' }, key).expect(409)
     await post(tactic).expect(409)
@@ -234,6 +245,56 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     }
     const locked = await post(lineup).expect(200)
     assert.equal(locked.body.rosterSnapshotId, snapshot.id)
+    assert.equal(locked.body.snapshotPlayers[0].shirtNumber, '1')
+    await prisma.playerProfile.update({
+      where: { id: players[0]!.id },
+      data: { displayName: 'DEMO_FIXTURE 后来修改的姓名' },
+    })
+    const replacementSubmission = await prisma.rosterSubmission.create({
+      data: {
+        organizationId: org.id,
+        teamRegistrationId: registration.id,
+        submissionVersion: 2,
+        status: 'LOCKED',
+        sourceFileHash: 'b'.repeat(64),
+        lockedAt: new Date(),
+      },
+    })
+    const replacementSnapshot = await prisma.rosterSnapshot.create({
+      data: {
+        organizationId: org.id,
+        tournamentId: tournament.id,
+        teamId: team.id,
+        teamRegistrationId: registration.id,
+        rosterSubmissionId: replacementSubmission.id,
+        snapshotVersion: 2,
+        sourceFileHash: replacementSubmission.sourceFileHash,
+      },
+    })
+    await prisma.rosterSnapshotEntry.createMany({
+      data: players.slice(0, 9).map((player, sortOrder) => ({
+        organizationId: org.id,
+        rosterSnapshotId: replacementSnapshot.id,
+        playerProfileId: player.id,
+        displayName: 'DEMO_FIXTURE 新名单姓名',
+        shirtNumber: sortOrder === 0 ? '99' : String(sortOrder + 1),
+        sortOrder,
+      })),
+    })
+    await prisma.rosterSnapshot.update({
+      where: { id: replacementSnapshot.id },
+      data: { lockedAt: new Date() },
+    })
+    const frozenRead = await request(server)
+      .get(path)
+      .set('Authorization', authorization)
+      .expect(200)
+    const frozenPlan = frozenRead.body.items.find(
+      (item: { id: string }) => item.id === locked.body.id,
+    )
+    assert.equal(frozenPlan.rosterSnapshotVersion, 1)
+    assert.equal(frozenPlan.snapshotPlayers[0].displayName, players[0]!.displayName)
+    assert.equal(frozenPlan.snapshotPlayers[0].shirtNumber, '1')
     await post({
       ...lineup,
       name: '重复球员',
