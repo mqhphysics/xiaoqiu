@@ -191,7 +191,12 @@ class CommunityPrismaFake {
 function makeCommunityServices(prisma: CommunityPrismaFake) {
   const auth = authStub(makeSession())
   const social = new SocialService(prisma as unknown as PrismaService, auth)
-  const experience = new ExperienceService(prisma as unknown as PrismaService, auth, social, new MediaService(prisma as unknown as PrismaService, auth))
+  const experience = new ExperienceService(
+    prisma as unknown as PrismaService,
+    auth,
+    social,
+    new MediaService(prisma as unknown as PrismaService, auth),
+  )
   return { experience, social }
 }
 
@@ -528,7 +533,7 @@ class ReportPrismaFake {
     reason: string
     reporterUserId: string
     resolution: string | null
-    status: 'PENDING'
+    status: 'OPEN'
     targetId: string | null
     targetType: string
     updatedAt: Date
@@ -577,7 +582,7 @@ class ReportPrismaFake {
       const stored = {
         ...create,
         id: `report-${this.nextId++}`,
-        status: 'PENDING' as const,
+        status: 'OPEN' as const,
         resolution: null,
         actionTaken: null,
         createdAt: now,

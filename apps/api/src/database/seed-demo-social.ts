@@ -60,6 +60,9 @@ export const DEMO_TEAM_POST_INDEXES: Readonly<Record<string, number>> = {
   'community-training': 0,
   'community-reporter': 0,
   'community-player': 0,
+  'photo-community-huddle': 0,
+  'photo-community-lineup': 0,
+  'photo-community-celebration': 0,
 }
 
 export const DEMO_PLAYER_FOLLOWS = [

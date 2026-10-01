@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 
@@ -178,6 +180,18 @@ export class SocialService {
     })
     if (existingMembership) throw conflict('你已经是该球队成员')
 
+    const existingApplication = await this.prisma.teamJoinApplication.findFirst({
+      where: { organizationId: session.organizationId, teamId, userId: session.userId },
+    })
+    if (
+      existingApplication?.status === TeamJoinApplicationStatus.PENDING &&
+      existingApplication.playerProfileId === (session.user.linkedPlayer?.id ?? null) &&
+      existingApplication.requestedPosition === (input.requestedPosition ?? null) &&
+      existingApplication.message === (input.message?.trim() || null)
+    ) {
+      return this.getTeamRelationship(authorization, teamId)
+    }
+
     const captains = await this.prisma.roleAssignment.findMany({
       where: {
         organizationId: session.organizationId,
@@ -185,31 +199,87 @@ export class SocialService {
         scopeType: 'TEAM',
         scopeId: teamId,
         revokedAt: null,
+        user: {
+          status: 'ACTIVE',
+          memberships: { some: { organizationId: session.organizationId, status: 'ACTIVE' } },
+        },
       },
       select: { userId: true },
+      distinct: ['userId'],
     })
+    const recipients = captains.length
+      ? captains
+      : await this.findAdministratorRecipients(session.organizationId)
     await this.prisma.$transaction(async (tx) => {
-      const application = await tx.teamJoinApplication.upsert({
-        where: { teamId_userId: { teamId, userId: session.userId } },
-        create: {
+      const member = await tx.teamMembership.findFirst({
+        where: {
           organizationId: session.organizationId,
           teamId,
-          userId: session.userId,
-          playerProfileId: session.user.linkedPlayer?.id ?? null,
-          requestedPosition: (input.requestedPosition as PlayerPosition | undefined) ?? null,
-          message: input.message?.trim() || null,
-        },
-        update: {
-          status: TeamJoinApplicationStatus.PENDING,
-          playerProfileId: session.user.linkedPlayer?.id ?? null,
-          requestedPosition: (input.requestedPosition as PlayerPosition | undefined) ?? null,
-          message: input.message?.trim() || null,
-          reviewedAt: null,
-          reviewedByUserId: null,
-          decisionNote: null,
+          status: 'ACTIVE',
+          OR: [
+            { userId: session.userId },
+            ...(session.user.linkedPlayer
+              ? [{ playerProfileId: session.user.linkedPlayer.id }]
+              : []),
+          ],
         },
       })
-      for (const { userId } of captains) {
+      if (member) throw conflict('你已经是该球队成员')
+      const fields = {
+        playerProfileId: session.user.linkedPlayer?.id ?? null,
+        requestedPosition: (input.requestedPosition as PlayerPosition | undefined) ?? null,
+        message: input.message?.trim() || null,
+      }
+      let application: { id: string }
+      if (existingApplication) {
+        const claimed = await tx.teamJoinApplication.updateMany({
+          where: {
+            id: existingApplication.id,
+            organizationId: session.organizationId,
+            teamId,
+            status: existingApplication.status,
+            updatedAt: existingApplication.updatedAt,
+          },
+          data: {
+            ...fields,
+            status: 'PENDING',
+            reviewedAt: null,
+            reviewedByUserId: null,
+            decisionNote: null,
+          },
+        })
+        if (claimed.count !== 1) throw conflict('申请状态刚刚发生变化，请刷新后重试')
+        application = { id: existingApplication.id }
+      } else {
+        const newApplicationId = randomUUID()
+        const created = await tx.teamJoinApplication.createMany({
+          data: [
+            {
+              id: newApplicationId,
+              organizationId: session.organizationId,
+              teamId,
+              userId: session.userId,
+              ...fields,
+            },
+          ],
+          skipDuplicates: true,
+        })
+        const stored = await tx.teamJoinApplication.findUnique({
+          where: { teamId_userId: { teamId, userId: session.userId } },
+        })
+        if (
+          !stored ||
+          stored.status !== 'PENDING' ||
+          stored.playerProfileId !== fields.playerProfileId ||
+          stored.requestedPosition !== fields.requestedPosition ||
+          stored.message !== fields.message
+        ) {
+          throw conflict('该申请已提交或处理，请刷新后重试')
+        }
+        if (created.count === 0) return
+        application = stored
+      }
+      for (const { userId } of recipients) {
         await this.notify(
           {
             actorUserId: session.userId,
@@ -310,11 +380,19 @@ export class SocialService {
         id: applicationId,
         organizationId: session.organizationId,
         teamId,
-        status: TeamJoinApplicationStatus.PENDING,
       },
       include: { team: true, user: true },
     })
     if (!application) throw conflict('该申请已处理或不存在')
+    if (application.status !== 'PENDING') {
+      if (
+        application.status === input.decision &&
+        application.decisionNote === (input.note?.trim() || null)
+      ) {
+        return this.getCaptainWorkspace(authorization, teamId)
+      }
+      throw conflict('该申请已处理，不能覆盖已有决定')
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.teamJoinApplication.updateMany({
@@ -565,6 +643,7 @@ export class SocialService {
         id: notificationId,
         organizationId: session.organizationId,
         recipientUserId: session.userId,
+        readAt: null,
       },
       data: { readAt: new Date() },
     })
@@ -590,25 +669,7 @@ export class SocialService {
     const targetId = input.targetType === 'FEEDBACK' ? null : (input.targetId ?? null)
     const reason = input.reason.trim()
     const details = input.details?.trim() || null
-    const administrators = await this.prisma.roleAssignment.findMany({
-      where: {
-        revokedAt: null,
-        OR: [
-          {
-            role: 'PLATFORM_ADMIN',
-            OR: [{ organizationId: session.organizationId }, { organizationId: null }],
-          },
-          {
-            organizationId: session.organizationId,
-            role: 'ORGANIZATION_ADMIN',
-            scopeType: 'ORGANIZATION',
-            scopeId: session.organizationId,
-          },
-        ],
-      },
-      select: { userId: true },
-      distinct: ['userId'],
-    })
+    const administrators = await this.findAdministratorRecipients(session.organizationId)
     const report = await this.prisma.$transaction(async (tx) => {
       const stored = await tx.contentReport.upsert({
         where: {
@@ -805,7 +866,21 @@ export class SocialService {
     if (input.hideContent && !['POST', 'COMMENT'].includes(report.targetType)) {
       throw badRequest('当前类型不支持直接隐藏内容')
     }
-    const actionTaken = input.hideContent ? `HIDDEN_${report.targetType}` : null
+    if (input.hideContent && input.status !== 'RESOLVED') {
+      throw badRequest('仅确认已解决的投诉可以隐藏内容')
+    }
+    const resolution = input.resolution.trim()
+    const actionTaken = input.hideContent ? `HIDDEN_${report.targetType}` : report.actionTaken
+    if (
+      report.status === input.status &&
+      report.resolution === resolution &&
+      report.actionTaken === actionTaken
+    ) {
+      return this.listAdminReports(authorization)
+    }
+    if (report.status === 'RESOLVED' || report.status === 'REJECTED') {
+      throw conflict('该反馈已完成处理，不能直接重开或覆盖处理结果')
+    }
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.contentReport.updateMany({
         where: {
@@ -815,7 +890,7 @@ export class SocialService {
         },
         data: {
           status: input.status as ReportStatus,
-          resolution: input.resolution.trim(),
+          resolution,
           actionTaken,
           handledAt: new Date(),
           handledByUserId: session.userId,
@@ -846,12 +921,18 @@ export class SocialService {
           recipientUserId: report.reporterUserId,
           actorUserId: session.userId,
           type: NotificationType.REPORT_UPDATED,
-          title: '你的投诉或反馈已有处理结果',
-          body: input.resolution.trim(),
+          title:
+            input.status === 'IN_REVIEW' ? '你的投诉或反馈正在处理' : '你的投诉或反馈已有处理结果',
+          body: notificationSummary(resolution),
           linkPath: '/pages/me/index',
           deduplicationKey: `report-updated:${report.id}:${input.status}`,
         },
-        update: { body: input.resolution.trim(), readAt: null },
+        update: {
+          body: notificationSummary(resolution),
+          actorUserId: session.userId,
+          createdAt: new Date(),
+          readAt: null,
+        },
       })
       await tx.auditLog.create({
         data: {
@@ -905,6 +986,8 @@ export class SocialService {
               linkPath: input.linkPath ?? null,
               ...(input.metadata ? { metadata: input.metadata } : {}),
               readAt: null,
+              createdAt: new Date(),
+              actorUserId: input.actorUserId ?? null,
             }
           : {},
       })
@@ -921,6 +1004,29 @@ export class SocialService {
         linkPath: input.linkPath ?? null,
         ...(input.metadata ? { metadata: input.metadata } : {}),
       },
+    })
+  }
+
+  private findAdministratorRecipients(organizationId: string) {
+    return this.prisma.roleAssignment.findMany({
+      where: {
+        revokedAt: null,
+        user: {
+          status: 'ACTIVE',
+          memberships: { some: { organizationId, status: 'ACTIVE' } },
+        },
+        OR: [
+          { role: 'PLATFORM_ADMIN', OR: [{ organizationId }, { organizationId: null }] },
+          {
+            organizationId,
+            role: 'ORGANIZATION_ADMIN',
+            scopeType: 'ORGANIZATION',
+            scopeId: organizationId,
+          },
+        ],
+      },
+      select: { userId: true },
+      distinct: ['userId'],
     })
   }
 
@@ -1079,4 +1185,9 @@ function notFound(message: string): ApiHttpException {
     code: ERROR_CODES.NOT_FOUND,
     message,
   })
+}
+
+function notificationSummary(value: string): string {
+  const characters = Array.from(value)
+  return characters.length <= 500 ? value : `${characters.slice(0, 499).join('')}…`
 }
