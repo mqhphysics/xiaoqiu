@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test"
+    "test": "tsx --test src/outbox/outbox-consumer.spec.ts src/outbox/pg-sql-client.spec.ts src/results/match-report-handler.spec.ts src/results/projection-payload.spec.ts",
+    "test:postgres": "tsx --test src/outbox/outbox.postgres.integration.ts"
   },
   "dependencies": {
     "@nestjs/common": "latest",

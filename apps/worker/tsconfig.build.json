@@ -4,5 +4,5 @@
     "declaration": true,
     "removeComments": true
   },
-  "exclude": ["**/*.spec.ts", "**/*.test.ts"]
+  "exclude": ["**/*.spec.ts", "**/*.test.ts", "**/*.integration.ts"]
 }
