@@ -64,3 +64,23 @@ pnpm test:postgres
 ## 公共文件建议
 
 由 integrator 独占处理：确认版本/投影/晋级预览模型和约束、contracts、生成 Client、新模块接线、必要索引与统一依赖安装/锁文件。现有 Outbox deduplicationKey 没有唯一约束；应按组织+消费者+源版本确定去重约束。大量读取还需独立验收查询计划、分页/索引、投影滞后及网站负载；本段没有声称完成容量测试。
+
+## 第二段接口准备（RESULTS-CONTRACT-01）
+
+第一段提交：`2e40e1af38d1057b404fc5085bcffe2f8ce883bb`。
+
+按 integrator 的合同预告新增：
+
+- `apps/worker/src/outbox/pg-sql-client.ts`：Pool 的同 client 事务适配器，连接取得后有总时限和数据库 statement/lock/idle 时限；超时销毁连接，拒绝迟到 Handler 再发 SQL。依据 [node-postgres 事务文档](https://node-postgres.com/features/transactions)及 [Pool 文档](https://node-postgres.com/apis/pool)。等待统一 pg 安装后做真实 Pool 测试及生产运行接线；现有 PostgreSQL Outbox 测试仍用测试专属 Prisma adapter。
+- `apps/worker/src/results/match-report-handler.ts`：严格解析已分配 `match.report / MatchReportConfirmed` 事件，验证组织与 aggregateId；持有 Match 锁读取当前 confirmedReportVersion，旧版本无害退出、未来版本重试、最新事件须匹配不可变确认 revision/规程版本。Repository 是待接生产 SQL 的接口，当前受控测试不冒充持久化实现。
+- `apps/api/src/results/progression-source.ts`：来源 hash 包含组织/赛事/阶段/规程、参赛队伍与分组，以及全部来源阶段场次的确认版本、双方队伍及小组。无确认报告的场次也纳入（version=0）；更正、增加场次、尚未比赛的新增队伍、换队/换组都能使旧预览失效。尚未作为公开 API 接入。
+- 对应专属测试及 Worker test 命令扩展；不新增依赖、不改共享文件。
+
+尚待：integrator 提供模型/迁移提交与可用 pg 路径、projection.payload 的具体语义、晋级端点与正式权限复用入口。收到后接生产 SQL repository、Worker lifecycle 与 results API；正式读取由 integrator 接 Experience。
+
+第二段定向检查：新增 13 项纯函数/受控生命周期及事件测试通过；当前完整定向单元集为 46 项通过，另有第一段真实 PostgreSQL 12 项通过。results/Worker 类型检查、Worker 构建、覆盖新目录的 ESLint、Prettier、diff 检查全部通过。未安装 pg 的阶段不把结构接口/受控 Pool 测试称为真实 pg 运行验证。
+
+```powershell
+node apps/worker/node_modules/tsx/dist/cli.mjs --test apps/api/src/results/competition-rules.spec.ts apps/api/src/results/progression-source.spec.ts apps/worker/src/outbox/outbox-consumer.spec.ts apps/worker/src/outbox/pg-sql-client.spec.ts apps/worker/src/results/match-report-handler.spec.ts
+node node_modules/eslint/bin/eslint.js apps/api/src/results apps/worker/src/outbox apps/worker/src/results
+```
