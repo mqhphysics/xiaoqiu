@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Req } from '@nestjs/common'
 import {
   ApiBody,
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
@@ -12,13 +13,7 @@ import {
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
 import type { RequestWithId } from '../common/request-context'
-import {
-  requireP1DevAdminContext,
-  requireP1DevOrganizationId,
-  P1_DEV_ORGANIZATION_HEADER,
-  P1_DEV_ROLE_HEADER,
-  P1_TOURNAMENT_ADMIN_ROLE,
-} from './dev-context'
+import { requireP1DevAdminContext, requireP1DevOrganizationId } from './dev-context'
 import {
   AdminScheduleWorkbenchResponseDto,
   CompetitionRuleVersionResponseDto,
@@ -49,17 +44,20 @@ export class ScheduleController {
 
   @Get('admin/schedule-workbench')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期读取后台赛程工作台快照' })
+  @ApiOperation({ summary: '读取后台赛程工作台快照' })
   @ApiOkResponse({ type: AdminScheduleWorkbenchResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   getAdminScheduleWorkbench(@Req() request: RequestWithId) {
     const context = requireP1DevAdminContext(request)
-    return this.scheduleService.getAdminScheduleWorkbench(context.organizationId)
+    return this.scheduleService.getAdminScheduleWorkbench(
+      context.organizationId,
+      request.administeredTournamentIds ?? null,
+    )
   }
 
   @Post('admin/seasons')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建赛季' })
+  @ApiOperation({ summary: '创建赛季' })
   @ApiBody({ type: CreateSeasonDto })
   @ApiCreatedResponse({ type: SeasonResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -70,7 +68,7 @@ export class ScheduleController {
 
   @Post('admin/tournaments')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建赛事' })
+  @ApiOperation({ summary: '创建赛事' })
   @ApiBody({ type: CreateTournamentDto })
   @ApiCreatedResponse({ type: TournamentResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -82,7 +80,7 @@ export class ScheduleController {
 
   @Post('admin/tournaments/:id/rule-versions')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建赛事规则版本' })
+  @ApiOperation({ summary: '创建赛事规则版本' })
   @ApiBody({ type: CreateCompetitionRuleVersionDto })
   @ApiCreatedResponse({ type: CompetitionRuleVersionResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -98,7 +96,7 @@ export class ScheduleController {
 
   @Post('admin/tournaments/:id/teams')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建球队' })
+  @ApiOperation({ summary: '创建球队' })
   @ApiBody({ type: CreateTeamDto })
   @ApiCreatedResponse({ type: TeamResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -114,7 +112,7 @@ export class ScheduleController {
 
   @Post('admin/venues')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建场地' })
+  @ApiOperation({ summary: '创建场地' })
   @ApiBody({ type: CreateVenueDto })
   @ApiCreatedResponse({ type: VenueResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -125,7 +123,7 @@ export class ScheduleController {
 
   @Post('admin/tournaments/:id/matches')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建比赛草案' })
+  @ApiOperation({ summary: '创建比赛草案' })
   @ApiBody({ type: CreateMatchDto })
   @ApiCreatedResponse({ type: MatchResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -141,7 +139,7 @@ export class ScheduleController {
 
   @Post('admin/schedule-plans')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期创建赛程草案' })
+  @ApiOperation({ summary: '创建赛程草案' })
   @ApiBody({ type: CreateSchedulePlanDto })
   @ApiCreatedResponse({ type: SchedulePlanResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
@@ -154,7 +152,7 @@ export class ScheduleController {
   @Post('admin/schedule-plans/:id/validate')
   @HttpCode(200)
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期校验赛程草案' })
+  @ApiOperation({ summary: '校验赛程草案' })
   @ApiOkResponse({ type: SchedulePlanResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -165,7 +163,7 @@ export class ScheduleController {
 
   @Post('admin/schedule-plans/:id/publish')
   @P1AdminHeaders()
-  @ApiOperation({ summary: 'P1 开发期发布赛程草案' })
+  @ApiOperation({ summary: '发布赛程草案' })
   @ApiCreatedResponse({ type: ScheduleRevisionResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
   @ApiNotFoundResponse({ type: ApiErrorResponseDto })
@@ -228,27 +226,13 @@ export class ScheduleController {
 }
 
 function P1AdminHeaders(): MethodDecorator {
-  const organizationHeader = ApiHeader({
-    name: P1_DEV_ORGANIZATION_HEADER,
-    description: 'P1 开发期组织上下文，后续由真实认证授权替换',
-    required: true,
-  })
-  const roleHeader = ApiHeader({
-    name: P1_DEV_ROLE_HEADER,
-    description: `P1 开发期临时角色，必须为 ${P1_TOURNAMENT_ADMIN_ROLE}`,
-    required: true,
-  })
-
-  return (target, propertyKey, descriptor) => {
-    organizationHeader(target, propertyKey, descriptor)
-    roleHeader(target, propertyKey, descriptor)
-  }
+  return ApiBearerAuth()
 }
 
 function P1PublicHeaders(): MethodDecorator {
   return ApiHeader({
-    name: P1_DEV_ORGANIZATION_HEADER,
-    description: 'P1 开发期组织上下文，用于只读接口组织过滤',
-    required: true,
+    name: 'x-organization-id',
+    description: '组织 UUID；登录后默认使用会话组织，游客可使用部署默认组织',
+    required: false,
   })
 }

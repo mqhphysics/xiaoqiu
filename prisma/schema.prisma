@@ -246,6 +246,10 @@ enum NotificationType {
   REPORT_CREATED
   REPORT_UPDATED
   DIRECT_MESSAGE
+  ROSTER_SUBMITTED
+  ROSTER_UPDATED
+  MATCH_REPORT_SUBMITTED
+  MATCH_REPORT_REVIEWED
 
   @@map("notification_type")
 }
@@ -312,6 +316,12 @@ model Organization {
   directConversations DirectConversation[]
   directMessages      DirectMessage[]
 
+  matchReportRevisions   MatchReportRevision[]
+  lineupPlans            TeamLineupPlan[]
+  lineupRevisions        TeamLineupRevision[]
+  resultProjections      MatchResultProjection[]
+  tournamentProgressions TournamentProgression[]
+
   @@map("organizations")
 }
 
@@ -356,6 +366,10 @@ model User {
   conversationsAsOne   DirectConversation[]     @relation("ConversationUserOne")
   conversationsAsTwo   DirectConversation[]     @relation("ConversationUserTwo")
   directMessages       DirectMessage[]          @relation("DirectMessageSender")
+
+  matchReportRevisions   MatchReportRevision[]   @relation("MatchReportAuthor")
+  lineupRevisions        TeamLineupRevision[]    @relation("LineupRevisionAuthor")
+  tournamentProgressions TournamentProgression[] @relation("ProgressionAuthor")
 
   @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
@@ -564,6 +578,10 @@ model Tournament {
   importBatches     ImportBatch[]
   posts             Post[]
 
+  progressionVersion Int                     @default(0) @map("progression_version")
+  progressions       TournamentProgression[]
+  lineupPlans        TeamLineupPlan[]
+
   @@unique([organizationId, tournamentCode], map: "tournaments_organization_id_tournament_code_key")
   @@unique([id, organizationId], map: "tournaments_id_organization_id_key")
   @@index([organizationId, status, createdAt], map: "tournaments_organization_id_status_created_at_idx")
@@ -584,6 +602,10 @@ model CompetitionRuleVersion {
   updatedAt      DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   tournament     Tournament                   @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
 
+  reportRevisions MatchReportRevision[]
+  progressions    TournamentProgression[]
+
+  @@unique([id, organizationId], map: "competition_rule_version_id_organization_id_key")
   @@unique([tournamentId, version], map: "competition_rule_versions_tournament_id_version_key")
   @@index([organizationId, tournamentId], map: "competition_rule_versions_organization_id_tournament_id_idx")
   @@map("competition_rule_versions")
@@ -669,6 +691,8 @@ model Team {
   posts            Post[]
   memberships      TeamMembership[]
   joinApplications TeamJoinApplication[]
+
+  lineupPlans TeamLineupPlan[]
 
   @@unique([organizationId, teamCode], map: "teams_organization_id_team_code_key")
   @@unique([id, organizationId], map: "teams_id_organization_id_key")
@@ -816,6 +840,13 @@ model Match {
   appearances        MatchAppearance[]
   reviews            MatchReview[]
 
+  reportVersion          Int                     @default(0) @map("report_version")
+  confirmedReportVersion Int?                    @map("confirmed_report_version")
+  reportRevisions        MatchReportRevision[]
+  lineupPlans            TeamLineupPlan[]
+  resultProjections      MatchResultProjection[]
+
+  @@unique([id, organizationId], map: "match_id_organization_id_key")
   @@unique([organizationId, matchCode], map: "matches_organization_id_match_code_key")
   @@index([organizationId, scheduledStartAt], map: "matches_organization_id_scheduled_start_at_idx")
   @@index([tournamentId, status, scheduledStartAt], map: "matches_tournament_id_status_scheduled_start_at_idx")
@@ -1215,6 +1246,11 @@ model RosterSnapshot {
   entries            RosterSnapshotEntry[]
   importBatches      ImportBatch[]
 
+  homeReportRevisions MatchReportRevision[] @relation("MatchReportHomeRoster")
+  awayReportRevisions MatchReportRevision[] @relation("MatchReportAwayRoster")
+  lineupPlans         TeamLineupPlan[]
+  lineupRevisions     TeamLineupRevision[]
+
   @@unique([tournamentId, teamId, snapshotVersion], map: "roster_snapshots_tournament_id_team_id_version_key")
   @@unique([rosterSubmissionId, organizationId], map: "roster_snapshots_submission_id_organization_id_key")
   @@unique([id, organizationId], map: "roster_snapshots_id_organization_id_key")
@@ -1266,4 +1302,132 @@ model ImportBatch {
   @@index([organizationId, tournamentId, createdAt], map: "import_batches_org_tournament_created_at_idx")
   @@index([teamRegistrationId, createdAt], map: "import_batches_registration_id_created_at_idx")
   @@map("import_batches")
+}
+
+enum MatchReportStatus {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  CONFIRMED
+
+  @@map("match_report_status")
+}
+
+enum LineupPlanKind {
+  TACTIC
+  MATCH_LINEUP
+
+  @@map("lineup_plan_kind")
+}
+
+model MatchReportRevision {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  organizationId       String                  @map("organization_id") @db.Uuid
+  matchId              String                  @map("match_id") @db.Uuid
+  version              Int
+  status               MatchReportStatus
+  action               String                  @db.VarChar(16)
+  fields               Json                    @db.JsonB
+  homeRosterSnapshotId String                  @map("home_roster_snapshot_id") @db.Uuid
+  awayRosterSnapshotId String                  @map("away_roster_snapshot_id") @db.Uuid
+  ruleVersionId        String                  @map("rule_version_id") @db.Uuid
+  createdByUserId      String                  @map("created_by_user_id") @db.Uuid
+  reason               String?                 @db.VarChar(1000)
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  match                Match                   @relation(fields: [matchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  homeRosterSnapshot   RosterSnapshot          @relation("MatchReportHomeRoster", fields: [homeRosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  awayRosterSnapshot   RosterSnapshot          @relation("MatchReportAwayRoster", fields: [awayRosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  ruleVersion          CompetitionRuleVersion  @relation(fields: [ruleVersionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdBy            User                    @relation("MatchReportAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  resultProjections    MatchResultProjection[]
+
+  @@unique([matchId, version], map: "match_report_revisions_match_version_key")
+  @@unique([id, organizationId], map: "match_report_revisions_id_org_key")
+  @@index([organizationId, matchId, status, version], map: "match_report_revisions_org_match_status_version_idx")
+  @@map("match_report_revisions")
+}
+
+model TeamLineupPlan {
+  id               String               @id @default(uuid()) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  teamId           String               @map("team_id") @db.Uuid
+  name             String               @db.VarChar(80)
+  kind             LineupPlanKind       @default(TACTIC)
+  tournamentId     String?              @map("tournament_id") @db.Uuid
+  matchId          String?              @map("match_id") @db.Uuid
+  rosterSnapshotId String?              @map("roster_snapshot_id") @db.Uuid
+  version          Int                  @default(0)
+  payload          Json                 @db.JsonB
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team             Team                 @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  tournament       Tournament?          @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  match            Match?               @relation(fields: [matchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  rosterSnapshot   RosterSnapshot?      @relation(fields: [rosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  revisions        TeamLineupRevision[]
+
+  @@unique([organizationId, teamId, name], map: "team_lineup_plans_org_team_name_key")
+  @@unique([id, organizationId], map: "team_lineup_plans_id_org_key")
+  @@index([organizationId, teamId, matchId], map: "team_lineup_plans_org_team_match_idx")
+  @@map("team_lineup_plans")
+}
+
+model TeamLineupRevision {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  planId           String          @map("plan_id") @db.Uuid
+  version          Int
+  payload          Json            @db.JsonB
+  rosterSnapshotId String?         @map("roster_snapshot_id") @db.Uuid
+  createdByUserId  String          @map("created_by_user_id") @db.Uuid
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan             TeamLineupPlan  @relation(fields: [planId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  rosterSnapshot   RosterSnapshot? @relation(fields: [rosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdBy        User            @relation("LineupRevisionAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, version], map: "team_lineup_revisions_plan_version_key")
+  @@index([organizationId, planId, version], map: "team_lineup_revisions_org_plan_version_idx")
+  @@map("team_lineup_revisions")
+}
+
+model MatchResultProjection {
+  id                  String              @id @default(uuid()) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  matchId             String              @map("match_id") @db.Uuid
+  sourceReportVersion Int                 @map("source_report_version")
+  reportRevisionId    String              @map("report_revision_id") @db.Uuid
+  payload             Json                @db.JsonB
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  match               Match               @relation(fields: [matchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reportRevision      MatchReportRevision @relation(fields: [reportRevisionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([organizationId, matchId], map: "match_result_projections_org_match_key")
+  @@index([organizationId, sourceReportVersion], map: "match_result_projections_org_version_idx")
+  @@map("match_result_projections")
+}
+
+model TournamentProgression {
+  id              String                 @id @default(uuid()) @db.Uuid
+  organizationId  String                 @map("organization_id") @db.Uuid
+  tournamentId    String                 @map("tournament_id") @db.Uuid
+  version         Int
+  sourceHash      String                 @map("source_hash") @db.Char(64)
+  sourceVersions  Json                   @map("source_versions") @db.JsonB
+  slots           Json                   @db.JsonB
+  ruleVersionId   String                 @map("rule_version_id") @db.Uuid
+  createdByUserId String                 @map("created_by_user_id") @db.Uuid
+  reason          String                 @db.VarChar(1000)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament      Tournament             @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  ruleVersion     CompetitionRuleVersion @relation(fields: [ruleVersionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdBy       User                   @relation("ProgressionAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tournamentId, version], map: "tournament_progressions_tournament_version_key")
+  @@index([organizationId, tournamentId, sourceHash], map: "tournament_progressions_org_tournament_hash_idx")
+  @@map("tournament_progressions")
 }

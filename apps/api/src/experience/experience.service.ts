@@ -3,6 +3,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
+import { selectPublicTournament } from '../common/public-tournament'
 import { PrismaService } from '../database/prisma.service'
 import { MediaService } from '../media/media.service'
 import {
@@ -23,8 +24,6 @@ import type {
 } from './experience.dto'
 import { calculateStandings } from './ranking'
 
-const FEATURED_TOURNAMENT_CODE = 'DEMO-GREEN-CUP-2026'
-
 @Injectable()
 export class ExperienceService {
   constructor(
@@ -34,12 +33,12 @@ export class ExperienceService {
     @Inject(MediaService) private readonly mediaService: MediaService,
   ) {}
 
-  async getHome(organizationId: string, authorization?: string) {
+  async getHome(organizationId: string, authorization?: string, tournamentId?: string) {
     const session = await this.authService.getSession(authorization)
-    const tournament = await this.getFeaturedTournament(organizationId)
+    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
     const [matches, registrations, posts] = await Promise.all([
       this.prisma.match.findMany({
-        where: { organizationId, tournamentId: tournament.id },
+        where: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
         include: matchSummaryInclude,
         orderBy: [{ scheduledStartAt: 'asc' }, { sortOrder: 'asc' }],
       }),
@@ -88,8 +87,18 @@ export class ExperienceService {
     }
   }
 
-  async search(organizationId: string, input: SearchQueryDto) {
-    const tournament = await this.getFeaturedTournament(organizationId)
+  async search(organizationId: string, input: SearchQueryDto, tournamentId?: string) {
+    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
+    const snapshotScope = {
+      organizationId,
+      tournamentId: tournament.id,
+      lockedAt: { not: null },
+      teamRegistration: {
+        organizationId,
+        tournamentId: tournament.id,
+        status: 'APPROVED' as const,
+      },
+    }
     const query = input.query
     const wants = (category: SearchQueryDto['category']) =>
       input.category === 'ALL' || input.category === category
@@ -99,6 +108,7 @@ export class ExperienceService {
         ? this.prisma.playerProfile.findMany({
             where: {
               organizationId,
+              snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
               OR: [
                 { displayName: { contains: query, mode: 'insensitive' } },
                 { jerseyName: { contains: query, mode: 'insensitive' } },
@@ -106,8 +116,9 @@ export class ExperienceService {
             },
             include: {
               snapshotEntries: {
-                where: { rosterSnapshot: { tournamentId: tournament.id } },
+                where: { organizationId, rosterSnapshot: snapshotScope },
                 include: { rosterSnapshot: { include: { team: true } } },
+                orderBy: { rosterSnapshot: { snapshotVersion: 'desc' } },
                 take: 1,
               },
             },
@@ -119,7 +130,9 @@ export class ExperienceService {
         ? this.prisma.team.findMany({
             where: {
               organizationId,
-              registrations: { some: { tournamentId: tournament.id } },
+              registrations: {
+                some: { organizationId, tournamentId: tournament.id, status: 'APPROVED' },
+              },
               OR: [
                 { name: { contains: query, mode: 'insensitive' } },
                 { shortName: { contains: query, mode: 'insensitive' } },
@@ -135,6 +148,7 @@ export class ExperienceService {
             where: {
               organizationId,
               tournamentId: tournament.id,
+              status: { not: 'DRAFT' },
               OR: [
                 { title: { contains: query, mode: 'insensitive' } },
                 { homeTeam: { name: { contains: query, mode: 'insensitive' } } },
@@ -187,7 +201,9 @@ export class ExperienceService {
     const tournaments = await this.prisma.tournament.findMany({
       where: {
         organizationId,
-        tournamentCode: { startsWith: 'DEMO-GREEN-CUP-' },
+        status: 'PUBLISHED',
+        organization: { status: 'ACTIVE' },
+        season: { organizationId },
       },
       include: { season: true },
       orderBy: { season: { startsOn: 'desc' } },
@@ -204,12 +220,7 @@ export class ExperienceService {
   }
 
   async getCompetitionData(organizationId: string, tournamentId?: string) {
-    const tournament = tournamentId
-      ? await this.prisma.tournament.findFirst({
-          where: { id: tournamentId, organizationId },
-          include: { season: true },
-        })
-      : await this.getFeaturedTournament(organizationId)
+    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
     if (!tournament) throw notFound('赛事不存在')
 
     const [registrations, matches, events, appearances, seasons] = await Promise.all([
@@ -219,16 +230,22 @@ export class ExperienceService {
         orderBy: [{ group: { sortOrder: 'asc' } }, { team: { name: 'asc' } }],
       }),
       this.prisma.match.findMany({
-        where: { organizationId, tournamentId: tournament.id },
+        where: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
         include: { ...matchSummaryInclude, stage: true, group: true, round: true },
         orderBy: [{ scheduledStartAt: 'asc' }, { sortOrder: 'asc' }],
       }),
       this.prisma.matchEvent.findMany({
-        where: { organizationId, match: { tournamentId: tournament.id } },
+        where: {
+          organizationId,
+          match: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
+        },
         include: { player: true, relatedPlayer: true, team: true },
       }),
       this.prisma.matchAppearance.findMany({
-        where: { organizationId, match: { tournamentId: tournament.id } },
+        where: {
+          organizationId,
+          match: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
+        },
         include: { player: true, team: true },
       }),
       this.listSeasons(organizationId),
@@ -345,13 +362,18 @@ export class ExperienceService {
   ) {
     const session = await this.authService.getSession(authorization)
     const viewerUserId = session?.organizationId === organizationId ? session.userId : undefined
-    const selectedTournamentId =
-      tournamentId ?? (await this.getFeaturedTournament(organizationId)).id
+    const selectedTournamentId = (await this.getFeaturedTournament(organizationId, tournamentId)).id
     const team = await this.prisma.team.findFirst({
-      where: { id: teamId, organizationId },
+      where: {
+        id: teamId,
+        organizationId,
+        registrations: {
+          some: { organizationId, tournamentId: selectedTournamentId, status: 'APPROVED' },
+        },
+      },
       include: {
         registrations: {
-          where: { tournamentId: selectedTournamentId },
+          where: { organizationId, tournamentId: selectedTournamentId, status: 'APPROVED' },
           include: { group: true },
           take: 1,
         },
@@ -372,6 +394,7 @@ export class ExperienceService {
         where: {
           organizationId,
           tournamentId: selectedTournamentId,
+          status: { not: 'DRAFT' },
           OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }],
         },
         include: matchSummaryInclude,
@@ -380,7 +403,7 @@ export class ExperienceService {
       this.prisma.matchEvent.findMany({
         where: {
           organizationId,
-          match: { tournamentId: selectedTournamentId },
+          match: { organizationId, tournamentId: selectedTournamentId, status: { not: 'DRAFT' } },
           OR: [{ playerId: { in: playerIds } }, { relatedPlayerId: { in: playerIds } }],
         },
         include: { player: true, relatedPlayer: true, team: true },
@@ -388,7 +411,7 @@ export class ExperienceService {
       this.prisma.matchAppearance.findMany({
         where: {
           organizationId,
-          match: { tournamentId: selectedTournamentId },
+          match: { organizationId, tournamentId: selectedTournamentId, status: { not: 'DRAFT' } },
           playerId: { in: playerIds },
         },
         include: { player: true, team: true },
@@ -471,14 +494,21 @@ export class ExperienceService {
   }
 
   async getPlayer(organizationId: string, playerId: string, tournamentId?: string) {
-    const selectedTournamentId =
-      tournamentId ?? (await this.getFeaturedTournament(organizationId)).id
+    const selectedTournamentId = (await this.getFeaturedTournament(organizationId, tournamentId)).id
     const player = await this.prisma.playerProfile.findFirst({
       where: { id: playerId, organizationId },
       include: {
         snapshotEntries: {
-          where: { rosterSnapshot: { tournamentId: selectedTournamentId } },
+          where: {
+            organizationId,
+            rosterSnapshot: {
+              organizationId,
+              tournamentId: selectedTournamentId,
+              lockedAt: { not: null },
+            },
+          },
           include: { rosterSnapshot: { include: { team: true, tournament: true } } },
+          orderBy: { rosterSnapshot: { snapshotVersion: 'desc' } },
           take: 1,
         },
       },
@@ -489,13 +519,17 @@ export class ExperienceService {
       this.prisma.matchEvent.findMany({
         where: {
           organizationId,
-          match: { tournamentId: selectedTournamentId },
+          match: { organizationId, tournamentId: selectedTournamentId, status: { not: 'DRAFT' } },
           OR: [{ playerId }, { relatedPlayerId: playerId }],
         },
         include: { player: true, relatedPlayer: true, team: true },
       }),
       this.prisma.matchAppearance.findMany({
-        where: { organizationId, playerId, match: { tournamentId: selectedTournamentId } },
+        where: {
+          organizationId,
+          playerId,
+          match: { organizationId, tournamentId: selectedTournamentId, status: { not: 'DRAFT' } },
+        },
         include: { player: true, team: true, match: { include: matchSummaryInclude } },
         orderBy: { match: { scheduledStartAt: 'desc' } },
       }),
@@ -541,7 +575,12 @@ export class ExperienceService {
   async getMatchExperience(organizationId: string, matchId: string, authorization?: string) {
     const session = await this.authService.getSession(authorization)
     const match = await this.prisma.match.findFirst({
-      where: { id: matchId, organizationId },
+      where: {
+        id: matchId,
+        organizationId,
+        status: { not: 'DRAFT' },
+        tournament: { organizationId, status: 'PUBLISHED' },
+      },
       include: {
         ...matchSummaryInclude,
         stage: true,
@@ -661,9 +700,9 @@ export class ExperienceService {
     return this.getMatchExperience(session.organizationId, matchId, authorization)
   }
 
-  async listPosts(organizationId: string, authorization?: string) {
+  async listPosts(organizationId: string, authorization?: string, tournamentId?: string) {
     const session = await this.authService.getSession(authorization)
-    const tournament = await this.getFeaturedTournament(organizationId)
+    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
     const posts = await this.prisma.post.findMany({
       where: { organizationId, tournamentId: tournament.id, status: PostStatus.PUBLISHED },
       include: postSummaryInclude(session?.userId),
@@ -705,14 +744,14 @@ export class ExperienceService {
     }
   }
 
-  async getTeamPreferences(authorization: string | undefined) {
+  async getTeamPreferences(authorization: string | undefined, tournamentId?: string) {
     const session = await this.authService.requireSession(authorization)
     const preferences = await this.prisma.userTeamPreference.findMany({
       where: { organizationId: session.organizationId, userId: session.userId },
       include: { team: true },
       orderBy: [{ isPrimary: 'desc' }, { team: { name: 'asc' } }],
     })
-    const tournament = await this.getFeaturedTournament(session.organizationId)
+    const tournament = await this.getFeaturedTournament(session.organizationId, tournamentId)
     const available = await this.prisma.team.findMany({
       where: {
         organizationId: session.organizationId,
@@ -1008,13 +1047,8 @@ export class ExperienceService {
     return mappedComment
   }
 
-  private async getFeaturedTournament(organizationId: string) {
-    const tournament = await this.prisma.tournament.findFirst({
-      where: { organizationId, tournamentCode: FEATURED_TOURNAMENT_CODE },
-      include: { season: true },
-    })
-    if (!tournament) throw notFound('演示赛事尚未初始化，请先运行数据库 Seed')
-    return tournament
+  private async getFeaturedTournament(organizationId: string, tournamentId?: string) {
+    return selectPublicTournament(this.prisma, organizationId, tournamentId)
   }
 }
 

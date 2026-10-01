@@ -13,9 +13,13 @@ export function configureApp(app: INestApplication): void {
   const httpApp = app as NestExpressApplication
   httpApp.useBodyParser('json', { limit: '6mb' })
   app.use((request: Request, response: Response, next: NextFunction) => {
+    if (/^\/api\/public(?:\/|$)/i.test(request.path)) {
+      response.vary('X-Organization-Id')
+      response.vary('X-Dev-Organization-Id')
+    }
     if (
       request.headers.authorization ||
-      /^\/api\/(?:auth|me|admin|captain|messages|reports)(?:\/|$)/.test(request.path)
+      /^\/api\/(?:auth|me|admin|captain|messages|reports)(?:\/|$)/i.test(request.path)
     ) {
       response.setHeader('Cache-Control', 'private, no-store')
       response.vary('Authorization')
@@ -31,6 +35,7 @@ export function configureApp(app: INestApplication): void {
       'authorization',
       'content-type',
       'idempotency-key',
+      'x-organization-id',
       'x-dev-organization-id',
       'x-dev-role',
       'x-dev-user-id',

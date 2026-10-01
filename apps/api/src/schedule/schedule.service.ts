@@ -35,31 +35,45 @@ type MatchWithRelations = Prisma.MatchGetPayload<{ include: typeof MATCH_INCLUDE
 export class ScheduleService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async getAdminScheduleWorkbench(organizationId: string) {
+  async getAdminScheduleWorkbench(organizationId: string, tournamentIds: string[] | null = null) {
+    const tournamentScope = tournamentIds === null ? {} : { tournamentId: { in: tournamentIds } }
     const seasons = await this.prisma.season.findMany({
       orderBy: { createdAt: 'desc' },
-      where: { organizationId },
+      where: {
+        organizationId,
+        ...(tournamentIds === null ? {} : { tournaments: { some: { id: { in: tournamentIds } } } }),
+      },
     })
     const tournaments = await this.prisma.tournament.findMany({
       orderBy: { createdAt: 'desc' },
-      where: { organizationId },
+      where: { organizationId, ...(tournamentIds === null ? {} : { id: { in: tournamentIds } }) },
     })
     const ruleVersions = await this.prisma.competitionRuleVersion.findMany({
       orderBy: [{ tournamentId: 'asc' }, { version: 'desc' }],
-      where: { organizationId },
+      where: { organizationId, ...tournamentScope },
     })
     const teams = await this.prisma.team.findMany({
       orderBy: { createdAt: 'desc' },
-      where: { organizationId },
+      where: {
+        organizationId,
+        ...(tournamentIds === null
+          ? {}
+          : { registrations: { some: { organizationId, tournamentId: { in: tournamentIds } } } }),
+      },
     })
     const venues = await this.prisma.venue.findMany({
       orderBy: { createdAt: 'desc' },
-      where: { organizationId },
+      where: {
+        organizationId,
+        ...(tournamentIds === null
+          ? {}
+          : { matches: { some: { organizationId, tournamentId: { in: tournamentIds } } } }),
+      },
     })
     const matches = await this.prisma.match.findMany({
       include: MATCH_INCLUDE,
       orderBy: [{ scheduledStartAt: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-      where: { organizationId },
+      where: { organizationId, ...tournamentScope },
     })
     const schedulePlans = await this.prisma.schedulePlan.findMany({
       include: {
@@ -68,7 +82,7 @@ export class ScheduleService {
         },
       },
       orderBy: { createdAt: 'desc' },
-      where: { organizationId },
+      where: { organizationId, ...tournamentScope },
     })
 
     return {
@@ -216,15 +230,27 @@ export class ScheduleService {
     await this.requireTournament(organizationId, dto.tournamentId)
     await this.requireMatches(organizationId, dto.tournamentId, dto.matchIds)
 
-    const plan = await this.prisma.schedulePlan.create({
-      data: {
-        organizationId,
-        tournamentId: dto.tournamentId,
-        name: dto.name,
-        matches: {
-          connect: dto.matchIds.map((id) => ({ id })),
+    const plan = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.schedulePlan.create({
+        data: { organizationId, tournamentId: dto.tournamentId, name: dto.name },
+      })
+      const reserved = await tx.match.updateMany({
+        where: {
+          organizationId,
+          tournamentId: dto.tournamentId,
+          id: { in: dto.matchIds },
+          status: MatchStatus.DRAFT,
+          schedulePlanId: null,
+          scheduleRevisionId: null,
+          homeScore: null,
+          awayScore: null,
+          homePenaltyScore: null,
+          awayPenaltyScore: null,
         },
-      },
+        data: { schedulePlanId: created.id },
+      })
+      if (reserved.count !== dto.matchIds.length) throw this.matchAlreadyScheduled()
+      return created
     })
 
     return this.toSchedulePlanView(plan)
@@ -255,6 +281,13 @@ export class ScheduleService {
     request: RequestWithId,
   ) {
     const requestId = getRequestId(request)
+    const session = request.authenticatedSession
+    if (!session || session.organizationId !== organizationId) {
+      throw new ApiHttpException(HttpStatus.UNAUTHORIZED, {
+        code: ERROR_CODES.UNAUTHORIZED,
+        message: '赛程发布需要有效的登录会话',
+      })
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const plan = await tx.schedulePlan.findFirst({
@@ -289,6 +322,17 @@ export class ScheduleService {
         })
       }
 
+      const reserved = await tx.schedulePlan.updateMany({
+        where: { id: plan.id, organizationId, status: SchedulePlanStatus.DRAFT },
+        data: { status: SchedulePlanStatus.PUBLISHED },
+      })
+      if (reserved.count !== 1) {
+        throw new ApiHttpException(HttpStatus.CONFLICT, {
+          code: ERROR_CODES.SCHEDULE_PLAN_ALREADY_PUBLISHED,
+          message: '赛程草案已发布，不能重复发布',
+        })
+      }
+
       const latestRevision = await tx.scheduleRevision.findFirst({
         orderBy: { version: 'desc' },
         select: { version: true },
@@ -299,7 +343,7 @@ export class ScheduleService {
       const version = (latestRevision?.version ?? 0) + 1
       const snapshot = {
         matches: plan.matches.map((match) => this.toMatchView(match)),
-        publishedBy: 'P1_DEV_TOURNAMENT_ADMIN',
+        publishedBy: session.userId,
         requestId,
       }
 
@@ -313,7 +357,7 @@ export class ScheduleService {
         },
       })
 
-      await tx.match.updateMany({
+      const scheduled = await tx.match.updateMany({
         data: {
           scheduleRevisionId: revision.id,
           status: MatchStatus.SCHEDULED,
@@ -321,8 +365,15 @@ export class ScheduleService {
         where: {
           organizationId,
           schedulePlanId: plan.id,
+          status: MatchStatus.DRAFT,
+          scheduleRevisionId: null,
+          homeScore: null,
+          awayScore: null,
+          homePenaltyScore: null,
+          awayPenaltyScore: null,
         },
       })
+      if (scheduled.count !== plan.matches.length) throw this.matchAlreadyScheduled()
 
       await tx.schedulePlan.update({
         data: {
@@ -343,9 +394,14 @@ export class ScheduleService {
         data: {
           organizationId,
           actorType: AuditActorType.ADMIN,
+          actorUserId: session.userId,
           actorRoleSnapshot: {
-            role: 'TOURNAMENT_ADMIN',
-            source: 'P1_DEV_HEADER',
+            roles: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+              role,
+              scopeType,
+              scopeId,
+            })),
+            source: 'AUTHENTICATED_SESSION',
           },
           action: 'SCHEDULE_PLAN_PUBLISHED',
           targetType: 'SchedulePlan',
@@ -473,6 +529,8 @@ export class ScheduleService {
       where: {
         id: matchId,
         organizationId,
+        status: { not: MatchStatus.DRAFT },
+        tournament: { organizationId, status: TournamentStatus.PUBLISHED },
         scheduleRevisionId: {
           not: null,
         },
@@ -599,6 +657,13 @@ export class ScheduleService {
     }
 
     return plan
+  }
+
+  private matchAlreadyScheduled(): ApiHttpException {
+    return new ApiHttpException(HttpStatus.CONFLICT, {
+      code: ERROR_CODES.CONFLICT,
+      message: '只能安排尚未加入草案、未发布且没有比分的比赛；既有赛程与结果不能覆盖',
+    })
   }
 
   private notFound(): ApiHttpException {

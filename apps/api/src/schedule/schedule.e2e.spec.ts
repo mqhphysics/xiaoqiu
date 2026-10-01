@@ -8,12 +8,15 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import request from 'supertest'
 
 import { configureApp } from '../app.setup'
+import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
+import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
 import { ScheduleModule } from './schedule.module'
 
 const ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001'
 const OTHER_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000099'
 const ADMIN_HEADERS = {
+  authorization: 'Bearer fictional-schedule-admin',
   'x-dev-organization-id': ORGANIZATION_ID,
   'x-dev-role': 'TOURNAMENT_ADMIN',
 }
@@ -24,6 +27,9 @@ const PUBLIC_HEADERS = {
 type Row = Record<string, unknown>
 
 class FakePrisma {
+  organization = {
+    findFirst: async ({ where }: { where: Row }) => ({ id: where.id }),
+  }
   seasons: Row[] = []
   tournaments: Row[] = []
   ruleVersions: Row[] = []
@@ -61,7 +67,13 @@ class FakePrisma {
         season: this.seasons.find((season) => season.id === tournament.seasonId),
       }
     },
-    findMany: async ({ orderBy, where }: { orderBy?: { createdAt?: 'asc' | 'desc' }; where: Row }) => {
+    findMany: async ({
+      orderBy,
+      where,
+    }: {
+      orderBy?: { createdAt?: 'asc' | 'desc' }
+      where: Row
+    }) => {
       const tournaments = this.tournaments.filter((tournament) =>
         this.matchesWhere(tournament, where),
       )
@@ -71,8 +83,7 @@ class FakePrisma {
       }
 
       return tournaments.sort((left, right) => {
-        const delta =
-          (left.createdAt as Date).getTime() - (right.createdAt as Date).getTime()
+        const delta = (left.createdAt as Date).getTime() - (right.createdAt as Date).getTime()
         return direction === 'asc' ? delta : -delta
       })
     },
@@ -124,7 +135,16 @@ class FakePrisma {
     count: async ({ where }: { where: Row }) =>
       this.matches.filter((match) => this.matchesWhere(match, where)).length,
     create: async ({ data }: { data: Row }) => {
-      const match = this.create(this.matches, { status: 'DRAFT', ...data })
+      const match = this.create(this.matches, {
+        status: 'DRAFT',
+        schedulePlanId: null,
+        scheduleRevisionId: null,
+        homeScore: null,
+        awayScore: null,
+        homePenaltyScore: null,
+        awayPenaltyScore: null,
+        ...data,
+      })
       return this.withMatchRelations(match)
     },
     findFirst: async ({ where }: { where: Row }) => {
@@ -150,6 +170,11 @@ class FakePrisma {
   }
 
   schedulePlan = {
+    updateMany: async ({ where, data }: { where: Row; data: Row }) => {
+      const rows = this.schedulePlans.filter((plan) => this.matchesWhere(plan, where))
+      rows.forEach((plan) => Object.assign(plan, data))
+      return { count: rows.length }
+    },
     create: async ({ data }: { data: Row & { matches?: { connect: Array<{ id: string }> } } }) => {
       const matchIds = data.matches?.connect.map((match) => match.id) ?? []
       const plan = this.create(this.schedulePlans, {
@@ -296,6 +321,44 @@ before(async () => {
   const moduleRef = await Test.createTestingModule({
     imports: [ScheduleModule],
   })
+    .overrideProvider(AuthService)
+    .useValue({
+      requireSession: async (authorization?: string): Promise<AuthenticatedSession> => {
+        const organizationId =
+          authorization === 'Bearer fictional-other-admin' ? OTHER_ORGANIZATION_ID : ORGANIZATION_ID
+        if (
+          !['Bearer fictional-schedule-admin', 'Bearer fictional-other-admin'].includes(
+            authorization ?? '',
+          )
+        ) {
+          throw new ApiHttpException(401, {
+            code: ERROR_CODES.UNAUTHORIZED,
+            message: 'Test session required',
+          })
+        }
+        return {
+          organizationId,
+          userId: '00000000-0000-4000-8000-000000000011',
+          sessionId: 'fictional-session',
+          user: {
+            id: '00000000-0000-4000-8000-000000000011',
+            organizationId,
+            username: 'fictional-admin',
+            displayName: '虚构测试管理员',
+            realName: null,
+            studentId: null,
+            email: null,
+            bio: null,
+            avatarUrl: null,
+            verificationLevel: 'UNVERIFIED',
+            linkedPlayer: null,
+            roles: [
+              { role: 'ORGANIZATION_ADMIN', scopeType: 'ORGANIZATION', scopeId: organizationId },
+            ],
+          },
+        }
+      },
+    })
     .overrideProvider(PrismaService)
     .useValue(fakePrisma)
     .compile()
@@ -428,9 +491,7 @@ test('P1 schedule slice creates and publishes a tournament schedule', async () =
   assert.equal(outboxJob.eventType, 'SchedulePlanPublished')
   assert.equal(outboxJob.correlationId, 'publish-request-id')
 
-  const originalTournament = fakePrisma.tournaments.find(
-    (item) => item.id === tournament.body.id,
-  )
+  const originalTournament = fakePrisma.tournaments.find((item) => item.id === tournament.body.id)
   if (originalTournament === undefined) {
     throw new Error('published tournament was not persisted')
   }
@@ -511,11 +572,12 @@ test('P1 admin endpoints reject missing role and cross-organization resource acc
       seasonCode: 'NO-ROLE',
       name: 'No role',
     })
-    .expect(403)
+    .expect(401)
 
   const response = await request(app.getHttpServer())
     .post('/api/admin/tournaments')
     .set({
+      authorization: 'Bearer fictional-other-admin',
       'x-dev-organization-id': OTHER_ORGANIZATION_ID,
       'x-dev-role': 'TOURNAMENT_ADMIN',
     })

@@ -23,8 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 
-import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
-import { getRequestId, type RequestWithId } from '../common/request-context'
+import { getOrganizationId, getRequestId, type RequestWithId } from '../common/request-context'
 import {
   CreateCommentDto,
   CreateMatchReviewDto,
@@ -44,10 +43,11 @@ export class ExperienceController {
   @ApiOperation({ summary: '读取五入口产品首页聚合数据' })
   @ApiOkResponse({ description: '赛事、公告、焦点比赛、球队和社区动态' })
   home(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
+    @Query('tournamentId') tournamentId: string | undefined,
   ) {
-    return this.experienceService.getHome(resolveOrganizationId(organizationId), authorization)
+    return this.experienceService.getHome(getOrganizationId(request), authorization, tournamentId)
   }
 
   @Get('public/search')
@@ -55,43 +55,38 @@ export class ExperienceController {
   @ApiOperation({ summary: '按球员、球队、比赛和动态搜索' })
   @ApiQuery({ type: SearchQueryDto })
   search(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Query() query: SearchQueryDto,
+    @Query('tournamentId') tournamentId: string | undefined,
   ) {
-    return this.experienceService.search(resolveOrganizationId(organizationId), query)
+    return this.experienceService.search(getOrganizationId(request), query, tournamentId)
   }
 
   @Get('public/seasons')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取可切换赛季' })
-  seasons(@Headers('x-dev-organization-id') organizationId: string | undefined) {
-    return this.experienceService.listSeasons(resolveOrganizationId(organizationId))
+  seasons(@Req() request: RequestWithId) {
+    return this.experienceService.listSeasons(getOrganizationId(request))
   }
 
   @Get('public/tournaments/:tournamentId/competition-data')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取积分榜、淘汰赛和球员榜单' })
-  competitionData(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
-    @Param('tournamentId') tournamentId: string,
-  ) {
-    return this.experienceService.getCompetitionData(
-      resolveOrganizationId(organizationId),
-      tournamentId,
-    )
+  competitionData(@Req() request: RequestWithId, @Param('tournamentId') tournamentId: string) {
+    return this.experienceService.getCompetitionData(getOrganizationId(request), tournamentId)
   }
 
   @Get('public/teams/:teamId/dashboard')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取球队战绩、赛程与完整名单' })
   teamDashboard(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
     @Param('teamId') teamId: string,
     @Query('tournamentId') tournamentId: string | undefined,
   ) {
     return this.experienceService.getTeamDashboard(
-      resolveOrganizationId(organizationId),
+      getOrganizationId(request),
       teamId,
       tournamentId,
       authorization,
@@ -102,27 +97,23 @@ export class ExperienceController {
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取完整公开球员档案与赛季数据' })
   player(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Param('playerId') playerId: string,
     @Query('tournamentId') tournamentId: string | undefined,
   ) {
-    return this.experienceService.getPlayer(
-      resolveOrganizationId(organizationId),
-      playerId,
-      tournamentId,
-    )
+    return this.experienceService.getPlayer(getOrganizationId(request), playerId, tournamentId)
   }
 
   @Get('public/matches/:matchId/experience')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取评分、比分、事件时间轴和阵容' })
   match(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
     @Param('matchId') matchId: string,
   ) {
     return this.experienceService.getMatchExperience(
-      resolveOrganizationId(organizationId),
+      getOrganizationId(request),
       matchId,
       authorization,
     )
@@ -146,32 +137,32 @@ export class ExperienceController {
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取社区与官方动态' })
   posts(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
+    @Query('tournamentId') tournamentId: string | undefined,
   ) {
-    return this.experienceService.listPosts(resolveOrganizationId(organizationId), authorization)
+    return this.experienceService.listPosts(getOrganizationId(request), authorization, tournamentId)
   }
 
   @Get('public/posts/:postId')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取动态与评论详情' })
   post(
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
+    @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
     @Param('postId') postId: string,
   ) {
-    return this.experienceService.getPost(
-      resolveOrganizationId(organizationId),
-      postId,
-      authorization,
-    )
+    return this.experienceService.getPost(getOrganizationId(request), postId, authorization)
   }
 
   @Get('me/team-preferences')
   @ApiBearerAuth()
   @ApiOperation({ summary: '读取当前用户主队与关注球队' })
-  teamPreferences(@Headers('authorization') authorization: string | undefined) {
-    return this.experienceService.getTeamPreferences(authorization)
+  teamPreferences(
+    @Headers('authorization') authorization: string | undefined,
+    @Query('tournamentId') tournamentId: string | undefined,
+  ) {
+    return this.experienceService.getTeamPreferences(authorization, tournamentId)
   }
 
   @Put('me/team-preferences')
@@ -235,12 +226,8 @@ export class ExperienceController {
 
 function PublicOrganizationHeader() {
   return ApiHeader({
-    name: 'x-dev-organization-id',
+    name: 'x-organization-id',
     required: false,
-    description: `本地默认 ${DEMO_ORGANIZATION_ID}`,
+    description: '组织 UUID；可使用会话或部署默认组织',
   })
-}
-
-function resolveOrganizationId(value: string | undefined): string {
-  return value?.trim() || DEMO_ORGANIZATION_ID
 }

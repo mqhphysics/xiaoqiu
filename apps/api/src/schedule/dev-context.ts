@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 import type { Request } from 'express'
+import type { RequestWithId } from '../common/request-context'
 
 import { ApiHttpException } from '../common/api-http.exception'
 
@@ -24,12 +25,12 @@ export function getHeaderValue(request: Request, name: string): string | undefin
 }
 
 export function requireP1DevOrganizationId(request: Request): string {
-  const organizationId = getHeaderValue(request, P1_DEV_ORGANIZATION_HEADER)
+  const organizationId = (request as RequestWithId).organizationId
 
   if (typeof organizationId !== 'string' || organizationId.trim() === '') {
     throw new ApiHttpException(HttpStatus.FORBIDDEN, {
       code: ERROR_CODES.FORBIDDEN,
-      message: '缺少 P1 开发期组织上下文',
+      message: '缺少服务端校验后的组织上下文',
     })
   }
 
@@ -38,17 +39,21 @@ export function requireP1DevOrganizationId(request: Request): string {
 
 export function requireP1DevAdminContext(request: Request): P1DevAdminContext {
   const organizationId = requireP1DevOrganizationId(request)
-  const role = getHeaderValue(request, P1_DEV_ROLE_HEADER)
+  const session = (request as RequestWithId).authenticatedSession
 
-  if (role !== P1_TOURNAMENT_ADMIN_ROLE) {
+  if (
+    !session ||
+    session.organizationId !== organizationId ||
+    !(request as RequestWithId).scheduleAdministratorAuthorized
+  ) {
     throw new ApiHttpException(HttpStatus.FORBIDDEN, {
       code: ERROR_CODES.FORBIDDEN,
-      message: 'P1 开发期接口需要赛事管理员角色',
+      message: '管理接口需要服务端校验后的对象权限',
     })
   }
 
   return {
     organizationId,
-    role,
+    role: P1_TOURNAMENT_ADMIN_ROLE,
   }
 }

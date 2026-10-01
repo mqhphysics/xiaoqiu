@@ -471,7 +471,7 @@ export class AuthService {
         assignment.scopeId === session.organizationId,
     )
     const isPlatformAdmin = session.user.roles.some(
-      (assignment) => assignment.role === 'PLATFORM_ADMIN',
+      (assignment) => assignment.role === 'PLATFORM_ADMIN' && assignment.scopeType === 'PLATFORM',
     )
     if (!isOrganizationAdmin && !isPlatformAdmin) {
       throw new ApiHttpException(HttpStatus.FORBIDDEN, {
@@ -571,8 +571,10 @@ function mapAuthUser(
 ): AuthUserDto {
   const roles = user.roleAssignments.filter(
     (assignment) =>
-      assignment.organizationId === organizationId ||
-      (assignment.role === 'PLATFORM_ADMIN' && assignment.organizationId === null),
+      (assignment.organizationId === organizationId && assignment.role !== 'PLATFORM_ADMIN') ||
+      (assignment.role === 'PLATFORM_ADMIN' &&
+        assignment.organizationId === null &&
+        assignment.scopeType === 'PLATFORM'),
   )
   const linkedPlayer =
     user.playerProfile?.organizationId === organizationId ? user.playerProfile : null
