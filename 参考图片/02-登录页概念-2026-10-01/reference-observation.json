@@ -1,0 +1,20 @@
+{
+  "ObservedDate": "2026-10-01",
+  "Purpose": "Read-only reference website research",
+  "Page": "https://leaderai.eu/",
+  "Viewport": {
+    "Width": 1440,
+    "Height": 1000
+  },
+  "SourceImage": "/wp-content/uploads/2023/03/hero-image2-1.png",
+  "CanvasCount": 1,
+  "Renderer": "default",
+  "Context": "CanvasRenderingContext2D",
+  "Origins": 62668,
+  "Gravity": 0.2,
+  "MouseForce": 230,
+  "ParticleGap": 2,
+  "Noise": 10,
+  "ObservedInteraction": "Mouse movement displaced the particle shape; separate ring cursor followed pointer",
+  "Limitation": "Observed reference site only; no Xiaoqiu implementation or performance acceptance"
+}

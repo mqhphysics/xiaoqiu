@@ -50,4 +50,31 @@ export class MediaController {
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.type(avatar.mimeType).send(avatar.body)
   }
+
+  @Get('media/demo/:kind/:fileName')
+  @ApiOperation({ summary: '读取本地演示队徽或人物示意照片' })
+  async demoMedia(
+    @Param('kind') kind: string,
+    @Param('fileName') fileName: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const media = await this.mediaService.readDemoMedia(kind, fileName)
+    response.setHeader('Cache-Control', 'public, max-age=86400')
+    response.setHeader('X-Content-Type-Options', 'nosniff')
+    response.type(media.mimeType).send(media.body)
+  }
+
+  @Get('media/posts/:organizationId/:authorUserId/:fileName')
+  @ApiOperation({ summary: '读取已公开动态关联的照片' })
+  async postImage(
+    @Param('organizationId') organizationId: string,
+    @Param('authorUserId') authorUserId: string,
+    @Param('fileName') fileName: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const image = await this.mediaService.readPostImage(organizationId, authorUserId, fileName)
+    response.setHeader('Cache-Control', 'public, max-age=60')
+    response.setHeader('X-Content-Type-Options', 'nosniff')
+    response.type(image.mimeType).send(image.body)
+  }
 }

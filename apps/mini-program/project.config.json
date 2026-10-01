@@ -1,12 +1,12 @@
 {
-  "miniprogramRoot": "dist/",
+  "miniprogramRoot": "dist-weapp/",
   "projectname": "xiaoqiu",
   "description": "晓球校园足球平台",
   "appid": "touristappid",
   "setting": {
     "urlCheck": false,
-    "es6": true,
-    "enhance": true,
+    "es6": false,
+    "enhance": false,
     "compileHotReLoad": true
   },
   "compileType": "miniprogram"

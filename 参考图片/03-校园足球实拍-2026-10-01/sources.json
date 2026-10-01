@@ -1,0 +1,74 @@
+[
+  {
+    "file": "01-campus-match.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "d8c34815af5fd943d17ed8522a8068bc9c9a2387dcee378b022e6bdeb12bcaba",
+    "width": 1920,
+    "height": 1280,
+    "usage": "home-hero",
+    "output": "apps/mini-program/src/assets/home-visual/home-campus-action.webp",
+    "outputWidth": 1920,
+    "outputHeight": 1280,
+    "outputBytes": 344062
+  },
+  {
+    "file": "02-trophy-team.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "ff17229def465b8c9e999e21d2f51d81e67aa0e0eebc9df3c5d0916e83fca412",
+    "width": 1706,
+    "height": 1279,
+    "usage": "official-photo-example",
+    "output": "apps/api/demo-media/photos/02.webp",
+    "outputWidth": 1280,
+    "outputHeight": 960,
+    "outputBytes": 314814
+  },
+  {
+    "file": "03-team-lineup.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "6998370194f48b70efe05d0df7ce145fb698af63696b1b6401154d67e18c54f9",
+    "width": 1706,
+    "height": 1280,
+    "usage": "community-photo-example",
+    "output": "apps/api/demo-media/photos/03.webp",
+    "outputWidth": 1280,
+    "outputHeight": 960,
+    "outputBytes": 180966
+  },
+  {
+    "file": "04-team-huddle.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "ba4cd49566f0d5142474550f43ebdc3cefab402354385526035a6a69a2a8f561",
+    "width": 2275,
+    "height": 1280,
+    "usage": "community-photo-example",
+    "output": "apps/api/demo-media/photos/04.webp",
+    "outputWidth": 1280,
+    "outputHeight": 720,
+    "outputBytes": 173696
+  },
+  {
+    "file": "05-team-celebration.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "cbe111b8974186bd9a5aa3b0cd3fc5c36531b8cd7f9c5cd45ab13391a29f4247",
+    "width": 1920,
+    "height": 1231,
+    "usage": "community-photo-example",
+    "output": "apps/api/demo-media/photos/05.webp",
+    "outputWidth": 1280,
+    "outputHeight": 821,
+    "outputBytes": 253554
+  },
+  {
+    "file": "06-awards.jpg",
+    "suppliedOn": "2026-10-01",
+    "sha256": "6444f7c18003e43392322b90f71aa7fab384f8f2befc648d269f21e132615ed0",
+    "width": 1920,
+    "height": 1068,
+    "usage": "official-photo-example",
+    "output": "apps/api/demo-media/photos/06.webp",
+    "outputWidth": 1280,
+    "outputHeight": 712,
+    "outputBytes": 83804
+  }
+]

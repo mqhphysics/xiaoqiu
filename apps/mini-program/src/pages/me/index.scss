@@ -104,6 +104,17 @@
   align-items: center;
   gap: 8px;
 }
+
+.profile-header__demo {
+  display: block;
+  width: fit-content;
+  margin-top: 7px;
+  padding: 4px 7px;
+  color: #f3e9c6;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  font-size: 10px;
+}
 .profile-header__edit {
   min-height: 38px;
   margin: 0;

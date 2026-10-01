@@ -41,6 +41,14 @@ export interface DemoPlayerDefinition {
   hometown: string
   bio: string
   profileColor: string
+  portraitUrl: string
+  ratings: {
+    shooting: number
+    speed: number
+    dribbling: number
+    passing: number
+    defending: number
+  }
   teamIndex: number
 }
 
@@ -70,6 +78,7 @@ export interface DemoAccountDefinition {
   realName: string
   studentId: string
   email: string
+  avatarUrl: string
   verificationLevel: VerificationLevel
   linkedTeamIndex?: number
   linkedPlayerIndex?: number
@@ -85,6 +94,7 @@ export interface DemoPostDefinition {
   authorUsername?: string
   title?: string
   body: string
+  imageUrl?: string
   publishedAt: string
 }
 
@@ -363,12 +373,14 @@ export const DEMO_PLAYERS: DemoPlayerDefinition[] = DEMO_TEAMS.flatMap((team, te
     const position = positionForIndex(playerIndex)
     const secondaryPosition = secondaryPositionFor(position, playerIndex)
     const style = styleForPosition(position)
-    const academicYear = `${2022 + ((teamIndex + playerIndex) % 4)}级`
+    const academicYear = `${2023 + ((teamIndex + playerIndex) % 3)}级`
+    const studentSuffix = `99${String(1000 + ((globalIndex * 7919 + 729) % 9000)).padStart(4, '0')}`
+    const portraitNumber = String((globalIndex % 16) + 1).padStart(2, '0')
 
     return {
       id: fixtureId(`player:${team.code}:${playerIndex + 1}`),
       sourceKey: `DEMO-2026-${team.code}-${String(playerIndex + 1).padStart(2, '0')}`,
-      studentId: `${academicYear.slice(0, 4)}88${String(globalIndex + 1).padStart(5, '0')}`,
+      studentId: `${academicYear.slice(0, 4)}${studentSuffix}`,
       displayName,
       jerseyName: displayName.slice(1),
       shirtNumber: shirtNumbers[playerIndex]!,
@@ -386,6 +398,8 @@ export const DEMO_PLAYERS: DemoPlayerDefinition[] = DEMO_TEAMS.flatMap((team, te
       hometown: hometowns[(teamIndex * 3 + playerIndex) % hometowns.length]!,
       bio: `${team.shortName}${positionLabel(position)}，${style}。训练之外喜欢记录校园比赛，也期待在绿茵杯留下属于球队的片段。`,
       profileColor: team.primaryColor,
+      portraitUrl: `/api/media/demo/portraits/${portraitNumber}.jpg`,
+      ratings: ratingsForPosition(position, globalIndex),
       teamIndex,
     }
   }),
@@ -968,8 +982,9 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     username: 'student',
     displayName: '知夏看球',
     realName: '林知夏',
-    studentId: '20249990001',
+    studentId: '2024990001',
     email: 'student@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/09.jpg',
     verificationLevel: VerificationLevel.STUDENT_VERIFIED,
     roles: [],
     primaryTeamIndex: 2,
@@ -982,6 +997,7 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     realName: DEMO_PLAYERS[10]!.displayName,
     studentId: DEMO_PLAYERS[10]!.studentId,
     email: 'player@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/13.jpg',
     verificationLevel: VerificationLevel.PLAYER_CONFIRMED,
     linkedTeamIndex: 0,
     linkedPlayerIndex: 10,
@@ -996,6 +1012,7 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     realName: DEMO_PLAYERS[6]!.displayName,
     studentId: DEMO_PLAYERS[6]!.studentId,
     email: 'captain@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/06.jpg',
     verificationLevel: VerificationLevel.PLAYER_CONFIRMED,
     linkedTeamIndex: 0,
     linkedPlayerIndex: 6,
@@ -1008,8 +1025,9 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     username: 'reporter',
     displayName: '嘉言现场',
     realName: '沈嘉言',
-    studentId: '20239990002',
+    studentId: '2023990002',
     email: 'reporter@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/14.jpg',
     verificationLevel: VerificationLevel.STAFF_VERIFIED,
     roles: [{ role: Role.MATCH_REPORTER, scope: 'TOURNAMENT' }],
     primaryTeamIndex: 3,
@@ -1020,8 +1038,9 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     username: 'admin',
     displayName: '清越赛事组',
     realName: '韩清越',
-    studentId: '20219990003',
+    studentId: '2025990003',
     email: 'admin@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/10.jpg',
     verificationLevel: VerificationLevel.STAFF_VERIFIED,
     roles: [
       { role: Role.ORGANIZATION_ADMIN, scope: 'ORGANIZATION' },
@@ -1031,9 +1050,77 @@ export const DEMO_ACCOUNTS: DemoAccountDefinition[] = [
     followedTeamIndexes: [1, 2, 3],
     bio: '本地演示赛事管理员，可查看赛事管理入口。',
   },
+  {
+    username: 'supporter',
+    displayName: '北看台阿澄',
+    realName: '许书澄',
+    studentId: '2023990004',
+    email: 'supporter@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/11.jpg',
+    verificationLevel: VerificationLevel.STUDENT_VERIFIED,
+    roles: [],
+    primaryTeamIndex: 4,
+    followedTeamIndexes: [2, 5],
+    bio: '常在北看台记录学院联赛的学生球迷。',
+  },
+  {
+    username: 'analyst',
+    displayName: '小满看数据',
+    realName: '唐知遥',
+    studentId: '2024990005',
+    email: 'analyst@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/12.jpg',
+    verificationLevel: VerificationLevel.STUDENT_VERIFIED,
+    roles: [],
+    primaryTeamIndex: 7,
+    followedTeamIndexes: [3, 8],
+    bio: '喜欢做赛后数据笔记的普通用户。',
+  },
+  {
+    username: 'winger',
+    displayName: '远航八号',
+    realName: DEMO_PLAYERS[11 * 14 + 7]!.displayName,
+    studentId: DEMO_PLAYERS[11 * 14 + 7]!.studentId,
+    email: 'winger@xiaoqiu.demo',
+    avatarUrl: '/api/media/demo/portraits/08.jpg',
+    verificationLevel: VerificationLevel.PLAYER_CONFIRMED,
+    linkedTeamIndex: 11,
+    linkedPlayerIndex: 7,
+    roles: [],
+    primaryTeamIndex: 11,
+    followedTeamIndexes: [2],
+    bio: '外院远航的演示球员账号，用于验证跨球队关联。',
+  },
 ]
 
 export const DEMO_POSTS: DemoPostDefinition[] = [
+  {
+    key: 'photo-official-trophy', type: PostType.OFFICIAL,
+    title: '校园足球影像：举杯时刻',
+    body: '【校园影像示例】2025 年“新生杯”合影：一起举起奖杯，留下属于校园足球的记忆。',
+    imageUrl: '/api/media/demo/photos/02.webp', publishedAt: '2026-09-01T20:00:00+08:00',
+  },
+  {
+    key: 'photo-official-awards', type: PostType.OFFICIAL,
+    title: '校园足球影像：赛场之外的荣誉',
+    body: '【校园影像示例】2025 年“计科杯”颁奖现场，记录努力获得回响的瞬间。',
+    imageUrl: '/api/media/demo/photos/06.webp', publishedAt: '2026-09-01T19:00:00+08:00',
+  },
+  {
+    key: 'photo-community-huddle', type: PostType.COMMUNITY, authorUsername: 'captain',
+    body: '【照片分享示例】把手叠在一起，带着同一个目标走上球场。',
+    imageUrl: '/api/media/demo/photos/04.webp', publishedAt: '2026-10-01T09:20:00+08:00',
+  },
+  {
+    key: 'photo-community-lineup', type: PostType.COMMUNITY, authorUsername: 'player',
+    body: '【照片分享示例】留一张开赛前的合影，记住一起踢球的时光。',
+    imageUrl: '/api/media/demo/photos/03.webp', publishedAt: '2026-10-01T09:10:00+08:00',
+  },
+  {
+    key: 'photo-community-celebration', type: PostType.COMMUNITY, authorUsername: 'student',
+    body: '【照片分享示例】欢呼、笑声和并肩作战的伙伴，都是校园足球的一部分。',
+    imageUrl: '/api/media/demo/photos/05.webp', publishedAt: '2026-10-01T09:05:00+08:00',
+  },
   {
     key: 'official-round-two',
     type: PostType.OFFICIAL,
@@ -1122,6 +1209,29 @@ function styleForPosition(position: PlayerPosition): string {
       return '跑动覆盖积极，重视向前传递'
     case PlayerPosition.FORWARD:
       return '喜欢攻击防线身后，门前处理果断'
+  }
+}
+
+function ratingsForPosition(
+  position: PlayerPosition,
+  index: number,
+): DemoPlayerDefinition['ratings'] {
+  const base =
+    position === PlayerPosition.GOALKEEPER
+      ? [28, 59, 40, 62, 80]
+      : position === PlayerPosition.DEFENDER
+        ? [45, 66, 56, 64, 77]
+        : position === PlayerPosition.MIDFIELDER
+          ? [62, 70, 73, 76, 64]
+          : [77, 78, 73, 63, 42]
+  const value = (offset: number) =>
+    Math.min(93, Math.max(24, base[offset]! + ((index * (offset + 5) * 7) % 19) - 9))
+  return {
+    shooting: value(0),
+    speed: value(1),
+    dribbling: value(2),
+    passing: value(3),
+    defending: value(4),
   }
 }
 

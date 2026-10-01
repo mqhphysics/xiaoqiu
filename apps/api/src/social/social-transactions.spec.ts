@@ -7,6 +7,7 @@ import type { AuthenticatedSession, AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import type { PrismaService } from '../database/prisma.service'
 import { ExperienceService } from '../experience/experience.service'
+import { MediaService } from '../media/media.service'
 import { MessagingService } from './messaging.service'
 import { SocialService } from './social.service'
 
@@ -190,7 +191,7 @@ class CommunityPrismaFake {
 function makeCommunityServices(prisma: CommunityPrismaFake) {
   const auth = authStub(makeSession())
   const social = new SocialService(prisma as unknown as PrismaService, auth)
-  const experience = new ExperienceService(prisma as unknown as PrismaService, auth, social)
+  const experience = new ExperienceService(prisma as unknown as PrismaService, auth, social, new MediaService(prisma as unknown as PrismaService, auth))
   return { experience, social }
 }
 

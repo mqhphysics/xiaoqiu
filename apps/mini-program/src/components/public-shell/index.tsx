@@ -1,13 +1,16 @@
 import { Button, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useEffect, useState, type PropsWithChildren } from 'react'
+import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react'
 
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type { TeamSummary } from '../../features/product/product.types'
 import type { PublicDataSource } from '../../features/readonly-schedule/readonly-schedule.types'
+import { TeamCrest, UserAvatar } from '../product-ui'
 import { MessagingDrawer, openMessaging } from '../messaging-drawer'
 import { ReportModal } from '../report-modal'
+import { SettingsDialog } from '../settings-dialog'
+import { PersistentHeaderSearch } from './persistent-header-search'
 
 import './index.scss'
 
@@ -15,6 +18,7 @@ type PublicSection = 'home' | 'schedule' | 'data' | 'team' | 'me' | 'tournaments
 
 interface PublicShellProps extends PropsWithChildren {
   active: PublicSection
+  headerSearch?: ReactNode
   onActiveReselect?: () => void
   tournamentId?: string | undefined
   source?: PublicDataSource | undefined
@@ -29,6 +33,7 @@ const navItems: Array<{ key: PublicSection; label: string; shortLabel: string }>
   { key: 'me', label: '我的', shortLabel: 'ME' },
 ]
 
+let lastTeamEntrySide: 'left' | 'right' | null = null
 const primaryTeamCache = new Map<string, TeamSummary | null>()
 const primaryTeamListeners = new Set<(key: string, team: TeamSummary | null) => void>()
 
@@ -42,6 +47,7 @@ export function updatePrimaryTeamCache(team: TeamSummary | null): void {
 
 export function PublicShell({
   active,
+  headerSearch,
   onActiveReselect,
   tournamentId,
   source,
@@ -52,6 +58,7 @@ export function PublicShell({
   const teamCacheKey = session ? `${session.user.id}:${session.expiresAt}` : null
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [primaryTeam, setPrimaryTeam] = useState<TeamSummary | null>(() =>
     teamCacheKey && primaryTeamCache.has(teamCacheKey)
       ? (primaryTeamCache.get(teamCacheKey) ?? null)
@@ -59,6 +66,8 @@ export function PublicShell({
   )
   const [navigatingTo, setNavigatingTo] = useState<PublicSection | null>(null)
   const normalizedActive = active === 'teams' ? 'team' : active === 'tournaments' ? 'data' : active
+  const selectedNavItem = navigatingTo ?? normalizedActive
+  const flowSide = normalizedActive === 'team' || navigatingTo === 'team' ? lastTeamEntrySide : null
   const currentPath = normalizePath(getCurrentInstance().router?.path ?? '')
 
   useEffect(() => {
@@ -108,9 +117,18 @@ export function PublicShell({
       return
     }
     closeMenu()
+    if (section === 'team') {
+      lastTeamEntrySide = navItems.findIndex((item) => item.key === normalizedActive) < 2
+        ? 'left'
+        : 'right'
+    }
     setNavigatingTo(section)
     try {
-      if (!prefersReducedMotion()) await wait(160)
+      if (!prefersReducedMotion()) {
+        const desktopH5 =
+          Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches
+        await wait(desktopH5 ? 460 : 160)
+      }
       await goToSection(section, tournamentId)
     } catch {
       await Taro.showToast({ title: '页面切换失败，请重试', icon: 'none' })
@@ -137,7 +155,7 @@ export function PublicShell({
   }
 
   return (
-    <View className="public-app">
+    <View className={`public-app ${active === 'home' && !showBack ? 'public-app--home' : ''}`}>
       <View className="public-topbar">
         <View className="public-topbar__inner">
           <View className="public-brand-area">
@@ -151,7 +169,7 @@ export function PublicShell({
               </Button>
             )}
             <View className="public-brand" onClick={() => void navigateToSection('home')}>
-              <Text className="public-brand__mark">XQ</Text>
+              <View aria-hidden="true" className="public-brand__mark" />
               <View className="public-brand__copy">
                 <Text className="public-brand__name">晓球</Text>
                 <Text className="public-brand__caption">把校园比赛认真记录下来</Text>
@@ -159,30 +177,34 @@ export function PublicShell({
             </View>
           </View>
 
-          <View className="public-nav">
+          <View className={`public-nav public-nav--selected-${selectedNavItem} ${navigatingTo ? 'public-nav--moving' : ''} ${flowSide ? `public-nav--flow-from-${flowSide}` : selectedNavItem === 'team' ? 'public-nav--flow-both' : ''}`}>
+            <View aria-hidden="true" className="public-nav__flow">
+              <View className="public-nav__flow-base" />
+            </View>
+            <View aria-hidden="true" className="public-nav__selection" />
             {navItems.map((item) =>
               item.key === 'team' ? (
                 <Button
                   aria-label={primaryTeam ? `打开${primaryTeam.name}` : '打开主队'}
-                  className={`public-team-nav ${normalizedActive === item.key ? 'public-team-nav--active' : ''} ${navigatingTo === item.key ? 'public-team-nav--switching' : ''}`}
+                  className={`public-team-nav ${selectedNavItem === item.key ? 'public-team-nav--active' : ''}`}
                   key={item.key}
+                  aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
                 >
-                  <Text
-                    className="public-team-nav__crest"
-                    style={
-                      primaryTeam?.primaryColor ? { backgroundColor: primaryTeam.primaryColor } : {}
-                    }
-                  >
-                    {primaryTeam?.shortName.slice(0, 2) ?? '杯'}
-                  </Text>
+                  {primaryTeam ? (
+                    <TeamCrest team={primaryTeam} size="large" />
+                  ) : (
+                    <Text className="public-team-nav__crest public-team-nav__crest--empty">主</Text>
+                  )}
                 </Button>
               ) : (
                 <Button
-                  className={`public-nav__item ${normalizedActive === item.key ? 'public-nav__item--active' : ''} ${navigatingTo === item.key ? 'public-nav__item--switching' : ''}`}
+                  className={`public-nav__item ${selectedNavItem === item.key ? 'public-nav__item--active' : ''}`}
                   key={item.key}
+                  aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
                 >
+                  <View aria-hidden="true" className={`public-nav__icon public-nav__icon--${item.key}`} />
                   <Text className="public-nav__label">{item.label}</Text>
                 </Button>
               ),
@@ -190,15 +212,22 @@ export function PublicShell({
           </View>
 
           <View className="public-account-wrap">
+            <View className="public-header-search">
+              {headerSearch === undefined ? <PersistentHeaderSearch /> : headerSearch}
+            </View>
             <Button
               aria-label="打开账户菜单"
               aria-expanded={menuOpen}
               className="public-account"
               onClick={() => setMenuOpen((value) => !value)}
             >
-              <Text className="public-account__avatar">
-                {session?.user.displayName.slice(0, 1) ?? '访'}
-              </Text>
+              <View className="public-account__avatar">
+                <UserAvatar
+                  avatarUrl={session?.user.avatarUrl ?? null}
+                  name={session?.user.displayName ?? '访客'}
+                  size="small"
+                />
+              </View>
               <View className="public-account__copy">
                 <Text className="public-account__name">
                   {session?.user.displayName ?? '游客模式'}
@@ -233,6 +262,15 @@ export function PublicShell({
                 )}
                 <Button className="public-account-menu__item" onClick={() => void openFeedback()}>
                   问题反馈
+                </Button>
+                <Button
+                  className="public-account-menu__item"
+                  onClick={() => {
+                    closeMenu()
+                    setSettingsOpen(true)
+                  }}
+                >
+                  设置
                 </Button>
                 <View className="public-account-menu__version">
                   <Text>晓球 V1.0.0</Text>
@@ -276,14 +314,11 @@ export function PublicShell({
               key={item.key}
               onClick={() => void navigateToSection(item.key)}
             >
-              <Text
-                className="mobile-team-tab__crest"
-                style={
-                  primaryTeam?.primaryColor ? { backgroundColor: primaryTeam.primaryColor } : {}
-                }
-              >
-                {primaryTeam?.shortName.slice(0, 2) ?? '杯'}
-              </Text>
+              {primaryTeam ? (
+                <TeamCrest team={primaryTeam} size="large" />
+              ) : (
+                <Text className="mobile-team-tab__crest mobile-team-tab__crest--empty">主</Text>
+              )}
             </Button>
           ) : (
             <Button
@@ -305,6 +340,7 @@ export function PublicShell({
           onClose={() => setFeedbackOpen(false)}
         />
       )}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </View>
   )
 }

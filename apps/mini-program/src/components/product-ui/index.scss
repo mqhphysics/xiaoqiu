@@ -2,9 +2,6 @@
 .user-avatar {
   display: inline-flex;
   flex: 0 0 auto;
-  object-fit: cover;
-  display: flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   color: #ffffff;
@@ -12,7 +9,21 @@
   line-height: 1;
 }
 .team-crest {
-  border: 2px solid rgba(255, 255, 255, 0.72);
+  display: block;
+  object-fit: contain;
+}
+
+.team-crest img {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: none;
+}
+
+.team-crest--fallback {
+  display: inline-flex;
   border-radius: 6px;
   box-shadow: 0 0 0 1px rgba(23, 35, 26, 0.12);
 }
@@ -36,6 +47,7 @@
 }
 
 .user-avatar {
+  object-fit: cover;
   border-radius: 50%;
 }
 

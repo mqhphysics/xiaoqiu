@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 
 import { ApiExceptionFilter } from './common/api-exception.filter'
 import { requestIdMiddleware } from './common/request-id.middleware'
@@ -8,6 +9,8 @@ import { createValidationPipe } from './common/validation'
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api')
+  const httpApp = app as NestExpressApplication
+  httpApp.useBodyParser('json', { limit: '6mb' })
   app.enableCors({
     origin: resolveCorsOrigins(),
     allowedHeaders: [

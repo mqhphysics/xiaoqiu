@@ -2,11 +2,24 @@
 
 晓球是面向校园足球的赛事数据、球队关注与轻社区平台。产品采用模块化单体，客户端由同一套 Taro + React 代码构建 H5 和微信小程序，服务端使用 NestJS、PostgreSQL 与 Prisma。
 
+日常查找先看 [文件夹怎么找](docs/目录说明.md)和[参考图片](参考图片/README.md)。根目录常见工程配置已设为 Windows 隐藏，仍可从[工程配置入口](工程配置/README.md)访问；普通文件只显示 `打开晓球网站.cmd`。
+
+## 当前开发规则（2026-10-01 起）
+
+1. **日常网站任务默认只推进 H5，不同时改微信小程序。** 不顺手调整微信专用组件、AppID、项目配置、小程序路由或微信功能，也不把小程序构建/真机测试作为普通网站任务的例行工作。手机浏览器 H5 和微信小程序是两个测试目标；用户只安排桌面时，移动 H5 也不扩展修改。
+2. H5 与小程序共用 `apps/mini-program`，共享代码的改动可能影响两端。网站专用行为优先放入 `.h5.tsx` / `.h5.ts`、平台判断或 H5 样式范围；必须改共享逻辑时保留现有微信行为，并在报告中说明潜在影响。微信端独立改造留到明确分配的手机任务。
+3. **每完成一轮修改、执行与范围相符的检查后，自行在当前任务分支 commit。** 无需再次询问是否提交；报告提交哈希、修改范围、检查结果和未验证项。只提交本任务成果，不代为提交其他进行中任务；用户明确要求提交当前全部修改时，以明确授权的快照范围为准。
+4. Commit 是本地保存，Push 是上传远端。**没有明确要求时不自行 push、合并到 main 或部署。** 检查失败不能写成通过；若用户要求保存当前状态，可以如实记录失败并提交阶段快照，不能称其已验收。
+5. 并行任务用独立分支与 worktree，先记录共同基线和具体写入文件。共享壳层、API 契约、数据库模型等指定唯一负责人；目录隔离后仍须协调接口、端口和测试数据库。
+6. 保留现有修改；私有报名资料、真实凭据、运行日志、依赖和生成产物不入库。正式赛事资料不用演示 Seed 承载，普通启动不重新 Seed。
+
+AI 协作者执行[AGENTS.md](AGENTS.md)。最新功能状态和真实赛事准备见[项目进度总览](docs/status/项目进度总览-2026-10-01.md)，工作树操作见[集成指南](docs/development/并行工作树与集成指南.md)。
+
 ## 开始之前
 
 - Node.js 22.13 或更高版本
 - pnpm 11.5.2 或更高版本
-- 微信开发者工具
+- 微信开发者工具：只在明确开展微信端任务时需要，日常 H5 开发不依赖它。
 
 启用 pnpm：
 
@@ -26,7 +39,7 @@ pnpm install
 依赖已安装后，在任意普通 PowerShell 窗口粘贴以下两行，不必先打开仓库文件夹。这里指向主仓库，不是 `.worktrees/` 中的开发副本：
 
 ```powershell
-Set-Location -LiteralPath 'D:\MuDevSpace\其他\华师绿茵纪'
+Set-Location -LiteralPath 'D:\MuDevSpace\xiaoqiu'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-local-demo.ps1'
 ```
 
@@ -86,7 +99,7 @@ pnpm check
 
 ## 目录地图
 
-日常开发主要关注下面六个目录：
+文件按下表分类，详细子目录与文档用途见[目录说明](docs/目录说明.md)：
 
 | 路径        | 内容                                             |
 | ----------- | ------------------------------------------------ |
@@ -96,12 +109,14 @@ pnpm check
 | `infra/`    | Docker Compose、镜像和部署配置                   |
 | `docs/`     | 当前文档入口；过期材料统一在 `docs/archive/`     |
 | `scripts/`  | 本地一键启动等辅助脚本                           |
+| `参考图片/` | 页面、品牌、球场和登录页的设计参考及缩略图入口    |
+| `工程配置/` | 隐藏配置的用途说明和指向原文件的本机快捷方式      |
 
-`private-data/` 仅保存本机报名表和解析中间件，已被 Git 忽略；`node_modules/`、`.pnpm-store/` 和构建目录均为生成内容。根目录的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json` 等是工具链入口，不能移入子目录。
+`private-data/` 保存本机报名资料、运行日志、媒体、备份和整理快照，已被 Git 忽略；`node_modules/`、`.pnpm-store/` 和构建目录均为生成内容。当前 H5 输出在 `apps/mini-program/dist/`，微信输出在 `dist-weapp/`，两个目录都不提交。`tools/` 放开发辅助工具源码，其下载缓存与本机安装记录不提交。根目录的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json` 等是工具链入口，不能移入子目录。
 
 ### 为什么根目录保留这些文件
 
-这些看起来像“散落文件”，实际都是 Git、pnpm、TypeScript、Docker 或协作工具默认从仓库根目录读取的入口。移动它们会导致命令失效，所以保留在根目录比放进配置文件夹更整洁可靠。
+这些看起来像“散落文件”，实际都是 Git、pnpm、TypeScript、Docker 或协作工具从仓库根目录读取的入口。本次保留这些配置的真实路径并设置隐藏；可移动的贡献说明归入 `docs/development/`，设计参考归入根目录 `参考图片/`，详细分工见目录说明。
 
 | 文件                                                      | 由谁读取     | 作用                                |
 | --------------------------------------------------------- | ------------ | ----------------------------------- |
@@ -114,7 +129,7 @@ pnpm check
 | `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` | pnpm         | Monorepo 命令、依赖锁定和工作区声明 |
 | `tsconfig.base.json`                                      | TypeScript   | API、网站、小程序和后台共享编译基线 |
 | `AGENTS.md`                                               | Codex/协作者 | 多 Agent 文件所有权和协作规则       |
-| `CONTRIBUTING.md`                                         | 开发者       | 分支、测试和提交规范                |
+| `docs/development/CONTRIBUTING.md`                         | 开发者       | 分支、测试和提交规范，已移入文档目录 |
 | `README.md`                                               | 所有人       | 项目总入口与启动说明                |
 
 `.github/` 保存云端 CI；`.worktrees/` 只用于并行 Agent 的临时工作区；`node_modules/` 和 `.pnpm-store/` 是本地生成目录，均不属于产品源码。
@@ -125,7 +140,7 @@ pnpm check
 - [文档索引](docs/README.md)
 - [演示验收手册](docs/testing/演示验收手册.md)
 - [协作规范](AGENTS.md)
-- [贡献说明](CONTRIBUTING.md)
+- [贡献说明](docs/development/CONTRIBUTING.md)
 
 ## 当前阶段
 
@@ -133,6 +148,6 @@ P0、P1、P2 以及 P4 体验完善已合入主仓库。当前是可本地体验
 
 ### 自行推送与分支收尾
 
-GitHub Desktop 选择主仓库及 `main`：有本地修改先检查并 Commit，再点 `Push origin`；不需要逐个推送已合入 main 的开发分支。更换 GitHub 登录账号不会自动更换仓库远端地址，推送前在 Repository Settings 中核对 Remote。
+先核对当前分支。本轮主目录使用 `codex/h5-refinement`，在这里 Commit 不会自动更新 `main`；Push 该分支也不代表 `main` 已包含它。需要发布 main 时，由集成负责人先审查并集成，完成检查后再推送。更换 GitHub 登录账号不会自动更换仓库远端地址，推送前在 Repository Settings 中核对 Remote。
 
 P4 开发分支已合并后，可在验收及推送完成后清理。先关闭对应开发任务/服务，逐个检查 `git -C .worktrees/<目录> status --short` 无输出，再执行 `git worktree remove .worktrees/<目录>`，最后 `git branch -d <分支名>`。不要直接删文件夹，不使用 `--force` 或 `-D` 绕过保护；命令拒绝时先保留。归档 Codex 任务与删除 Git worktree 是两回事。

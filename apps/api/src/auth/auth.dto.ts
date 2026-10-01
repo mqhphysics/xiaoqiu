@@ -6,7 +6,7 @@ export class LoginDto {
   @ApiProperty({
     type: String,
     description: '用户名、昵称、真实姓名、学号或绑定邮箱',
-    example: '20249990001',
+    example: '2024990001',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -39,11 +39,11 @@ export class RegisterDto {
   @Length(2, 120)
   realName!: string
 
-  @ApiProperty({ type: String, example: '20249990001' })
+  @ApiProperty({ type: String, example: '2024990001' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @Length(6, 32)
-  @Matches(/^[A-Za-z0-9-]+$/, { message: '学号格式不正确' })
+  @Length(10, 10)
+  @Matches(/^\d{10}$/, { message: '学号应为10位数字' })
   studentId!: string
 
   @ApiProperty({ type: String, format: 'email', example: 'student@example.com' })
@@ -139,10 +139,11 @@ export class ResetPasswordByIdentityDto {
   @Length(2, 120)
   realName!: string
 
-  @ApiProperty({ type: String, example: '20249990001' })
+  @ApiProperty({ type: String, example: '2024990001' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @Length(6, 32)
+  @Length(10, 10)
+  @Matches(/^\d{10}$/, { message: '学号应为10位数字' })
   studentId!: string
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })

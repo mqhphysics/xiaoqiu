@@ -1,5 +1,7 @@
 import { Button, Image, Text, View } from '@tarojs/components'
 import type { BaseEventOrig } from '@tarojs/components/types/common'
+import Taro from '@tarojs/taro'
+import { useState } from 'react'
 
 import {
   formatDate,
@@ -10,6 +12,7 @@ import {
   verificationLabel,
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
+import { demoCrestUrl } from '../../features/product/demo-media'
 import { resolveMediaUrl } from '../../features/product/product.repository'
 
 import './index.scss'
@@ -22,13 +25,25 @@ export function TeamCrest({
   size?: 'small' | 'medium' | 'large'
 }) {
   const label = team ? team.shortName.slice(0, 2) : '待定'
+  const crestPath = team?.crestUrl?.includes('/api/media/demo/crests/')
+    ? demoCrestUrl(team.teamCode)
+    : (team?.crestUrl ?? (team ? demoCrestUrl(team.teamCode) : null))
+  const source = resolveMediaUrl(crestPath)
+  if (source) {
+    return (
+      <Image
+        aria-label={`${team?.name ?? '球队'}队徽`}
+        className={`team-crest team-crest--${size}`}
+        mode="aspectFit"
+        src={source}
+      />
+    )
+  }
   return (
     <Text
-      className={`team-crest team-crest--${size}`}
-      style={{
-        backgroundColor: team?.primaryColor ?? '#8a948c',
-        color: getContrastColor(team?.primaryColor),
-      }}
+      aria-label={team ? `${team.name}队徽待上传` : '球队待定'}
+      className={`team-crest team-crest--${size} team-crest--fallback`}
+      style={{ backgroundColor: team?.primaryColor ?? '#8a948c' }}
     >
       {label}
     </Text>
@@ -107,12 +122,16 @@ export function PostCard({
   onOpen,
   onLike,
   onMessageAuthor,
+  variant,
 }: {
   post: PostSummary
   onOpen: () => void
   onLike?: () => void
   onMessageAuthor?: () => void
+  variant?: 'home'
 }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const imageUrl = variant === 'home' && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
     onLike?.()
@@ -123,7 +142,10 @@ export function PostCard({
     onMessageAuthor()
   }
   return (
-    <View className="post-card" onClick={onOpen}>
+    <View
+      className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${imageUrl ? 'post-card--with-image' : ''}`}
+      onClick={onOpen}
+    >
       <View className="post-card__author">
         <UserAvatar avatarUrl={post.author.avatarUrl} name={post.author.displayName} size="small" />
         <View className="post-card__identity">
@@ -145,6 +167,19 @@ export function PostCard({
           </Button>
         )}
       </View>
+      {imageUrl && (
+        <Image
+          aria-label={post.title ?? '动态配图'}
+          className="post-card__image"
+          mode="aspectFill"
+          src={imageUrl}
+          onError={() => setImageFailed(true)}
+          onClick={(event) => {
+            event.stopPropagation()
+            void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
+          }}
+        />
+      )}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
       <View className="post-card__actions">
@@ -206,12 +241,4 @@ function avatarColor(name: string): string {
   let hash = 0
   for (const character of name) hash += character.charCodeAt(0)
   return colors[hash % colors.length] ?? colors[0]!
-}
-
-function getContrastColor(color?: string | null): string {
-  if (!color?.startsWith('#') || color.length !== 7) return '#ffffff'
-  const red = Number.parseInt(color.slice(1, 3), 16)
-  const green = Number.parseInt(color.slice(3, 5), 16)
-  const blue = Number.parseInt(color.slice(5, 7), 16)
-  return red * 0.299 + green * 0.587 + blue * 0.114 > 170 ? '#17231a' : '#ffffff'
 }

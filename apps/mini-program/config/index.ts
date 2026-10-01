@@ -6,6 +6,7 @@ const buildEnvironment = (
   globalThis as typeof globalThis & {
     process?: {
       env?: {
+        TARO_ENV?: string
         TARO_APP_API_BASE_URL?: string
         TARO_APP_ORGANIZATION_ID?: string
       }
@@ -23,7 +24,8 @@ const config: UserConfigExport = {
     828: 1.81 / 2,
   },
   sourceRoot: 'src',
-  outputRoot: 'dist',
+  // Keep WeChat output separate from the running H5 development server.
+  outputRoot: buildEnvironment?.TARO_ENV === 'weapp' ? 'dist-weapp' : 'dist',
   plugins: [],
   env: {
     TARO_APP_API_BASE_URL: JSON.stringify(

@@ -1,0 +1,50 @@
+{
+  "Date": "2026-10-01",
+  "Origin": "Four files explicitly provided by user in this task",
+  "Scope": "Reference preservation and implementation planning only",
+  "Images": [
+    {
+      "File": "01-login-approved.png",
+      "OriginalPath": "D:\\MuQinghan\\下载\\点墨校园足球登录页.png",
+      "Role": "User-approved login visual baseline",
+      "Sha256": "2483566ae8124964683dedaa7c520c5271fd548c44f873bc63dea548b853f0c8",
+      "OriginalHashMatchedWhenCopied": true,
+      "ImageEdited": false,
+      "RuntimeReady": false
+    },
+    {
+      "File": "02-cursor-style-c.png",
+      "OriginalPath": "D:\\MuQinghan\\下载\\ChatGPT 图像 2026年10月1日 17_48_57.png",
+      "Role": "Cursor style C reference sheet, not individual runtime icons",
+      "Sha256": "093a2cafd8b47536af43ec497258b284939fe10d9fc4ebd4a22249b50e571893",
+      "OriginalHashMatchedWhenCopied": true,
+      "ImageEdited": false,
+      "RuntimeReady": false
+    },
+    {
+      "File": "03-cursor-strip-reference.png",
+      "OriginalPath": "C:\\Users\\MUQING~1\\AppData\\Local\\Temp\\codex-clipboard-f87aef37-1738-4ba6-bab2-6c8ad3d04d65.png",
+      "Role": "Cursor strip reference, actual alpha fully opaque",
+      "Sha256": "318d076ad6017e702d633204e3d2530ebc225812c9d7a87c3e39e0da6d26ab1a",
+      "OriginalHashMatchedWhenCopied": true,
+      "ImageEdited": false,
+      "RuntimeReady": false
+    },
+    {
+      "File": "04-default-cursor-transparent-source.png",
+      "OriginalPath": "D:\\MuQinghan\\下载\\深绿描边折角光标图标.png",
+      "Role": "Selected default arrow source, transparent but not runtime-sized",
+      "Sha256": "a3edcb574fbd62a02f3b82eee88fea8de73c9249ad71bd6707bc049ca745802b",
+      "OriginalHashMatchedWhenCopied": true,
+      "ImageEdited": false,
+      "RuntimeReady": false
+    }
+  ],
+  "PlannedCursorStates": [
+    "football",
+    "default-arrow",
+    "text",
+    "pointer"
+  ],
+  "FinalHotspots": "Pending runtime asset preparation and real browser hit tests"
+}

@@ -1,8 +1,12 @@
-import { Button, Input, Text, Textarea, View } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import { Button, Image, Input, Text, Textarea, View } from '@tarojs/components'
+import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { PersistentHeaderSearch } from '../../components/public-shell/persistent-header-search'
+import { openSearchPage } from '../../components/public-shell/search-transition'
+import backIcon from '../../assets/search-icons/arrow-left.svg'
+import { PostImagePicker } from '../../components/post-image-picker'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
@@ -14,7 +18,11 @@ import {
   UserAvatar,
 } from '../../components/product-ui'
 import { formatDate, formatTime } from '../../features/product/product.format'
-import { createClientActionId, productRepository } from '../../features/product/product.repository'
+import {
+  createClientActionId,
+  productRepository,
+  resolveMediaUrl,
+} from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
   HomeResponse,
@@ -39,18 +47,43 @@ const searchCategories: Array<{ key: SearchCategory; label: string }> = [
   { key: 'POST', label: '动态' },
 ]
 
+function readSearchRoute() {
+  if (typeof window !== 'undefined') {
+    const routeQuery = window.location.hash.includes('?')
+      ? window.location.hash.slice(window.location.hash.indexOf('?') + 1)
+      : window.location.search
+    const params = new URLSearchParams(routeQuery)
+    const query = params.get('query') ?? ''
+    const category =
+      searchCategories.find((item) => item.key === params.get('category'))?.key ?? 'ALL'
+    return { query, category, expanded: params.get('search') === '1' || Boolean(query.trim()) }
+  }
+  const params = getCurrentInstance().router?.params ?? {}
+  let query = params.query ?? ''
+  try {
+    query = decodeURIComponent(query.replace(/\+/g, ' '))
+  } catch {
+    // Keep malformed links readable instead of failing the whole page.
+  }
+  const category = searchCategories.find((item) => item.key === params.category)?.key ?? 'ALL'
+  return { query, category, expanded: params.search === '1' || Boolean(query.trim()) }
+}
+
 export default function IndexPage() {
+  const [initialSearch] = useState(readSearchRoute)
   const [state, setState] = useState<PageState>({ phase: 'loading' })
-  const [searchText, setSearchText] = useState('')
-  const [searchCategory, setSearchCategory] = useState<SearchCategory>('ALL')
-  const [searchMode, setSearchMode] = useState(false)
+  const [searchText, setSearchText] = useState(initialSearch.query)
+  const [searchCategory, setSearchCategory] = useState<SearchCategory>(initialSearch.category)
+  const [searchMode, setSearchMode] = useState(initialSearch.expanded)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
   const [postBody, setPostBody] = useState('')
+  const [postImageDataUrl, setPostImageDataUrl] = useState<string | null>(null)
+  const [postImageProcessing, setPostImageProcessing] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [pendingPost, setPendingPost] = useState<{ id: string; body: string } | null>(null)
+  const [pendingPost, setPendingPost] = useState<{ id: string; signature: string } | null>(null)
   const searchRequestId = useRef(0)
 
   useOverlayFocus(composerOpen, '.composer-dialog', () => setComposerOpen(false))
@@ -71,10 +104,9 @@ export default function IndexPage() {
     void load()
   }, [load])
 
-  const handleSearch = async (category: SearchCategory = searchCategory) => {
-    const query = searchText.trim()
+  const runSearch = useCallback(async (text: string, category: SearchCategory) => {
+    const query = text.trim()
     const requestId = ++searchRequestId.current
-    setSearchMode(true)
     if (!query) {
       setSearching(false)
       setSearchResult(null)
@@ -94,6 +126,41 @@ export default function IndexPage() {
     } finally {
       if (requestId === searchRequestId.current) setSearching(false)
     }
+  }, [])
+
+  useEffect(() => {
+    if (initialSearch.expanded) void runSearch(initialSearch.query, initialSearch.category)
+    return () => {
+      searchRequestId.current += 1
+    }
+  }, [initialSearch, runSearch])
+
+  const handleSearch = async (category: SearchCategory = searchCategory, text = searchText) => {
+    const query = text.trim()
+    if (!searchMode && !query) return
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB) {
+      const url = `/pages/index/index?search=1&query=${encodeURIComponent(query)}&category=${category}`
+      if (!searchMode) {
+        try {
+          await openSearchPage(query, category)
+        } catch {
+          await Taro.showToast({ title: '搜索未能打开，请重试', icon: 'none' })
+        }
+        return
+      }
+      // Refining a search replaces this entry so Back returns to its originating page.
+      const browserUrl = new URL(window.location.href)
+      if (browserUrl.hash.startsWith('#/')) browserUrl.hash = url
+      else {
+        const target = new URL(url, browserUrl.origin)
+        browserUrl.pathname = target.pathname
+        browserUrl.search = target.search
+      }
+      window.history.replaceState(window.history.state, '', browserUrl)
+    }
+    setSearchText(text)
+    setSearchMode(true)
+    await runSearch(query, category)
   }
 
   const handleCategoryChange = (category: SearchCategory) => {
@@ -111,6 +178,15 @@ export default function IndexPage() {
   }
 
   const exitSearch = () => {
+    if (!searchMode) return
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && initialSearch.expanded) {
+      if (window.history.state?.xiaoqiuSearchEntry) {
+        window.history.back()
+      } else {
+        void Taro.redirectTo({ url: '/pages/index/index' })
+      }
+      return
+    }
     searchRequestId.current += 1
     setSearchMode(false)
     setSearching(false)
@@ -149,8 +225,13 @@ export default function IndexPage() {
 
   const openComposer = async () => {
     if (!readSession()) {
-      await Taro.showToast({ title: '请先登录', icon: 'none' })
-      await Taro.reLaunch({ url: '/pages/login/index' })
+      const result = await Taro.showModal({
+        title: '登录后即可发送动态',
+        content: '登录后即可发布绿茵动态。是否前往登录？',
+        confirmText: '前往登录',
+        cancelText: '取消',
+      })
+      if (result.confirm) await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
     setComposerOpen(true)
@@ -158,19 +239,29 @@ export default function IndexPage() {
 
   const publishPost = async () => {
     const body = postBody.trim()
-    if (body.length < 2 || publishing) return
+    if (body.length < 2 || publishing || postImageProcessing) return
+    const signature = `${body}\n${postImageDataUrl ?? ''}`
     const request =
-      pendingPost?.body === body ? pendingPost : { id: createClientActionId('post'), body }
+      pendingPost?.signature === signature
+        ? pendingPost
+        : { id: createClientActionId('post'), signature }
     setPendingPost(request)
     setPublishing(true)
     try {
-      const post = await productRepository.createPost(body, request.id)
+      const post = await productRepository.createPost(
+        body,
+        request.id,
+        undefined,
+        undefined,
+        postImageDataUrl ?? undefined,
+      )
       setState((current) =>
         current.phase === 'ready'
           ? { phase: 'ready', data: { ...current.data, posts: [post, ...current.data.posts] } }
           : current,
       )
       setPostBody('')
+      setPostImageDataUrl(null)
       setPendingPost(null)
       setComposerOpen(false)
       await Taro.showToast({ title: '已发布', icon: 'success' })
@@ -187,9 +278,27 @@ export default function IndexPage() {
   const tournamentId = state.phase === 'ready' ? state.data.tournament.id : undefined
 
   return (
-    <PublicShell active="home" tournamentId={tournamentId} onActiveReselect={exitSearch}>
-      {state.phase === 'loading' && <DataState kind="loading" title="正在进入晓球" />}
-      {state.phase === 'failed' && (
+    <PublicShell
+      active="home"
+      tournamentId={tournamentId}
+      onActiveReselect={() => {
+        if (initialSearch.expanded) void Taro.redirectTo({ url: '/pages/index/index' })
+        else exitSearch()
+      }}
+      headerSearch={
+        searchMode ? null : (
+          <PersistentHeaderSearch
+            query={searchText}
+            onQueryChange={handleSearchTextChange}
+            onSearch={(query) => void handleSearch(searchCategory, query)}
+          />
+        )
+      }
+    >
+      {!searchMode && state.phase === 'loading' && (
+        <DataState kind="loading" title="正在进入晓球" />
+      )}
+      {!searchMode && state.phase === 'failed' && (
         <DataState
           kind="error"
           title="暂时无法连接赛事数据"
@@ -197,35 +306,73 @@ export default function IndexPage() {
           onRetry={() => void load()}
         />
       )}
-      {state.phase === 'ready' &&
-        (searchMode ? (
-          <SearchExperience
-            category={searchCategory}
-            error={searchError}
-            query={searchText}
-            result={searchResult}
-            searching={searching}
-            tournamentId={state.data.tournament.id}
-            onBack={exitSearch}
-            onCategoryChange={handleCategoryChange}
-            onQueryChange={handleSearchTextChange}
-            onSearch={() => void handleSearch()}
-          />
-        ) : (
-          <HomeContent
-            composerOpen={composerOpen}
-            data={state.data}
-            postBody={postBody}
-            publishing={publishing}
-            onCloseComposer={() => setComposerOpen(false)}
-            onEnterSearch={() => setSearchMode(true)}
-            onLike={(post) => void handleLike(post)}
-            onOpenComposer={() => void openComposer()}
-            onPostBodyChange={setPostBody}
-            onPublish={() => void publishPost()}
-          />
-        ))}
+      {searchMode ? (
+        <SearchExperience
+          category={searchCategory}
+          error={searchError}
+          query={searchText}
+          result={searchResult}
+          searching={searching}
+          tournamentId={tournamentId ?? ''}
+          onBack={exitSearch}
+          onCategoryChange={handleCategoryChange}
+          onQueryChange={handleSearchTextChange}
+          onSearch={() => void handleSearch()}
+        />
+      ) : state.phase === 'ready' ? (
+        <HomeContent
+          composerOpen={composerOpen}
+          data={state.data}
+          postBody={postBody}
+          postImageDataUrl={postImageDataUrl}
+          postImageProcessing={postImageProcessing}
+          publishing={publishing}
+          searchText={searchText}
+          onCloseComposer={() => setComposerOpen(false)}
+          onLike={(post) => void handleLike(post)}
+          onOpenComposer={() => void openComposer()}
+          onPostBodyChange={setPostBody}
+          onPostImageChange={setPostImageDataUrl}
+          onPostImageProcessingChange={setPostImageProcessing}
+          onPublish={() => void publishPost()}
+          onSearch={() => void handleSearch()}
+          onSearchTextChange={handleSearchTextChange}
+        />
+      ) : null}
     </PublicShell>
+  )
+}
+
+function HomeSearch({
+  placement,
+  searchText,
+  onSearch,
+  onSearchTextChange,
+}: {
+  placement: 'header' | 'body'
+  searchText: string
+  onSearch: () => void
+  onSearchTextChange: (value: string) => void
+}) {
+  return (
+    <View className={`home-search-entry home-search-entry--${placement}`}>
+      {placement === 'header' ? (
+        <View aria-hidden="true" className="persistent-header-search__icon" />
+      ) : (
+        <Text className="home-search-entry__icon">⌕</Text>
+      )}
+      <Input
+        className="home-search-entry__input"
+        confirmType="search"
+        placeholder="搜索球员、球队、比赛或动态"
+        value={searchText}
+        onConfirm={onSearch}
+        onInput={(event) => onSearchTextChange(event.detail.value)}
+      />
+      <Button aria-label="搜索" className="home-search-entry__action" onClick={onSearch}>
+        搜索
+      </Button>
+    </View>
   )
 }
 
@@ -233,48 +380,89 @@ function HomeContent({
   composerOpen,
   data,
   postBody,
+  postImageDataUrl,
+  postImageProcessing,
   publishing,
+  searchText,
   onCloseComposer,
-  onEnterSearch,
   onLike,
   onOpenComposer,
   onPostBodyChange,
+  onPostImageChange,
+  onPostImageProcessingChange,
   onPublish,
+  onSearch,
+  onSearchTextChange,
 }: {
   composerOpen: boolean
   data: HomeResponse
   postBody: string
+  postImageDataUrl: string | null
+  postImageProcessing: boolean
   publishing: boolean
+  searchText: string
   onCloseComposer: () => void
-  onEnterSearch: () => void
   onLike: (post: PostSummary) => void
   onOpenComposer: () => void
   onPostBodyChange: (value: string) => void
+  onPostImageChange: (value: string | null) => void
+  onPostImageProcessingChange: (processing: boolean) => void
   onPublish: () => void
+  onSearch: () => void
+  onSearchTextChange: (value: string) => void
 }) {
   const focusMatches = selectFocusMatches(data.focusMatches)
+  const featuredAnnouncement = data.announcements[0]
+  const otherAnnouncements = data.announcements.slice(1)
   return (
-    <View>
+    <View className="home-page">
+      <View aria-hidden="true" className="home-page__lineart" />
+      <View aria-hidden="true" className="home-page__lineart home-page__lineart--left" />
       <View className="experience-hero">
         <View className="experience-hero__copy">
-          <Text className="experience-hero__eyebrow">XIAOQIU CAMPUS FOOTBALL</Text>
-          <Text className="experience-hero__title">{data.tournament.name}</Text>
-          <Text className="experience-hero__season">{data.tournament.seasonName}</Text>
+          <Text className="experience-hero__eyebrow">
+            {data.tournament.name} · {data.tournament.seasonName}
+          </Text>
+          {featuredAnnouncement && <Text className="experience-hero__badge">官方公告</Text>}
+          <Text
+            className={`experience-hero__title ${
+              (featuredAnnouncement?.title?.length ?? data.tournament.name.length) > 20
+                ? 'experience-hero__title--long'
+                : ''
+            }`}
+          >
+            {featuredAnnouncement?.title ?? data.tournament.name}
+          </Text>
+          <Text className="experience-hero__summary">
+            {featuredAnnouncement?.body ?? '校园赛事、球队和绿茵动态，都在这里。'}
+          </Text>
+          <Button
+            className="experience-hero__action"
+            onClick={() =>
+              void (featuredAnnouncement
+                ? goToPost(featuredAnnouncement.id)
+                : goToSchedule(data.tournament.id))
+            }
+          >
+            {featuredAnnouncement ? '查看公告' : '查看赛程'} <Text>→</Text>
+          </Button>
+        </View>
+        <View aria-hidden="true" className="experience-hero__media">
+          <View className="experience-hero__illustration" />
         </View>
       </View>
 
-      <View className="home-search-entry" onClick={onEnterSearch}>
-        <Text className="home-search-entry__icon">⌕</Text>
-        <Input
-          className="home-search-entry__input"
-          confirmType="search"
-          placeholder="搜索球员、球队、比赛或动态"
-          onFocus={onEnterSearch}
-        />
-        <Text className="home-search-entry__action">搜索</Text>
-      </View>
+      <HomeSearch
+        placement="body"
+        searchText={searchText}
+        onSearch={onSearch}
+        onSearchTextChange={onSearchTextChange}
+      />
 
       <View className="home-product-section">
+        <View aria-hidden="true" className="match-ornament match-ornament--floodlight" />
+        <View aria-hidden="true" className="match-ornament match-ornament--ball" />
+        <View aria-hidden="true" className="match-ornament match-ornament--goal" />
         <ProductSection
           kicker="MATCH CENTRE"
           title="焦点赛事"
@@ -282,9 +470,9 @@ function HomeContent({
           onAction={() => void goToSchedule(data.tournament.id)}
         />
         {focusMatches.length > 0 ? (
-          <View className="focus-match-grid">
-            {focusMatches.map((match) => (
-              <CompactMatchCard match={match} key={match.id} />
+          <View className={`focus-match-grid focus-match-grid--count-${focusMatches.length}`}>
+            {focusMatches.map((match, index) => (
+              <CompactMatchCard featured={index === 0} match={match} key={match.id} />
             ))}
           </View>
         ) : (
@@ -292,19 +480,27 @@ function HomeContent({
         )}
       </View>
 
-      {data.announcements.length > 0 && (
+      {otherAnnouncements.length > 0 && (
         <View className="notice-rail">
           <Text className="notice-rail__label">官方公告</Text>
           <View className="notice-rail__items">
-            {data.announcements.map((announcement) => (
-              <View
-                className="notice-rail__item"
+            {otherAnnouncements.map((announcement) => (
+              <Button
+                className={`notice-rail__item ${announcement.imageUrl ? 'notice-rail__item--photo' : ''}`}
                 key={announcement.id}
                 onClick={() => void goToPost(announcement.id)}
               >
+                {announcement.imageUrl && (
+                  <Image
+                    className="notice-rail__photo"
+                    mode="aspectFill"
+                    src={resolveMediaUrl(announcement.imageUrl) ?? ''}
+                  />
+                )}
                 <Text className="notice-rail__title">{announcement.title}</Text>
                 <Text className="notice-rail__body">{announcement.body}</Text>
-              </View>
+                <Text className="notice-rail__more">查看详情 →</Text>
+              </Button>
             ))}
           </View>
         </View>
@@ -327,6 +523,7 @@ function HomeContent({
               <PostCard
                 key={post.id}
                 post={post}
+                variant="home"
                 onLike={() => onLike(post)}
                 onOpen={() => void goToPost(post.id)}
                 {...(post.author.messageable && readSession()
@@ -391,6 +588,12 @@ function HomeContent({
               value={postBody}
               onInput={(event) => onPostBodyChange(event.detail.value)}
             />
+            <PostImagePicker
+              value={postImageDataUrl}
+              disabled={publishing}
+              onChange={onPostImageChange}
+              onProcessingChange={onPostImageProcessingChange}
+            />
             <View className="composer-dialog__footer">
               <Text>{postBody.length}/500</Text>
               <View className="composer-dialog__actions">
@@ -399,7 +602,7 @@ function HomeContent({
                 </Button>
                 <Button
                   className="composer-dialog__submit"
-                  disabled={postBody.trim().length < 2 || publishing}
+                  disabled={postBody.trim().length < 2 || publishing || postImageProcessing}
                   loading={publishing}
                   onClick={onPublish}
                 >
@@ -441,12 +644,22 @@ function SearchExperience({
     <View className="search-experience">
       <View className="search-experience__head">
         <Button aria-label="退出搜索" className="search-experience__back" onClick={onBack}>
-          ←
+          <Text className="search-experience__mobile-back">←</Text>
+          <Image aria-hidden="true" className="search-experience__back-icon" src={backIcon} />
         </Button>
         <Text className="search-experience__title">全站搜索</Text>
         <Button className="search-experience__exit" onClick={onBack}>
           退出
         </Button>
+      </View>
+      <View className="search-experience__desktop-bar">
+        <PersistentHeaderSearch
+          expanded
+          query={query}
+          searching={searching}
+          onQueryChange={onQueryChange}
+          onSearch={onSearch}
+        />
       </View>
       <View className="search-experience__bar">
         <Input
@@ -473,6 +686,7 @@ function SearchExperience({
           </Button>
         ))}
       </View>
+      {searching && <DataState kind="loading" title="正在搜索" />}
       {error && (
         <DataState kind="error" title="搜索暂时不可用" description={error} onRetry={onSearch} />
       )}
@@ -486,31 +700,42 @@ function SearchExperience({
   )
 }
 
-function CompactMatchCard({ match }: { match: MatchSummary }) {
+function CompactMatchCard({ match, featured }: { match: MatchSummary; featured: boolean }) {
   const hasScore = match.homeScore !== null && match.awayScore !== null
   return (
-    <View className="compact-match" onClick={() => void goToMatch(match.id)}>
+    <Button
+      aria-label={`查看${match.title}比赛详情`}
+      className={`compact-match ${featured ? 'compact-match--featured' : ''}`}
+      onClick={() => void goToMatch(match.id)}
+    >
       <View className="compact-match__meta">
         <MatchStatus status={match.status} />
-        <Text>
-          {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
-        </Text>
+        <View className="compact-match__meta-copy">
+          <Text className="compact-match__round">{match.title}</Text>
+          <Text className="compact-match__time">
+            {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
+          </Text>
+        </View>
       </View>
       <View className="compact-match__line">
-        <Text className="compact-match__team">
-          {match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}
-        </Text>
+        <View className="compact-match__side">
+          <TeamCrest team={match.homeTeam} size="medium" />
+          <Text className="compact-match__team">
+            {match.homeTeam?.name ?? match.homePlaceholder ?? '主队待定'}
+          </Text>
+        </View>
         <Text className="compact-match__score">
-          {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'vs'}
+          {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}
         </Text>
-        <Text className="compact-match__team compact-match__team--away">
-          {match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}
-        </Text>
+        <View className="compact-match__side compact-match__side--away">
+          <TeamCrest team={match.awayTeam} size="medium" />
+          <Text className="compact-match__team">
+            {match.awayTeam?.name ?? match.awayPlaceholder ?? '客队待定'}
+          </Text>
+        </View>
       </View>
-      <Text className="compact-match__stage">
-        {match.title} · {match.venue?.name ?? '场地待定'}
-      </Text>
-    </View>
+      <Text className="compact-match__stage">{match.venue?.name ?? '场地待定'}</Text>
+    </Button>
   )
 }
 

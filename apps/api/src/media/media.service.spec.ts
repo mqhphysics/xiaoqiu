@@ -5,7 +5,7 @@ import { HttpStatus } from '@nestjs/common'
 import sharp from 'sharp'
 
 import { ApiHttpException } from '../common/api-http.exception'
-import { normalizeAvatarImage } from './media.service'
+import { normalizeAvatarImage, normalizePostImage } from './media.service'
 
 const OUTPUT_EDGE = 320
 const MAX_OUTPUT_BYTES = 72 * 1024
@@ -117,3 +117,30 @@ async function assertBadAvatar(
     return true
   })
 }
+
+for (const subtype of ['jpeg', 'png', 'webp'] as const) {
+  test(`post photos preserve landscape proportions and remove metadata for ${subtype}`, async () => {
+    const source = await createFixture(480, 320, subtype)
+    const image = await normalizePostImage(
+      `data:image/${subtype};base64,${source.toString('base64')}`,
+    )
+    assert.equal(image.width, 480)
+    assert.equal(image.height, 320)
+    assert.ok(image.body.length <= 768 * 1024)
+    const metadata = await sharp(image.body).metadata()
+    assert.equal(metadata.exif, undefined)
+    assert.equal(metadata.format, 'webp')
+  })
+}
+
+test('post photos reject forged formats and truncated data', async () => {
+  const source = await createFixture(320, 180, 'png')
+  await assertBadAvatar(
+    () => normalizePostImage(`data:image/jpeg;base64,${source.toString('base64')}`),
+    '动态图片内容与格式不一致',
+  )
+  await assertBadAvatar(() =>
+    normalizePostImage(`data:image/png;base64,${source.subarray(0, 80).toString('base64')}`),
+  )
+  await assertBadAvatar(() => normalizePostImage('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='))
+})

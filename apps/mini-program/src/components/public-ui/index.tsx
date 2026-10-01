@@ -1,4 +1,7 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Image, Text, View } from '@tarojs/components'
+
+import { demoCrestUrl } from '../../features/product/demo-media'
+import { resolveMediaUrl } from '../../features/product/product.repository'
 
 import './index.scss'
 
@@ -37,8 +40,13 @@ export function TeamMark({ teamCode, name }: { teamCode: string; name: string })
       .slice(0, 2)
       .toUpperCase() || name.slice(0, 1)
   const tone = getTeamTone(teamCode || name)
+  const crest = resolveMediaUrl(demoCrestUrl(teamCode))
 
-  return <Text className={`team-mark team-mark--${tone}`}>{label}</Text>
+  return crest ? (
+    <Image className="team-mark" aria-label={`${name}队徽`} mode="aspectFit" src={crest} />
+  ) : (
+    <Text className={`team-mark team-mark--${tone}`}>{label}</Text>
+  )
 }
 
 export function SectionHeading({

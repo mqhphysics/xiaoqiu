@@ -201,6 +201,7 @@ export async function seedDemoAccountsAndCommunity(
         email: account.email,
         emailNormalized: account.email.toLowerCase(),
         bio: account.bio,
+        avatarUrl: account.avatarUrl,
         verificationLevel: account.verificationLevel,
         playerProfileId: linkedPlayer?.id ?? null,
         status: UserStatus.ACTIVE,
@@ -218,6 +219,10 @@ export async function seedDemoAccountsAndCommunity(
         playerProfileId: linkedPlayer?.id ?? null,
         status: UserStatus.ACTIVE,
       },
+    })
+    await tx.user.updateMany({
+      where: { id: userId, avatarUrl: null },
+      data: { avatarUrl: account.avatarUrl },
     })
 
     const salt = createHash('sha256')
@@ -330,6 +335,7 @@ export async function seedDemoAccountsAndCommunity(
         status: PostStatus.PUBLISHED,
         title: post.title ?? null,
         body: post.body,
+        imageUrl: post.imageUrl ?? null,
         publishedAt: new Date(post.publishedAt),
         createdAt: new Date(post.publishedAt),
       },
