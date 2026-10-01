@@ -54,7 +54,10 @@ export default function LineupBoard({
   const [ownerInvalid, setOwnerInvalid] = useState(false)
   const [kind, setKind] = useState<'TACTIC' | 'MATCH_LINEUP'>('TACTIC')
   const [matchId, setMatchId] = useState('')
-  const players = kind === 'MATCH_LINEUP' ? lockedPlayers : teamPlayers
+  const [boundPlayers, setBoundPlayers] = useState<LineupPlayer[] | null>(null)
+  const [boundSnapshotId, setBoundSnapshotId] = useState<string | null>(null)
+  const [boundSnapshotVersion, setBoundSnapshotVersion] = useState<number | null>(null)
+  const players = kind === 'MATCH_LINEUP' ? (boundPlayers ?? lockedPlayers) : teamPlayers
   const storageKey =
     owner.current.userId && owner.current.organizationId
       ? draftStorageKey(owner.current.organizationId, owner.current.userId, tournamentId, teamId)
@@ -107,8 +110,20 @@ export default function LineupBoard({
   const previousRects = useRef(new Map<string, DOMRect>())
   const playerMap = new Map(players.map((player) => [player.id, player]))
   const starters = new Set(draft.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])))
-  const substitutes = players.filter((player) => !starters.has(player.id))
+  const benchIds = draft.benchPlayerIds ? new Set(draft.benchPlayerIds) : null
+  const substitutes = draft.benchPlayerIds
+    ? draft.benchPlayerIds.flatMap((id) => {
+        const player = playerMap.get(id)
+        return player && !starters.has(id) ? [player] : []
+      })
+    : players.filter((player) => !starters.has(player.id))
+  const unassigned = players.filter(
+    (player) => !starters.has(player.id) && benchIds && !benchIds.has(player.id),
+  )
   const bench = substitutes.filter((player) =>
+    `${player.displayName} ${player.shirtNumber ?? ''}`.includes(query.trim()),
+  )
+  const visibleUnassigned = unassigned.filter((player) =>
     `${player.displayName} ${player.shirtNumber ?? ''}`.includes(query.trim()),
   )
   const candidateIds = players.map((player) => player.id).join(',')
@@ -289,7 +304,9 @@ export default function LineupBoard({
     const target =
       document
         .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>('[data-lineup-slot], [data-lineup-bench]') ?? null
+        ?.closest<HTMLElement>(
+          '[data-lineup-slot], [data-lineup-bench], [data-lineup-unassigned]',
+        ) ?? null
     if (target !== highlighted.current) {
       highlighted.current?.classList.remove('lineup-drop-active')
       target?.classList.add('lineup-drop-active')
@@ -303,9 +320,19 @@ export default function LineupBoard({
       suppressClick.current = true
       const target = document
         .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>('[data-lineup-slot], [data-lineup-bench]')
+        ?.closest<HTMLElement>('[data-lineup-slot], [data-lineup-bench], [data-lineup-unassigned]')
       const rect = pitch.current?.getBoundingClientRect()
-      if (target?.hasAttribute('data-lineup-bench') && current.playerId) {
+      if (target?.hasAttribute('data-lineup-unassigned') && current.playerId) {
+        change(
+          {
+            ...assignPlayer(draft, current.playerId, null),
+            benchPlayerIds: substitutes
+              .map((player) => player.id)
+              .filter((id) => id !== current.playerId),
+          },
+          '球员已移至未安排。',
+        )
+      } else if (target?.hasAttribute('data-lineup-bench') && current.playerId) {
         change(assignPlayer(draft, current.playerId, null), '球员已移至替补。')
       } else if (
         freeMove &&
@@ -388,6 +415,7 @@ export default function LineupBoard({
       ...draft,
       name,
       custom: true,
+      benchPlayerIds: [],
       slots: draft.slots.map((slot) => ({ ...slot, playerId: null })),
     }
     const next = [...templates.filter((item) => item.name !== name), template].slice(-12)
@@ -400,7 +428,7 @@ export default function LineupBoard({
     }
   }
 
-  const openPlan = async (id: string) => {
+  const openPlan = async (id: string, latestPlan?: LineupPlanView) => {
     if (cloudBusy || pendingSave) return
     if (dirty) {
       const answer = await Taro.showModal({
@@ -410,7 +438,7 @@ export default function LineupBoard({
       })
       if (!answer.confirm) return
     }
-    const plan = plans.find((item) => item.id === id)
+    const plan = latestPlan ?? plans.find((item) => item.id === id)
     if (!plan) {
       setCloudPlan(null)
       setPlanHistory(null)
@@ -424,14 +452,18 @@ export default function LineupBoard({
         name: plan.name,
         custom: true,
         slots: plan.payload.slots.map((slot) => ({ ...slot, id: slot.slotId })),
+        benchPlayerIds: plan.payload.benchPlayerIds,
       },
-      plan.kind === 'MATCH_LINEUP' ? lockedPlayers : teamPlayers,
+      plan.kind === 'MATCH_LINEUP' ? plan.snapshotPlayers : teamPlayers,
     )
     if (!restored) {
       setCloudError('云端战术格式不可读取，请联系赛事管理员。')
       return
     }
     setKind(plan.kind)
+    setBoundPlayers(plan.kind === 'MATCH_LINEUP' ? plan.snapshotPlayers : null)
+    setBoundSnapshotId(plan.rosterSnapshotId)
+    setBoundSnapshotVersion(plan.rosterSnapshotVersion)
     setMatchId(plan.matchId ?? '')
     setCloudPlan(plan)
     setDraft(restored)
@@ -453,6 +485,11 @@ export default function LineupBoard({
         const workflow = await rosterRepository.read(tournamentId, teamId)
         const format = workflow.policy?.playersOnPitch
         if (!format) throw new Error('赛事尚未配置首发人数，请联系赛事管理员。')
+        if (!workflow.lockedSnapshot) throw new Error('本队尚无赛事锁定名单，不能编排单场阵容。')
+        setBoundPlayers(workflow.lockedSnapshot.players)
+        setBoundSnapshotId(workflow.lockedSnapshot.id)
+        setBoundSnapshotVersion(workflow.lockedSnapshot.version)
+        next = restoreDraft(next, workflow.lockedSnapshot.players) ?? createFormation('3-3-1')
         if (next.slots.length !== format)
           next = createFormation(
             FORMATIONS.find((formation) => formation.format === format)!.name,
@@ -497,9 +534,7 @@ export default function LineupBoard({
       sending.current = true
       setCloudBusy(true)
       try {
-        const workflow =
-          kind === 'MATCH_LINEUP' ? await rosterRepository.read(tournamentId, teamId) : null
-        if (kind === 'MATCH_LINEUP' && !workflow?.lockedSnapshot)
+        if (kind === 'MATCH_LINEUP' && !boundSnapshotId)
           throw new Error('本队尚无赛事锁定名单，不能保存单场阵容。')
         request = {
           key: createClientActionId('lineup'),
@@ -508,9 +543,9 @@ export default function LineupBoard({
             name: draft.name.trim(),
             kind,
             expectedVersion: cloudPlan?.version ?? 0,
-            tournamentId,
+            tournamentId: cloudPlan ? cloudPlan.tournamentId : tournamentId,
             matchId: kind === 'MATCH_LINEUP' ? matchId : null,
-            rosterSnapshotId: workflow?.lockedSnapshot?.id ?? null,
+            rosterSnapshotId: kind === 'MATCH_LINEUP' ? boundSnapshotId : null,
             payload: {
               formation: draft.formation,
               format: draft.slots.length as 5 | 7 | 8 | 11,
@@ -540,6 +575,7 @@ export default function LineupBoard({
       const result = await lineupPlanRepository.save(teamId, request.input, request.key)
       if (!alive.current) return
       setCloudPlan(result)
+      setBoundSnapshotVersion(result.rosterSnapshotVersion)
       setPlans((items) => [result, ...items.filter((item) => item.id !== result.id)])
       setPendingSave(null)
       setDirty(false)
@@ -591,6 +627,13 @@ export default function LineupBoard({
         </div>
       </div>
       <div className="lineup-cloud">
+        {cloudPlan && (
+          <span className="lineup-cloud__hint">
+            {cloudPlan.tournamentId === null
+              ? '全队通用战术 · 保留原归属保存'
+              : '当前赛事计划 · 保留原归属保存'}
+          </span>
+        )}
         <label className="lineup-label">
           计划用途
           <select
@@ -656,6 +699,25 @@ export default function LineupBoard({
         >
           刷新云端列表
         </button>
+        {cloudPlan && (
+          <button
+            className="lineup-button"
+            disabled={cloudBusy || Boolean(pendingSave)}
+            onClick={async () => {
+              try {
+                const result = await lineupPlanRepository.list(teamId)
+                setPlans(result.items)
+                const latest = result.items.find((plan) => plan.id === cloudPlan.id)
+                if (!latest) throw new Error('云端计划已不可用，请重新打开球队管理。')
+                await openPlan(latest.id, latest)
+              } catch (error) {
+                setCloudError(error instanceof Error ? error.message : '最新版本读取失败')
+              }
+            }}
+          >
+            读取最新版本
+          </button>
+        )}
         {cloudPlan && (
           <button
             className="lineup-button"
@@ -782,6 +844,9 @@ export default function LineupBoard({
           <div className="lineup-pitch-caption">
             <span>{draft.custom ? draft.name || '自定义战术' : draft.formation}</span>
             <span>
+              {kind === 'MATCH_LINEUP' && boundSnapshotVersion
+                ? `名单 v${boundSnapshotVersion} · `
+                : ''}
               首发 {starters.size}/{draft.slots.length} · 进攻方向 ↑
             </span>
           </div>
@@ -864,11 +929,11 @@ export default function LineupBoard({
             </button>
           </div>
         </div>
-        <aside className="lineup-bench" data-lineup-bench="true">
+        <aside className="lineup-bench">
           <div className="lineup-bench__heading">
             <div>
               <span className="lineup-eyebrow">ON THE BENCH</span>
-              <h3>替补与待安排</h3>
+              <h3>替补</h3>
             </div>
             <strong>{substitutes.length}</strong>
           </div>
@@ -880,40 +945,100 @@ export default function LineupBoard({
             onChange={(event) => setQuery(event.target.value)}
           />
           <p className="lineup-bench__hint">拖入球场成为首发，拖回这里成为替补。</p>
-          <div className="lineup-bench__list">
+          <div className="lineup-bench__list" data-lineup-bench="true">
             {bench.map((player) => (
-              <button
-                key={player.id}
-                className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
-                aria-label={`选择${player.displayName}`}
-                aria-pressed={selected === player.id}
-                onPointerDown={(event) => startDrag(event, player.id)}
-                onPointerMove={moveDrag}
-                onPointerUp={endDrag}
-                onPointerCancel={clearDrag}
-                onClick={() => choosePlayer(player)}
-              >
-                <PlayerPortrait player={player} />
-                <span className="lineup-player__copy">
-                  <strong>{player.displayName}</strong>
-                  <small>
-                    {positionLabel(player.position)} · {player.shirtNumber ?? '未设'} 号
-                  </small>
-                </span>
-                <span className="lineup-player__grip" aria-hidden="true">
-                  ⠿
-                </span>
-              </button>
+              <div className="lineup-bench-row" key={player.id}>
+                <button
+                  className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
+                  aria-label={`选择${player.displayName}`}
+                  aria-pressed={selected === player.id}
+                  onPointerDown={(event) => startDrag(event, player.id)}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={clearDrag}
+                  onClick={() => choosePlayer(player)}
+                >
+                  <PlayerPortrait player={player} />
+                  <span className="lineup-player__copy">
+                    <strong>{player.displayName}</strong>
+                    <small>
+                      {positionLabel(player.position)} · {player.shirtNumber ?? '未设'} 号
+                    </small>
+                  </span>
+                  <span className="lineup-player__grip" aria-hidden="true">
+                    ⠿
+                  </span>
+                </button>
+                <button
+                  className="lineup-button lineup-player-action"
+                  aria-label={`将${player.displayName}移至未安排`}
+                  onClick={() =>
+                    change(
+                      {
+                        ...draft,
+                        benchPlayerIds: substitutes
+                          .map((item) => item.id)
+                          .filter((id) => id !== player.id),
+                      },
+                      '已移至未安排。',
+                    )
+                  }
+                >
+                  未安排
+                </button>
+              </div>
             ))}
             {!bench.length && (
               <p className="lineup-empty">
                 {query
                   ? '没有符合搜索的本队球员'
                   : players.length
-                    ? '所有球员均已安排首发'
+                    ? unassigned.length
+                      ? '暂未选择替补，可从未安排中添加。'
+                      : '所有球员均已安排首发'
                     : '本队还没有已关联档案的球员'}
               </p>
             )}
+          </div>
+          <div className="lineup-unassigned" data-lineup-unassigned="true">
+            <h3>
+              未安排 <span>{unassigned.length}</span>
+            </h3>
+            {visibleUnassigned.map((player) => (
+              <div className="lineup-bench-row" key={player.id}>
+                <button
+                  className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
+                  aria-label={`选择未安排的${player.displayName}`}
+                  aria-pressed={selected === player.id}
+                  onPointerDown={(event) => startDrag(event, player.id)}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={clearDrag}
+                  onClick={() => choosePlayer(player)}
+                >
+                  <PlayerPortrait player={player} />
+                  <span className="lineup-player__copy">
+                    <strong>{player.displayName}</strong>
+                    <small>{positionLabel(player.position)}</small>
+                  </span>
+                </button>
+                <button
+                  className="lineup-button lineup-player-action"
+                  aria-label={`将${player.displayName}设为替补`}
+                  onClick={() =>
+                    change(
+                      {
+                        ...draft,
+                        benchPlayerIds: [...substitutes.map((item) => item.id), player.id],
+                      },
+                      '已设为替补。',
+                    )
+                  }
+                >
+                  替补
+                </button>
+              </div>
+            ))}
           </div>
           <button
             className="lineup-button lineup-bench__remove"
@@ -952,6 +1077,7 @@ export default function LineupBoard({
                 change(
                   {
                     ...template,
+                    benchPlayerIds: base.benchPlayerIds,
                     slots: template.slots.map((slot, index) => ({
                       ...slot,
                       playerId: base.slots[index]?.playerId ?? null,

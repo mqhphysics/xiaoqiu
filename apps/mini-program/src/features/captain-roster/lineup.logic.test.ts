@@ -82,3 +82,15 @@ test('custom positioning remains in the pitch and rejects nonfinite gesture coor
   assert.equal(moved.slots[0]!.y, 91)
   assert.equal(moveSlot(draft, draft.slots[0]!.id, NaN, 10), draft)
 })
+test('eight starters, one substitute and one unassigned survive restore without silently adding bench players', () => {
+  const squad = players.slice(0, 10)
+  const draft = { ...createFormation('3-3-1'), benchPlayerIds: [squad[8]!.id] }
+  draft.slots = draft.slots.map((slot, index) => ({ ...slot, playerId: squad[index]!.id }))
+  draft.slots[0]!.x = 0
+  draft.slots[0]!.y = 100
+  const restored = restoreDraft(draft, squad)!
+  assert.deepEqual(restored, draft)
+  assert.equal(restored.benchPlayerIds!.includes(squad[9]!.id), false)
+  const swapped = assignPlayer(restored, squad[8]!.id, restored.slots[0]!.id)
+  assert.deepEqual(swapped.benchPlayerIds, [squad[0]!.id])
+})

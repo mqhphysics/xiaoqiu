@@ -88,11 +88,13 @@ function RegistrationEditor({ teamId, tournamentId }: { teamId: string; tourname
   const [pending, setPending] = useState<{ command: RosterCommand; key: string } | null>(null)
   const alive = useRef(true)
   const sending = useRef(false)
+  const loadGeneration = useRef(0)
   const load = async () => {
+    const generation = ++loadGeneration.current
     setLoading(true)
     try {
       const result = await rosterRepository.read(tournamentId, teamId)
-      if (!alive.current) return
+      if (!alive.current || generation !== loadGeneration.current) return
       setData(result)
       setEntries(
         result.players.map((player) => ({
@@ -104,9 +106,12 @@ function RegistrationEditor({ teamId, tournamentId }: { teamId: string; tourname
       setPending(null)
       setDirty(false)
     } catch (reason) {
-      if (alive.current) setError(reason instanceof Error ? reason.message : '赛事名单加载失败')
+      if (alive.current && generation === loadGeneration.current) {
+        if (reason instanceof RosterApiError && [401, 403].includes(reason.status)) setData(null)
+        setError(reason instanceof Error ? reason.message : '赛事名单加载失败')
+      }
     } finally {
-      if (alive.current) setLoading(false)
+      if (alive.current && generation === loadGeneration.current) setLoading(false)
     }
   }
   useEffect(() => {
@@ -121,8 +126,21 @@ function RegistrationEditor({ teamId, tournamentId }: { teamId: string; tourname
     ['DRAFT', 'RETURNED', 'REOPENED'].includes(data.status) &&
     !['WITHDRAWN', 'SUSPENDED'].includes(data.registrationStatus) &&
     !busy &&
+    !loading &&
     !pending,
   )
+  const refresh = async () => {
+    if (busy || pending || loading) return
+    if (dirty) {
+      const answer = await Taro.showModal({
+        title: '重新读取名单',
+        content: '将读取服务器最新名单，当前未保存的报名编辑会被替换。',
+        confirmText: '重新读取',
+      })
+      if (!answer.confirm) return
+    }
+    await load()
+  }
   const send = async (action: 'SAVE' | 'SUBMIT', retry = false) => {
     if (!data || sending.current) return
     const request =
@@ -188,9 +206,14 @@ function RegistrationEditor({ teamId, tournamentId }: { teamId: string; tourname
             data ? `${statuses[data.status] ?? data.status} · v${data.version}` : '独立于战术草稿'
           }
         />
-        <Button onClick={() => setExpanded(!expanded)}>
-          {expanded ? '收起名单' : '查看与编辑'}
-        </Button>
+        <View className="captain-registration__head-buttons">
+          <Button disabled={busy || loading || Boolean(pending)} onClick={() => void refresh()}>
+            刷新名单
+          </Button>
+          <Button onClick={() => setExpanded(!expanded)}>
+            {expanded ? '收起名单' : '查看与编辑'}
+          </Button>
+        </View>
       </View>
       {loading && <DataState kind="loading" title="正在读取赛事报名名单" />}
       {error && (

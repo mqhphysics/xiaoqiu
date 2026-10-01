@@ -20,6 +20,8 @@ import {
 import { ProductApiError, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { CaptainRosterWorkflow } from '../../features/captain-roster'
+import { captainRequest } from '../../features/captain-roster/roster.repository'
+import { RosterReviewWorkspace } from '../../features/captain-roster/roster-review'
 import type {
   HomeResponse,
   CaptainWorkspaceResponse,
@@ -56,6 +58,14 @@ const POSITION_GROUPS = [
 
 export default function MyTeamPage() {
   const requestedTeamId = getCurrentInstance().router?.params?.teamId ?? ''
+  const requestedTournamentId =
+    Taro.getEnv() === Taro.ENV_TYPE.WEB
+      ? (getCurrentInstance().router?.params?.tournamentId ?? '')
+      : ''
+  const isRosterReview =
+    Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+    getCurrentInstance().router?.params?.review === 'roster' &&
+    Boolean(requestedTeamId && requestedTournamentId)
   const [state, setState] = useState<PageState>({ phase: 'loading' })
   const [editing, setEditing] = useState(false)
   const [primaryId, setPrimaryId] = useState('')
@@ -65,9 +75,15 @@ export default function MyTeamPage() {
   const [playerBusy, setPlayerBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    if (isRosterReview) return
     setState({ phase: 'loading' })
     try {
-      const homeData = await productRepository.getHome()
+      const homeData =
+        requestedTournamentId && readSession()
+          ? await captainRequest<HomeResponse>(
+              `/public/home?tournamentId=${encodeURIComponent(requestedTournamentId)}`,
+            )
+          : await productRepository.getHome()
       if (!readSession()) {
         setState({
           phase: 'ready',
@@ -114,14 +130,18 @@ export default function MyTeamPage() {
         captain,
         captainError,
       })
-      if (!preferences.primaryTeam) setEditing(true)
+      if (
+        !preferences.primaryTeam &&
+        !(Taro.getEnv() === Taro.ENV_TYPE.WEB && requestedTeamId && captain)
+      )
+        setEditing(true)
     } catch (error) {
       setState({
         phase: 'failed',
         message: error instanceof Error ? error.message : '主队数据加载失败。',
       })
     }
-  }, [requestedTeamId])
+  }, [requestedTeamId, requestedTournamentId, isRosterReview])
 
   useEffect(() => {
     void load()
@@ -268,6 +288,12 @@ export default function MyTeamPage() {
   }
 
   const tournamentId = state.phase === 'ready' ? state.home.tournament.id : undefined
+  if (isRosterReview)
+    return (
+      <PublicShell active="me" tournamentId={requestedTournamentId}>
+        <RosterReviewWorkspace teamId={requestedTeamId} tournamentId={requestedTournamentId} />
+      </PublicShell>
+    )
   return (
     <PublicShell active="team" tournamentId={tournamentId}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在加载主队空间" />}
@@ -304,7 +330,11 @@ export default function MyTeamPage() {
             <TeamDashboard
               key={state.dashboard.team.id}
               data={state.dashboard}
-              primaryTeam={state.preferences.primaryTeam ?? state.dashboard.team}
+              primaryTeam={
+                Taro.getEnv() === Taro.ENV_TYPE.WEB && requestedTeamId
+                  ? state.dashboard.team
+                  : (state.preferences.primaryTeam ?? state.dashboard.team)
+              }
               followedTeams={state.preferences.followedTeams}
               saving={saving}
               teamMatches={state.schedule.filter(

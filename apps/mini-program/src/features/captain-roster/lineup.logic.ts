@@ -13,6 +13,7 @@ export interface LineupSlot {
   playerId: string | null
 }
 export interface LineupDraft {
+  benchPlayerIds?: string[] | undefined
   schemaVersion: 1
   formation: string
   name: string
@@ -141,7 +142,19 @@ export function createFormation(name = '4-3-3', previous?: LineupDraft): LineupD
       assigned.add(match.id)
     }
   }
-  return { schemaVersion: 1, formation: formation.name, name: formation.name, custom: false, slots }
+  const bench = previous?.benchPlayerIds ? new Set(previous.benchPlayerIds) : null
+  if (bench) {
+    for (const player of remaining) if (!assigned.has(player.id)) bench.add(player.id)
+    for (const id of assigned) bench.delete(id)
+  }
+  return {
+    schemaVersion: 1,
+    formation: formation.name,
+    name: formation.name,
+    custom: false,
+    slots,
+    ...(bench ? { benchPlayerIds: [...bench] } : {}),
+  }
 }
 
 export function assignPlayer(
@@ -153,11 +166,18 @@ export function assignPlayer(
   const source = slots.find((slot) => slot.playerId === playerId)
   const target = slots.find((slot) => slot.id === targetId)
   if (targetId !== null && !target) return draft
-  if (source === target) return draft
+  if (target && source === target) return draft
   const displaced = target?.playerId ?? null
   if (source) source.playerId = displaced
   if (target) target.playerId = playerId
-  return { ...draft, slots }
+  const bench = draft.benchPlayerIds ? new Set(draft.benchPlayerIds) : null
+  if (bench) {
+    bench.delete(playerId)
+    if (targetId === null) bench.add(playerId)
+    if (displaced && !source) bench.add(displaced)
+    for (const slot of slots) if (slot.playerId) bench.delete(slot.playerId)
+  }
+  return { ...draft, slots, ...(bench ? { benchPlayerIds: [...bench] } : {}) }
 }
 
 export function moveSlot(draft: LineupDraft, slotId: string, x: number, y: number): LineupDraft {
@@ -179,24 +199,28 @@ export function moveSlot(draft: LineupDraft, slotId: string, x: number, y: numbe
 
 export function fillByPosition(draft: LineupDraft, players: LineupPlayer[]): LineupDraft {
   const used = new Set(draft.slots.map((slot) => slot.playerId).filter(Boolean))
+  const slots = draft.slots.map((slot) => {
+    if (slot.playerId) return slot
+    const preferred =
+      slot.label === 'GK'
+        ? 'GOALKEEPER'
+        : /B$/.test(slot.label)
+          ? 'DEFENDER'
+          : /M$/.test(slot.label)
+            ? 'MIDFIELDER'
+            : 'FORWARD'
+    const player =
+      players.find((candidate) => !used.has(candidate.id) && candidate.position === preferred) ??
+      players.find((candidate) => !used.has(candidate.id))
+    if (player) used.add(player.id)
+    return { ...slot, playerId: player?.id ?? null }
+  })
   return {
     ...draft,
-    slots: draft.slots.map((slot) => {
-      if (slot.playerId) return slot
-      const preferred =
-        slot.label === 'GK'
-          ? 'GOALKEEPER'
-          : /B$/.test(slot.label)
-            ? 'DEFENDER'
-            : /M$/.test(slot.label)
-              ? 'MIDFIELDER'
-              : 'FORWARD'
-      const player =
-        players.find((candidate) => !used.has(candidate.id) && candidate.position === preferred) ??
-        players.find((candidate) => !used.has(candidate.id))
-      if (player) used.add(player.id)
-      return { ...slot, playerId: player?.id ?? null }
-    }),
+    slots,
+    ...(draft.benchPlayerIds
+      ? { benchPlayerIds: draft.benchPlayerIds.filter((id) => !used.has(id)) }
+      : {}),
   }
 }
 
@@ -235,17 +259,27 @@ export function restoreDraft(value: unknown, players: LineupPlayer[]): LineupDra
     slots.push({
       id: raw.id,
       label: raw.label,
-      x: Math.max(8, Math.min(92, raw.x)),
-      y: Math.max(9, Math.min(91, raw.y)),
+      x: raw.x >= 0 && raw.x <= 100 ? raw.x : Math.max(8, Math.min(92, raw.x)),
+      y: raw.y >= 0 && raw.y <= 100 ? raw.y : Math.max(9, Math.min(91, raw.y)),
       playerId,
     })
   }
+  if (
+    draft.benchPlayerIds !== undefined &&
+    (!Array.isArray(draft.benchPlayerIds) ||
+      !draft.benchPlayerIds.every((id) => typeof id === 'string'))
+  )
+    return null
+  const benchPlayerIds = draft.benchPlayerIds
+    ? [...new Set(draft.benchPlayerIds)].filter((id) => allowed.has(id) && !assigned.has(id))
+    : undefined
   return {
     schemaVersion: 1,
     formation: draft.formation.slice(0, 32),
     name: draft.name.slice(0, 32),
     custom: draft.custom === true,
     slots,
+    ...(benchPlayerIds ? { benchPlayerIds } : {}),
   }
 }
 

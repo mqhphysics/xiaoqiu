@@ -1,11 +1,13 @@
 import Taro from '@tarojs/taro'
 import { readSession } from '../product/session'
+import type { LineupPlayer } from './lineup.logic'
 
 // Local integration types pending promotion by the contracts owner. No generated client edits.
 export interface RosterWorkflowView {
   tournamentId: string
   tournamentName: string
   teamId: string
+  teamName: string
   registrationId: string
   registrationStatus: string
   version: number
@@ -18,7 +20,7 @@ export interface RosterWorkflowView {
     ruleVersionId: string
   } | null
   decisionReason: string | null
-  lockedSnapshot: { id: string; version: number } | null
+  lockedSnapshot: { id: string; version: number; players: LineupPlayer[] } | null
   players: Array<{ playerId: string; displayName: string; shirtNumber: string | null }>
   availablePlayers: Array<{
     playerId: string
@@ -72,6 +74,21 @@ export async function captainRequest<T>(path: string, command?: unknown, key?: s
 const rosterPath = (tournamentId: string, teamId: string) =>
   `/roster/tournaments/${encodeURIComponent(tournamentId)}/teams/${encodeURIComponent(teamId)}`
 export const rosterRepository = {
+  review: (
+    tournamentId: string,
+    teamId: string,
+    command: {
+      action: 'RETURN' | 'APPROVE' | 'LOCK' | 'REOPEN'
+      expectedVersion: number
+      reason?: string
+    },
+    key: string,
+  ) =>
+    captainRequest<RosterWorkflowView>(
+      `${rosterPath(tournamentId, teamId)}/commands`,
+      command,
+      key,
+    ),
   read: (tournamentId: string, teamId: string) =>
     captainRequest<RosterWorkflowView>(rosterPath(tournamentId, teamId)),
   execute: (tournamentId: string, teamId: string, command: RosterCommand, key: string) =>

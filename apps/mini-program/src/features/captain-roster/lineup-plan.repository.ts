@@ -1,4 +1,5 @@
 import { captainRequest } from './roster.repository'
+import type { LineupPlayer } from './lineup.logic'
 export interface LineupPlanPayload {
   formation: string
   format: 5 | 7 | 8 | 11
@@ -16,6 +17,8 @@ export interface LineupPlanView {
   version: number
   payload: LineupPlanPayload
   updatedAt: string
+  snapshotPlayers: LineupPlayer[]
+  rosterSnapshotVersion: number | null
 }
 export interface SaveLineupPlan {
   planId?: string
