@@ -13,7 +13,7 @@
 5. 并行任务用独立分支与 worktree，先记录共同基线和具体写入文件。共享壳层、API 契约、数据库模型等指定唯一负责人；目录隔离后仍须协调接口、端口和测试数据库。
 6. 保留现有修改；私有报名资料、真实凭据、运行日志、依赖和生成产物不入库。正式赛事资料不用演示 Seed 承载，普通启动不重新 Seed。
 
-AI 协作者执行[AGENTS.md](AGENTS.md)。最新功能状态和真实赛事准备见[项目进度总览](docs/status/项目进度总览-2026-10-01.md)，工作树操作见[集成指南](docs/development/并行工作树与集成指南.md)。
+AI 协作者执行[AGENTS.md](AGENTS.md)。首轮功能盘点见[项目进度总览](docs/status/项目进度总览-2026-10-01.md)；本轮并行功能按 [V2 工作流公共契约](docs/architecture/V2-工作流公共契约.md)和 `docs/tasks/V2-00` 至 `V2-04` 实施。工作树起点不一致的实证、修复和后续规则见[集成指南](docs/development/并行工作树与集成指南.md)。
 
 ## 开始之前
 
@@ -109,8 +109,8 @@ pnpm check
 | `infra/`    | Docker Compose、镜像和部署配置                   |
 | `docs/`     | 当前文档入口；过期材料统一在 `docs/archive/`     |
 | `scripts/`  | 本地一键启动等辅助脚本                           |
-| `参考图片/` | 页面、品牌、球场和登录页的设计参考及缩略图入口    |
-| `工程配置/` | 隐藏配置的用途说明和指向原文件的本机快捷方式      |
+| `参考图片/` | 页面、品牌、球场和登录页的设计参考及缩略图入口   |
+| `工程配置/` | 隐藏配置的用途说明和指向原文件的本机快捷方式     |
 
 `private-data/` 保存本机报名资料、运行日志、媒体、备份和整理快照，已被 Git 忽略；`node_modules/`、`.pnpm-store/` 和构建目录均为生成内容。当前 H5 输出在 `apps/mini-program/dist/`，微信输出在 `dist-weapp/`，两个目录都不提交。`tools/` 放开发辅助工具源码，其下载缓存与本机安装记录不提交。根目录的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json` 等是工具链入口，不能移入子目录。
 
@@ -118,19 +118,19 @@ pnpm check
 
 这些看起来像“散落文件”，实际都是 Git、pnpm、TypeScript、Docker 或协作工具从仓库根目录读取的入口。本次保留这些配置的真实路径并设置隐藏；可移动的贡献说明归入 `docs/development/`，设计参考归入根目录 `参考图片/`，详细分工见目录说明。
 
-| 文件                                                      | 由谁读取     | 作用                                |
-| --------------------------------------------------------- | ------------ | ----------------------------------- |
-| `.dockerignore`                                           | Docker       | 构建镜像时排除依赖、缓存和私有文件  |
-| `.editorconfig`                                           | 编辑器       | 统一缩进、换行和字符集              |
-| `.env.example`                                            | 开发者       | 环境变量模板，不包含真实密钥        |
-| `.gitignore`                                              | Git          | 防止依赖、构建产物和私有数据入库    |
-| `.prettierignore` / `.prettierrc.json`                    | Prettier     | 统一格式化范围与代码风格            |
-| `eslint.config.mjs`                                       | ESLint       | 全仓代码质量规则                    |
-| `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` | pnpm         | Monorepo 命令、依赖锁定和工作区声明 |
-| `tsconfig.base.json`                                      | TypeScript   | API、网站、小程序和后台共享编译基线 |
-| `AGENTS.md`                                               | Codex/协作者 | 多 Agent 文件所有权和协作规则       |
-| `docs/development/CONTRIBUTING.md`                         | 开发者       | 分支、测试和提交规范，已移入文档目录 |
-| `README.md`                                               | 所有人       | 项目总入口与启动说明                |
+| 文件                                                      | 由谁读取     | 作用                                 |
+| --------------------------------------------------------- | ------------ | ------------------------------------ |
+| `.dockerignore`                                           | Docker       | 构建镜像时排除依赖、缓存和私有文件   |
+| `.editorconfig`                                           | 编辑器       | 统一缩进、换行和字符集               |
+| `.env.example`                                            | 开发者       | 环境变量模板，不包含真实密钥         |
+| `.gitignore`                                              | Git          | 防止依赖、构建产物和私有数据入库     |
+| `.prettierignore` / `.prettierrc.json`                    | Prettier     | 统一格式化范围与代码风格             |
+| `eslint.config.mjs`                                       | ESLint       | 全仓代码质量规则                     |
+| `package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml` | pnpm         | Monorepo 命令、依赖锁定和工作区声明  |
+| `tsconfig.base.json`                                      | TypeScript   | API、网站、小程序和后台共享编译基线  |
+| `AGENTS.md`                                               | Codex/协作者 | 多 Agent 文件所有权和协作规则        |
+| `docs/development/CONTRIBUTING.md`                        | 开发者       | 分支、测试和提交规范，已移入文档目录 |
+| `README.md`                                               | 所有人       | 项目总入口与启动说明                 |
 
 `.github/` 保存云端 CI；`.worktrees/` 只用于并行 Agent 的临时工作区；`node_modules/` 和 `.pnpm-store/` 是本地生成目录，均不属于产品源码。
 
