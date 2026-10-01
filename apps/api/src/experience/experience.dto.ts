@@ -16,6 +16,11 @@ import {
 } from 'class-validator'
 
 export class SearchQueryDto {
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  tournamentId?: string
+
   @ApiProperty({ type: String, example: '物院' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

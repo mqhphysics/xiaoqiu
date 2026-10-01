@@ -20,11 +20,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
-import type { Request } from 'express'
 
 import { ApiErrorResponseDto } from '../common/api-error-response.dto'
-import { getRequestId, type RequestWithId } from '../common/request-context'
-import { DEMO_ORGANIZATION_ID } from '../database/demo-fixture'
+import { getOrganizationId, getRequestId, type RequestWithId } from '../common/request-context'
 import {
   AuthUserDto,
   LoginDto,
@@ -46,21 +44,11 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
-  login(
-    @Body() body: LoginDto,
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
-    @Ip() ip: string,
-    @Req() request: Request,
-  ) {
-    return this.authService.login(
-      body.username,
-      body.password,
-      organizationId?.trim() || DEMO_ORGANIZATION_ID,
-      {
-        ip,
-        userAgent: request.headers['user-agent'],
-      },
-    )
+  login(@Body() body: LoginDto, @Ip() ip: string, @Req() request: RequestWithId) {
+    return this.authService.login(body.username, body.password, getOrganizationId(request), {
+      ip,
+      userAgent: request.headers['user-agent'],
+    })
   }
 
   @Post('register')
@@ -68,13 +56,8 @@ export class AuthController {
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({ type: LoginResponseDto })
   @ApiConflictResponse({ type: ApiErrorResponseDto })
-  register(
-    @Body() body: RegisterDto,
-    @Headers('x-dev-organization-id') organizationId: string | undefined,
-    @Ip() ip: string,
-    @Req() request: RequestWithId,
-  ) {
-    return this.authService.register(body, organizationId?.trim() || DEMO_ORGANIZATION_ID, {
+  register(@Body() body: RegisterDto, @Ip() ip: string, @Req() request: RequestWithId) {
+    return this.authService.register(body, getOrganizationId(request), {
       ip,
       requestId: getRequestId(request),
       userAgent: request.headers['user-agent'],
