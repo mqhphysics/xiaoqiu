@@ -19,6 +19,7 @@ import {
 } from '../../features/product/product.format'
 import { ProductApiError, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { CaptainRosterWorkflow } from '../../features/captain-roster'
 import type {
   HomeResponse,
   CaptainWorkspaceResponse,
@@ -707,7 +708,18 @@ function TeamDashboard({
         </View>
       )}
       {captain && (
-        <CaptainWorkspace teamId={data.team.id} data={captain} onChange={onCaptainChange} />
+        <>
+          {Taro.getEnv() === Taro.ENV_TYPE.WEB && (
+            <CaptainRosterWorkflow
+              teamId={data.team.id}
+              tournamentId={tournamentId}
+              captain={captain}
+              roster={data.roster}
+              matches={teamMatches}
+            />
+          )}
+          <CaptainWorkspace teamId={data.team.id} data={captain} onChange={onCaptainChange} />
+        </>
       )}
 
       <View className="my-team-section">

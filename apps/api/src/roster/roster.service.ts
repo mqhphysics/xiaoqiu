@@ -185,17 +185,17 @@ export class RosterService {
     const submission = registration.rosterSubmissions[0]
     const importBatch = registration.importBatches[0]
     const players =
-      snapshot?.entries.map((entry) => ({
-        id: entry.playerProfileId,
-        displayName: entry.displayName,
-        shirtNumber: entry.shirtNumber,
-        studentIdMasked: entry.studentIdMasked,
-      })) ??
       submission?.entries.map((entry) => ({
         id: entry.playerProfileId,
         displayName: entry.playerProfile.displayName,
         shirtNumber: entry.shirtNumber,
         studentIdMasked: entry.playerProfile.studentIdMasked,
+      })) ??
+      snapshot?.entries.map((entry) => ({
+        id: entry.playerProfileId,
+        displayName: entry.displayName,
+        shirtNumber: entry.shirtNumber,
+        studentIdMasked: entry.studentIdMasked,
       })) ??
       []
 
@@ -243,7 +243,7 @@ export class RosterService {
       rosterStatus: submission?.status ?? null,
       rosterSubmissionVersion: submission?.submissionVersion ?? null,
       rosterSnapshotVersion: snapshot?.snapshotVersion ?? null,
-      playerCount: snapshot?.entries.length ?? submission?.entries.length ?? 0,
+      playerCount: submission?.entries.length ?? snapshot?.entries.length ?? 0,
       dataQualityStatus: submission?.dataQualityStatus ?? null,
       warningCodes: submission?.warningCodes ?? [],
       contactName: registration.contactName,
