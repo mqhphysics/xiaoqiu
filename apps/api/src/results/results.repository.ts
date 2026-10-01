@@ -26,10 +26,10 @@ export async function loadResultFixtures(
 ): Promise<ResultFixtureRow[]> {
   return tx.$queryRawUnsafe<ResultFixtureRow[]>(
     `SELECT fixture.id, fixture.organization_id AS "organizationId", fixture.tournament_id AS "tournamentId",
-    fixture.stage_id AS "stageId", fixture.group_id AS "groupId", fixture.home_team_id AS "homeTeamId", fixture.away_team_id AS "awayTeamId",
+    fixture.stage_id AS "stageId", fixture.group_id AS "groupId", fixture.round_id AS "roundId", fixture.scheduled_start_at AS "scheduledStartAt", fixture.home_team_id AS "homeTeamId", fixture.away_team_id AS "awayTeamId",
     fixture.status::text AS status, fixture.report_version AS "reportVersion", fixture.confirmed_report_version AS "confirmedReportVersion",
     revision.id AS "reportRevisionId", revision.rule_version_id AS "ruleVersionId",
-    CASE WHEN revision.id IS NULL THEN NULL ELSE jsonb_build_object('outcome', revision.fields->'outcome', 'homeScore', revision.fields->'homeScore', 'awayScore', revision.fields->'awayScore', 'homePenaltyScore', revision.fields->'homePenaltyScore', 'awayPenaltyScore', revision.fields->'awayPenaltyScore') END AS fields,
+    CASE WHEN revision.id IS NULL THEN NULL ELSE jsonb_build_object('outcome', revision.fields->'outcome', 'homeScore', revision.fields->'homeScore', 'awayScore', revision.fields->'awayScore', 'homePenaltyScore', revision.fields->'homePenaltyScore', 'awayPenaltyScore', revision.fields->'awayPenaltyScore', '_matchContext', revision.fields->'_matchContext') END AS fields,
     coalesce(fixture.scheduled_start_at, revision.created_at, fixture.created_at) AS "playedAt",
     projection.source_report_version AS "projectionSourceVersion", projection.report_revision_id AS "projectionRevisionId", NULL::jsonb AS "projectionPayload"
     FROM matches fixture

@@ -9,7 +9,12 @@ import { ApiHttpException } from '../common/api-http.exception'
 import { selectPublicTournament } from '../common/public-tournament'
 import { PrismaService } from '../database/prisma.service'
 import { type Prisma } from '../generated/prisma/client'
-import { CompetitionRuleError, requireRule, type ResultFact } from './competition-rules'
+import {
+  CompetitionRuleError,
+  requireRule,
+  resolveScore,
+  type ResultFact,
+} from './competition-rules'
 import { confirmedResultFact } from './confirmed-result'
 import { resolveKnockoutResult } from './knockout'
 import { parseResultsRules } from './parse-rules'
@@ -26,7 +31,12 @@ import { calculateResultStandings } from './standings'
 
 function failure(status: HttpStatus, message: string, reason: string): ApiHttpException {
   return new ApiHttpException(status, {
-    code: status === HttpStatus.CONFLICT ? ERROR_CODES.CONFLICT : ERROR_CODES.BAD_REQUEST,
+    code:
+      status === HttpStatus.CONFLICT
+        ? ERROR_CODES.CONFLICT
+        : status === HttpStatus.NOT_FOUND
+          ? ERROR_CODES.NOT_FOUND
+          : ERROR_CODES.BAD_REQUEST,
     message,
     details: { reason },
   })
@@ -73,6 +83,7 @@ export class ResultsService {
   }
 
   async readTournamentResults(organizationId: string, tournamentId: string) {
+    tournamentId = tournamentId.toLowerCase()
     await selectPublicTournament(this.prisma, organizationId, tournamentId)
     return this.prisma.$transaction(
       async (tx) => {
@@ -82,14 +93,21 @@ export class ResultsService {
           loadParticipants(tx, organizationId, tournamentId),
           loadGroups(tx, organizationId, tournamentId),
         ])
-        const facts = fixtures
-          .map(confirmedResultFact)
-          .filter((fact): fact is ResultFact & { ruleVersionId: string } => fact !== null)
         try {
+          const facts = fixtures
+            .map(confirmedResultFact)
+            .filter((fact): fact is ResultFact & { ruleVersionId: string } => fact !== null)
           requireRule(
             facts.every((fact) => fact.ruleVersionId === row.id),
             'CONFIRMED_RULE_VERSION_MISMATCH',
           )
+          for (const fact of facts.filter((item) => item.decision !== 'PLAYED')) {
+            const score = resolveScore(fact, engine)
+            requireRule(
+              fact.homeScore === score.homeGoals && fact.awayScore === score.awayGoals,
+              'CONFIRMED_FORFEIT_SCORE_MISMATCH',
+            )
+          }
           return {
             tournamentId,
             ruleVersionId: row.id,
@@ -104,10 +122,15 @@ export class ResultsService {
                 'OFFICIAL',
               ),
             })),
-            confirmedResults: facts.map((fact) => ({
-              ...fact,
-              playedAt: fact.playedAt.toISOString(),
-            })),
+            confirmedResults: facts.map((fact) => {
+              const score = fact.status === 'VOID' ? null : resolveScore(fact, engine)
+              return {
+                ...fact,
+                homeScore: score?.homeGoals ?? fact.homeScore,
+                awayScore: score?.awayGoals ?? fact.awayScore,
+                playedAt: fact.playedAt.toISOString(),
+              }
+            }),
             sourceVersions: Object.fromEntries(
               fixtures.map((fixture) => [fixture.id, fixture.confirmedReportVersion ?? 0]),
             ),
@@ -125,6 +148,7 @@ export class ResultsService {
     tournamentId: string,
     dto: ProgressionPreviewDto,
   ) {
+    tournamentId = tournamentId.toLowerCase()
     const session = await this.auth.requireSession(authorization)
     await this.policy.requireTournamentAdministrator(session, tournamentId)
     return this.prisma.$transaction(
@@ -135,6 +159,8 @@ export class ResultsService {
 
   private ruleFailure(error: unknown): never {
     if (error instanceof ApiHttpException) throw error
+    if (error instanceof CompetitionRuleError && error.code === 'CONFIRMED_MATCH_CONTEXT_CHANGED')
+      throw failure(HttpStatus.CONFLICT, '比赛上下文已变化，请先核对冻结报告', error.code)
     if (error instanceof CompetitionRuleError)
       throw failure(HttpStatus.UNPROCESSABLE_ENTITY, '赛果或规程不能完成当前计算', error.code)
     throw error
@@ -171,14 +197,28 @@ export class ResultsService {
         loadParticipants(tx, organizationId, tournamentId),
         loadGroups(tx, organizationId, tournamentId),
       ])
+      const sourceGroups = new Set(
+        progression.slots.flatMap((slot) =>
+          slot.source.type === 'GROUP_RANK' ? [slot.source.groupId] : [],
+        ),
+      )
+      const sourceMatchIds = new Set(
+        progression.slots.flatMap((slot) =>
+          slot.source.type === 'GROUP_RANK' ? [] : [slot.source.matchId],
+        ),
+      )
       const sourceFixtures = fixtures.filter(
-        (fixture) => fixture.stageId === progression.sourceStageId,
+        (fixture) =>
+          fixture.stageId === progression.sourceStageId &&
+          (sourceMatchIds.has(fixture.id) ||
+            (fixture.groupId !== null && sourceGroups.has(fixture.groupId))),
       )
       requireRule(sourceFixtures.length > 0, 'NO_SOURCE_MATCHES')
       requireRule(
         targets.every((id) =>
           fixtures.some(
-            (fixture) => fixture.id === id && fixture.stageId !== progression.sourceStageId,
+            (fixture) =>
+              fixture.id === id && !sourceFixtures.some((source) => source.id === fixture.id),
           ),
         ),
         'INVALID_PROGRESSION_TARGET',
@@ -206,6 +246,12 @@ export class ResultsService {
       if (facts.some((fact) => fact.status === 'VOID')) reasons.push('SOURCE_VOID')
       if (facts.some((fact) => fact.ruleVersionId !== row.id))
         reasons.push('CONFIRMED_RULE_VERSION_MISMATCH')
+      if (!reasons.length)
+        for (const fact of facts.filter((item) => item.decision !== 'PLAYED')) {
+          const score = resolveScore(fact, engine)
+          if (fact.homeScore !== score.homeGoals || fact.awayScore !== score.awayGoals)
+            reasons.push('CONFIRMED_FORFEIT_SCORE_MISMATCH')
+        }
       const assignments: PlannedSlot[] = []
       if (!reasons.length)
         for (const slot of progression.slots) {
@@ -252,7 +298,23 @@ export class ResultsService {
           if (teamId)
             assignments.push({ targetMatchId: slot.targetMatchId, side: slot.side, teamId })
         }
+      const boundLineups = await tx.$queryRawUnsafe<Array<{ matchId: string }>>(
+        `SELECT DISTINCT match_id AS "matchId" FROM team_lineup_plans
+        WHERE organization_id = $1::uuid AND tournament_id = $2::uuid AND match_id = ANY($3::uuid[])
+          AND kind = 'MATCH_LINEUP' AND roster_snapshot_id IS NOT NULL AND version > 0`,
+        organizationId,
+        tournamentId,
+        targets,
+      )
+      const assignedTeams = new Map<string, string>()
+      for (const slot of assignments) {
+        const previous = assignedTeams.get(slot.teamId)
+        if (previous && previous !== slot.targetMatchId) reasons.push('DUPLICATE_QUALIFIER')
+        assignedTeams.set(slot.teamId, slot.targetMatchId)
+      }
       for (const targetId of targets) {
+        if (boundLineups.some((lineup) => lineup.matchId === targetId))
+          reasons.push('TARGET_LINEUP_ALREADY_BOUND')
         const target = fixtures.find((fixture) => fixture.id === targetId)!
         if (
           !['DRAFT', 'SCHEDULED', 'POSTPONED'].includes(target.status) ||
@@ -290,6 +352,8 @@ export class ResultsService {
     idempotencyKey: string | undefined,
     requestId: string,
   ) {
+    tournamentId = tournamentId.toLowerCase()
+    dto = { ...dto, ruleVersionId: dto.ruleVersionId.toLowerCase() }
     if (
       !idempotencyKey ||
       idempotencyKey.length > 128 ||
@@ -310,12 +374,10 @@ export class ResultsService {
     try {
       return await this.prisma.$transaction(
         async (tx) => {
-          const preview = await this.buildPreview(
-            tx,
+          await tx.$queryRawUnsafe(
+            'SELECT id FROM tournaments WHERE organization_id = $1::uuid AND id = $2::uuid FOR UPDATE',
             session.organizationId,
             tournamentId,
-            dto.ruleVersionId,
-            true,
           )
           const existing = await tx.idempotencyRecord.findFirst({
             where: {
@@ -328,14 +390,21 @@ export class ResultsService {
           if (existing) {
             if (existing.requestHash !== requestHash)
               throw failure(HttpStatus.CONFLICT, '幂等键已用于其他请求', 'IDEMPOTENCY_CONFLICT')
-            if (preview.sourceHash !== dto.sourceHash)
+            if (existing.responseStatus !== 200 || existing.responseBody === null)
               throw failure(
                 HttpStatus.CONFLICT,
-                '来源赛果已变化，请重新预览',
-                'PROGRESSION_SOURCE_CHANGED',
+                '此前命令尚无成功回执，请保留幂等键重试',
+                'IDEMPOTENCY_IN_PROGRESS',
               )
             return existing.responseBody
           }
+          const preview = await this.buildPreview(
+            tx,
+            session.organizationId,
+            tournamentId,
+            dto.ruleVersionId,
+            true,
+          )
           if (preview.sourceHash !== dto.sourceHash)
             throw failure(
               HttpStatus.CONFLICT,
@@ -403,6 +472,13 @@ export class ResultsService {
               organizationId: session.organizationId,
               actorType: 'ADMIN',
               actorUserId: session.userId,
+              actorRoleSnapshot: json(
+                session.user.roles.map((role) => ({
+                  role: role.role,
+                  scopeType: role.scopeType,
+                  scopeId: role.scopeId,
+                })),
+              ),
               action: 'TOURNAMENT_PROGRESSION_CONFIRMED',
               targetType: 'Tournament',
               targetId: tournamentId,
@@ -444,7 +520,10 @@ export class ResultsService {
         { isolationLevel: 'Serializable', timeout: 10000 },
       )
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2034')
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+      const meta = error && typeof error === 'object' && 'meta' in error ? error.meta : undefined
+      const sqlCode = meta && typeof meta === 'object' && 'code' in meta ? meta.code : undefined
+      if (code === 'P2034' || (code === 'P2010' && (sqlCode === '40001' || sqlCode === '40P01')))
         throw failure(
           HttpStatus.CONFLICT,
           '并发变更，请重新预览或重试',

@@ -4,6 +4,7 @@ import { OutboxConsumer, type ConsumerOptions } from './outbox/outbox-consumer'
 import { PostgresOutboxStore, validDuration } from './outbox/outbox-store'
 import { PgSqlClient, type PgPool } from './outbox/pg-sql-client'
 import { createMatchReportHandler } from './results/match-report-handler'
+import { matchReportNotificationReceipt } from './results/notification-receipt-handler'
 import { PostgresResultProjectionRepository } from './results/postgres-projection-repository'
 import { buildResultProjectionPayload } from './results/projection-payload'
 
@@ -43,7 +44,10 @@ export class WorkerRuntime {
     const repository = new PostgresResultProjectionRepository(buildResultProjectionPayload)
     this.consumer = new OutboxConsumer(
       new PostgresOutboxStore(sql),
-      new Map([['match.report', createMatchReportHandler(repository)]]),
+      new Map([
+        ['match.report', createMatchReportHandler(repository)],
+        ['match.report.notification', matchReportNotificationReceipt],
+      ]),
       options,
     )
   }

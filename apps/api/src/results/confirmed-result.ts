@@ -1,6 +1,8 @@
 import { requireRule, type ResultFact } from './competition-rules'
 
 export interface ConfirmedResultRow {
+  roundId: string | null
+  scheduledStartAt: Date | null
   organizationId: string
   tournamentId: string
   stageId: string | null
@@ -32,6 +34,27 @@ export function confirmedResultFact(
     'INVALID_CONFIRMED_FIELDS',
   )
   const fields = row.fields as Record<string, unknown>
+  const frozen = fields._matchContext
+  const context = {
+    organizationId: row.organizationId,
+    matchId: row.id,
+    tournamentId: row.tournamentId,
+    stageId: row.stageId,
+    groupId: row.groupId,
+    roundId: row.roundId,
+    homeTeamId: row.homeTeamId,
+    awayTeamId: row.awayTeamId,
+    scheduledStartAt: row.scheduledStartAt?.toISOString() ?? null,
+  }
+  requireRule(
+    frozen &&
+      typeof frozen === 'object' &&
+      !Array.isArray(frozen) &&
+      Object.entries(context).every(
+        ([key, value]) => (frozen as Record<string, unknown>)[key] === value,
+      ),
+    'CONFIRMED_MATCH_CONTEXT_CHANGED',
+  )
   requireRule(
     ['FINISHED', 'ABANDONED', 'HOME_FORFEIT', 'AWAY_FORFEIT', 'BOTH_FORFEIT'].includes(
       String(fields.outcome),

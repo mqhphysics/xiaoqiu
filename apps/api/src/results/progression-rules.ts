@@ -57,7 +57,7 @@ export function parseProgressionRules(document: unknown): ProgressionRules {
           input.rank > 0,
         'INVALID_GROUP_RANK_SOURCE',
       )
-      source = { type: 'GROUP_RANK', groupId: input.groupId, rank: input.rank }
+      source = { type: 'GROUP_RANK', groupId: input.groupId.toLowerCase(), rank: input.rank }
     } else {
       requireRule(
         (input.type === 'MATCH_WINNER' || input.type === 'MATCH_LOSER') &&
@@ -65,9 +65,10 @@ export function parseProgressionRules(document: unknown): ProgressionRules {
           uuid.test(input.matchId),
         'INVALID_MATCH_SOURCE',
       )
-      source = { type: input.type, matchId: input.matchId }
+      source = { type: input.type, matchId: input.matchId.toLowerCase() }
     }
-    const destinationKey = `${slot.targetMatchId}:${slot.side}`
+    const targetMatchId = slot.targetMatchId.toLowerCase()
+    const destinationKey = `${targetMatchId}:${slot.side}`
     const sourceKey = JSON.stringify(source)
     requireRule(
       !destinations.has(destinationKey) && !sources.has(sourceKey),
@@ -75,7 +76,7 @@ export function parseProgressionRules(document: unknown): ProgressionRules {
     )
     destinations.add(destinationKey)
     sources.add(sourceKey)
-    return { targetMatchId: slot.targetMatchId, side: slot.side, source }
+    return { targetMatchId, side: slot.side, source }
   })
-  return { sourceStageId: rule.sourceStageId, slots }
+  return { sourceStageId: rule.sourceStageId.toLowerCase(), slots }
 }

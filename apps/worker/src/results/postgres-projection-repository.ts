@@ -38,11 +38,19 @@ export class PostgresResultProjectionRepository implements ResultProjectionRepos
       `SELECT revision.organization_id AS "organizationId", revision.match_id AS "matchId",
       fixture.tournament_id AS "tournamentId", revision.version, revision.id AS "revisionId",
       revision.rule_version_id AS "ruleVersionId", revision.status::text AS status, revision.fields,
-      fixture.stage_id AS "stageId", fixture.group_id AS "groupId",
+      fixture.stage_id AS "stageId", fixture.group_id AS "groupId", fixture.round_id AS "roundId", fixture.scheduled_start_at AS "scheduledStartAt",
       fixture.home_team_id AS "homeTeamId", fixture.away_team_id AS "awayTeamId",
-      coalesce(fixture.scheduled_start_at, revision.created_at) AS "playedAt"
+      coalesce(fixture.scheduled_start_at, revision.created_at) AS "playedAt", rule.rules->'results' AS "resultRules"
       FROM match_report_revisions revision
       JOIN matches fixture ON fixture.id = revision.match_id AND fixture.organization_id = revision.organization_id
+      JOIN competition_rule_versions rule ON rule.id = revision.rule_version_id
+        AND rule.organization_id = revision.organization_id AND rule.tournament_id = fixture.tournament_id
+      JOIN roster_snapshots home_roster ON home_roster.id = revision.home_roster_snapshot_id
+        AND home_roster.organization_id = revision.organization_id AND home_roster.tournament_id = fixture.tournament_id
+        AND home_roster.team_id = fixture.home_team_id AND home_roster.locked_at IS NOT NULL
+      JOIN roster_snapshots away_roster ON away_roster.id = revision.away_roster_snapshot_id
+        AND away_roster.organization_id = revision.organization_id AND away_roster.tournament_id = fixture.tournament_id
+        AND away_roster.team_id = fixture.away_team_id AND away_roster.locked_at IS NOT NULL
       WHERE revision.organization_id = $1::uuid AND revision.match_id = $2::uuid AND revision.version = $3 AND revision.status = 'CONFIRMED'`,
       [organizationId, matchId, version],
     )
@@ -58,7 +66,8 @@ export class PostgresResultProjectionRepository implements ResultProjectionRepos
       const serialized = JSON.stringify(data)
       if (typeof serialized !== 'string') throw new Error('INVALID_PAYLOAD')
       payload = serialized
-    } catch {
+    } catch (error) {
+      if (error instanceof PermanentJobError) throw error
       throw new PermanentJobError('RESULT_PROJECTION_PAYLOAD_INVALID')
     }
     // Business revision fencing applies even if this method is called without the handler.

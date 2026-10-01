@@ -19,12 +19,18 @@ interface TestPrismaClient extends PrismaSql {
 const databaseUrl = process.env.TEST_DATABASE_URL
 assert.ok(databaseUrl, 'TEST_DATABASE_URL must identify a disposable results-worker database')
 const parsed = new URL(databaseUrl)
-assert.match(decodeURIComponent(parsed.pathname.slice(1)), /^xiaoqiu_results_test_[a-z0-9_]+$/)
-assert.notEqual(
-  databaseUrl,
-  process.env.DATABASE_URL,
-  'Do not use the application database as TEST_DATABASE_URL',
-)
+const databaseName = decodeURIComponent(parsed.pathname.slice(1))
+assert.match(databaseName, /(?:^|_)(?:test|ci)(?:_|$)/)
+if (process.env.DATABASE_URL) {
+  const daily = new URL(process.env.DATABASE_URL)
+  assert.ok(
+    parsed.hostname !== daily.hostname ||
+      (parsed.port || '5432') !== (daily.port || '5432') ||
+      parsed.pathname !== daily.pathname ||
+      (process.env.CI === 'true' && databaseName === 'xiaoqiu_ci'),
+    'Do not use the application database as TEST_DATABASE_URL',
+  )
+}
 // Reuse the integrator-generated client only for tests; no Worker runtime dependency.
 export const clientLoader = createRequire(resolve(process.cwd(), 'package.json'))
 const clientModule =

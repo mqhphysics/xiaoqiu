@@ -29,6 +29,9 @@ export interface ConfirmedRevision {
   homeTeamId?: string | null
   awayTeamId?: string | null
   playedAt?: Date | string
+  resultRules?: unknown
+  roundId?: string | null
+  scheduledStartAt?: Date | string | null
 }
 
 export interface ResultProjectionRepository {
@@ -82,8 +85,17 @@ export function parseConfirmedEvent(job: ClaimedJob): MatchReportConfirmedEvent 
       payload.confirmedReportVersion <= 2147483647,
     'INVALID_RESULT_EVENT_VERSION',
   )
-  rejectUnless(job.aggregateId === payload.matchId, 'RESULT_AGGREGATE_MISMATCH')
-  return payload as unknown as MatchReportConfirmedEvent
+  rejectUnless(
+    job.aggregateId.toLowerCase() === String(payload.matchId).toLowerCase(),
+    'RESULT_AGGREGATE_MISMATCH',
+  )
+  return {
+    matchId: String(payload.matchId).toLowerCase(),
+    tournamentId: String(payload.tournamentId).toLowerCase(),
+    revisionId: String(payload.revisionId).toLowerCase(),
+    ruleVersionId: String(payload.ruleVersionId).toLowerCase(),
+    confirmedReportVersion: payload.confirmedReportVersion,
+  }
 }
 
 export function createMatchReportHandler(

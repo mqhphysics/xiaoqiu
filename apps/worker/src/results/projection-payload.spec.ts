@@ -26,6 +26,17 @@ const revision: ConfirmedRevision = {
     notes: 'FICTIONAL_PRIVATE_NOTES',
     createdByUserId: 'PRIVATE_AUTHOR',
     events: [],
+    _matchContext: {
+      organizationId: 'FICTIONAL_TEST_ORG',
+      matchId: 'match',
+      tournamentId: 'cup',
+      stageId: 'stage',
+      groupId: null,
+      roundId: null,
+      homeTeamId: 'a',
+      awayTeamId: 'b',
+      scheduledStartAt: null,
+    },
   },
 }
 
@@ -46,6 +57,7 @@ test('abandoned reports project as VOID and retain no invented forfeit decision'
   const payload = buildResultProjectionPayload({
     ...revision,
     fields: {
+      ...(revision.fields as object),
       outcome: 'ABANDONED',
       homeScore: '',
       awayScore: '',
@@ -75,4 +87,45 @@ test('malformed confirmed data fails before writing a projection', () => {
     assert.throws(() => buildResultProjectionPayload({ ...revision, fields }))
   }
   assert.throws(() => buildResultProjectionPayload({ ...revision, playedAt: 'broken' }))
+})
+
+test('forfeit projection uses the confirmation-bound award and never invents a default policy', () => {
+  const forfeit = {
+    ...revision,
+    fields: {
+      ...(revision.fields as object),
+      outcome: 'HOME_FORFEIT',
+      homeScore: '0',
+      awayScore: '3',
+      homePenaltyScore: '',
+      awayPenaltyScore: '',
+    },
+  }
+  assert.throws(() => buildResultProjectionPayload(forfeit), /FORFEIT_RULES_REQUIRED/)
+  const payload = buildResultProjectionPayload({
+    ...forfeit,
+    resultRules: { forfeit: { winnerGoals: 3, loserGoals: 0, both: null } },
+  })
+  assert.equal(payload.homeScore, 0)
+  assert.equal(payload.awayScore, 3)
+  assert.throws(
+    () =>
+      buildResultProjectionPayload({
+        ...forfeit,
+        fields: { ...forfeit.fields, homeScore: '9' },
+        resultRules: { forfeit: { winnerGoals: 3, loserGoals: 0, both: null } },
+      }),
+    /FORFEIT_SCORE_MISMATCH/,
+  )
+})
+
+test('a changed match context refuses the old frozen report instead of repointing its result', () => {
+  assert.throws(
+    () => buildResultProjectionPayload({ ...revision, groupId: 'changed-group' }),
+    /CONFIRMED_MATCH_CONTEXT_CHANGED/,
+  )
+  assert.throws(
+    () => buildResultProjectionPayload({ ...revision, scheduledStartAt: new Date() }),
+    /CONFIRMED_MATCH_CONTEXT_CHANGED/,
+  )
 })
