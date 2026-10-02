@@ -78,6 +78,9 @@ const config: UserConfigExport = {
     staticDirectory: 'static',
     devServer: {
       hot: false,
+      host: '127.0.0.1',
+      port: 3000,
+      open: false,
     },
     htmlPluginOption: {
       favicon: path.resolve(__dirname, '../src/assets/favicon.svg'),

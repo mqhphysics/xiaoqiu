@@ -6,6 +6,7 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      '**/dist-weapp/**',
       '**/node_modules/**',
       '**/.worktrees/**',
       '**/.taro/**',
@@ -13,6 +14,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/*.tsbuildinfo',
       'private-data/**',
+      'tools/wechat-devtools/official-*.js',
       'packages/api-client/src/generated/**',
     ],
   },
