@@ -2,6 +2,7 @@ import { Button, Text, View } from '@tarojs/components'
 
 import { FullscreenSetting } from '../fullscreen-control'
 import { useOverlayFocus } from '../overlay-focus'
+import { IconButton } from '../icon-button'
 
 import './index.scss'
 
@@ -18,9 +19,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <Text className="settings-dialog__title">设置</Text>
             <Text className="settings-dialog__intro">调整你的晓球浏览体验</Text>
           </View>
-          <Button aria-label="关闭设置" className="settings-dialog__close" onClick={onClose}>
+          <IconButton icon="close" aria-label="关闭设置" className="settings-dialog__close" onClick={onClose}>
             ×
-          </Button>
+          </IconButton>
         </View>
 
         <View className="settings-dialog__body">
