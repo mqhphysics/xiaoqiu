@@ -807,9 +807,9 @@ test(
         const auditBefore = await prisma.auditLog.count({ where: { targetId: target.id } })
         const functionName = `report_notification_fault_${suffix}`
         assert.match(functionName, /^report_notification_fault_[a-f0-9]{8}$/)
-        // SQL fault injection is confined to the URL-validated dedicated test database.
+        // Limit fault injection to this match in the URL-validated dedicated test database.
         await prisma.$executeRawUnsafe(
-          `CREATE FUNCTION ${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.topic = 'match.report.notification' AND NEW.payload->>'action' = 'CONFIRM' THEN RAISE EXCEPTION 'FICTIONAL_TEST notification outbox failure'; END IF; RETURN NEW; END; $$`,
+          `CREATE FUNCTION ${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.payload->>'matchId' = '${target.id}' AND NEW.topic = 'match.report.notification' AND NEW.payload->>'action' = 'CONFIRM' THEN RAISE EXCEPTION 'FICTIONAL_TEST notification outbox failure'; END IF; RETURN NEW; END; $$`,
         )
         await prisma.$executeRawUnsafe(
           `CREATE TRIGGER ${functionName} BEFORE INSERT ON outbox_jobs FOR EACH ROW EXECUTE FUNCTION ${functionName}()`,

@@ -1,3 +1,4 @@
+/* global Buffer, console, process */
 import fs from 'node:fs'
 const archive = 'D:/software/WeChatDevTools/resources/app.asar'
 const fd = fs.openSync(archive, 'r')
@@ -14,11 +15,14 @@ try {
     if (!entry) throw new Error(`Archive path is unavailable: ${requestedPath}`)
     console.log(`FILE: ${requestedPath}`)
     if (entry.files) console.log(Object.keys(entry.files).join('\n'))
-    else if (entry.unpacked) console.log(fs.readFileSync(`${archive}.unpacked/${requestedPath}`, 'utf8'))
+    else if (entry.unpacked)
+      console.log(fs.readFileSync(`${archive}.unpacked/${requestedPath}`, 'utf8'))
     else {
       const content = Buffer.alloc(entry.size)
       fs.readSync(fd, content, 0, content.length, payloadOffset + Number(entry.offset))
       console.log(content.toString())
     }
   }
-} finally { fs.closeSync(fd) }
+} finally {
+  fs.closeSync(fd)
+}
