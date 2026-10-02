@@ -1,6 +1,6 @@
 {
   "scope": "Desktop H5 login page only; min-width: 1024px, hover: hover, pointer: fine",
-  "implementation": "Static intrinsic-size SVG images through native CSS cursor, with semantic keyword fallbacks. Cross-boundary animation belongs to stage 4.",
+  "implementation": "Intrinsic-size native CSS cursors. The default PNG is a 32px browser rasterization of the faithful self-contained SVG; simple vector cursors remain SVG. Cross-boundary animation belongs to stage 4.",
   "sourceReferenceDirectory": "参考图片/04-登录页定稿与光标-2026-10-01",
   "assets": [
     {
@@ -14,7 +14,7 @@
       "source": "Original minimal SVG: fine outer contour, central pentagon, five seams, no attached decoration"
     },
     {
-      "file": "default-32.svg",
+      "file": "default-32.png",
       "width": 32,
       "height": 32,
       "hotspotX": 2,
@@ -25,7 +25,8 @@
       "sourceSha256": "a3edcb574fbd62a02f3b82eee88fea8de73c9249ad71bd6707bc049ca745802b",
       "viewBox": [399, 270, 497, 732],
       "preserveAspectRatio": "xMinYMin meet",
-      "note": "ViewBox clips the huge transparent outside padding while retaining the approved green outline and coral corner. Intrinsic SVG size, rather than image CSS sizing, makes the native cursor 32px."
+      "note": "Browser-decoded and rendered to a 32px transparent PNG to keep the runtime cursor compact; original supplied artwork and SVG crop retained. Natural size and hotspot are unchanged.",
+      "sourceSvg": "default-32.svg"
     },
     {
       "file": "text-32.svg",

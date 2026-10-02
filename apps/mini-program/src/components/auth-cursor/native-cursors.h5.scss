@@ -2,24 +2,35 @@
 // Limit this first implementation to desktop H5 with a precise hover device.
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .art-login {
-    cursor: url('../../assets/login-art/cursors/default-32.svg') 2 2, default;
+    cursor:
+      url('../../assets/login-art/cursors/default-32.png') 2 2,
+      default;
   }
 
+  .art-login .art-login__left,
   .art-login .art-login__scene {
-    cursor: url('../../assets/login-art/cursors/football-28.svg') 14 14, default;
+    cursor:
+      url('../../assets/login-art/cursors/football-28.svg') 14 14,
+      default;
   }
 
   .art-login .art-login__panel {
-    cursor: url('../../assets/login-art/cursors/default-32.svg') 2 2, default;
+    cursor:
+      url('../../assets/login-art/cursors/default-32.png') 2 2,
+      default;
   }
 
   // Class selectors survive the Taro H5 stylesheet element-name transform.
   .art-login .art-login__control:not(:disabled) {
-    cursor: url('../../assets/login-art/cursors/hand-32.svg') 12 4, pointer;
+    cursor:
+      url('../../assets/login-art/cursors/hand-32.svg') 12 4,
+      pointer;
   }
 
   .art-login .art-login__input {
-    cursor: url('../../assets/login-art/cursors/text-32.svg') 16 16, text;
+    cursor:
+      url('../../assets/login-art/cursors/text-32.svg') 16 16,
+      text;
   }
 
   .art-login .art-login__control:disabled {

@@ -1,0 +1,559 @@
+import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { useEffect, useState, type HTMLInputTypeAttribute } from 'react'
+
+import sceneSource from '../../assets/login-art/stadium-particle-plate.png'
+import { AuthScene } from '../../components/auth-scene/index.h5'
+import { productRepository } from '../../features/product/product.repository'
+import { enterGuestMode, readSession } from '../../features/product/session'
+import type { RegisterInput } from '../../features/product/product.types'
+// An explicit extension bypasses Taro's multi-platform resolver. Compact H5
+// keeps the existing page; the WeChat entry itself is not modified.
+import ExistingLoginPage from './index.tsx'
+
+import '../../components/auth-cursor/native-cursors.h5.scss'
+import './index.h5.scss'
+
+const emptyRegistration: RegisterInput & { confirmPassword: string } = {
+  username: '',
+  displayName: '',
+  realName: '',
+  studentId: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+}
+
+export default function H5LoginPage() {
+  const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)')
+    const update = () => setDesktop(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return desktop ? <ArtLoginPage /> : <ExistingLoginPage />
+}
+
+function ArtLoginPage() {
+  const [screen, setScreen] = useState<'login' | 'register'>('login')
+  const [method, setMethod] = useState<'password' | 'email'>('password')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [registration, setRegistration] = useState(emptyRegistration)
+  const [submitting, setSubmitting] = useState(false)
+  const [recovery, setRecovery] = useState(false)
+  const [recoveryName, setRecoveryName] = useState('')
+  const [recoveryStudentId, setRecoveryStudentId] = useState('')
+  const [recoveryPassword, setRecoveryPassword] = useState('')
+
+  useEffect(() => {
+    const preview = getCurrentInstance().router?.params.preview === 'art'
+    if (readSession() && !preview) void Taro.reLaunch({ url: '/pages/index/index' })
+  }, [])
+
+  const login = async () => {
+    if (!identifier.trim() || password.length < 8 || submitting) return
+    setSubmitting(true)
+    try {
+      await productRepository.login(identifier, password)
+      await Taro.reLaunch({ url: '/pages/index/index' })
+    } catch (error) {
+      await showError(error, '登录失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  const register = async () => {
+    if (submitting) return
+    if (registration.password !== registration.confirmPassword) {
+      await Taro.showToast({ title: '两次输入的密码不一致', icon: 'none' })
+      return
+    }
+    if (!canRegister(registration)) return
+    setSubmitting(true)
+    try {
+      const { confirmPassword: _confirmPassword, ...input } = registration
+      await productRepository.register(input)
+      await Taro.reLaunch({ url: '/pages/index/index' })
+    } catch (error) {
+      await showError(error, '注册失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  const resetPassword = async () => {
+    if (
+      !recoveryName.trim() ||
+      !recoveryStudentId.trim() ||
+      recoveryPassword.length < 8 ||
+      submitting
+    )
+      return
+    setSubmitting(true)
+    try {
+      await productRepository.resetPasswordByIdentity(
+        recoveryName,
+        recoveryStudentId,
+        recoveryPassword,
+      )
+      setIdentifier(recoveryStudentId.trim())
+      setPassword(recoveryPassword)
+      setRecovery(false)
+      await Taro.showToast({ title: '密码已重置', icon: 'success' })
+    } catch (error) {
+      await showError(error, '重置失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  const guest = async () => {
+    enterGuestMode()
+    await Taro.reLaunch({ url: '/pages/index/index' })
+  }
+  const emailPlaceholder = () =>
+    Taro.showToast({ title: '邮箱验证码服务正在接入', icon: 'none', duration: 2200 })
+  const updateRegistration = (key: keyof typeof emptyRegistration, value: string) =>
+    setRegistration((previous) => ({ ...previous, [key]: value }))
+
+  return (
+    <main className="art-login">
+      <section className="art-login__left" aria-label="晓球校园足球">
+        <div className="art-login__brand">
+          <svg className="art-login__brand-mark" viewBox="0 0 72 52" fill="none" aria-hidden="true">
+            <path
+              d="M7 7 45 45M7 45 30 18"
+              stroke="currentColor"
+              strokeWidth="5"
+              strokeLinecap="square"
+            />
+            <circle cx="45" cy="24" r="18" stroke="currentColor" strokeWidth="5" />
+            <path d="m48 33 13 13" stroke="currentColor" strokeWidth="5" />
+          </svg>
+          <div>
+            <div className="art-login__brand-name">晓球</div>
+            <div className="art-login__brand-caption">记录校园足球的每一刻</div>
+          </div>
+        </div>
+        <AuthScene source={sceneSource} />
+        <div className="art-login__handwriting art-login__handwriting--top" aria-hidden="true">
+          Football
+          <br />
+          Connects
+          <br />
+          Us
+        </div>
+        <div className="art-login__story">
+          <h1 className="art-login__story-title">每一场校园比赛，都值得被认真记录</h1>
+          <p className="art-login__story-copy">
+            赛程、数据、球队与同学们的现场声音，在这里汇成完整赛季。
+          </p>
+          <div className="art-login__signature">
+            体育连接彼此<span>·</span>FOOTBALL CONNECTS US
+          </div>
+        </div>
+        <div className="art-login__handwriting art-login__handwriting--bottom" aria-hidden="true">
+          在绿茵场上
+          <br />
+          遇见更好的我们
+        </div>
+      </section>
+
+      <section className="art-login__panel" aria-label="账号入口">
+        <div className="art-login__values" aria-hidden="true">
+          热爱<span>·</span>友谊<span>·</span>成长
+        </div>
+        <div className="art-login__form-content">
+          <div className="art-login__tabs" role="group" aria-label="账号操作">
+            <button
+              type="button"
+              aria-pressed={screen === 'login'}
+              className={`art-login__control art-login__tab ${screen === 'login' ? 'is-active' : ''}`}
+              onClick={() => setScreen('login')}
+            >
+              登录
+            </button>
+            <button
+              type="button"
+              aria-pressed={screen === 'register'}
+              className={`art-login__control art-login__tab ${screen === 'register' ? 'is-active' : ''}`}
+              onClick={() => setScreen('register')}
+            >
+              注册
+            </button>
+          </div>
+          <div className="art-login__form-heading">
+            <h2 className="art-login__form-title">
+              {screen === 'login' ? '欢迎回来' : '创建实名账号'}
+            </h2>
+            <p className="art-login__form-subtitle">
+              {screen === 'login'
+                ? '登录后继续关注你的球队与比赛。'
+                : '公开页面显示昵称，实名与学号仅供本人和授权管理员使用。'}
+            </p>
+          </div>
+
+          {screen === 'login' ? (
+            <>
+              <div className="art-login__methods" role="group" aria-label="登录方式">
+                <button
+                  type="button"
+                  aria-pressed={method === 'password'}
+                  className={`art-login__control art-login__method ${method === 'password' ? 'is-active' : ''}`}
+                  onClick={() => setMethod('password')}
+                >
+                  账号密码
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={method === 'email'}
+                  className={`art-login__control art-login__method ${method === 'email' ? 'is-active' : ''}`}
+                  onClick={() => setMethod('email')}
+                >
+                  邮箱验证码
+                </button>
+              </div>
+              {method === 'password' ? (
+                <form
+                  className="art-login__form"
+                  noValidate
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void login()
+                  }}
+                >
+                  <Field
+                    id="art-identifier"
+                    label="用户名 / 昵称 / 姓名 / 学号"
+                    value={identifier}
+                    onChange={setIdentifier}
+                    placeholder="请输入账号信息"
+                    autoComplete="username"
+                    icon="user"
+                  />
+                  <Field
+                    id="art-password"
+                    label="密码"
+                    value={password}
+                    onChange={setPassword}
+                    placeholder="请输入密码"
+                    autoComplete="current-password"
+                    password
+                  />
+                  <button
+                    type="button"
+                    className="art-login__control art-login__forgot"
+                    onClick={() => setRecovery((value) => !value)}
+                  >
+                    忘记密码
+                  </button>
+                  <button
+                    type="submit"
+                    className="art-login__control art-login__primary"
+                    disabled={!identifier.trim() || password.length < 8 || submitting}
+                    aria-busy={submitting}
+                  >
+                    {submitting ? '登录中…' : '登录'}
+                  </button>
+                </form>
+              ) : (
+                <form
+                  className="art-login__form"
+                  noValidate
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void emailPlaceholder()
+                  }}
+                >
+                  <Field
+                    id="art-email"
+                    label="绑定邮箱"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder="name@example.com"
+                    autoComplete="email"
+                    icon="user"
+                  />
+                  <div className="art-login__code-row">
+                    <Field
+                      id="art-code"
+                      label="验证码"
+                      value={code}
+                      onChange={setCode}
+                      placeholder="6 位验证码"
+                      autoComplete="one-time-code"
+                    />
+                    <button
+                      type="button"
+                      className="art-login__control art-login__code-button"
+                      onClick={() => void emailPlaceholder()}
+                    >
+                      获取验证码
+                    </button>
+                  </div>
+                  <button
+                    type="submit"
+                    className="art-login__control art-login__primary"
+                    disabled={!email.trim() || code.length !== 6}
+                  >
+                    邮箱登录
+                  </button>
+                </form>
+              )}
+            </>
+          ) : (
+            <form
+              className="art-login__form"
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault()
+                void register()
+              }}
+            >
+              <div className="art-login__register-grid">
+                <Field
+                  id="art-register-username"
+                  label="用户名"
+                  value={registration.username}
+                  onChange={(value) => updateRegistration('username', value)}
+                  autoComplete="username"
+                />
+                <Field
+                  id="art-register-display"
+                  label="公开昵称"
+                  value={registration.displayName}
+                  onChange={(value) => updateRegistration('displayName', value)}
+                />
+                <Field
+                  id="art-register-name"
+                  label="真实姓名"
+                  value={registration.realName}
+                  onChange={(value) => updateRegistration('realName', value)}
+                  autoComplete="name"
+                />
+                <Field
+                  id="art-register-student"
+                  label="学号（10位数字）"
+                  value={registration.studentId}
+                  onChange={(value) => updateRegistration('studentId', value)}
+                />
+                <Field
+                  id="art-register-email"
+                  className="art-login__wide"
+                  label="绑定邮箱"
+                  value={registration.email}
+                  onChange={(value) => updateRegistration('email', value)}
+                  autoComplete="email"
+                />
+                <Field
+                  id="art-register-password"
+                  label="密码"
+                  value={registration.password}
+                  onChange={(value) => updateRegistration('password', value)}
+                  autoComplete="new-password"
+                  password
+                />
+                <Field
+                  id="art-register-confirm"
+                  label="确认密码"
+                  value={registration.confirmPassword}
+                  onChange={(value) => updateRegistration('confirmPassword', value)}
+                  autoComplete="new-password"
+                  password
+                />
+              </div>
+              <button
+                type="submit"
+                className="art-login__control art-login__primary"
+                disabled={!canRegister(registration) || submitting}
+                aria-busy={submitting}
+              >
+                {submitting ? '注册中…' : '注册并进入'}
+              </button>
+            </form>
+          )}
+
+          <button
+            type="button"
+            className="art-login__control art-login__guest"
+            onClick={() => void guest()}
+          >
+            以游客身份浏览
+          </button>
+          <p className="art-login__guest-hint">无需注册，先看赛程、比分和球队</p>
+
+          {recovery && screen === 'login' && method === 'password' && (
+            <form
+              className="art-login__recovery"
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault()
+                void resetPassword()
+              }}
+            >
+              <div className="art-login__recovery-head">
+                <h3>找回密码</h3>
+                <button
+                  type="button"
+                  className="art-login__control art-login__text-button"
+                  onClick={() => setRecovery(false)}
+                >
+                  关闭
+                </button>
+              </div>
+              <Field
+                id="art-recovery-name"
+                label="真实姓名"
+                value={recoveryName}
+                onChange={setRecoveryName}
+              />
+              <Field
+                id="art-recovery-student"
+                label="学号"
+                value={recoveryStudentId}
+                onChange={setRecoveryStudentId}
+              />
+              <Field
+                id="art-recovery-password"
+                label="新密码"
+                value={recoveryPassword}
+                onChange={setRecoveryPassword}
+                password
+              />
+              <button
+                type="submit"
+                className="art-login__control art-login__primary"
+                disabled={
+                  !recoveryName.trim() ||
+                  !recoveryStudentId.trim() ||
+                  recoveryPassword.length < 8 ||
+                  submitting
+                }
+              >
+                重置密码
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function Field({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  password = false,
+  icon,
+  className = '',
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  autoComplete?: string
+  password?: boolean
+  icon?: 'user'
+  className?: string
+}) {
+  const [visible, setVisible] = useState(false)
+  const type: HTMLInputTypeAttribute = password && !visible ? 'password' : 'text'
+  return (
+    <div className={`art-login__field ${className}`}>
+      <label className="art-login__label" htmlFor={id}>
+        {label}
+      </label>
+      <div
+        className={`art-login__input-wrap ${icon || password ? 'has-icon' : ''} ${password ? 'has-reveal' : ''}`}
+      >
+        {(icon || password) && (
+          <span className="art-login__field-icon">
+            <Icon kind={password ? 'lock' : 'user'} />
+          </span>
+        )}
+        <input
+          id={id}
+          className="art-login__input"
+          type={type}
+          value={value}
+          maxLength={140}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        {password && (
+          <button
+            type="button"
+            className="art-login__control art-login__reveal"
+            aria-label={visible ? '隐藏密码' : '显示密码'}
+            aria-pressed={visible}
+            onClick={() => setVisible((previous) => !previous)}
+          >
+            <Icon kind={visible ? 'eye' : 'eye-off'} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Icon({ kind }: { kind: 'user' | 'lock' | 'eye' | 'eye-off' }) {
+  return (
+    <svg
+      className="art-login__icon-svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {kind === 'user' && (
+        <>
+          <circle cx="12" cy="7" r="4" />
+          <path d="M4 21v-2a8 8 0 0 1 16 0v2Z" />
+        </>
+      )}
+      {kind === 'lock' && (
+        <>
+          <rect x="5" y="10" width="14" height="11" rx="1.5" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v3" />
+          <circle cx="12" cy="15" r=".7" />
+        </>
+      )}
+      {(kind === 'eye' || kind === 'eye-off') && (
+        <>
+          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+          <circle cx="12" cy="12" r="3" />
+          {kind === 'eye-off' && <path d="m4 20 16-16" />}
+        </>
+      )}
+    </svg>
+  )
+}
+
+function canRegister(input: RegisterInput & { confirmPassword: string }) {
+  return Boolean(
+    input.username.trim().length >= 3 &&
+    input.displayName.trim().length >= 2 &&
+    input.realName.trim().length >= 2 &&
+    /^\d{10}$/.test(input.studentId.trim()) &&
+    input.email.includes('@') &&
+    input.password.length >= 8 &&
+    input.confirmPassword.length >= 8,
+  )
+}
+async function showError(error: unknown, fallback: string) {
+  await Taro.showToast({
+    title: error instanceof Error ? error.message : fallback,
+    icon: 'none',
+    duration: 2200,
+  })
+}
