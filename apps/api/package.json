@@ -5,7 +5,7 @@
   "scripts": {
     "contracts:build": "npm --prefix ../../packages/contracts run build",
     "predev": "npm run contracts:build && npm run prisma:generate",
-    "dev": "tsx watch src/main.ts",
+    "dev": "node scripts/dev.mjs",
     "prebuild": "npm run contracts:build && npm run prisma:generate",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-prisma-engine.mjs dist/generated/prisma",
     "start": "node dist/main.js",

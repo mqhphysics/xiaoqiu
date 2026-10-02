@@ -3,7 +3,8 @@ param(
   [switch]$PrepareOnly,
   [switch]$SkipSeed,
   [switch]$Seed,
-  [switch]$NoBrowser
+  [switch]$NoBrowser,
+  [string]$TournamentId
 )
 
 $ErrorActionPreference = 'Stop'
@@ -136,6 +137,20 @@ if ($Seed) {
   Write-Host '[3/4] Keeping existing data. Use -Seed only to initialize or restore demo data.'
 }
 
+# This launcher is explicitly for the local demo. Prefer its existing fixture,
+# rather than an older incomplete real-tournament row selected by creation time.
+if (-not $TournamentId) {
+  $taskDemoSelection = & docker compose --env-file $composeEnv -f $composeFile exec -T postgres psql -U xiaoqiu -d xiaoqiu -At -c "SELECT id FROM tournaments WHERE organization_id='00000000-0000-4000-8000-000000000001' AND tournament_code='DEMO-GREEN-CUP-2026' AND status='PUBLISHED' LIMIT 1"
+  if ($LASTEXITCODE -ne 0) { throw 'Could not select the existing demo tournament.' }
+  $TournamentId = ([string]$taskDemoSelection).Trim()
+}
+if (-not $TournamentId) { throw 'Demo tournament is not initialized. Run with -Seed once, or specify -TournamentId.' }
+if ($TournamentId) {
+  $taskParsedTournament = [Guid]::Empty
+  if (-not [Guid]::TryParse($TournamentId, [ref]$taskParsedTournament)) { throw 'TournamentId must be a UUID.' }
+  $env:DEFAULT_TOURNAMENT_ID = $TournamentId
+}
+
 if ($PrepareOnly) {
   Write-Host 'Local database preparation completed.' -ForegroundColor Green
   exit 0
@@ -147,7 +162,7 @@ $h5Url = 'http://127.0.0.1:10087/'
 
 if (-not (Test-ApiReady -Uri $apiHealthUrl)) {
   Assert-PortAvailable -Port 3001
-  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; npm.cmd --prefix apps/api run dev"
+  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; `$env:DEFAULT_TOURNAMENT_ID='$TournamentId'; npm.cmd --prefix apps/api run dev"
   $apiReady = $false
   foreach ($attempt in 1..60) {
     Start-Sleep -Seconds 1
