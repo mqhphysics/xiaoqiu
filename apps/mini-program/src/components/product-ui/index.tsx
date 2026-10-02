@@ -16,15 +16,18 @@ import { demoCrestUrl } from '../../features/product/demo-media'
 import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
 import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
+import { openDesktopTeam, openTeamCrest } from '../../features/product/team-navigation'
 
 import './index.scss'
 
 export function TeamCrest({
   team,
   size = 'medium',
+  interactive = true,
 }: {
   team: TeamSummary | null
   size?: 'small' | 'medium' | 'large'
+  interactive?: boolean
 }) {
   const label = team ? team.shortName.slice(0, 2) : '待定'
   const crestPath = team?.crestUrl?.includes('/api/media/demo/crests/')
@@ -35,9 +38,12 @@ export function TeamCrest({
     return (
       <Image
         aria-label={`${team?.name ?? '球队'}队徽`}
-        className={`team-crest team-crest--${size}`}
+        className={`team-crest team-crest--${size} ${interactive ? 'team-crest--interactive' : ''}`}
         mode="aspectFit"
         src={source}
+        onClick={(event) => {
+          if (interactive && team && openTeamCrest(event, team.id)) event.stopPropagation()
+        }}
       />
     )
   }
@@ -46,10 +52,24 @@ export function TeamCrest({
       aria-label={team ? `${team.name}队徽待上传` : '球队待定'}
       className={`team-crest team-crest--${size} team-crest--fallback`}
       style={{ backgroundColor: team?.primaryColor ?? '#8a948c' }}
+      onClick={(event) => {
+        if (interactive && team && openTeamCrest(event, team.id)) event.stopPropagation()
+      }}
     >
       {label}
     </Text>
   )
+}
+
+export function TeamName({ team, tournamentId, className = '', fallback = '球队待定' }: {
+  team: TeamSummary | null
+  tournamentId?: string
+  className?: string
+  fallback?: string
+}) {
+  return <Text className={`${className} ${team ? 'team-name-link' : ''}`} onClick={(event) => {
+    if (team && openDesktopTeam(team.id, tournamentId)) event.stopPropagation()
+  }}>{team?.name ?? fallback}</Text>
 }
 
 export function UserAvatar({
@@ -102,16 +122,12 @@ export function MatchCard({ match, onClick }: { match: MatchSummary; onClick?: (
       </View>
       <View className="product-match-card__team">
         <TeamCrest team={match.homeTeam} size="small" />
-        <Text className="product-match-card__name">
-          {match.homeTeam?.name ?? match.homePlaceholder ?? '主队待定'}
-        </Text>
+        <TeamName className="product-match-card__name" team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '主队待定'} />
         <Text className="product-match-card__score">{hasScore ? match.homeScore : '-'}</Text>
       </View>
       <View className="product-match-card__team">
         <TeamCrest team={match.awayTeam} size="small" />
-        <Text className="product-match-card__name">
-          {match.awayTeam?.name ?? match.awayPlaceholder ?? '客队待定'}
-        </Text>
+        <TeamName className="product-match-card__name" team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '客队待定'} />
         <Text className="product-match-card__score">{hasScore ? match.awayScore : '-'}</Text>
       </View>
       <Text className="product-match-card__venue">{match.venue?.name ?? '场地待定'}</Text>

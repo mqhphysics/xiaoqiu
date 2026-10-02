@@ -9,6 +9,10 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+// Only the foremost overlay handles keyboard input; nested details retain focus.
+const overlayStack: symbol[] = []
+let initialOverflow = ''
+
 export function useOverlayFocus(
   enabled: boolean,
   panelSelector: string,
@@ -20,13 +24,16 @@ export function useOverlayFocus(
     if (!enabled) return
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const previousOverflow = document.body.style.overflow
+    const entry = Symbol(panelSelector)
+    if (overlayStack.length === 0) initialOverflow = document.body.style.overflow
+    overlayStack.push(entry)
     const panel = document.querySelector<HTMLElement>(panelSelector)
     const focusFirst = () => {
       panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
     const timer = window.setTimeout(focusFirst, 0)
     const onKeyDown = (event: KeyboardEvent) => {
+      if (overlayStack.at(-1) !== entry) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onCloseRef.current()
@@ -56,9 +63,12 @@ export function useOverlayFocus(
     document.addEventListener('keydown', onKeyDown)
     return () => {
       window.clearTimeout(timer)
-      document.body.style.overflow = previousOverflow
+      const wasTop = overlayStack.at(-1) === entry
+      const index = overlayStack.indexOf(entry)
+      if (index >= 0) overlayStack.splice(index, 1)
+      if (overlayStack.length === 0) document.body.style.overflow = initialOverflow
       document.removeEventListener('keydown', onKeyDown)
-      previousFocus?.focus()
+      if (wasTop && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }
   }, [enabled, panelSelector])
 }

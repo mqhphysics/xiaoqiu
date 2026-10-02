@@ -10,6 +10,7 @@ import { HeroCarousel } from '../../components/hero-carousel'
 import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
+import { openTeam } from '../../features/product/team-navigation'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
@@ -18,6 +19,7 @@ import {
   PostCard,
   ProductSection,
   TeamCrest,
+  TeamName,
   UserAvatar,
 } from '../../components/product-ui'
 import { formatDate, formatTime } from '../../features/product/product.format'
@@ -728,18 +730,14 @@ function CompactMatchCard({ match, featured }: { match: MatchSummary; featured: 
       <View className="compact-match__line">
         <View className="compact-match__side">
           <TeamCrest team={match.homeTeam} size="medium" />
-          <Text className="compact-match__team">
-            {match.homeTeam?.name ?? match.homePlaceholder ?? '主队待定'}
-          </Text>
+          <TeamName className="compact-match__team" team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '主队待定'} />
         </View>
         <Text className="compact-match__score">
           {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}
         </Text>
         <View className="compact-match__side compact-match__side--away">
           <TeamCrest team={match.awayTeam} size="medium" />
-          <Text className="compact-match__team">
-            {match.awayTeam?.name ?? match.awayPlaceholder ?? '客队待定'}
-          </Text>
+          <TeamName className="compact-match__team" team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '客队待定'} />
         </View>
       </View>
       <Text className="compact-match__stage">{match.venue?.name ?? '场地待定'}</Text>
@@ -799,7 +797,7 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
           />
           <View className="search-result-row__copy">
             <Text>{player.displayName}</Text>
-            <Text>{player.team?.name ?? '暂无球队'} · 球员</Text>
+            <Text><TeamName team={player.team} tournamentId={tournamentId} fallback="暂无球队" /> · 球员</Text>
           </View>
         </View>
       ))}
@@ -811,7 +809,7 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
         >
           <TeamCrest team={team} size="small" />
           <View className="search-result-row__copy">
-            <Text>{team.name}</Text>
+            <TeamName team={team} tournamentId={tournamentId} />
             <Text>{team.collegeName} · 球队</Text>
           </View>
         </View>
@@ -821,7 +819,7 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
           <Text className="search-result-row__tag">赛</Text>
           <View className="search-result-row__copy">
             <Text>
-              {match.homeTeam?.name ?? '待定'} vs {match.awayTeam?.name ?? '待定'}
+              <TeamName team={match.homeTeam} tournamentId={tournamentId} fallback="待定" /> vs <TeamName team={match.awayTeam} tournamentId={tournamentId} fallback="待定" />
             </Text>
             <Text>
               {match.title} · {formatDate(match.scheduledStartAt)}
@@ -855,9 +853,7 @@ async function goToSchedule(tournamentId: string) {
 }
 
 async function goToTeam(teamId: string, tournamentId: string) {
-  await Taro.navigateTo({
-    url: `/pages/readonly-team-detail/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-  })
+  await openTeam(teamId, tournamentId)
 }
 
 async function goToPlayer(playerId: string, tournamentId: string) {

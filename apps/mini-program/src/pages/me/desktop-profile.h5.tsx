@@ -1,11 +1,12 @@
 import Taro from '@tarojs/taro'
+import { openTeam as openTeamDetail } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AvatarCropper } from '../../components/avatar-cropper'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
-import { TeamCrest, UserAvatar } from '../../components/product-ui'
+import { TeamCrest, TeamName, UserAvatar } from '../../components/product-ui'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
 import { ReportModal } from '../../components/report-modal'
@@ -280,6 +281,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   }
   const openTeam = (teamId: string, manage = false) => {
     setModal(null)
+    if (!manage) { void openTeamDetail(teamId, home.tournament.id).catch(toastError); return }
     const page = manage ? 'my-team' : 'readonly-team-detail'
     void Taro.navigateTo({
       url: `/pages/${page}/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(home.tournament.id)}`,
@@ -1371,12 +1373,12 @@ function ProfileMatch({
       >
         <span>
           <TeamCrest team={match.homeTeam} size="small" />
-          <strong>{match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}</strong>
+          <strong><TeamName team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '待定'} /></strong>
         </span>
         <b>{hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}</b>
         <span>
           <TeamCrest team={match.awayTeam} size="small" />
-          <strong>{match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}</strong>
+          <strong><TeamName team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '待定'} /></strong>
         </span>
       </button>
       <div className="profile-match__footer">

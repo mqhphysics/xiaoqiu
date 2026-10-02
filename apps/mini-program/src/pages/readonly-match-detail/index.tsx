@@ -1,5 +1,6 @@
 import { Button, Text, Textarea, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { openTeam } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -478,13 +479,7 @@ function TeamSide({
       className={`experience-scoreboard__team ${team ? 'experience-scoreboard__team--linked' : ''}`}
       onClick={() =>
         team &&
-        void Taro.navigateTo({
-          url:
-            '/pages/readonly-team-detail/index?teamId=' +
-            encodeURIComponent(team.id) +
-            '&tournamentId=' +
-            encodeURIComponent(tournamentId),
-        })
+        void openTeam(team.id, tournamentId)
       }
     >
       <TeamCrest team={team} size="large" />

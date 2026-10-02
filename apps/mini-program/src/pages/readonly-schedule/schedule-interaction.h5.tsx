@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { openTeamFromUrl } from '../../features/product/team-navigation'
 import {
   createContext,
   useCallback,
@@ -39,6 +40,7 @@ export function ScheduleInteractionProvider({
   const [navigationError, setNavigationError] = useState('')
   const navigate = useCallback(async (url: string, replace = false) => {
     if (locked.current) return
+    if (openTeamFromUrl(url)) return
     const sourcePage = root.current?.closest<HTMLElement>('.taro_page')
     if (sourcePage)
       returnScroll.current = {

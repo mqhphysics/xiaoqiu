@@ -1,5 +1,6 @@
 import { Image, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { openTeam } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -104,13 +105,7 @@ function PlayerContent({
           <View
             className="player-team-link"
             onClick={() =>
-              void Taro.navigateTo({
-                url:
-                  '/pages/readonly-team-detail/index?teamId=' +
-                  encodeURIComponent(player.team!.id) +
-                  '&tournamentId=' +
-                  encodeURIComponent(tournamentId),
-              })
+              void openTeam(player.team!.id, tournamentId)
             }
           >
             <TeamCrest team={player.team} />

@@ -19,6 +19,7 @@ import {
 } from '../../features/product/product.format'
 import { ProductApiError, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { openTeam } from '../../features/product/team-navigation'
 import { CaptainRosterWorkflow } from '../../features/captain-roster'
 import { captainRequest } from '../../features/captain-roster/roster.repository'
 import { RosterReviewWorkspace } from '../../features/captain-roster/roster-review'
@@ -1277,13 +1278,7 @@ async function goToMatch(matchId: string) {
 }
 
 async function goToTeam(teamId: string, tournamentId: string) {
-  await Taro.navigateTo({
-    url:
-      '/pages/readonly-team-detail/index?teamId=' +
-      encodeURIComponent(teamId) +
-      '&tournamentId=' +
-      encodeURIComponent(tournamentId),
-  })
+  await openTeam(teamId, tournamentId)
 }
 
 async function goToPlayer(playerId: string, tournamentId: string) {

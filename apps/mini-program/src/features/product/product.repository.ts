@@ -42,11 +42,14 @@ export class ProductApiError extends Error {
 }
 
 export const productRepository = {
-  getHome: () => request<HomeResponse>('/public/home'),
+  getHome: (tournamentId?: string) =>
+    request<HomeResponse>(
+      `/public/home${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+    ),
 
-  search: (query: string, category: SearchCategory) =>
+  search: (query: string, category: SearchCategory, tournamentId?: string) =>
     request<SearchResponse>(
-      `/public/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}`,
+      `/public/search?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}${tournamentId ? `&tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
     ),
 
   getCompetitionData: (tournamentId: string) =>
@@ -133,7 +136,10 @@ export const productRepository = {
     }
   },
 
-  getTeamPreferences: () => request<TeamPreferencesResponse>('/me/team-preferences'),
+  getTeamPreferences: (tournamentId?: string) =>
+    request<TeamPreferencesResponse>(
+      `/me/team-preferences${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+    ),
 
   updateTeamPreferences: (primaryTeamId: string, followedTeamIds: string[]) =>
     request<TeamPreferencesResponse>('/me/team-preferences', {

@@ -14,7 +14,7 @@ import {
 import type { PostComposerProps } from './index'
 import '../post-social/index.h5.scss'
 
-export function DesktopPostComposer({ open, onClose, onPublished }: PostComposerProps) {
+export function DesktopPostComposer({ open, onClose, onPublished, teamId }: PostComposerProps) {
   const [body, setBody] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
@@ -36,7 +36,7 @@ export function DesktopPostComposer({ open, onClose, onPublished }: PostComposer
     busy.current = true
     setPublishing(true)
     setError('')
-    const signature = JSON.stringify([body.trim(), images])
+    const signature = JSON.stringify([body.trim(), images, teamId])
     if (pending.current?.signature !== signature)
       pending.current = { signature, id: createClientActionId('post') }
     try {
@@ -44,7 +44,7 @@ export function DesktopPostComposer({ open, onClose, onPublished }: PostComposer
         body.trim(),
         pending.current.id,
         undefined,
-        undefined,
+        teamId,
         undefined,
         images,
       )

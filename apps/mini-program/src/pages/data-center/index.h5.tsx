@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
-import { MatchStatus, TeamCrest } from '../../components/product-ui'
+import { MatchStatus, TeamCrest, TeamName } from '../../components/product-ui'
 import { createBracketLayout } from '../../features/competition/competition.logic'
 import { formatDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { openTeamFromUrl } from '../../features/product/team-navigation'
 import type {
   CompetitionDataResponse,
   PlayerStats,
@@ -663,12 +664,12 @@ function KnockoutCard({ data }: { data: CompetitionData }) {
                   </div>
                   <div className="data-desktop__match-team">
                     <TeamCrest team={match.homeTeam} size="small" />
-                    <span>{match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}</span>
+                    <TeamName team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '待定'} />
                     <strong>{match.homeScore ?? '—'}</strong>
                   </div>
                   <div className="data-desktop__match-team">
                     <TeamCrest team={match.awayTeam} size="small" />
-                    <span>{match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}</span>
+                    <TeamName team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '待定'} />
                     <strong>{match.awayScore ?? '—'}</strong>
                   </div>
                 </a>
@@ -688,7 +689,8 @@ function teamUrl(teamId: string, tournamentId: string) {
 function navigateLink(event: React.MouseEvent<HTMLAnchorElement>) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
-  void Taro.navigateTo({ url: event.currentTarget.getAttribute('href') ?? '' })
+  const url = event.currentTarget.getAttribute('href') ?? ''
+  if (!openTeamFromUrl(url)) void Taro.navigateTo({ url })
 }
 
 function formatDataTimestamp(value: string) {

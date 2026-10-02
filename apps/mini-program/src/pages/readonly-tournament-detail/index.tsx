@@ -1,5 +1,6 @@
 import { Button, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { openTeam } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -197,9 +198,7 @@ function TournamentContent({ tournament }: { tournament: ReadonlyTournamentDetai
                 className="tournament-team surface link-row"
                 key={team.id}
                 onClick={() =>
-                  void Taro.navigateTo({
-                    url: `/pages/readonly-team-detail/index?tournamentId=${encodeURIComponent(tournament.id)}&teamId=${encodeURIComponent(team.id)}`,
-                  })
+                  void openTeam(team.id, tournament.id)
                 }
               >
                 <TeamMark teamCode={team.teamCode} name={team.name} />

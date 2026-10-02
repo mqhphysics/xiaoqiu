@@ -1,5 +1,6 @@
 import { Button, Input, Text, View } from '@tarojs/components'
-import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { getCurrentInstance } from '@tarojs/taro'
+import { openDesktopTeam, openTeam } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -160,7 +161,7 @@ function TeamsContent({
             <View className="team-directory">
               {filteredTeams.map((team) => (
                 <View className="team-card surface" key={team.id}>
-                  <View className="team-card__heading">
+                  <View className="team-card__heading" onClick={() => openDesktopTeam(team.id, tournamentId)}>
                     <TeamMark teamCode={team.teamCode} name={team.name} />
                     <View className="team-card__identity">
                       <Text className="team-card__name">{team.name}</Text>
@@ -182,9 +183,7 @@ function TeamsContent({
                   <Button
                     className="button button--primary team-card__button"
                     onClick={() =>
-                      void Taro.navigateTo({
-                        url: `/pages/readonly-team-detail/index?tournamentId=${encodeURIComponent(tournamentId)}&teamId=${encodeURIComponent(team.id)}`,
-                      })
+                      void openTeam(team.id, tournamentId)
                     }
                   >
                     查看球队
