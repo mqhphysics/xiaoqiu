@@ -23,7 +23,9 @@ import {
   animateNavigationEntrance,
   captureNavigationOrigin,
   clearNavigationOrigin,
+  playTeamFocus,
 } from './navigation-transition'
+import { TeamNavFocus } from './team-nav-focus'
 
 import './index.scss'
 
@@ -131,6 +133,7 @@ export function PublicShell({
     const targetPath = getSectionPath(section, tournamentId)
     if (navigationLock.current) return
     if (currentPath === normalizePath(targetPath)) {
+      if (section === 'team' && isDesktopH5() && shellRef.current) playTeamFocus(shellRef.current)
       onActiveReselect?.()
       return
     }
@@ -213,6 +216,7 @@ export function PublicShell({
                   aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
                 >
+                  <TeamNavFocus />
                   {primaryTeam ? (
                     <TeamCrest team={primaryTeam} size="large" />
                   ) : (

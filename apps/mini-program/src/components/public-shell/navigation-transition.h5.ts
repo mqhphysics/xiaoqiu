@@ -15,6 +15,51 @@ interface NavigationOrigin {
 const sections: NavigationSection[] = ['home', 'schedule', 'team', 'data', 'me']
 const easing = 'cubic-bezier(0.22, 1, 0.36, 1)'
 let origin: NavigationOrigin | null = null
+const focusAnimations = new WeakMap<HTMLElement, Animation[]>()
+
+function stopTeamFocus(shell: HTMLElement): void {
+  focusAnimations.get(shell)?.forEach((animation) => animation.cancel())
+  focusAnimations.delete(shell)
+}
+
+export function playTeamFocus(shell: HTMLElement): void {
+  stopTeamFocus(shell)
+  if (
+    !window.matchMedia('(min-width: 721px)').matches ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    document.activeElement?.matches(':focus-visible')
+  )
+    return
+  const button = shell.querySelector<HTMLElement>('.public-team-nav')
+  if (!button?.classList.contains('public-team-nav--active')) return
+  const travel = parseFloat(getComputedStyle(button).getPropertyValue('--team-focus-travel')) || 30
+  const animations: Animation[] = []
+  for (const wing of button.querySelectorAll<SVGGElement>('.public-team-focus__wing')) {
+    const side = Number(wing.dataset.focusSide)
+    const pair = Number(wing.dataset.focusPair)
+    const options: KeyframeAnimationOptions = {
+      duration: 280,
+      delay: pair * 35,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      fill: 'backwards',
+    }
+    animations.push(
+      wing.animate(
+        [
+          { transform: `translateX(${side * travel}px)`, opacity: 0 },
+          { transform: 'translateX(0)', opacity: 1 },
+        ],
+        options,
+      ),
+    )
+    const stroke = wing.querySelector<SVGPathElement>('.public-team-focus__stroke')
+    if (stroke)
+      animations.push(
+        stroke.animate([{ strokeDashoffset: '1' }, { strokeDashoffset: '0' }], options),
+      )
+  }
+  focusAnimations.set(shell, animations)
+}
 
 export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSection): void {
   const selection = shell.querySelector<HTMLElement>('.public-nav__selection')
@@ -75,7 +120,10 @@ export function animateNavigationEntrance(
     button.click()
   }
   nav?.addEventListener('keydown', onKeyDown)
-  const removeKeyboardListener = () => nav?.removeEventListener('keydown', onKeyDown)
+  const removeKeyboardListener = () => {
+    nav?.removeEventListener('keydown', onKeyDown)
+    stopTeamFocus(shell)
+  }
   const previous = origin
   origin = null
   if (
@@ -89,6 +137,7 @@ export function animateNavigationEntrance(
     return removeKeyboardListener
 
   const animations: Animation[] = []
+  if (section === 'team') playTeamFocus(shell)
   const animate = (element: HTMLElement | null, frames: Keyframe[], duration = 260) => {
     if (element?.animate) animations.push(element.animate(frames, { duration, easing }))
   }

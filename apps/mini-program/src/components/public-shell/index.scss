@@ -873,17 +873,19 @@
 
     .public-nav {
       --nav-slot: 76PX;
+      --nav-team-slot: 132PX;
       --nav-gap: 14PX;
       --nav-index: 0;
+      --nav-offset: 0PX;
       position: relative;
-      grid-template-columns: repeat(5, var(--nav-slot));
+      grid-template-columns: var(--nav-slot) var(--nav-slot) var(--nav-team-slot) var(--nav-slot) var(--nav-slot);
       gap: var(--nav-gap);
     }
 
     .public-nav--selected-schedule { --nav-index: 1; }
-    .public-nav--selected-team { --nav-index: 2; }
-    .public-nav--selected-data { --nav-index: 3; }
-    .public-nav--selected-me { --nav-index: 4; }
+    .public-nav--selected-team { --nav-index: 2; --nav-offset: calc((var(--nav-team-slot) - var(--nav-slot)) / 2); }
+    .public-nav--selected-data { --nav-index: 3; --nav-offset: calc(var(--nav-team-slot) - var(--nav-slot)); }
+    .public-nav--selected-me { --nav-index: 4; --nav-offset: calc(var(--nav-team-slot) - var(--nav-slot)); }
 
     .public-nav__selection {
       position: absolute;
@@ -893,7 +895,7 @@
       width: 64PX;
       height: 12PX;
       pointer-events: none;
-      transform: translateX(calc(var(--nav-index) * (var(--nav-slot) + var(--nav-gap))));
+      transform: translateX(calc(var(--nav-index) * (var(--nav-slot) + var(--nav-gap)) + var(--nav-offset)));
     }
 
     .public-nav__line,
@@ -921,7 +923,7 @@
     }
 
     .public-nav--selected-team .public-nav__line { opacity: 0; }
-    .public-nav--selected-team .public-nav__arc { opacity: 1; }
+    .public-nav--selected-team .public-nav__arc { opacity: 0; }
 
     .public-nav__item,
     .public-team-nav {
@@ -964,7 +966,8 @@
     .public-nav__item--active::before { content: none; }
 
     .public-team-nav {
-      width: var(--nav-slot);
+      --team-focus-travel: 30PX;
+      width: var(--nav-team-slot);
       height: 76PX;
       margin: 0;
       padding-bottom: 8PX;
@@ -972,17 +975,17 @@
 
     .public-team-nav > .team-crest,
     .public-team-nav__crest {
-      width: 48PX;
-      height: 48PX;
+      width: 40PX;
+      height: 40PX;
       opacity: 0.86;
       transform: scale(1);
-      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+      transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
     }
 
     .public-team-nav--active > .team-crest,
     .public-team-nav--active .public-team-nav__crest {
       opacity: 1;
-      transform: scale(1.08);
+      transform: scale(1.16);
     }
 
     .public-nav__item:active .public-nav__icon,
@@ -1066,21 +1069,22 @@
     .public-team-nav:hover > .team-crest,
     .public-team-nav:hover .public-team-nav__crest {
       opacity: 1;
-      transform: translateY(-2PX) scale(1.2);
+      transform: translateY(-3PX) scale(1.42);
     }
   }
 }
 
 @media (min-width: 721px) and (max-width: 1040px) {
   .public-app--h5 {
-    .public-nav { --nav-slot: 64PX; --nav-gap: 8PX; }
+    .public-nav { --nav-slot: 64PX; --nav-team-slot: 112PX; --nav-gap: 8PX; }
+    .public-team-nav { --team-focus-travel: 22PX; }
     .public-nav__icon { width: 22PX; height: 22PX; background-size: 88PX 22PX; }
     .public-nav__icon--schedule { background-position: -22PX 0; }
     .public-nav__icon--data { background-position: -44PX 0; }
     .public-nav__icon--me { background-position: -66PX 0; }
     .public-nav__label { font-size: 14PX; }
     .public-team-nav > .team-crest,
-    .public-team-nav__crest { width: 44PX; height: 44PX; }
+    .public-team-nav__crest { width: 38PX; height: 38PX; }
   }
 }
 

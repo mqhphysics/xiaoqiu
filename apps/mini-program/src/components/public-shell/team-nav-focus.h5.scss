@@ -1,0 +1,61 @@
+.public-team-focus {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .public-app--h5 {
+    .public-team-focus {
+      position: absolute;
+      z-index: 0;
+      top: 0;
+      left: 50%;
+      display: block;
+      width: 132px;
+      height: 76px;
+      overflow: visible;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%);
+      transition: opacity 180ms ease;
+    }
+
+    .public-team-focus__stroke {
+      stroke: #244e35;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
+    }
+
+    .public-team-focus__wing--outer .public-team-focus__stroke {
+      stroke: #b39b62;
+      stroke-width: 1.1;
+    }
+
+    .public-team-focus__wing--base .public-team-focus__stroke {
+      stroke-width: 1.35;
+    }
+
+    .public-team-nav--active .public-team-focus {
+      opacity: 1;
+    }
+
+    .public-team-nav > .team-crest,
+    .public-team-nav__crest {
+      position: relative;
+      z-index: 1;
+    }
+  }
+}
+
+@media (min-width: 721px) and (hover: hover) and (pointer: fine) {
+  .public-app--h5 .public-team-nav:hover:not(.public-team-nav--active) .public-team-focus {
+    opacity: 0.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-team-focus {
+    transition: none;
+  }
+}

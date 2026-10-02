@@ -5,6 +5,8 @@ export function captureNavigationOrigin(_shell: HTMLElement, _target: Navigation
 
 export function clearNavigationOrigin(): void {}
 
+export function playTeamFocus(_shell: HTMLElement): void {}
+
 export function animateNavigationEntrance(
   _shell: HTMLElement,
   _section: NavigationSection,
