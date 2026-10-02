@@ -1,6 +1,13 @@
 import { Button, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+  type ReactNode,
+} from 'react'
 
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
@@ -11,6 +18,11 @@ import { MessagingDrawer, openMessaging } from '../messaging-drawer'
 import { ReportModal } from '../report-modal'
 import { SettingsDialog } from '../settings-dialog'
 import { PersistentHeaderSearch } from './persistent-header-search'
+import {
+  animateNavigationEntrance,
+  captureNavigationOrigin,
+  clearNavigationOrigin,
+} from './navigation-transition'
 
 import './index.scss'
 
@@ -33,7 +45,6 @@ const navItems: Array<{ key: PublicSection; label: string; shortLabel: string }>
   { key: 'me', label: '我的', shortLabel: 'ME' },
 ]
 
-let lastTeamEntrySide: 'left' | 'right' | null = null
 const primaryTeamCache = new Map<string, TeamSummary | null>()
 const primaryTeamListeners = new Set<(key: string, team: TeamSummary | null) => void>()
 
@@ -65,10 +76,16 @@ export function PublicShell({
       : null,
   )
   const [navigatingTo, setNavigatingTo] = useState<PublicSection | null>(null)
+  const shellRef = useRef<HTMLElement | null>(null)
+  const navigationLock = useRef(false)
   const normalizedActive = active === 'teams' ? 'team' : active === 'tournaments' ? 'data' : active
   const selectedNavItem = navigatingTo ?? normalizedActive
-  const flowSide = normalizedActive === 'team' || navigatingTo === 'team' ? lastTeamEntrySide : null
   const currentPath = normalizePath(getCurrentInstance().router?.path ?? '')
+
+  useLayoutEffect(() => {
+    if (!shellRef.current || Taro.getEnv() !== Taro.ENV_TYPE.WEB) return
+    return animateNavigationEntrance(shellRef.current, normalizedActive)
+  }, [normalizedActive])
 
   useEffect(() => {
     let mounted = true
@@ -111,28 +128,28 @@ export function PublicShell({
   const closeMenu = () => setMenuOpen(false)
   const navigateToSection = async (section: PublicSection) => {
     const targetPath = getSectionPath(section, tournamentId)
-    if (navigatingTo) return
+    if (navigationLock.current) return
     if (currentPath === normalizePath(targetPath)) {
       onActiveReselect?.()
       return
     }
     closeMenu()
-    if (section === 'team') {
-      lastTeamEntrySide = navItems.findIndex((item) => item.key === normalizedActive) < 2
-        ? 'left'
-        : 'right'
+    navigationLock.current = true
+    const desktopH5 = isDesktopH5()
+    if (desktopH5 && shellRef.current) {
+      const target = section === 'teams' ? 'team' : section === 'tournaments' ? 'data' : section
+      captureNavigationOrigin(shellRef.current, target)
+    } else {
+      setNavigatingTo(section)
     }
-    setNavigatingTo(section)
     try {
-      if (!prefersReducedMotion()) {
-        const desktopH5 =
-          Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches
-        await wait(desktopH5 ? 460 : 160)
-      }
+      if (!desktopH5 && !prefersReducedMotion()) await wait(160)
       await goToSection(section, tournamentId)
     } catch {
+      clearNavigationOrigin()
       await Taro.showToast({ title: '页面切换失败，请重试', icon: 'none' })
     } finally {
+      navigationLock.current = false
       setNavigatingTo(null)
     }
   }
@@ -155,7 +172,10 @@ export function PublicShell({
   }
 
   return (
-    <View className={`public-app ${active === 'home' && !showBack ? 'public-app--home' : ''}`}>
+    <View
+      ref={shellRef}
+      className={`public-app ${Taro.getEnv() === Taro.ENV_TYPE.WEB ? 'public-app--h5' : ''} public-app--section-${normalizedActive} ${active === 'home' && !showBack ? 'public-app--home' : ''}`}
+    >
       <View className="public-topbar">
         <View className="public-topbar__inner">
           <View className="public-brand-area">
@@ -177,11 +197,11 @@ export function PublicShell({
             </View>
           </View>
 
-          <View className={`public-nav public-nav--selected-${selectedNavItem} ${navigatingTo ? 'public-nav--moving' : ''} ${flowSide ? `public-nav--flow-from-${flowSide}` : selectedNavItem === 'team' ? 'public-nav--flow-both' : ''}`}>
-            <View aria-hidden="true" className="public-nav__flow">
-              <View className="public-nav__flow-base" />
+          <View className={`public-nav public-nav--selected-${selectedNavItem}`}>
+            <View aria-hidden="true" className="public-nav__selection">
+              <View className="public-nav__line" />
+              <View className="public-nav__arc" />
             </View>
-            <View aria-hidden="true" className="public-nav__selection" />
             {navItems.map((item) =>
               item.key === 'team' ? (
                 <Button
@@ -204,7 +224,10 @@ export function PublicShell({
                   aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
                 >
-                  <View aria-hidden="true" className={`public-nav__icon public-nav__icon--${item.key}`} />
+                  <View
+                    aria-hidden="true"
+                    className={`public-nav__icon public-nav__icon--${item.key}`}
+                  />
                   <Text className="public-nav__label">{item.label}</Text>
                 </Button>
               ),
@@ -397,6 +420,14 @@ function normalizePath(path: string): string {
 function prefersReducedMotion(): boolean {
   return (
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+function isDesktopH5(): boolean {
+  return (
+    Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+    typeof window !== 'undefined' &&
+    window.matchMedia('(min-width: 721px)').matches
   )
 }
 
