@@ -1,8 +1,11 @@
+/* global Buffer, console, fetch, process, WebSocket */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const targets = await (await fetch('http://127.0.0.1:12690/json/list')).json()
-const target = targets.find((item) => item.type === 'page' && item.url.includes(process.argv[2] ?? 'entrance'))
+const target = targets.find(
+  (item) => item.type === 'page' && item.url.includes(process.argv[2] ?? 'entrance'),
+)
 if (!target) throw new Error('Requested IDE window is not available')
 const socket = new WebSocket(target.webSocketDebuggerUrl)
 await new Promise((resolve, reject) => {
@@ -17,7 +20,11 @@ socket.addEventListener('message', ({ data }) => {
   const operation = pending.get(response.id)
   if (!operation) return
   pending.delete(response.id)
-  response.error ? operation.reject(response.error) : operation.resolve(response.result)
+  if (response.error) {
+    operation.reject(response.error)
+  } else {
+    operation.resolve(response.result)
+  }
 })
 function send(method, params = {}) {
   const id = ++nextId
@@ -27,7 +34,9 @@ function send(method, params = {}) {
   })
 }
 try {
-  const expression = process.argv[3] ?? `JSON.stringify({text:document.body.innerText,controls:[...document.querySelectorAll('button,input,a,[role="button"]')].map(el=>({tag:el.tagName,text:el.innerText,value:el.value,placeholder:el.placeholder}))})`
+  const expression =
+    process.argv[3] ??
+    `JSON.stringify({text:document.body.innerText,controls:[...document.querySelectorAll('button,input,a,[role="button"]')].map(el=>({tag:el.tagName,text:el.innerText,value:el.value,placeholder:el.placeholder}))})`
   const clickSelector = expression.startsWith('@click:') ? expression.slice(7) : null
   if (clickSelector) {
     const location = await send('Runtime.evaluate', {
@@ -35,10 +44,23 @@ try {
       returnByValue: true,
     })
     if (location.exceptionDetails) throw new Error('Control not found')
-    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...location.result.value, button: 'left', clickCount: 1 })
-    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...location.result.value, button: 'left', clickCount: 1 })
+    await send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      ...location.result.value,
+      button: 'left',
+      clickCount: 1,
+    })
+    await send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      ...location.result.value,
+      button: 'left',
+      clickCount: 1,
+    })
   }
-  const result = await send('Runtime.evaluate', { expression: clickSelector ? 'document.body.innerText' : expression, returnByValue: true })
+  const result = await send('Runtime.evaluate', {
+    expression: clickSelector ? 'document.body.innerText' : expression,
+    returnByValue: true,
+  })
   if (result.exceptionDetails) console.log(JSON.stringify(result.exceptionDetails))
   else console.log(result.result.value ?? result.result.description)
   if (process.argv[4]) {

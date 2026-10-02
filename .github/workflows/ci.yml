@@ -18,7 +18,7 @@ env:
   CI: 'true'
   PNPM_CONFIG_REPORTER: append-only
   DATABASE_URL: postgresql://xiaoqiu_ci:xiaoqiu_ci@localhost:5432/xiaoqiu_ci?schema=public
-  TEST_DATABASE_URL: postgresql://xiaoqiu_ci:xiaoqiu_ci@localhost:5432/xiaoqiu_ci?schema=public
+  TEST_DATABASE_URL: postgresql://xiaoqiu_ci:xiaoqiu_ci@localhost:5432/roster_v2_test_ci?schema=public
 
 jobs:
   verify:
@@ -74,8 +74,15 @@ jobs:
           echo "::error::PostgreSQL did not become ready within 60 seconds"
           exit 1
 
+      - name: Create isolated integration database
+        env:
+          PGPASSWORD: xiaoqiu_ci
+        run: createdb -h localhost -p 5432 -U xiaoqiu_ci roster_v2_test_ci
+
       - name: Apply Prisma migrations
-        run: pnpm --filter @xiaoqiu/api db:migrate:deploy
+        run: |
+          pnpm --filter @xiaoqiu/api db:migrate:deploy
+          DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @xiaoqiu/api db:migrate:deploy
 
       - name: Seed database twice
         run: |
