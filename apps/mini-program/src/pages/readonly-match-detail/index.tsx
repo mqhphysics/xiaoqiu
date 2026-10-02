@@ -17,6 +17,7 @@ import {
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { MatchReportEntry } from '../../features/match-report/MatchReportEntry'
+import { useDetailBack } from '../readonly-schedule/detail-back'
 import type { MatchExperienceResponse } from '../../features/product/product.types'
 
 import './index.scss'
@@ -30,7 +31,15 @@ type DetailTab = 'ratings' | 'events' | 'lineups'
 
 export default function MatchDetailPage() {
   const matchId = getCurrentInstance().router?.params.matchId ?? ''
+  const routeTournamentId =
+    Taro.getEnv() === Taro.ENV_TYPE.WEB
+      ? getCurrentInstance().router?.params.tournamentId
+      : undefined
   const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const tournamentId = state.phase === 'ready' ? state.match.tournamentId : routeTournamentId
+  useDetailBack(
+    `/pages/readonly-schedule/index${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+  )
 
   const load = useCallback(async () => {
     if (!matchId) {
@@ -53,11 +62,7 @@ export default function MatchDetailPage() {
   }, [load])
 
   return (
-    <PublicShell
-      active="schedule"
-      showBack
-      tournamentId={state.phase === 'ready' ? state.match.tournamentId : undefined}
-    >
+    <PublicShell active="schedule" showBack tournamentId={tournamentId}>
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取比赛详情" />}
       {state.phase === 'failed' && (
         <DataState

@@ -14,6 +14,7 @@ import {
 import { positionLabel } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { useDetailBack } from '../readonly-schedule/detail-back'
 import type {
   TeamDashboardResponse,
   TeamRelationshipResponse,
@@ -44,6 +45,9 @@ export default function TeamDetailPage() {
   const teamId = params?.teamId ?? ''
   const routeTournamentId = params?.tournamentId ?? ''
   const [state, setState] = useState<PageState>({ phase: 'loading' })
+  useDetailBack(
+    `/pages/my-team/index${routeTournamentId ? `?tournamentId=${encodeURIComponent(routeTournamentId)}` : ''}`,
+  )
 
   const load = useCallback(async () => {
     if (!teamId) {

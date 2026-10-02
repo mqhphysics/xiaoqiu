@@ -1113,3 +1113,65 @@
     transition: none;
   }
 }
+
+@media (min-width: 721px) {
+  .schedule-navigation-error {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    color: #855a27;
+    background: #faf2e3;
+    border: 1px solid #e7d5af;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+
+  .schedule-load-error > .schedule-outline + .schedule-outline {
+    margin-left: 10px;
+  }
+
+  .schedule-desktop [data-schedule-button] {
+    transition:
+      transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease;
+  }
+
+  .schedule-desktop:not([data-schedule-input='keyboard'])
+    [data-schedule-button]:not(:disabled):active {
+    transform: scale(0.98);
+  }
+
+  .schedule-desktop [data-schedule-navigation]:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
+
+  .schedule-icon--arrow {
+    transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .schedule-desktop[data-schedule-input='keyboard'] [data-schedule-button],
+  .schedule-desktop[data-schedule-input='keyboard'] .schedule-switch i,
+  .schedule-desktop[data-schedule-input='keyboard'] .schedule-icon--arrow {
+    transition: none;
+  }
+}
+
+@media (min-width: 721px) and (hover: hover) and (pointer: fine) {
+  .schedule-desktop:not([data-schedule-input='keyboard'])
+    .schedule-outline:hover
+    .schedule-icon--arrow {
+    transform: translateX(2px);
+  }
+}
+
+@media (min-width: 721px) and (prefers-reduced-motion: reduce) {
+  .schedule-desktop [data-schedule-button],
+  .schedule-desktop .schedule-icon--arrow {
+    transition: none;
+    transform: none !important;
+  }
+}

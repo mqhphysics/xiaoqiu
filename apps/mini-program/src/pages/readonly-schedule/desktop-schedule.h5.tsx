@@ -1,5 +1,5 @@
-import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getCurrentInstance, useDidShow } from '@tarojs/taro'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
@@ -18,6 +18,12 @@ import type {
   TeamSummary,
 } from '../../features/product/product.types'
 import CompactSchedulePage from './schedule-compact'
+import {
+  ScheduleInteractionProvider,
+  ScheduleLink,
+  useScheduleInteraction,
+  useScheduleMotion,
+} from './schedule-interaction.h5'
 
 import './index.h5.scss'
 
@@ -54,7 +60,7 @@ function Icon({ name }: { name: IconName }) {
   }
   return (
     <svg
-      className="schedule-icon"
+      className={`schedule-icon schedule-icon--${name}`}
       width="20"
       height="20"
       viewBox="0 0 24 24"
@@ -82,13 +88,11 @@ function shiftDate(value: string, days: number): string {
   return dateKey(date.toISOString())
 }
 
-function openMatch(matchId: string) {
-  void Taro.navigateTo({ url: matchDetailUrl(matchId) })
+function matchUrl(matchId: string, tournamentId: string) {
+  return `${matchDetailUrl(matchId)}&tournamentId=${encodeURIComponent(tournamentId)}`
 }
-function openTeam(teamId: string, tournamentId: string) {
-  void Taro.navigateTo({
-    url: `/pages/readonly-team-detail/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-  })
+function teamUrl(teamId: string, tournamentId: string) {
+  return `/pages/readonly-team-detail/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(tournamentId)}`
 }
 
 export default function SchedulePage() {
@@ -105,6 +109,8 @@ export default function SchedulePage() {
 function DesktopSchedulePage() {
   const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
   const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const [appearance, setAppearance] = useState(0)
+  useDidShow(() => setAppearance((value) => value + 1))
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
     try {
@@ -125,7 +131,7 @@ function DesktopSchedulePage() {
       active="schedule"
       tournamentId={state.phase === 'ready' ? state.data.tournament.id : routeTournamentId}
     >
-      <div className="schedule-desktop">
+      <ScheduleInteractionProvider appearance={appearance}>
         <div className="schedule-art" aria-hidden="true">
           <div className="schedule-art__light" />
           <div className="schedule-art__stadium" />
@@ -140,33 +146,46 @@ function DesktopSchedulePage() {
         {state.phase === 'loading' && <DataState kind="loading" title="正在读取完整赛程" />}
         {state.phase === 'failed' && (
           <div className="schedule-load-error">
-            <DataState
-              kind="error"
-              title="赛程不可用"
-              description={state.message}
-              onRetry={() => void load()}
-            />
+            <DataState kind="error" title="赛程不可用" description={state.message} />
+            <button
+              data-schedule-button=""
+              type="button"
+              className="schedule-outline"
+              onClick={() => void load()}
+            >
+              重新加载
+            </button>
             {routeTournamentId && (
-              <button
-                data-schedule-button=""
-                type="button"
+              <ScheduleLink
                 className="schedule-outline"
-                onClick={() => void Taro.redirectTo({ url: '/pages/readonly-schedule/index' })}
+                url="/pages/readonly-schedule/index"
+                replace
               >
                 返回当前赛事
-              </button>
+              </ScheduleLink>
             )}
           </div>
         )}
         {state.phase === 'ready' && (
-          <ScheduleContent key={state.data.tournament.id} data={state.data} />
+          <ScheduleContent
+            key={state.data.tournament.id}
+            data={state.data}
+            appearance={appearance}
+          />
         )}
-      </div>
+      </ScheduleInteractionProvider>
     </PublicShell>
   )
 }
 
-function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
+function ScheduleContent({
+  data,
+  appearance,
+}: {
+  data: CompetitionDataResponse
+  appearance: number
+}) {
+  const { navigate, pending } = useScheduleInteraction()
   const [teamId, setTeamId] = useState('')
   const [stage, setStage] = useState('')
   const [status, setStatus] = useState('')
@@ -175,6 +194,9 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
   const [descending, setDescending] = useState(false)
   const [view, setView] = useState<'list' | 'bracket'>('list')
   const [primary, setPrimary] = useState<PrimaryTeamState>({ phase: 'loading' })
+  const primaryRequest = useRef(0)
+  const resultsRef = useRef<HTMLElement>(null)
+  const datesRef = useRef<HTMLDivElement>(null)
   const session = readSession()
   const accessToken = session?.accessToken
   const primaryTeam = primary.phase === 'ready' ? primary.team : null
@@ -188,23 +210,43 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
   const [weekStart, setWeekStart] = useState(() => shiftDate(initialDate, -2))
 
   const loadPrimary = useCallback(async () => {
+    const request = ++primaryRequest.current
     if (!accessToken) {
       setPrimary({ phase: 'ready', team: null })
       return
     }
-    setPrimary({ phase: 'loading' })
+    setPrimary((previous) => (previous.phase === 'ready' ? previous : { phase: 'loading' }))
     try {
+      const preferences = await productRepository.getTeamPreferences()
+      if (request !== primaryRequest.current) return
       setPrimary({
         phase: 'ready',
-        team: (await productRepository.getTeamPreferences()).primaryTeam,
+        team: preferences.primaryTeam,
       })
     } catch {
-      setPrimary({ phase: 'failed' })
+      if (request === primaryRequest.current) setPrimary({ phase: 'failed' })
     }
   }, [accessToken])
   useEffect(() => {
     void loadPrimary()
-  }, [loadPrimary])
+    return () => {
+      primaryRequest.current += 1
+    }
+  }, [loadPrimary, appearance])
+  useScheduleMotion(
+    resultsRef,
+    JSON.stringify([
+      view,
+      teamId,
+      stage,
+      status,
+      onlyPrimary,
+      onlyPrimary ? primaryTeam?.id : null,
+      selectedDate,
+      descending,
+    ]),
+  )
+  useScheduleMotion(datesRef, weekStart, 'x')
 
   const teams = useMemo(() => {
     const map = new Map<string, TeamSummary>()
@@ -279,10 +321,12 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
             data-schedule-select=""
             aria-label="选择赛季"
             value={data.tournament.id}
+            disabled={pending}
             onChange={(event) =>
-              void Taro.redirectTo({
-                url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(event.target.value)}`,
-              })
+              void navigate(
+                `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(event.target.value)}`,
+                true,
+              )
             }
           >
             {data.seasons.map((season) => (
@@ -329,7 +373,7 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
           >
             <Icon name="left" />
           </button>
-          <div className="schedule-calendar__dates">
+          <div className="schedule-calendar__dates" ref={datesRef}>
             {dates.map((date) => (
               <button
                 data-schedule-button=""
@@ -449,7 +493,7 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
       </section>
 
       <div className="schedule-layout">
-        <main className="schedule-results">
+        <main className="schedule-results" ref={resultsRef}>
           {view === 'list' ? (
             <>
               <div className="schedule-results__meta">
@@ -517,18 +561,18 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
           <section className="schedule-side-card">
             <header>
               <h3>我的主队</h3>
-              <button
-                data-schedule-button=""
-                type="button"
-                onClick={() =>
-                  void Taro.navigateTo({
-                    url: `/pages/my-team/index?tournamentId=${encodeURIComponent(data.tournament.id)}`,
-                  })
+              <ScheduleLink
+                url={
+                  primaryTeam
+                    ? teamUrl(primaryTeam.id, data.tournament.id)
+                    : session
+                      ? `/pages/my-team/index?tournamentId=${encodeURIComponent(data.tournament.id)}`
+                      : '/pages/login/index'
                 }
               >
                 {primaryTeam ? '查看球队主页' : '选择主队'}
                 <Icon name="arrow" />
-              </button>
+              </ScheduleLink>
             </header>
             {primary.phase === 'loading' ? (
               <p className="schedule-side-card__hint">正在读取主队…</p>
@@ -556,21 +600,17 @@ function ScheduleContent({ data }: { data: CompetitionDataResponse }) {
                     ? '选择主队，随时关注他们的下一场比赛。'
                     : '登录并选择主队，关注球队的每一场比赛。'}
                 </p>
-                <button
-                  data-schedule-button=""
-                  type="button"
+                <ScheduleLink
                   className="schedule-outline"
-                  onClick={() =>
-                    void Taro.navigateTo({
-                      url: session
-                        ? `/pages/my-team/index?tournamentId=${encodeURIComponent(data.tournament.id)}`
-                        : '/pages/login/index',
-                    })
+                  url={
+                    session
+                      ? `/pages/my-team/index?tournamentId=${encodeURIComponent(data.tournament.id)}`
+                      : '/pages/login/index'
                   }
                 >
                   {session ? '选择我的主队' : '登录并选择主队'}
                   <Icon name="arrow" />
-                </button>
+                </ScheduleLink>
               </div>
             )}
           </section>
@@ -682,16 +722,14 @@ function MatchRow({ match }: { match: MatchSummary }) {
           <Icon name="pin" />
           <span>{match.venue?.name ?? '场地待定'}</span>
         </div>
-        <button
-          data-schedule-button=""
-          type="button"
+        <ScheduleLink
           className="schedule-outline schedule-row__detail"
           aria-label={`查看${match.homeTeam?.name ?? match.homePlaceholder ?? '待定'}对阵${match.awayTeam?.name ?? match.awayPlaceholder ?? '待定'}的比赛详情`}
-          onClick={() => openMatch(match.id)}
+          url={matchUrl(match.id, match.tournamentId)}
         >
           查看详情
           <Icon name="arrow" />
-        </button>
+        </ScheduleLink>
       </div>
       {match.statusReason && <p className="schedule-row__reason">{match.statusReason}</p>}
     </article>
@@ -716,16 +754,14 @@ function RowTeam({
     </>
   )
   return team ? (
-    <button
-      data-schedule-button=""
-      type="button"
+    <ScheduleLink
       className={`schedule-row__team ${away ? 'schedule-row__team--away' : ''}`}
       aria-label={`查看${team.name}`}
       title={team.name}
-      onClick={() => openTeam(team.id, tournamentId)}
+      url={teamUrl(team.id, tournamentId)}
     >
       {content}
-    </button>
+    </ScheduleLink>
   ) : (
     <div
       className={`schedule-row__team ${away ? 'schedule-row__team--away' : ''}`}
@@ -758,25 +794,15 @@ function PrimaryTeam({
     )[0]
   return (
     <>
-      <button
-        data-schedule-button=""
-        type="button"
-        className="schedule-primary-team"
-        onClick={() => openTeam(team.id, tournamentId)}
-      >
+      <ScheduleLink className="schedule-primary-team" url={teamUrl(team.id, tournamentId)}>
         <TeamCrest team={team} size="large" />
         <span>
           <strong>{team.name}</strong>
           <small>{team.collegeName ?? '为每一场热爱而战'}</small>
         </span>
-      </button>
+      </ScheduleLink>
       {next ? (
-        <button
-          data-schedule-button=""
-          type="button"
-          className="schedule-next-match"
-          onClick={() => openMatch(next.id)}
-        >
+        <ScheduleLink className="schedule-next-match" url={matchUrl(next.id, tournamentId)}>
           <span className="schedule-next-match__heading">
             {next.status === 'LIVE' ? '正在比赛' : '下一场比赛'}
             <small>{next.title}</small>
@@ -796,7 +822,7 @@ function PrimaryTeam({
             <Icon name="pin" />
             {next.venue?.name ?? '场地待定'}
           </span>
-        </button>
+        </ScheduleLink>
       ) : (
         <p className="schedule-side-card__hint">该赛季暂无待赛安排</p>
       )}
@@ -861,13 +887,11 @@ function BracketView({
             const match = byId.get(node.matchId)
             if (!match) return null
             return (
-              <button
-                data-schedule-button=""
-                type="button"
+              <ScheduleLink
                 className={`schedule-bracket__match ${matchingIds.has(match.id) ? '' : 'schedule-bracket__match--muted'}`}
                 key={node.id}
                 style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
-                onClick={() => openMatch(match.id)}
+                url={matchUrl(match.id, data.tournament.id)}
               >
                 <span className="schedule-bracket__meta">
                   {match.title} · {formatTime(match.scheduledStartAt)}
@@ -883,7 +907,7 @@ function BracketView({
                     <b>{(index === 0 ? match.homeScore : match.awayScore) ?? '–'}</b>
                   </span>
                 ))}
-              </button>
+              </ScheduleLink>
             )
           })}
         </div>
