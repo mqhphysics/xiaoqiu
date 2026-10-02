@@ -47,6 +47,146 @@
       "fallback": "pointer",
       "role": "Enabled tabs, buttons and links",
       "source": "Code-native green outlined index hand based on 02-cursor-style-c.png; tiny coral palm mark replaces small football details"
+    },
+    {
+      "file": "disabled-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "not-allowed",
+      "role": "disabled",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "busy-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "wait",
+      "role": "busy",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "progress-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 2,
+      "hotspotY": 2,
+      "fallback": "progress",
+      "role": "progress",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "move-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "move",
+      "role": "move",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "grab-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "grab",
+      "role": "grab",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "grabbing-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "grabbing",
+      "role": "grabbing",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "precision-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "crosshair",
+      "role": "precision",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "resize-ew-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "ew-resize",
+      "role": "resize-ew",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "resize-ns-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "ns-resize",
+      "role": "resize-ns",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "resize-nwse-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "nwse-resize",
+      "role": "resize-nwse",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "resize-nesw-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "nesw-resize",
+      "role": "resize-nesw",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "help-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 2,
+      "hotspotY": 2,
+      "fallback": "help",
+      "role": "help",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "zoom-in-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 13,
+      "hotspotY": 13,
+      "fallback": "zoom-in",
+      "role": "zoom-in",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+    },
+    {
+      "file": "zoom-out-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 13,
+      "hotspotY": 13,
+      "fallback": "zoom-out",
+      "role": "zoom-out",
+      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
     }
   ],
   "hotspotVerification": "Positions checked against SVG coordinates. Final perceived tip alignment and operating-system native cursor display require a visible desktop browser check; ordinary Playwright page screenshots omit the native cursor.",
@@ -57,6 +197,6 @@
     "panelClass": "art-login__panel",
     "inputClass": "art-login__input",
     "controlClass": "art-login__control",
-    "disabledControls": "Native disabled, disabled attribute, aria-disabled=true and existing Taro disabled class use not-allowed"
+    "disabledControls": "Native disabled, disabled attribute, aria-disabled=true, existing Taro disabled class and no-drop show the coral unavailable skin; disabling or re-enabling a hovered control updates without pointer movement."
   }
 }

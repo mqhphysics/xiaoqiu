@@ -34,6 +34,8 @@
   }
 
   .art-login .art-login__control:disabled {
-    cursor: not-allowed;
+    cursor:
+      url('../../assets/login-art/cursors/disabled-32.svg') 16 16,
+      not-allowed;
   }
 }
