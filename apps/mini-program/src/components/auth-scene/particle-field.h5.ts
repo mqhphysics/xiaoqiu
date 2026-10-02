@@ -1,6 +1,7 @@
 export type ParticleFieldOptions = {
   backgroundColor?: string
   maxParticles?: number
+  watermark?: { text: string; x: number; y: number; fontRatio: number; color: string }
   onReady?: () => void
   onError?: (error: unknown) => void
 }
@@ -250,6 +251,14 @@ export function createParticleField(
       if (!atlasContext)
         throw new Error('The particle artwork could not acquire a sampling context.')
       atlasContext.drawImage(image, 0, 0, atlas.width, atlas.height)
+      if (options.watermark) {
+        const mark = options.watermark
+        atlasContext.font = `600 ${atlas.width * mark.fontRatio}px Arial, sans-serif`
+        atlasContext.textAlign = 'center'
+        atlasContext.textBaseline = 'middle'
+        atlasContext.fillStyle = mark.color
+        atlasContext.fillText(mark.text, atlas.width * mark.x, atlas.height * mark.y)
+      }
       const pixels = atlasContext.getImageData(0, 0, atlas.width, atlas.height)
       const data = pixels.data
       const integralWidth = atlas.width + 1

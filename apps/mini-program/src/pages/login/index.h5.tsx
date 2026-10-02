@@ -2,6 +2,8 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useEffect, useState, type HTMLInputTypeAttribute } from 'react'
 
 import sceneSource from '../../assets/login-art/stadium-particle-plate.png'
+import brandMark from '../../assets/home-visual/brand-mark.png'
+import { AuthRecoveryDialog } from '../../components/auth-recovery/index.h5'
 import { AuthScene } from '../../components/auth-scene/index.h5'
 import { productRepository } from '../../features/product/product.repository'
 import { enterGuestMode, readSession } from '../../features/product/session'
@@ -46,9 +48,6 @@ function ArtLoginPage() {
   const [registration, setRegistration] = useState(emptyRegistration)
   const [submitting, setSubmitting] = useState(false)
   const [recovery, setRecovery] = useState(false)
-  const [recoveryName, setRecoveryName] = useState('')
-  const [recoveryStudentId, setRecoveryStudentId] = useState('')
-  const [recoveryPassword, setRecoveryPassword] = useState('')
 
   useEffect(() => {
     const preview = getCurrentInstance().router?.params.preview === 'art'
@@ -85,31 +84,6 @@ function ArtLoginPage() {
       setSubmitting(false)
     }
   }
-  const resetPassword = async () => {
-    if (
-      !recoveryName.trim() ||
-      !recoveryStudentId.trim() ||
-      recoveryPassword.length < 8 ||
-      submitting
-    )
-      return
-    setSubmitting(true)
-    try {
-      await productRepository.resetPasswordByIdentity(
-        recoveryName,
-        recoveryStudentId,
-        recoveryPassword,
-      )
-      setIdentifier(recoveryStudentId.trim())
-      setPassword(recoveryPassword)
-      setRecovery(false)
-      await Taro.showToast({ title: '密码已重置', icon: 'success' })
-    } catch (error) {
-      await showError(error, '重置失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
   const guest = async () => {
     enterGuestMode()
     await Taro.reLaunch({ url: '/pages/index/index' })
@@ -120,19 +94,10 @@ function ArtLoginPage() {
     setRegistration((previous) => ({ ...previous, [key]: value }))
 
   return (
-    <main className="art-login">
+    <main className={`art-login ${screen === 'register' ? 'art-login--register' : ''}`}>
       <section className="art-login__left" aria-label="晓球校园足球">
         <div className="art-login__brand">
-          <svg className="art-login__brand-mark" viewBox="0 0 72 52" fill="none" aria-hidden="true">
-            <path
-              d="M7 7 45 45M7 45 30 18"
-              stroke="currentColor"
-              strokeWidth="5"
-              strokeLinecap="square"
-            />
-            <circle cx="45" cy="24" r="18" stroke="currentColor" strokeWidth="5" />
-            <path d="m48 33 13 13" stroke="currentColor" strokeWidth="5" />
-          </svg>
+          <img className="art-login__brand-mark" src={brandMark} alt="" draggable={false} />
           <div>
             <div className="art-login__brand-name">晓球</div>
             <div className="art-login__brand-caption">记录校园足球的每一刻</div>
@@ -246,7 +211,7 @@ function ArtLoginPage() {
                   <button
                     type="button"
                     className="art-login__control art-login__forgot"
-                    onClick={() => setRecovery((value) => !value)}
+                    onClick={() => setRecovery(true)}
                   >
                     忘记密码
                   </button>
@@ -388,61 +353,9 @@ function ArtLoginPage() {
             以游客身份浏览
           </button>
           <p className="art-login__guest-hint">无需注册，先看赛程、比分和球队</p>
-
-          {recovery && screen === 'login' && method === 'password' && (
-            <form
-              className="art-login__recovery"
-              noValidate
-              onSubmit={(event) => {
-                event.preventDefault()
-                void resetPassword()
-              }}
-            >
-              <div className="art-login__recovery-head">
-                <h3>找回密码</h3>
-                <button
-                  type="button"
-                  className="art-login__control art-login__text-button"
-                  onClick={() => setRecovery(false)}
-                >
-                  关闭
-                </button>
-              </div>
-              <Field
-                id="art-recovery-name"
-                label="真实姓名"
-                value={recoveryName}
-                onChange={setRecoveryName}
-              />
-              <Field
-                id="art-recovery-student"
-                label="学号"
-                value={recoveryStudentId}
-                onChange={setRecoveryStudentId}
-              />
-              <Field
-                id="art-recovery-password"
-                label="新密码"
-                value={recoveryPassword}
-                onChange={setRecoveryPassword}
-                password
-              />
-              <button
-                type="submit"
-                className="art-login__control art-login__primary"
-                disabled={
-                  !recoveryName.trim() ||
-                  !recoveryStudentId.trim() ||
-                  recoveryPassword.length < 8 ||
-                  submitting
-                }
-              >
-                重置密码
-              </button>
-            </form>
-          )}
         </div>
       </section>
+      {recovery && <AuthRecoveryDialog onClose={() => setRecovery(false)} />}
     </main>
   )
 }

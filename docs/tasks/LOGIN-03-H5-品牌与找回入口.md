@@ -1,12 +1,12 @@
 # LOGIN-03 品牌、CCNU、单页适配与找回弹窗
 
-状态：用户已暂停。仅保存未接线初稿；类型检查通过，功能与浏览器未验收，不调用任何找回接口。后续恢复任务后再完成。
+状态：用户于2026-10-02恢复，并明确要求在main继续；额外补齐不可用、忙碌、拖动、精确选择、缩放等光标皮肤。
 
 2026-10-02 用户追加：登录页改用原品牌图标，网页标签小图标同步；紫色点云内增加浅色CCNU；右侧内容单页显示；找回密码独立弹窗，邮箱、微信与人工核验入口。人工核验填写姓名、学号、注册/使用情况，可选学生卡或学生证图片，不能凭姓名学号直接改密。
 
-必读：当前架构、根目录AGENTS.md、LOGIN-01/02。桌面H5范围，原移动/微信登录页只读。分支继续 `codex/login-art-stages-1-3`；main 汇总暂缓。
+必读：当前架构、根目录AGENTS.md、LOGIN-01/02。桌面H5范围，原移动/微信登录页只读。主目录另一个赛程任务分支及其未提交文件保持原状；在 `.worktrees/login-main-continuation` 检出main完成并提交本轮。
 
-写入：`pages/login/index.h5.tsx/.scss`、登录PNG资源声明、`components/auth-recovery/`、`components/auth-scene/index.h5.tsx` 和 `particle-field.h5.ts` 的可选水印绘制、H5 favicon素材及本轮文档。品牌复用已有 `assets/home-visual/brand-mark.png`，不重绘标志。其它任务的公共布局、首页、API改动不覆盖、不提交。
+写入：`components/auth-cursor/`、`assets/login-art/cursors/`、`pages/login/index.h5.tsx/.scss`、登录PNG资源声明、`components/auth-recovery/`、`components/auth-scene/index.h5.tsx` 和 `particle-field.h5.ts` 的可选水印绘制、H5 favicon素材及本轮文档。品牌复用已有 `assets/home-visual/brand-mark.png`，不重绘标志。其它任务的公共布局、首页、API改动不覆盖、不提交。
 
 现有API只含受限演示身份重置，邮箱令牌、微信扫码、人工申请/证件存储/审核、可信设备校验均无已采用契约。本轮做好可查看、可填写与可确认的UI，相关操作明确未开放；不冒充发送邮件、提交审核或改密成功，不新增公共模型/API，也不调用旧姓名学号改密。
 

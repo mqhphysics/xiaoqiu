@@ -2,9 +2,71 @@ import arrowUrl from '../../assets/login-art/cursors/default-32.png'
 import ballUrl from '../../assets/login-art/cursors/football-28.svg'
 import handUrl from '../../assets/login-art/cursors/hand-32.svg'
 import textUrl from '../../assets/login-art/cursors/text-32.svg'
+import disabledUrl from '../../assets/login-art/cursors/disabled-32.svg'
+import busyUrl from '../../assets/login-art/cursors/busy-32.svg'
+import progressUrl from '../../assets/login-art/cursors/progress-32.svg'
+import moveUrl from '../../assets/login-art/cursors/move-32.svg'
+import grabUrl from '../../assets/login-art/cursors/grab-32.svg'
+import grabbingUrl from '../../assets/login-art/cursors/grabbing-32.svg'
+import precisionUrl from '../../assets/login-art/cursors/precision-32.svg'
+import resizeEwUrl from '../../assets/login-art/cursors/resize-ew-32.svg'
+import resizeNsUrl from '../../assets/login-art/cursors/resize-ns-32.svg'
+import resizeNwseUrl from '../../assets/login-art/cursors/resize-nwse-32.svg'
+import resizeNeswUrl from '../../assets/login-art/cursors/resize-nesw-32.svg'
+import helpUrl from '../../assets/login-art/cursors/help-32.svg'
+import zoomInUrl from '../../assets/login-art/cursors/zoom-in-32.svg'
+import zoomOutUrl from '../../assets/login-art/cursors/zoom-out-32.svg'
 import { cursorMorphPath } from './morph.h5'
 
-type Skin = 'default' | 'football' | 'hand' | 'text' | 'disabled' | null
+const skins = {
+  default: { url: arrowUrl, hotspot: '2 2', fallback: 'default' },
+  football: { url: ballUrl, hotspot: '14 14', fallback: 'default' },
+  hand: { url: handUrl, hotspot: '12 4', fallback: 'pointer' },
+  text: { url: textUrl, hotspot: '16 16', fallback: 'text' },
+  disabled: { url: disabledUrl, hotspot: '16 16', fallback: 'not-allowed' },
+  busy: { url: busyUrl, hotspot: '16 16', fallback: 'wait' },
+  progress: { url: progressUrl, hotspot: '2 2', fallback: 'progress' },
+  move: { url: moveUrl, hotspot: '16 16', fallback: 'move' },
+  grab: { url: grabUrl, hotspot: '16 16', fallback: 'grab' },
+  grabbing: { url: grabbingUrl, hotspot: '16 16', fallback: 'grabbing' },
+  precision: { url: precisionUrl, hotspot: '16 16', fallback: 'crosshair' },
+  'resize-ew': { url: resizeEwUrl, hotspot: '16 16', fallback: 'ew-resize' },
+  'resize-ns': { url: resizeNsUrl, hotspot: '16 16', fallback: 'ns-resize' },
+  'resize-nwse': { url: resizeNwseUrl, hotspot: '16 16', fallback: 'nwse-resize' },
+  'resize-nesw': { url: resizeNeswUrl, hotspot: '16 16', fallback: 'nesw-resize' },
+  help: { url: helpUrl, hotspot: '2 2', fallback: 'help' },
+  'zoom-in': { url: zoomInUrl, hotspot: '13 13', fallback: 'zoom-in' },
+  'zoom-out': { url: zoomOutUrl, hotspot: '13 13', fallback: 'zoom-out' },
+} as const
+type Skin = keyof typeof skins | null
+const nativeSkins: Record<string, Exclude<Skin, null>> = {
+  'not-allowed': 'disabled',
+  'no-drop': 'disabled',
+  wait: 'busy',
+  progress: 'progress',
+  move: 'move',
+  'all-scroll': 'move',
+  grab: 'grab',
+  grabbing: 'grabbing',
+  crosshair: 'precision',
+  'ew-resize': 'resize-ew',
+  'e-resize': 'resize-ew',
+  'w-resize': 'resize-ew',
+  'col-resize': 'resize-ew',
+  'ns-resize': 'resize-ns',
+  'n-resize': 'resize-ns',
+  's-resize': 'resize-ns',
+  'row-resize': 'resize-ns',
+  'nwse-resize': 'resize-nwse',
+  'nw-resize': 'resize-nwse',
+  'se-resize': 'resize-nwse',
+  'nesw-resize': 'resize-nesw',
+  'ne-resize': 'resize-nesw',
+  'sw-resize': 'resize-nesw',
+  help: 'help',
+  'zoom-in': 'zoom-in',
+  'zoom-out': 'zoom-out',
+}
 type Zone = 'art' | 'form' | null
 const ATTRIBUTE = 'data-xq-cursor'
 const DURATION = 280
@@ -21,11 +83,13 @@ export function mountCursorSkin(): () => void {
   // Raw H5 CSS keeps native element names out of Taro's stylesheet transform.
   style.textContent = `
     html.xq-cursor-skin { cursor: url("${arrowUrl}") 2 2, default; }
-    html.xq-cursor-skin [${ATTRIBUTE}="default"] { cursor: url("${arrowUrl}") 2 2, default !important; }
-    html.xq-cursor-skin [${ATTRIBUTE}="football"] { cursor: url("${ballUrl}") 14 14, default !important; }
-    html.xq-cursor-skin [${ATTRIBUTE}="hand"] { cursor: url("${handUrl}") 12 4, pointer !important; }
-    html.xq-cursor-skin [${ATTRIBUTE}="text"] { cursor: url("${textUrl}") 16 16, text !important; }
-    html.xq-cursor-skin [${ATTRIBUTE}="disabled"] { cursor: not-allowed !important; }
+    ${Object.entries(skins)
+      .map(
+        ([name, skin]) =>
+          `html.xq-cursor-skin [${ATTRIBUTE}="${name}"] { cursor: url("${skin.url}") ${skin.hotspot}, ${skin.fallback} !important; }`,
+      )
+      .join('\n')}
+    html.xq-cursor-skin :disabled { cursor: url("${disabledUrl}") 16 16, not-allowed !important; }
     html.xq-cursor-skin.xq-cursor-morphing,
     html.xq-cursor-skin.xq-cursor-morphing * { cursor: none !important; }
     #xq-cursor-morph { position: fixed; left: 0; top: 0; width: 72px; height: 72px;
@@ -56,6 +120,9 @@ export function mountCursorSkin(): () => void {
   let from = 0
   let goal = 0
   let duration = DURATION
+  let refreshFrame = 0
+  let pointerX = 0
+  let pointerY = 0
 
   function finishMorph() {
     window.cancelAnimationFrame(frame)
@@ -65,6 +132,8 @@ export function mountCursorSkin(): () => void {
   }
 
   function clearHover() {
+    window.cancelAnimationFrame(refreshFrame)
+    refreshFrame = 0
     target?.removeAttribute(ATTRIBUTE)
     target = null
     zone = null
@@ -110,24 +179,38 @@ export function mountCursorSkin(): () => void {
   }
 
   function classify(element: Element): Skin {
-    if (element.closest('.art-login__left')) return 'football'
     if (element.closest(':disabled, [disabled], [aria-disabled="true"], .weui-btn_disabled'))
       return 'disabled'
+    if (element.closest('.art-login__left')) return 'football'
     const cursor = window.getComputedStyle(element).cursor
-    if (/^(?:grab|grabbing|move|crosshair|wait|progress|zoom-in|zoom-out|.*-resize)$/.test(cursor))
+    if (nativeSkins[cursor]) return nativeSkins[cursor]
+    if (
+      ![
+        'auto',
+        'default',
+        'inherit',
+        'initial',
+        'unset',
+        'pointer',
+        'text',
+        'vertical-text',
+      ].includes(cursor) &&
+      !cursor.includes('url(')
+    )
       return null
+    if (element.closest('[aria-busy="true"]')) return 'progress'
+    if (
+      element.closest(
+        'input[type="file"], input[type="checkbox"], input[type="radio"], input[type="color"], input[type="button"], input[type="submit"], input[type="reset"]',
+      )
+    )
+      return 'hand'
     if (element.closest('input, textarea, [contenteditable="true"], .weui-input, .weui-textarea'))
       return 'text'
     if (element.closest('button, a[href], select, [role="button"], taro-button-core')) return 'hand'
     if (cursor === 'pointer') return 'hand'
     if (cursor === 'text' || cursor === 'vertical-text') return 'text'
     if (cursor === 'not-allowed') return 'disabled'
-    // Preserve drag, resize, busy and other specialized native cursors.
-    if (
-      !['auto', 'default', 'inherit', 'initial', 'unset'].includes(cursor) &&
-      !cursor.includes('url(')
-    )
-      return null
     return 'default'
   }
 
@@ -138,8 +221,13 @@ export function mountCursorSkin(): () => void {
       !(event.target instanceof Element)
     )
       return
-    const element = event.target
-    if (target === element) return
+    pointerX = event.clientX
+    pointerY = event.clientY
+    applyHover(event.target)
+  }
+
+  function applyHover(element: Element, force = false) {
+    if (target === element && !force) return
     target?.removeAttribute(ATTRIBUTE)
     // Inspect existing CSS before applying the skin; clickable Taro Views keep
     // their pointer semantics without changing every page or modal component.
@@ -158,7 +246,7 @@ export function mountCursorSkin(): () => void {
         : null
     const crossing = zone !== null && nextZone !== null && zone !== nextZone
     if (crossing && (skin === 'default' || skin === 'football') && !reducedMotion.matches) {
-      morph(nextZone === 'art' ? 1 : 0, event.clientX, event.clientY)
+      morph(nextZone === 'art' ? 1 : 0, pointerX, pointerY)
     } else if (nextZone === null || (skin !== 'default' && skin !== 'football')) {
       finishMorph()
     }
@@ -183,11 +271,44 @@ export function mountCursorSkin(): () => void {
     root.classList.toggle('xq-cursor-skin', precisePointer.matches)
   }
 
+  function refreshAfterInteraction(event: PointerEvent) {
+    if (!precisePointer.matches || event.pointerType !== 'mouse') return
+    window.cancelAnimationFrame(refreshFrame)
+    refreshFrame = window.requestAnimationFrame(() => {
+      refreshFrame = 0
+      if (target?.isConnected) applyHover(target, true)
+    })
+  }
+  // A hovered button can become disabled or busy without pointer movement.
+  const semanticObserver = new MutationObserver((records) => {
+    if (!target || !precisePointer.matches) return
+    if (!target.isConnected) {
+      clearHover()
+      return
+    }
+    if (
+      records.some(
+        (record) =>
+          record.target instanceof Element &&
+          record.target !== root &&
+          record.target.contains(target),
+      )
+    )
+      applyHover(target, true)
+  })
+  semanticObserver.observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['disabled', 'aria-disabled', 'aria-busy', 'class', 'style'],
+  })
+
   precisePointer.addEventListener('change', syncPointer)
   reducedMotion.addEventListener('change', finishMorph)
   document.addEventListener('pointerover', hover, true)
   document.addEventListener('pointermove', move, true)
   document.addEventListener('pointerout', leave, true)
+  document.addEventListener('pointerdown', refreshAfterInteraction, true)
+  document.addEventListener('pointerup', refreshAfterInteraction, true)
   document.addEventListener('visibilitychange', visibility)
   window.addEventListener('blur', clearHover)
   window.addEventListener('hashchange', clearHover)
@@ -202,11 +323,14 @@ export function mountCursorSkin(): () => void {
     document.removeEventListener('pointerover', hover, true)
     document.removeEventListener('pointermove', move, true)
     document.removeEventListener('pointerout', leave, true)
+    document.removeEventListener('pointerdown', refreshAfterInteraction, true)
+    document.removeEventListener('pointerup', refreshAfterInteraction, true)
     document.removeEventListener('visibilitychange', visibility)
     window.removeEventListener('blur', clearHover)
     window.removeEventListener('hashchange', clearHover)
     window.removeEventListener('scroll', clearHover, true)
     overlay.remove()
     style.remove()
+    semanticObserver.disconnect()
   }
 }

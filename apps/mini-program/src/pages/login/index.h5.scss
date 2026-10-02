@@ -1,5 +1,5 @@
 /* postcss-pxtransform disable */
-@media (min-width: 1024px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .taro_page_show:has(.art-login) {
     overflow-y: hidden;
   }
@@ -14,7 +14,7 @@
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  min-height: 640px;
+  min-height: 560px;
   overflow: hidden;
   color: var(--art-ink);
   background: var(--art-paper);
@@ -48,8 +48,9 @@
 
 .art-login__brand-mark {
   display: block;
-  width: 62px;
-  height: 48px;
+  width: 74px;
+  height: 64px;
+  object-fit: contain;
 }
 
 .art-login__brand-name {
@@ -94,7 +95,22 @@
   opacity: 0;
 }
 
+.art-login__scene-watermark {
+  position: absolute;
+  color: rgba(124, 97, 158, 0.16);
+  font-family: Arial, sans-serif;
+  font-weight: 600;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
 .art-login__scene[data-scene-phase='ready'] .art-login__scene-image {
+  visibility: hidden;
+}
+
+.art-login__scene[data-scene-phase='ready'] .art-login__scene-watermark {
   visibility: hidden;
 }
 
@@ -181,8 +197,7 @@
   min-height: 0;
   margin: 52px 0 44px;
   padding: 84px clamp(32px, 3.75vw, 58px) 42px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   border-left: 1px solid #d2ddd4;
   scrollbar-width: thin;
   scrollbar-color: #c5d4c9 transparent;
@@ -494,27 +509,6 @@
   font-size: 14px;
 }
 
-.art-login__recovery {
-  margin-top: 30px;
-  padding: 20px 16px;
-  background: #e4ede340;
-  border: 1px solid #d7e1d5;
-  border-radius: 6px;
-}
-
-.art-login__recovery-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 16px;
-}
-
-.art-login__text-button {
-  min-height: 32px;
-  color: #657b6b;
-  font-size: 13px;
-}
-
 @media (prefers-reduced-motion: no-preference) {
   .art-login__control,
   .art-login__input,
@@ -621,5 +615,152 @@
 
   .art-login__primary {
     margin-top: 19px;
+  }
+}
+
+// Compact the form's spacing before making text smaller. The base login and
+// registration both fit a desktop viewport; the separate dialog may scroll.
+.art-login--register .art-login__register-grid .art-login__field {
+  margin-top: 15px;
+}
+.art-login--register .art-login__register-grid .art-login__label {
+  margin-bottom: 6px;
+}
+.art-login--register .art-login__input,
+.art-login--register .art-login__reveal {
+  height: 48px;
+}
+.art-login--register .art-login__field-icon {
+  top: 14px;
+}
+
+@media (max-height: 830px) {
+  .art-login--register .art-login__register-grid .art-login__field {
+    margin-top: 12px;
+  }
+  .art-login--register .art-login__input,
+  .art-login--register .art-login__reveal {
+    height: 44px;
+  }
+}
+
+@media (max-height: 760px) {
+  .art-login__panel {
+    margin: 26px 0 24px;
+    padding-top: 20px;
+    padding-bottom: 16px;
+  }
+  .art-login__form-heading {
+    margin-top: 18px;
+  }
+  .art-login__form-title {
+    font-size: 34px;
+  }
+  .art-login__form-subtitle {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .art-login__methods {
+    margin-top: 18px;
+  }
+  .art-login__field,
+  .art-login__field + .art-login__field {
+    margin-top: 18px;
+  }
+  .art-login__input,
+  .art-login__reveal,
+  .art-login__code-button {
+    height: 48px;
+    min-height: 48px;
+  }
+  .art-login__field-icon {
+    top: 14px;
+  }
+  .art-login__primary,
+  .art-login__guest {
+    min-height: 48px;
+  }
+  .art-login__primary {
+    margin-top: 17px;
+  }
+  .art-login__guest-hint {
+    margin-top: 9px;
+  }
+  .art-login--register .art-login__register-grid .art-login__field {
+    margin-top: 11px;
+  }
+  .art-login--register .art-login__input,
+  .art-login--register .art-login__reveal {
+    height: 44px;
+  }
+}
+
+@media (max-height: 660px) {
+  .art-login__panel {
+    margin: 22px 0;
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+  .art-login__tab {
+    font-size: 18px;
+    min-height: 32px;
+  }
+  .art-login__form-heading {
+    margin-top: 14px;
+  }
+  .art-login__form-title {
+    font-size: 30px;
+  }
+  .art-login__form-subtitle {
+    margin-top: 6px;
+    font-size: 14px;
+  }
+  .art-login__methods {
+    margin-top: 14px;
+  }
+  .art-login__method {
+    min-height: 36px;
+    font-size: 15px;
+  }
+  .art-login__field,
+  .art-login__field + .art-login__field {
+    margin-top: 14px;
+  }
+  .art-login__input,
+  .art-login__reveal,
+  .art-login__code-button {
+    height: 44px;
+    min-height: 44px;
+  }
+  .art-login__label {
+    margin-bottom: 5px;
+    font-size: 14px;
+  }
+  .art-login__field-icon {
+    top: 12px;
+  }
+  .art-login__primary,
+  .art-login__guest {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 16px;
+  }
+  .art-login__primary {
+    margin-top: 12px;
+  }
+  .art-login__guest {
+    margin-top: 10px;
+  }
+  .art-login__guest-hint {
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .art-login--register .art-login__register-grid .art-login__field {
+    margin-top: 8px;
+  }
+  .art-login--register .art-login__register-grid .art-login__label {
+    margin-bottom: 4px;
+    font-size: 12px;
   }
 }

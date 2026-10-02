@@ -2,9 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 
 import { createParticleField, type ParticleField } from './particle-field.h5'
 
+const watermark = {
+  text: 'CCNU',
+  x: 0.47,
+  y: 0.225,
+  fontRatio: 0.08,
+  color: 'rgba(124, 97, 158, 0.16)',
+}
+
 export function AuthScene({ source }: { source: string }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const watermarkRef = useRef<HTMLSpanElement>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'static' | 'fallback'>('loading')
 
   useEffect(() => {
@@ -28,12 +37,23 @@ export function AuthScene({ source }: { source: string }) {
     const resize = () => {
       const bounds = host.getBoundingClientRect()
       field?.resize(bounds.width, bounds.height)
+      const label = watermarkRef.current
+      if (label && image.naturalWidth && image.naturalHeight) {
+        const scale = Math.min(
+          bounds.width / image.naturalWidth,
+          bounds.height / image.naturalHeight,
+        )
+        label.style.left = `${(bounds.width - image.naturalWidth * scale) / 2 + image.naturalWidth * scale * watermark.x}px`
+        label.style.top = `${(bounds.height - image.naturalHeight * scale) / 2 + image.naturalHeight * scale * watermark.y}px`
+        label.style.fontSize = `${image.naturalWidth * scale * watermark.fontRatio}px`
+      }
       updateDiagnostics()
     }
     const start = () => {
       if (disposed) return
       field?.destroy()
       field = null
+      resize()
       if (motion.matches) {
         setPhase('static')
         host.dataset.engineState = 'reduced-motion'
@@ -44,6 +64,7 @@ export function AuthScene({ source }: { source: string }) {
       if (!image.complete || !image.naturalWidth) return
       field = createParticleField(canvas, image, {
         maxParticles: 24000,
+        watermark,
         onReady: () => {
           if (!disposed) setPhase('ready')
         },
@@ -89,9 +110,18 @@ export function AuthScene({ source }: { source: string }) {
   }, [source])
 
   return (
-    <div ref={hostRef} className="art-login__scene" data-scene-phase={phase} aria-hidden="true">
+    <div
+      ref={hostRef}
+      className="art-login__scene"
+      data-scene-phase={phase}
+      data-watermark="CCNU"
+      aria-hidden="true"
+    >
       <img className="art-login__scene-image" src={source} alt="" draggable={false} />
       <canvas ref={canvasRef} className="art-login__scene-canvas" />
+      <span ref={watermarkRef} className="art-login__scene-watermark">
+        CCNU
+      </span>
     </div>
   )
 }
