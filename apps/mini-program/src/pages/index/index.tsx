@@ -295,6 +295,7 @@ export default function IndexPage() {
         )
       }
     >
+      <CampusBackdrop search={searchMode} />
       {!searchMode && state.phase === 'loading' && (
         <DataState kind="loading" title="正在进入晓球" />
       )}
@@ -340,6 +341,18 @@ export default function IndexPage() {
         />
       ) : null}
     </PublicShell>
+  )
+}
+
+function CampusBackdrop({ search }: { search: boolean }) {
+  return (
+    <View aria-hidden="true" className={`campus-backdrop ${search ? 'campus-backdrop--search' : ''}`}>
+      <View className="home-page__lineart" />
+      <View className="match-ornament match-ornament--floodlight" />
+      <View className="match-ornament match-ornament--ball" />
+      <View className="match-ornament match-ornament--goal" />
+      <View className="match-ornament match-ornament--goal-lines" />
+    </View>
   )
 }
 
@@ -416,8 +429,6 @@ function HomeContent({
   const otherAnnouncements = data.announcements.slice(1)
   return (
     <View className="home-page">
-      <View aria-hidden="true" className="home-page__lineart" />
-      <View aria-hidden="true" className="home-page__lineart home-page__lineart--left" />
       <View className="experience-hero">
         <View className="experience-hero__copy">
           <Text className="experience-hero__eyebrow">
@@ -460,9 +471,6 @@ function HomeContent({
       />
 
       <View className="home-product-section">
-        <View aria-hidden="true" className="match-ornament match-ornament--floodlight" />
-        <View aria-hidden="true" className="match-ornament match-ornament--ball" />
-        <View aria-hidden="true" className="match-ornament match-ornament--goal" />
         <ProductSection
           kicker="MATCH CENTRE"
           title="焦点赛事"

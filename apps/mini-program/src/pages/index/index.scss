@@ -2017,3 +2017,43 @@
     transform: none;
   }
 }
+
+/* Desktop decoration shares one fixed viewport layer across home and search. */
+.campus-backdrop { display: none; pointer-events: none; }
+
+@media (min-width: 721px) {
+  .campus-backdrop { display: block; position: fixed; z-index: 0; inset: 0; pointer-events: none; }
+  .home-page, .public-app--home .search-experience { position: relative; z-index: 1; }
+  .campus-backdrop .home-page__lineart {
+    position: absolute;
+    top: 58vh;
+    left: 50%;
+    right: auto;
+    width: min(1180PX, 90vw);
+    height: min(418PX, 32vw);
+    opacity: 0.12;
+    transform: translateX(-50%);
+  }
+
+  .public-app.public-app--home .search-experience { width: min(100%, 760PX); min-height: 0; padding: 30PX 0 28PX; }
+  .search-experience__desktop-bar { margin-top: 18PX; }
+  .search-experience__desktop-bar .persistent-header-search--expanded { height: 48PX; padding: 0 58PX 0 18PX; }
+  .search-experience__desktop-bar .persistent-header-search--expanded .persistent-header-search__input { height: 46PX; font-size: 15PX; }
+  .search-experience__desktop-bar .persistent-header-search--expanded .persistent-header-search__frame { border-radius: 10PX; }
+  .search-experience__desktop-bar .persistent-header-search--expanded .persistent-header-search__submit { top: 4PX; right: 4PX; width: 40PX; height: 40PX; border-radius: 7PX; }
+  .search-experience .global-search__categories { margin-top: 16PX; padding-bottom: 14PX; }
+  .search-experience__empty { padding: 32PX 20PX; }
+}
+
+@media (min-width: 1101px) {
+  .campus-backdrop .match-ornament { position: absolute; }
+  .campus-backdrop .match-ornament--floodlight { top: 360PX; left: 5PX; width: 225PX; height: 365PX; }
+  .campus-backdrop .match-ornament--goal { top: 410PX; right: -28PX; width: 340PX; height: 250PX; }
+  .campus-backdrop .match-ornament--ball { top: 406PX; left: calc(max(56PX, (100vw - 1295PX) / 2) + 189PX); }
+  .campus-backdrop .match-ornament--goal-lines { top: 604PX; right: -10PX; width: 226PX; height: 108PX; background-image: url('../../assets/home-visual/pitch-markings.svg'); opacity: 0.4; }
+
+  .campus-backdrop--search .match-ornament--floodlight { top: 27vh; left: calc((100vw - 760PX) / 2 - 240PX); }
+  .campus-backdrop--search .match-ornament--ball { top: 23vh; left: calc((100vw - 760PX) / 2 - 105PX); }
+  .campus-backdrop--search .match-ornament--goal { top: 30vh; right: calc((100vw - 760PX) / 2 - 310PX); }
+  .campus-backdrop--search .match-ornament--goal-lines { top: calc(30vh + 204PX); right: calc((100vw - 760PX) / 2 - 280PX); }
+}
