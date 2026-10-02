@@ -1,6 +1,6 @@
 {
-  "scope": "Desktop H5 login page only; min-width: 1024px, hover: hover, pointer: fine",
-  "implementation": "Intrinsic-size native CSS cursors. The default PNG is a 32px browser rasterization of the faithful self-contained SVG; simple vector cursors remain SVG. Cross-boundary animation belongs to stage 4.",
+  "scope": "All desktop H5 pages; min-width: 1024px, hover: hover, pointer: fine. Football and morph are confined to the login artwork/divider.",
+  "implementation": "Native CSS cursors when settled. A 280ms SVG path morph temporarily replaces the native cursor across the login divider; rapid reversal continues from the current contour. No continuous DOM follower.",
   "sourceReferenceDirectory": "参考图片/04-登录页定稿与光标-2026-10-01",
   "assets": [
     {
@@ -20,12 +20,12 @@
       "hotspotX": 2,
       "hotspotY": 2,
       "fallback": "default",
-      "role": "Right panel and login page default",
-      "source": "04-default-cursor-transparent-source.png, original PNG embedded unchanged",
+      "role": "Default pointer throughout desktop H5",
+      "source": "Code-native SVG traced from the supplied deep-green outline and coral fold reference, with opaque sage fill",
       "sourceSha256": "a3edcb574fbd62a02f3b82eee88fea8de73c9249ad71bd6707bc049ca745802b",
-      "viewBox": [399, 270, 497, 732],
-      "preserveAspectRatio": "xMinYMin meet",
-      "note": "Browser-decoded and rendered to a 32px transparent PNG to keep the runtime cursor compact; original supplied artwork and SVG crop retained. Natural size and hotspot are unchanged.",
+      "viewBox": [0, 0, 32, 32],
+      "preserveAspectRatio": "xMidYMid meet",
+      "note": "Opaque interior #e4ede5. Source reference retained unchanged in the reference directory; the new SVG is a derivative, not an unchanged embedded raster. Browser-rendered 32px PNG keeps native cursor compatibility.",
       "sourceSvg": "default-32.svg"
     },
     {
@@ -51,12 +51,12 @@
   ],
   "hotspotVerification": "Positions checked against SVG coordinates. Final perceived tip alignment and operating-system native cursor display require a visible desktop browser check; ordinary Playwright page screenshots omit the native cursor.",
   "integration": {
-    "importStyle": "Import components/auth-cursor/native-cursors.h5.scss from the desktop H5 login component",
-    "rootClass": "art-login",
+    "importStyle": "App effect calls platform-resolved components/auth-cursor mountCursorSkin; non-H5 module is a no-op. Login styles preserve native region defaults.",
+    "rootClass": "xq-cursor-skin on document.documentElement",
     "sceneClass": "art-login__scene",
     "panelClass": "art-login__panel",
     "inputClass": "art-login__input",
     "controlClass": "art-login__control",
-    "disabledControls": "Use the native disabled property; their fallback is not-allowed"
+    "disabledControls": "Native disabled, disabled attribute, aria-disabled=true and existing Taro disabled class use not-allowed"
   }
 }

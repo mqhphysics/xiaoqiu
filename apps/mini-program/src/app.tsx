@@ -1,11 +1,14 @@
 import Taro from '@tarojs/taro'
 import { useEffect, type PropsWithChildren } from 'react'
 
+import { mountCursorSkin } from './components/auth-cursor'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
 
 import './app.scss'
 
 export default function App({ children }: PropsWithChildren) {
+  useEffect(() => mountCursorSkin(), [])
+
   useEffect(
     () =>
       subscribeToExternalSessionChanges(() => {

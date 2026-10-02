@@ -1,5 +1,5 @@
-// The operating system positions these static cursors. No DOM follower is used.
-// Limit this first implementation to desktop H5 with a precise hover device.
+// Stable cursors are native. The app-wide H5 mount adds a brief SVG morph only
+// while crossing this page's divider, and preserves the skin on other pages.
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .art-login {
     cursor:
