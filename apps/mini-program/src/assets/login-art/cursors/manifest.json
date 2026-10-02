@@ -1,0 +1,61 @@
+{
+  "scope": "Desktop H5 login page only; min-width: 1024px, hover: hover, pointer: fine",
+  "implementation": "Static intrinsic-size SVG images through native CSS cursor, with semantic keyword fallbacks. Cross-boundary animation belongs to stage 4.",
+  "sourceReferenceDirectory": "参考图片/04-登录页定稿与光标-2026-10-01",
+  "assets": [
+    {
+      "file": "football-28.svg",
+      "width": 28,
+      "height": 28,
+      "hotspotX": 14,
+      "hotspotY": 14,
+      "fallback": "default",
+      "role": "Left artwork only",
+      "source": "Original minimal SVG: fine outer contour, central pentagon, five seams, no attached decoration"
+    },
+    {
+      "file": "default-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 2,
+      "hotspotY": 2,
+      "fallback": "default",
+      "role": "Right panel and login page default",
+      "source": "04-default-cursor-transparent-source.png, original PNG embedded unchanged",
+      "sourceSha256": "a3edcb574fbd62a02f3b82eee88fea8de73c9249ad71bd6707bc049ca745802b",
+      "viewBox": [399, 270, 497, 732],
+      "preserveAspectRatio": "xMinYMin meet",
+      "note": "ViewBox clips the huge transparent outside padding while retaining the approved green outline and coral corner. Intrinsic SVG size, rather than image CSS sizing, makes the native cursor 32px."
+    },
+    {
+      "file": "text-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 16,
+      "hotspotY": 16,
+      "fallback": "text",
+      "role": "Real input and textarea elements",
+      "source": "Code-native fine I outline based on the leftmost glyph of 03-cursor-strip-reference.png"
+    },
+    {
+      "file": "hand-32.svg",
+      "width": 32,
+      "height": 32,
+      "hotspotX": 12,
+      "hotspotY": 4,
+      "fallback": "pointer",
+      "role": "Enabled tabs, buttons and links",
+      "source": "Code-native green outlined index hand based on 02-cursor-style-c.png; tiny coral palm mark replaces small football details"
+    }
+  ],
+  "hotspotVerification": "Positions checked against SVG coordinates. Final perceived tip alignment and operating-system native cursor display require a visible desktop browser check; ordinary Playwright page screenshots omit the native cursor.",
+  "integration": {
+    "importStyle": "Import components/auth-cursor/native-cursors.h5.scss from the desktop H5 login component",
+    "rootClass": "art-login",
+    "sceneClass": "art-login__scene",
+    "panelClass": "art-login__panel",
+    "inputClass": "art-login__input",
+    "controlClass": "art-login__control",
+    "disabledControls": "Use the native disabled property; their fallback is not-allowed"
+  }
+}
