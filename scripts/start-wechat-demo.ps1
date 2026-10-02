@@ -1,18 +1,92 @@
 [CmdletBinding()]
 param(
   [switch]$SkipBuild,
+  [string]$WorkspaceRoot = '',
   [string]$DevToolsRoot = 'D:\software\WeChatDevTools',
   [string]$ApiBaseUrl = 'http://127.0.0.1:3001'
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$repoRoot = if ($WorkspaceRoot) {
+  (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+} else {
+  (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+}
 $projectRoot = Join-Path $repoRoot 'apps\mini-program'
 $wechatide = Join-Path $DevToolsRoot 'wechatide.cmd'
 if (-not (Test-Path -LiteralPath $wechatide)) {
   throw "WeChat Developer Tools is missing: $wechatide"
 }
 Set-Location -LiteralPath $repoRoot
+
+function Invoke-WeChatTool {
+  param([string]$Tool, [string[]]$ToolArguments = @())
+
+  $outputText = (& $wechatide -c Codex $Tool @ToolArguments | Out-String).Trim()
+  $exitCode = $LASTEXITCODE
+  $jsonStart = $outputText.IndexOf('{')
+  if ($jsonStart -lt 0) {
+    throw "WeChat tool '$Tool' returned no structured result (exit code $exitCode). Check its window."
+  }
+  try {
+    $reply = $outputText.Substring($jsonStart) | ConvertFrom-Json
+  } catch {
+    throw "WeChat tool '$Tool' returned an unreadable result. Check its window."
+  }
+  if ($exitCode -ne 0 -and $reply.ok) {
+    throw "WeChat tool '$Tool' exited with code $exitCode."
+  }
+  return $reply
+}
+
+function Assert-WeChatToolSucceeded {
+  param([object]$Reply)
+
+  if ($Reply.ok -and $Reply.result.success -ne $false) { return }
+  $code = if ($Reply.errorType) { $Reply.errorType } else { $Reply.result.code }
+  $detail = if ($Reply.message) { $Reply.message } else { $Reply.result.message }
+  $reason = "[$code] $detail"
+  if ($code -in @('CONNECT_ERROR', 'AUTH_TASK_ERROR')) {
+    throw "WeChat CLI connection/authorization failed. In WeChat Developer Tools, allow the Codex connection, then retry. The mini-program build is not the cause. Original error: $reason"
+  }
+  if ($code -in @('AUTH_DENIED', 'AUTH_ERROR')) {
+    throw "WeChat did not authorize Codex. Check its authorization window. Original error: $reason"
+  }
+  if ($code -eq 'APPID_ERROR') {
+    throw "WeChat rejected the project AppID. Configure a valid test AppID in project.private.config.json. Original error: $reason"
+  }
+  throw "WeChat tool request failed. Original error: $reason"
+}
+
+function Test-WeChatConfirmationPending {
+  param([object]$Reply)
+
+  if ($Reply.status -ne 'pending' -and $Reply.result.status -ne 'pending') { return $false }
+  Write-Host 'WeChat is waiting for your confirmation. Click Allow in its Codex authorization window, then run this launcher again.'
+  Write-Host 'The launcher has paused; the simulator has not opened yet.'
+  return $true
+}
+
+# Check the official connection before starting services or rebuilding the package.
+Write-Host 'Checking the official WeChat connection first. If a Codex authorization window appears, click Allow there.'
+$skillFile = Join-Path $DevToolsRoot 'resources\app.asar.unpacked\wechatide-skill\SKILL.md'
+if (-not (Test-Path -LiteralPath $skillFile)) {
+  throw 'The official WeChat skill is missing. Check or update WeChat Developer Tools.'
+}
+$skillVersion = [regex]::Match((Get-Content -LiteralPath $skillFile -Raw), '(?m)^version:\s*(\S+)').Groups[1].Value
+if (-not $skillVersion) { throw 'The official WeChat skill version is missing.' }
+$status = Invoke-WeChatTool -Tool 'check_wechatide_status' -ToolArguments @('--skill-version', $skillVersion)
+Assert-WeChatToolSucceeded -Reply $status
+if (Test-WeChatConfirmationPending -Reply $status) { return }
+if ($status.result.versionRelation -notin @('equal', 'agent_ahead')) {
+  throw "WeChat skill compatibility is not confirmed: $($status.result.versionRelation). Check the installed official skill."
+}
+if ($status.result.loginExpired -ne $false) {
+  throw 'WeChat login is not ready. Sign in with your WeChat account in the developer tool, then retry.'
+}
+if ($status.result.cliTokenRequired -or $status.result.tokenRequired) {
+  throw 'WeChat requires its configured CLI access token. Supply it through the official CLI settings before retrying; do not save it in this project.'
+}
 
 $apiReady = $false
 try {
@@ -42,17 +116,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'dist-weapp\app.json'))
 }
 
 Write-Host 'Opening Xiaoqiu in the official WeChat simulator...'
-$openOutput = (& $wechatide -c Codex open_project_window --project $projectRoot --window-mode fullMode | Out-String).Trim()
-if ($LASTEXITCODE -ne 0) { throw 'WeChat Developer Tools could not open the project.' }
-Write-Host $openOutput
-$jsonStart = $openOutput.IndexOf('{')
-if ($jsonStart -lt 0) { throw 'WeChat did not return a structured result. Check its window.' }
-$openResult = $openOutput.Substring($jsonStart) | ConvertFrom-Json
-if (-not $openResult.ok -or $openResult.result.success -eq $false) {
-  throw 'WeChat could not open the project. Complete login/test AppID setup in its window and retry.'
-}
-if ($openResult.status -eq 'pending' -or $openResult.result.status -eq 'pending') {
-  Write-Host 'WeChat is waiting for your confirmation. Finish the prompt in its window.'
-} else {
-  Write-Host 'The official tool accepted the request. Check the simulator for the rendered page.'
-}
+$openResult = Invoke-WeChatTool -Tool 'open_project_window' -ToolArguments @('--project', $projectRoot, '--window-mode', 'fullMode')
+Assert-WeChatToolSucceeded -Reply $openResult
+if (Test-WeChatConfirmationPending -Reply $openResult) { return }
+Write-Host 'The official tool accepted the request. Check the simulator for the rendered page.'
