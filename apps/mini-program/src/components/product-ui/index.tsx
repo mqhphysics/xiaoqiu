@@ -16,6 +16,7 @@ import { demoCrestUrl } from '../../features/product/demo-media'
 import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
 import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
+import { PlayerTrigger } from '../player-trigger'
 
 import './index.scss'
 
@@ -57,14 +58,18 @@ export function UserAvatar({
   color,
   avatarUrl,
   size = 'medium',
+  playerId,
+  tournamentId,
 }: {
   name: string
   color?: string | null
   avatarUrl?: string | null
   size?: 'small' | 'medium' | 'large'
+  playerId?: string
+  tournamentId?: string
 }) {
   const source = resolveMediaUrl(avatarUrl)
-  return source ? (
+  const avatar = source ? (
     <Image
       aria-label={`${name}的头像`}
       className={`user-avatar user-avatar--${size}`}
@@ -79,6 +84,11 @@ export function UserAvatar({
       {name.slice(0, 1)}
     </Text>
   )
+  return playerId ? (
+    <PlayerTrigger playerId={playerId} {...(tournamentId ? { tournamentId } : {})} name={name}>
+      {avatar}
+    </PlayerTrigger>
+  ) : avatar
 }
 
 export function MatchStatus({ status }: { status: MatchSummary['status'] }) {

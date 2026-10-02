@@ -9,6 +9,12 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+interface OverlayEntry {
+  panel: HTMLElement | null
+}
+const overlays: OverlayEntry[] = []
+let unlockedOverflow = ''
+
 export function useOverlayFocus(
   enabled: boolean,
   panelSelector: string,
@@ -20,13 +26,23 @@ export function useOverlayFocus(
     if (!enabled) return
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const previousOverflow = document.body.style.overflow
     const panel = document.querySelector<HTMLElement>(panelSelector)
+    const entry = { panel }
+    if (overlays.length === 0) unlockedOverflow = document.body.style.overflow
+    overlays.push(entry)
     const focusFirst = () => {
       panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
     const timer = window.setTimeout(focusFirst, 0)
     const onKeyDown = (event: KeyboardEvent) => {
+      // A profile and the message drawer can remain interactive together. Route
+      // keyboard handling to the panel with focus, falling back to the newest.
+      const active =
+        overlays
+          .slice()
+          .reverse()
+          .find((overlay) => overlay.panel?.contains(document.activeElement)) ?? overlays.at(-1)
+      if (active !== entry || event.defaultPrevented) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onCloseRef.current()
@@ -56,9 +72,18 @@ export function useOverlayFocus(
     document.addEventListener('keydown', onKeyDown)
     return () => {
       window.clearTimeout(timer)
-      document.body.style.overflow = previousOverflow
+      const index = overlays.indexOf(entry)
+      if (index !== -1) overlays.splice(index, 1)
+      if (overlays.length === 0) document.body.style.overflow = unlockedOverflow
       document.removeEventListener('keydown', onKeyDown)
-      previousFocus?.focus()
+      if (
+        previousFocus?.isConnected &&
+        previousFocus.offsetParent !== null &&
+        (overlays.length === 0 ||
+          overlays.some((overlay) => overlay.panel?.contains(previousFocus)))
+      )
+        previousFocus.focus()
+      else overlays.at(-1)?.panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
   }, [enabled, panelSelector])
 }

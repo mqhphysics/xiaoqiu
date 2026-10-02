@@ -5,6 +5,7 @@ import { AvatarCropper } from '../../components/avatar-cropper'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
+import { openPlayer } from '../../features/product/player-navigation'
 import { TeamCrest, UserAvatar } from '../../components/product-ui'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
@@ -1002,9 +1003,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               className="profile-button profile-button--primary"
               onClick={() => {
                 setModal(null)
-                void Taro.navigateTo({
-                  url: `/pages/player-detail/index?playerId=${encodeURIComponent(user.linkedPlayer!.id)}&tournamentId=${encodeURIComponent(home.tournament.id)}`,
-                }).catch(toastError)
+                void openPlayer(user.linkedPlayer!.id, home.tournament.id).catch(toastError)
               }}
             >
               查看球员档案

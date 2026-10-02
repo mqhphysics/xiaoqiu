@@ -15,6 +15,7 @@ import {
   positionLabel,
 } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { openPlayer } from '../../features/product/player-navigation'
 import { readSession } from '../../features/product/session'
 import { MatchReportEntry } from '../../features/match-report/MatchReportEntry'
 import { useDetailBack } from '../readonly-schedule/detail-back'
@@ -276,17 +277,11 @@ function MatchContent({
                     className="lineup-player"
                     key={player.id}
                     onClick={() =>
-                      void Taro.navigateTo({
-                        url:
-                          '/pages/player-detail/index?playerId=' +
-                          encodeURIComponent(player.id) +
-                          '&tournamentId=' +
-                          encodeURIComponent(match.tournamentId),
-                      })
+                      void openPlayer(player.id, match.tournamentId)
                     }
                   >
                     <Text className="lineup-player__number">{player.shirtNumber ?? '-'}</Text>
-                    <UserAvatar name={player.displayName} size="small" />
+                    <UserAvatar name={player.displayName} playerId={player.id} tournamentId={match.tournamentId} size="small" />
                     <View className="lineup-player__copy">
                       <Text>{player.displayName}</Text>
                       <Text>

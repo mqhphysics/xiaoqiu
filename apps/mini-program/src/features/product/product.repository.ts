@@ -69,6 +69,11 @@ export const productRepository = {
 
   getPost: (postId: string) => request<PostDetail>(`/public/posts/${encodeURIComponent(postId)}`),
 
+  getPosts: (tournamentId?: string) =>
+    request<{ items: PostSummary[] }>(
+      `/public/posts${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+    ),
+
   login: async (identifier: string, password: string) => {
     const session = await request<AuthSession>('/auth/login', {
       method: 'POST',

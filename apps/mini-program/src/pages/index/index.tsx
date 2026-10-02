@@ -10,6 +10,7 @@ import { HeroCarousel } from '../../components/hero-carousel'
 import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
+import { openPlayer } from '../../features/product/player-navigation'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
@@ -793,6 +794,8 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
         >
           <UserAvatar
             avatarUrl={player.avatarUrl}
+            playerId={player.id}
+            tournamentId={tournamentId}
             name={player.displayName}
             color={player.profileColor}
             size="small"
@@ -861,9 +864,7 @@ async function goToTeam(teamId: string, tournamentId: string) {
 }
 
 async function goToPlayer(playerId: string, tournamentId: string) {
-  await Taro.navigateTo({
-    url: `/pages/player-detail/index?playerId=${encodeURIComponent(playerId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-  })
+  await openPlayer(playerId, tournamentId)
 }
 
 async function goToPost(postId: string) {
