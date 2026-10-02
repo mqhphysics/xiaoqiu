@@ -112,7 +112,12 @@ export async function requestAdmin<T>(
   api: string,
   context: { accessToken: string; organizationId: string },
   path: string,
-  options: { method?: 'GET' | 'POST'; body?: unknown } = {},
+  options: {
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+    body?: unknown
+    headers?: Record<string, string>
+    signal?: AbortSignal
+  } = {},
 ): Promise<T> {
   const session = adminSession.getSnapshot()
   const token = context.accessToken
@@ -129,11 +134,13 @@ export async function requestAdmin<T>(
     method: options.method ?? 'GET',
     cache: 'no-store',
     headers: {
+      ...options.headers,
       'content-type': 'application/json',
       authorization: `Bearer ${token}`,
       'x-organization-id': context.organizationId,
     },
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
   })
   const current = adminSession.getSnapshot().credential
   if (current?.accessToken !== token)

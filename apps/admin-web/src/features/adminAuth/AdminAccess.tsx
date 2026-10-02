@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 
-import { AdminScheduleWorkspace } from '../adminSchedule/AdminScheduleWorkspace'
+import { AdminCenter } from '../adminCenter/AdminCenter'
 import type { OrganizationContext } from '../adminSchedule/types'
 import { AdminApiError, currentAdminUser, loginAdmin, revokeAdminSession } from './request'
 import { adminSession, validCredential } from './session'
@@ -207,7 +207,7 @@ export function AdminAccess({ api }: { api: string }) {
           </button>
         </div>
       ) : null}
-      <AdminScheduleWorkspace
+      <AdminCenter
         key={context.accessToken}
         context={context}
         displayName={state.user!.displayName}
@@ -292,9 +292,13 @@ function AdminLogin({ api, message }: { api: string; message: string }) {
   return (
     <main className="admin-auth-shell">
       <section className="admin-auth-panel panel">
-        <p className="eyebrow">XIAOQIU ADMIN</p>
-        <h1>管理后台登录</h1>
-        <p>使用已获授权的账号管理赛事和名单。</p>
+        <p className="eyebrow">XIAOQIU · 管理中心</p>
+        <h1>
+          把每一场球，
+          <br />
+          照顾好。
+        </h1>
+        <p>赛事、人员与内容，在同一个工作台。</p>
         <form
           className="admin-auth-form"
           onSubmit={(event) => {
@@ -335,7 +339,9 @@ function AdminLogin({ api, message }: { api: string; message: string }) {
               type="password"
               name="password"
               autoComplete="current-password"
-              minLength={8}
+              minLength={
+                import.meta.env.DEV && import.meta.env.VITE_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
+              }
               maxLength={128}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -348,9 +354,12 @@ function AdminLogin({ api, message }: { api: string; message: string }) {
             </p>
           ) : null}
           <button type="submit" disabled={busy}>
-            {busy ? '正在登录…' : '登录管理后台'}
+            {busy ? '正在登录…' : '进入管理中心'}
           </button>
         </form>
+        <a className="admin-public-link" href="http://127.0.0.1:3000/">
+          返回晓球网站 ↗
+        </a>
       </section>
     </main>
   )

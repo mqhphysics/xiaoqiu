@@ -31,13 +31,17 @@ export function AdminScheduleWorkspace({
   context,
   displayName,
   onLogout,
+  initialSection = 'events',
+  onSnapshotChange,
 }: {
   context: OrganizationContext
   displayName: string
   onLogout: () => void
+  initialSection?: WorkbenchSection
+  onSnapshotChange?: () => void
 }) {
   const repository = useMemo(() => createAdminScheduleRepository(), [])
-  const [activeSection, setActiveSection] = useState<WorkbenchSection>('events')
+  const [activeSection, setActiveSection] = useState<WorkbenchSection>(initialSection)
   const [snapshot, setSnapshot] = useState<AdminScheduleSnapshot>(emptySnapshot)
   const [isLoading, setIsLoading] = useState(true)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
@@ -70,6 +74,7 @@ export function AdminScheduleWorkspace({
         setSnapshot(nextSnapshot)
         if (successMessage) {
           setNotice(successMessage)
+          onSnapshotChange?.()
         }
       } catch (caught) {
         if (version !== refreshVersion.current) return
@@ -79,7 +84,7 @@ export function AdminScheduleWorkspace({
         if (version === refreshVersion.current) setIsLoading(false)
       }
     },
-    [repository, context],
+    [repository, context, onSnapshotChange],
   )
 
   useEffect(() => {
@@ -397,8 +402,12 @@ function EventsSection(props: {
         </form>
       </Panel>
 
-      <Panel title="创建并发布规则版本" description="规则版本发布后不可修改，变更时创建新版本。">
+      <Panel title="规程版本" description="完整名单、赛果与晋级规程在“规程与晋级”中维护。">
+        <p className="mc-muted">
+          请切换到“规程与晋级”发布带审核原因的完整新版本。历史规则不会被覆盖。
+        </p>
         <form
+          hidden
           className="form-grid"
           onSubmit={(event) => {
             event.preventDefault()
