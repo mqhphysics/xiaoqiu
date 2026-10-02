@@ -7,6 +7,8 @@ import { PersistentHeaderSearch } from '../../components/public-shell/persistent
 import { openSearchPage } from '../../components/public-shell/search-transition'
 import backIcon from '../../assets/search-icons/arrow-left.svg'
 import { PostImagePicker } from '../../components/post-image-picker'
+import { DesktopPostComposer } from '../../components/post-composer'
+import { openPost } from '../../features/product/post-navigation'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
@@ -86,7 +88,7 @@ export default function IndexPage() {
   const [pendingPost, setPendingPost] = useState<{ id: string; signature: string } | null>(null)
   const searchRequestId = useRef(0)
 
-  useOverlayFocus(composerOpen, '.composer-dialog', () => setComposerOpen(false))
+  useOverlayFocus(composerOpen && !(Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches), '.composer-dialog', () => setComposerOpen(false))
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -340,6 +342,7 @@ export default function IndexPage() {
           onSearchTextChange={handleSearchTextChange}
         />
       ) : null}
+      <DesktopPostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={post => setState(current => current.phase === 'ready' ? { phase: 'ready', data: { ...current.data, posts: [post, ...current.data.posts] } } : current)} />
     </PublicShell>
   )
 }
@@ -556,7 +559,7 @@ function HomeContent({
         </View>
       </View>
 
-      {composerOpen && (
+      {composerOpen && !(Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) && (
         <View className="composer-scrim" onClick={onCloseComposer}>
           <View
             aria-labelledby="composer-dialog-title"
@@ -867,5 +870,5 @@ async function goToPlayer(playerId: string, tournamentId: string) {
 }
 
 async function goToPost(postId: string) {
-  await Taro.navigateTo({ url: `/pages/post-detail/index?postId=${encodeURIComponent(postId)}` })
+  await openPost(postId)
 }

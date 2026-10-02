@@ -144,3 +144,28 @@ test('post photos reject forged formats and truncated data', async () => {
   )
   await assertBadAvatar(() => normalizePostImage('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='))
 })
+
+test('post GIFs retain all frames, delays and looping; excessive animations are rejected', async () => {
+  const pixels = Buffer.alloc(96 * 192 * 3)
+  pixels.fill(255, 0, 96 * 96 * 3)
+  const source = await sharp(pixels, {
+    raw: { width: 96, height: 192, channels: 3, pageHeight: 96 },
+  })
+    .gif({ delay: [80, 120], loop: 0 })
+    .toBuffer()
+  const image = await normalizePostImage(`data:image/gif;base64,${source.toString('base64')}`)
+  const metadata = await sharp(image.body, { animated: true }).metadata()
+  assert.equal(metadata.pages, 2)
+  assert.deepEqual(metadata.delay, [80, 120])
+  assert.equal(metadata.loop, 0)
+  assert.equal(image.width, 96)
+  assert.equal(image.height, 96)
+  const oversized = await sharp({
+    create: { width: 8001, height: 64, channels: 3, background: 'red' },
+  })
+    .gif()
+    .toBuffer()
+  await assertBadAvatar(() =>
+    normalizePostImage(`data:image/gif;base64,${oversized.toString('base64')}`),
+  )
+})

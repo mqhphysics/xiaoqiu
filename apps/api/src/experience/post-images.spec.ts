@@ -151,6 +151,71 @@ test('HTTP publishes a large single photo, retries once, reads it back, and pres
       .expect(201)
     assert.equal(plain.body.imageUrl, null)
     assert.equal(auditCount, 2)
+    const animationPixels = Buffer.alloc(96 * 192 * 3)
+    animationPixels.fill(255, 0, 96 * 96 * 3)
+    const gif = await sharp(animationPixels, {
+      raw: { width: 96, height: 192, channels: 3, pageHeight: 96 },
+    })
+      .gif({ delay: [80, 120], loop: 0 })
+      .toBuffer()
+    const gifDataUrl = `data:image/gif;base64,${gif.toString('base64')}`
+    const albumPayload = {
+      clientPostId: 'post-album-test-3',
+      body: '',
+      imageDataUrls: [imageDataUrl, gifDataUrl, imageDataUrl],
+    }
+    const album = await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send(albumPayload)
+      .expect(201)
+    assert.equal(album.body.imageUrls.length, 3)
+    assert.equal(album.body.imageUrl, album.body.imageUrls[0])
+    const animation = await request(app.getHttpServer()).get(album.body.imageUrls[1]).expect(200)
+    const animationMetadata = await sharp(animation.body, { animated: true }).metadata()
+    assert.equal(animationMetadata.pages, 2, 'GIF frames must survive storage')
+    assert.deepEqual(animationMetadata.delay, [80, 120])
+    assert.equal(animationMetadata.loop, 0)
+    const albumRetry = await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send(albumPayload)
+      .expect(201)
+    assert.equal(albumRetry.body.id, album.body.id)
+    assert.equal(auditCount, 3)
+    await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send({ ...albumPayload, imageDataUrls: [gifDataUrl, imageDataUrl, imageDataUrl] })
+      .expect(409)
+    await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send({
+        ...albumPayload,
+        clientPostId: 'post-album-test-4',
+        imageDataUrls: Array(10).fill(imageDataUrl),
+      })
+      .expect(400)
+    await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send({ ...albumPayload, clientPostId: 'post-album-test-5', imageDataUrl })
+      .expect(409)
+    await request(app.getHttpServer())
+      .post('/api/community/posts')
+      .set('Authorization', 'Bearer photo-test')
+      .send({ clientPostId: 'post-empty-test-6', body: '' })
+      .expect(400)
+    posts.get(`${userId}:${albumPayload.clientPostId}`)!.status = 'HIDDEN'
+    for (const image of album.body.imageUrls)
+      await request(app.getHttpServer()).get(image).expect(404)
+    await request(app.getHttpServer())
+      .get(album.body.imageUrls[1].replace(org, tournamentId))
+      .expect(404)
+    await request(app.getHttpServer())
+      .get(album.body.imageUrls[1].replace('-3-1.webp', '-3-8.webp'))
+      .expect(404)
     posts.get(`${userId}:${payload.clientPostId}`)!.status = 'HIDDEN'
     await request(app.getHttpServer()).get(first.body.imageUrl).expect(404)
     await request(app.getHttpServer())

@@ -147,6 +147,7 @@ export const productRepository = {
     title?: string,
     teamId?: string,
     imageDataUrl?: string,
+    imageDataUrls?: string[],
   ) =>
     request<PostSummary>('/community/posts', {
       method: 'POST',
@@ -156,6 +157,7 @@ export const productRepository = {
         ...(title ? { title } : {}),
         ...(teamId ? { teamId } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
+        ...(imageDataUrls?.length ? { imageDataUrls } : {}),
       },
     }),
 

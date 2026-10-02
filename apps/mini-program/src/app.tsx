@@ -3,6 +3,7 @@ import { useEffect, type PropsWithChildren } from 'react'
 
 import { mountCursorSkin } from './components/auth-cursor'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
+import { PostOverlayHost } from './components/post-overlay'
 
 import './app.scss'
 
@@ -21,5 +22,10 @@ export default function App({ children }: PropsWithChildren) {
     [],
   )
 
-  return children
+  return (
+    <>
+      {children}
+      <PostOverlayHost />
+    </>
+  )
 }

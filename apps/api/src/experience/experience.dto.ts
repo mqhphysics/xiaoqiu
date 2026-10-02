@@ -68,17 +68,29 @@ export class CreatePostDto {
   @ApiProperty({ type: String })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @Length(2, 1000)
+  @Length(0, 1000)
   body!: string
 
   @ApiPropertyOptional({
     type: String,
-    description: '可选的单张 JPEG/PNG/WebP 图片 data URL，文件最大 4 MiB',
+    description: '兼容旧客户端的单张 JPEG/PNG/WebP/GIF 图片，最大 4 MiB',
   })
   @IsOptional()
   @IsString()
   @MaxLength(5_600_000)
   imageDataUrl?: string
+
+  @ApiPropertyOptional({
+    type: [String],
+    maxItems: 9,
+    description: '按展示顺序上传，最多 9 张；与 imageDataUrl 二选一',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(9)
+  @IsString({ each: true })
+  @MaxLength(5_600_000, { each: true })
+  imageDataUrls?: string[]
 }
 
 export class CreateCommentDto {

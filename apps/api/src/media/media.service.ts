@@ -32,6 +32,20 @@ export interface StoredPostImage {
   height: number
 }
 
+// The existing imageUrl remains a renderable cover. Album membership is encoded in
+// content-addressed filenames, keeping the local media adapter schema-compatible.
+export function postImageUrls(imageUrl: string | null): string[] {
+  if (!imageUrl) return []
+  const album =
+    /^(\/api\/media\/posts\/[a-f0-9-]+\/[a-f0-9-]+\/[a-f0-9]{64})-([2-9])-0\.webp$/.exec(imageUrl)
+  return album
+    ? Array.from(
+        { length: Number(album[2]) },
+        (_, index) => `${album[1]}-${album[2]}-${index}.webp`,
+      )
+    : [imageUrl]
+}
+
 export interface StoredAvatar {
   avatarUrl: string
   bytes: number
@@ -81,10 +95,13 @@ export class MediaService {
     if (
       !isMediaScope(organizationId) ||
       !isMediaScope(authorUserId) ||
-      !/^[a-f0-9]{64}\.webp$/.test(fileName)
+      !/^[a-f0-9]{64}(?:-[2-9]-[0-8])?\.webp$/.test(fileName)
     )
       throw notFound('动态图片不存在')
-    const imageUrl = `/api/media/posts/${organizationId}/${authorUserId}/${fileName}`
+    const album = /^([a-f0-9]{64})-([2-9])-([0-8])\.webp$/.exec(fileName)
+    if (album && Number(album[3]) >= Number(album[2])) throw notFound('动态图片不存在')
+    const cover = album ? `${album[1]}-${album[2]}-0.webp` : fileName
+    const imageUrl = `/api/media/posts/${organizationId}/${authorUserId}/${cover}`
     const visiblePost = await this.prisma.post.findFirst({
       where: { organizationId, authorUserId, imageUrl, status: 'PUBLISHED' },
       select: { id: true },
@@ -101,15 +118,60 @@ export class MediaService {
   }
 
   async cleanupPostImageIfUnreferenced(imageUrl: string): Promise<void> {
-    const match = /^\/api\/media\/posts\/([a-f0-9-]+)\/([a-f0-9-]+)\/([a-f0-9]{64}\.webp)$/.exec(
-      imageUrl,
-    )
+    const match =
+      /^\/api\/media\/posts\/([a-f0-9-]+)\/([a-f0-9-]+)\/([a-f0-9]{64}(?:-[2-9]-0)?\.webp)$/.exec(
+        imageUrl,
+      )
     if (!match || !isMediaScope(match[1]!) || !isMediaScope(match[2]!)) return
     if (await this.prisma.post.count({ where: { imageUrl } })) return
+    for (const url of postImageUrls(imageUrl)) {
+      try {
+        await unlink(resolve(postDirectory(), match[1]!, match[2]!, url.split('/').at(-1)!))
+      } catch {
+        // Missing or concurrently cleaned files need no further action.
+      }
+    }
+  }
+
+  async storePostImages(
+    organizationId: string,
+    authorUserId: string,
+    dataUrls: string[],
+  ): Promise<StoredPostImage | null> {
+    if (!isMediaScope(organizationId) || !isMediaScope(authorUserId))
+      throw badAvatar('图片所属账户无效')
+    if (dataUrls.length > 9) throw badAvatar('每条动态最多 9 张图片')
+    if (dataUrls.reduce((sum, url) => sum + url.length, 0) > 24_000_000)
+      throw badAvatar('图片总大小过大，请减少图片')
+    if (dataUrls.length === 0) return null
+    if (dataUrls.length === 1)
+      return this.storePostImage(organizationId, authorUserId, dataUrls[0]!)
+    // Normalize all files before writing, so a rejected image leaves no partial album.
+    const images = []
+    for (const dataUrl of dataUrls) images.push(await normalizePostImage(dataUrl))
+    const hash = createHash('sha256')
+    for (const image of images) hash.update(createHash('sha256').update(image.body).digest())
+    const prefix = `${hash.digest('hex')}-${images.length}`
+    const directory = resolve(postDirectory(), organizationId, authorUserId)
+    await mkdir(directory, { recursive: true })
+    const imageUrl = `/api/media/posts/${organizationId}/${authorUserId}/${prefix}-0.webp`
     try {
-      await unlink(resolve(postDirectory(), match[1]!, match[2]!, match[3]!))
-    } catch {
-      // A failed publish may have no remaining file or may share content with another publish.
+      for (const [index, image] of images.entries()) {
+        try {
+          await writeFile(resolve(directory, `${prefix}-${index}.webp`), image.body, { flag: 'wx' })
+        } catch (error) {
+          if (!isAlreadyExists(error)) throw error
+        }
+      }
+    } catch (error) {
+      await this.cleanupPostImageIfUnreferenced(imageUrl)
+      throw error
+    }
+    return {
+      imageUrl,
+      bytes: images.reduce((sum, image) => sum + image.body.length, 0),
+      width: images[0]!.width,
+      height: images[0]!.height,
     }
   }
 
@@ -305,8 +367,8 @@ function isMediaScope(value: string): boolean {
 export async function normalizePostImage(
   dataUrl: string,
 ): Promise<{ body: Buffer; width: number; height: number }> {
-  const match = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
-  if (!match) throw badAvatar('动态图片仅支持 JPEG、PNG 或 WebP')
+  const match = /^data:image\/(webp|png|jpeg|gif);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
+  if (!match) throw badAvatar('动态图片仅支持 JPEG、PNG、WebP 或 GIF')
   const input = Buffer.from(match[2]!, 'base64')
   if (input.length < 100 || input.length > MAX_POST_IMAGE_BYTES)
     throw badAvatar('动态图片需小于 4 MiB')
@@ -316,24 +378,35 @@ export async function normalizePostImage(
       limitInputPixels: 24_000_000,
     }).metadata()
     if (metadata.format !== match[1]) throw badAvatar('动态图片内容与格式不一致')
+    const frameHeight = metadata.pageHeight ?? metadata.height
+    const frames = metadata.pages ?? 1
     if (
       !metadata.width ||
-      !metadata.height ||
+      !frameHeight ||
       metadata.width < 64 ||
-      metadata.height < 64 ||
+      frameHeight < 64 ||
       metadata.width > 8000 ||
-      metadata.height > 8000 ||
-      (metadata.pages ?? 1) > 1
+      frameHeight > 8000 ||
+      frames > 200 ||
+      metadata.width * frameHeight * frames > 48_000_000
     )
-      throw badAvatar('请选择尺寸适中的静态照片')
+      throw badAvatar('图片尺寸或动画帧数过大，请选择较小的图片')
     for (const quality of [82, 68, 54]) {
-      const output = await sharp(input, { failOn: 'error', limitInputPixels: 24_000_000 })
+      const output = await sharp(input, {
+        animated: true,
+        failOn: 'error',
+        limitInputPixels: 48_000_000,
+      })
         .rotate()
         .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
         .webp({ quality, effort: 4 })
         .toBuffer({ resolveWithObject: true })
-      if (output.data.length <= MAX_POST_OUTPUT_BYTES)
-        return { body: output.data, width: output.info.width, height: output.info.height }
+      if (output.data.length <= (frames > 1 ? MAX_POST_IMAGE_BYTES : MAX_POST_OUTPUT_BYTES))
+        return {
+          body: output.data,
+          width: output.info.width,
+          height: Math.round(output.info.height / frames),
+        }
     }
   } catch (error) {
     if (error instanceof ApiHttpException) throw error

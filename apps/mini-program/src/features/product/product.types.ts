@@ -59,6 +59,7 @@ export interface PostSummary {
   title: string | null
   body: string
   imageUrl: string | null
+  imageUrls?: string[]
   publishedAt: string
   author: PostAuthor
   team: TeamSummary | null

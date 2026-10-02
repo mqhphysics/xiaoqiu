@@ -1,7 +1,7 @@
 import { Button, Image, Text, View } from '@tarojs/components'
 import type { BaseEventOrig } from '@tarojs/components/types/common'
 import Taro from '@tarojs/taro'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import {
   formatDate,
@@ -13,7 +13,9 @@ import {
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
 import { demoCrestUrl } from '../../features/product/demo-media'
-import { resolveMediaUrl } from '../../features/product/product.repository'
+import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
+import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
+import { readSession } from '../../features/product/session'
 
 import './index.scss'
 
@@ -118,7 +120,7 @@ export function MatchCard({ match, onClick }: { match: MatchSummary; onClick?: (
 }
 
 export function PostCard({
-  post,
+  post: originalPost,
   onOpen,
   onLike,
   onMessageAuthor,
@@ -130,11 +132,28 @@ export function PostCard({
   onMessageAuthor?: () => void
   variant?: 'home'
 }) {
+  const post = usePostInteraction(originalPost)
+  const open = () => {
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) void openPost(post.id)
+    else onOpen()
+  }
   const [imageFailed, setImageFailed] = useState(false)
+  const likePending = useRef(false)
   const imageUrl = variant === 'home' && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
-    onLike?.()
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB || !window.matchMedia('(min-width: 721px)').matches) { onLike?.(); return }
+    if (likePending.current) return
+    if (!readSession()) {
+      void Taro.showToast({ title: '登录后可以点赞', icon: 'none' })
+      return
+    }
+    likePending.current = true
+    void productRepository.setLike(post.id, !post.likedByMe).then(result => {
+      updatePostInteraction({ ...post, likedByMe: result.liked, likeCount: result.likeCount })
+    }).catch(issue => {
+      void Taro.showToast({ title: issue instanceof Error ? issue.message : '点赞失败，请重试', icon: 'none' })
+    }).finally(() => { likePending.current = false })
   }
   const stopAndMessage = (event: BaseEventOrig) => {
     if (!onMessageAuthor) return
@@ -144,7 +163,7 @@ export function PostCard({
   return (
     <View
       className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${imageUrl ? 'post-card--with-image' : ''}`}
-      onClick={onOpen}
+      onClick={open}
     >
       <View className="post-card__author">
         <UserAvatar avatarUrl={post.author.avatarUrl} name={post.author.displayName} size="small" />
@@ -176,10 +195,12 @@ export function PostCard({
           onError={() => setImageFailed(true)}
           onClick={(event) => {
             event.stopPropagation()
-            void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
+            if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) open()
+            else void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
           }}
         />
       )}
+      {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
       <View className="post-card__actions">

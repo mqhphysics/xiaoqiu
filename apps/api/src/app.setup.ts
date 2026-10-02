@@ -11,7 +11,7 @@ import { createValidationPipe } from './common/validation'
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api')
   const httpApp = app as NestExpressApplication
-  httpApp.useBodyParser('json', { limit: '6mb' })
+  httpApp.useBodyParser('json', { limit: '26mb' })
   app.use((request: Request, response: Response, next: NextFunction) => {
     if (/^\/api\/public(?:\/|$)/i.test(request.path)) {
       response.vary('X-Organization-Id')

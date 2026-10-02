@@ -5,7 +5,7 @@ import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { selectPublicTournament } from '../common/public-tournament'
 import { PrismaService } from '../database/prisma.service'
-import { MediaService } from '../media/media.service'
+import { MediaService, postImageUrls } from '../media/media.service'
 import {
   AuditActorType,
   MatchEventType,
@@ -967,13 +967,18 @@ export class ExperienceService {
     const title = input.title?.trim() || null
     const body = input.body.trim()
     const teamId = input.teamId ?? null
-    const storedImage = input.imageDataUrl
-      ? await this.mediaService.storePostImage(
-          session.organizationId,
-          session.userId,
-          input.imageDataUrl,
-        )
-      : null
+    if (input.imageDataUrl && input.imageDataUrls) throw conflict('请只提交一种图片格式')
+    const imageDataUrls = input.imageDataUrls ?? (input.imageDataUrl ? [input.imageDataUrl] : [])
+    if (!body && imageDataUrls.length === 0)
+      throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
+        code: ERROR_CODES.BAD_REQUEST,
+        message: '请填写正文或添加图片',
+      })
+    const storedImage = await this.mediaService.storePostImages(
+      session.organizationId,
+      session.userId,
+      imageDataUrls,
+    )
     const imageUrl = storedImage?.imageUrl ?? null
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1028,7 +1033,12 @@ export class ExperienceService {
               action: 'COMMUNITY_POST_CREATED',
               targetType: 'Post',
               targetId: post.id,
-              afterSummary: { title, teamId, hasImage: Boolean(imageUrl) },
+              afterSummary: {
+                title,
+                teamId,
+                hasImage: Boolean(imageUrl),
+                imageCount: imageDataUrls.length,
+              },
               reason: '用户发布校园足球动态',
               requestId,
               source: 'API',
@@ -1361,6 +1371,7 @@ function mapPost(
     title: post.title,
     body: post.body,
     imageUrl: post.imageUrl,
+    imageUrls: postImageUrls(post.imageUrl),
     publishedAt: post.publishedAt.toISOString(),
     author: post.author
       ? {
