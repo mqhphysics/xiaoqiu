@@ -1,40 +1,74 @@
+import { useId } from 'react'
+
 import './team-nav-focus.h5.scss'
 
-const contours = [
-  { side: -1, tone: 'primary', path: 'M52 7C37 12 30 22 30 35C30 47 37 58 49 63' },
-  { side: 1, tone: 'primary', path: 'M80 7C95 12 102 22 102 35C102 47 95 58 83 63' },
-  { side: -1, tone: 'outer', path: 'M46 3C26 13 19 31 25 48' },
-  { side: 1, tone: 'outer', path: 'M86 3C106 13 113 31 107 48' },
-  { side: -1, tone: 'base', path: 'M37 63C45 70 55 74 63 74' },
-  { side: 1, tone: 'base', path: 'M95 63C87 70 77 74 69 74' },
+const layers = [
+  {
+    tone: 'outer',
+    path: 'M7 37C20 57 39 64 63 65C37 70 14 57 7 37Z',
+    edge: 'M7 37C20 57 39 64 63 65',
+    colors: ['#fbf8ed', '#dfd1a6', '#9eaa87'],
+  },
+  {
+    tone: 'middle',
+    path: 'M20 34C29 48 44 58 63 63C39 65 23 55 20 34Z',
+    edge: 'M20 34C29 48 44 58 63 63',
+    colors: ['#fffaf0', '#c9bd92', '#708c71'],
+  },
+  {
+    tone: 'base',
+    path: 'M33 43C39 55 49 61 63 63C45 65 34 56 33 43Z',
+    edge: 'M33 43C39 55 49 61 63 63',
+    colors: ['#d8dfcb', '#718e75', '#244f3c'],
+  },
 ] as const
 
 export function TeamNavFocus() {
+  const id = useId().replace(/:/g, '')
+
   return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      className="public-team-focus"
-      viewBox="0 0 132 76"
-      width="132"
-      height="76"
-      fill="none"
-    >
-      {contours.map((contour, index) => (
-        <g
-          className={`public-team-focus__wing public-team-focus__wing--${contour.tone}`}
-          data-focus-side={contour.side}
-          data-focus-pair={Math.floor(index / 2)}
-          key={`${contour.tone}-${contour.side}`}
-        >
-          <path
-            className="public-team-focus__stroke"
-            d={contour.path}
-            pathLength="1"
-            vectorEffect="non-scaling-stroke"
-          />
-        </g>
-      ))}
-    </svg>
+    <span aria-hidden="true" className="public-team-focus">
+      {layers.flatMap((layer, pair) =>
+        [-1, 1].map((side) => {
+          const gradientId = `${id}-${layer.tone}-${side}`
+          return (
+            <span
+              className={`public-team-focus__wing public-team-focus__wing--${layer.tone}`}
+              data-focus-side={side}
+              data-focus-pair={pair}
+              key={`${layer.tone}-${side}`}
+            >
+              <svg focusable="false" viewBox="0 0 132 76" fill="none">
+                <defs>
+                  <linearGradient
+                    id={gradientId}
+                    x1="14"
+                    y1="43"
+                    x2="62"
+                    y2="67"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop stopColor={layer.colors[0]} />
+                    <stop offset="0.48" stopColor={layer.colors[1]} />
+                    <stop offset="1" stopColor={layer.colors[2]} />
+                  </linearGradient>
+                </defs>
+                <g transform={side === 1 ? 'translate(132 0) scale(-1 1)' : undefined}>
+                  <path d={layer.path} fill={`url(#${gradientId})`} />
+                  <path d={layer.edge} stroke="#f8f4e5" strokeWidth="0.55" />
+                </g>
+              </svg>
+            </span>
+          )
+        }),
+      )}
+      <span className="public-team-focus__jewel">
+        <svg focusable="false" viewBox="0 0 132 76" fill="none">
+          <path d="M66 64L69.5 68L66 72L62.5 68Z" fill="#bb9d57" />
+          <path d="M66 64L66 72L62.5 68Z" fill="#52705a" />
+          <path d="M66 73V76" stroke="#c6ad70" strokeWidth="0.65" />
+        </svg>
+      </span>
+    </span>
   )
 }

@@ -1,5 +1,10 @@
 import type { NavigationSection } from './navigation-transition.types'
 
+interface TeamFocusState extends Keyframe {
+  transform: string
+  opacity: string
+}
+
 interface NavigationOrigin {
   target: NavigationSection
   direction: number
@@ -9,6 +14,7 @@ interface NavigationOrigin {
   arcOpacity: string
   crest: DOMRect | null
   crestOpacity: string
+  teamFocus: TeamFocusState[]
   animate: boolean
 }
 
@@ -22,7 +28,7 @@ function stopTeamFocus(shell: HTMLElement): void {
   focusAnimations.delete(shell)
 }
 
-export function playTeamFocus(shell: HTMLElement): void {
+export function playTeamFocus(shell: HTMLElement, initialFocus?: TeamFocusState[]): void {
   stopTeamFocus(shell)
   if (
     !window.matchMedia('(min-width: 721px)').matches ||
@@ -32,32 +38,44 @@ export function playTeamFocus(shell: HTMLElement): void {
     return
   const button = shell.querySelector<HTMLElement>('.public-team-nav')
   if (!button?.classList.contains('public-team-nav--active')) return
-  const travel = parseFloat(getComputedStyle(button).getPropertyValue('--team-focus-travel')) || 30
   const animations: Animation[] = []
-  for (const wing of button.querySelectorAll<SVGGElement>('.public-team-focus__wing')) {
+  const wings = button.querySelectorAll<HTMLElement>('.public-team-focus__wing')
+  for (const [index, wing] of wings.entries()) {
     const side = Number(wing.dataset.focusSide)
     const pair = Number(wing.dataset.focusPair)
     const options: KeyframeAnimationOptions = {
-      duration: 280,
-      delay: pair * 35,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      duration: 220,
+      delay: pair * 30,
+      easing,
       fill: 'backwards',
     }
     animations.push(
       wing.animate(
         [
-          { transform: `translateX(${side * travel}px)`, opacity: 0 },
-          { transform: 'translateX(0)', opacity: 1 },
+          initialFocus?.[index] ?? {
+            transform: `translate(${-side * 4}px, 2px) scaleX(0.92)`,
+            opacity: '0.3',
+          },
+          { transform: 'none', opacity: 1 },
         ],
         options,
       ),
     )
-    const stroke = wing.querySelector<SVGPathElement>('.public-team-focus__stroke')
-    if (stroke)
-      animations.push(
-        stroke.animate([{ strokeDashoffset: '1' }, { strokeDashoffset: '0' }], options),
-      )
   }
+  const jewel = button.querySelector<HTMLElement>('.public-team-focus__jewel')
+  if (jewel)
+    animations.push(
+      jewel.animate(
+        [
+          initialFocus?.[wings.length] ?? {
+            transform: 'translateY(2px) scale(0.9)',
+            opacity: '0.3',
+          },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 220, delay: 60, easing, fill: 'backwards' },
+      ),
+    )
   focusAnimations.set(shell, animations)
 }
 
@@ -82,6 +100,13 @@ export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSe
     arcOpacity: getComputedStyle(arc).opacity,
     crest: crest?.getBoundingClientRect() ?? null,
     crestOpacity: crest ? getComputedStyle(crest).opacity : '1',
+    teamFocus: Array.from(
+      shell.querySelectorAll<HTMLElement>('.public-team-focus__wing, .public-team-focus__jewel'),
+      (element) => {
+        const style = getComputedStyle(element)
+        return { transform: style.transform, opacity: style.opacity }
+      },
+    ),
     animate:
       !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
       !document.activeElement?.matches(':focus-visible'),
@@ -137,9 +162,23 @@ export function animateNavigationEntrance(
     return removeKeyboardListener
 
   const animations: Animation[] = []
-  if (section === 'team') playTeamFocus(shell)
+  if (section === 'team') playTeamFocus(shell, previous.teamFocus)
   const animate = (element: HTMLElement | null, frames: Keyframe[], duration = 260) => {
     if (element?.animate) animations.push(element.animate(frames, { duration, easing }))
+  }
+  if (section !== 'team') {
+    shell
+      .querySelectorAll<HTMLElement>('.public-team-focus__wing, .public-team-focus__jewel')
+      .forEach((element, index) => {
+        const previousFocus = previous.teamFocus[index]
+        if (!previousFocus) return
+        const style = getComputedStyle(element)
+        animate(
+          element,
+          [previousFocus, { transform: style.transform, opacity: style.opacity }],
+          220,
+        )
+      })
   }
   const selection = shell.querySelector<HTMLElement>('.public-nav__selection')
   if (selection) {
