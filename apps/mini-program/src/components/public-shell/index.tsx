@@ -17,6 +17,7 @@ import { TeamCrest, UserAvatar } from '../product-ui'
 import { MessagingDrawer, openMessaging } from '../messaging-drawer'
 import { ReportModal } from '../report-modal'
 import { SettingsDialog } from '../settings-dialog'
+import { IconButton } from '../icon-button'
 import { PersistentHeaderSearch } from './persistent-header-search'
 import {
   animateNavigationEntrance,
@@ -180,13 +181,14 @@ export function PublicShell({
         <View className="public-topbar__inner">
           <View className="public-brand-area">
             {showBack && (
-              <Button
+              <IconButton
+                icon="back"
                 aria-label="返回"
                 className="public-back"
                 onClick={() => void goBack(active, tournamentId)}
               >
                 <Text className="public-back__glyph">←</Text>
-              </Button>
+              </IconButton>
             )}
             <View className="public-brand" onClick={() => void navigateToSection('home')}>
               <View aria-hidden="true" className="public-brand__mark" />

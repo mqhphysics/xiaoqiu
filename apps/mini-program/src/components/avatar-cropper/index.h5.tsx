@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro'
 import { useMemo, useState } from 'react'
 
 import { useOverlayFocus } from '../overlay-focus'
+import { IconButton } from '../icon-button'
 
 import './index.scss'
 
@@ -73,9 +74,9 @@ export function AvatarCropper({
             <Text className="avatar-cropper-kicker">AVATAR</Text>
             <Text className="avatar-cropper-title">裁剪并压缩头像</Text>
           </View>
-          <Button aria-label="关闭头像裁剪" className="avatar-cropper-close" onClick={onCancel}>
+          <IconButton icon="close" aria-label="关闭头像裁剪" className="avatar-cropper-close" onClick={onCancel}>
             ×
-          </Button>
+          </IconButton>
         </View>
         <View className="avatar-cropper-stage">
           {source ? (

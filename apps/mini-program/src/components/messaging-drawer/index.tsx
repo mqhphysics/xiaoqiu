@@ -11,6 +11,7 @@ import type {
 } from '../../features/product/product.types'
 import { useOverlayFocus } from '../overlay-focus'
 import { ReportModal } from '../report-modal'
+import { IconButton } from '../icon-button'
 
 import './index.scss'
 
@@ -250,9 +251,9 @@ export function MessagingDrawer() {
             <Text className="message-drawer__kicker">MESSAGES</Text>
             <Text className="message-drawer__title">私信</Text>
           </View>
-          <Button aria-label="关闭私信" className="message-drawer__close" onClick={closeDrawer}>
+          <IconButton icon="close" aria-label="关闭私信" className="message-drawer__close" onClick={closeDrawer}>
             ×
-          </Button>
+          </IconButton>
         </View>
         <View className="message-drawer__body">
           <View className="message-sidebar">

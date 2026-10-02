@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PublicShell } from '../../components/public-shell'
 import { PersistentHeaderSearch } from '../../components/public-shell/persistent-header-search'
 import { openSearchPage } from '../../components/public-shell/search-transition'
-import backIcon from '../../assets/search-icons/arrow-left.svg'
+import { IconButton } from '../../components/icon-button'
+import { HeroCarousel } from '../../components/hero-carousel'
 import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
@@ -352,9 +353,7 @@ function CampusBackdrop({ search }: { search: boolean }) {
     <View aria-hidden="true" className={`campus-backdrop ${search ? 'campus-backdrop--search' : ''}`}>
       <View className="home-page__lineart" />
       <View className="match-ornament match-ornament--floodlight" />
-      <View className="match-ornament match-ornament--ball" />
       <View className="match-ornament match-ornament--goal" />
-      <View className="match-ornament match-ornament--goal-lines" />
     </View>
   )
 }
@@ -461,9 +460,7 @@ function HomeContent({
             {featuredAnnouncement ? '查看公告' : '查看赛程'} <Text>→</Text>
           </Button>
         </View>
-        <View aria-hidden="true" className="experience-hero__media">
-          <View className="experience-hero__illustration" />
-        </View>
+        <HeroCarousel />
       </View>
 
       <HomeSearch
@@ -575,13 +572,14 @@ function HomeContent({
                   发布绿茵动态
                 </Text>
               </View>
-              <Button
+              <IconButton
+                icon="close"
                 aria-label="关闭发布窗口"
                 className="composer-dialog__close"
                 onClick={onCloseComposer}
               >
                 ×
-              </Button>
+              </IconButton>
             </View>
             <View className="composer-dialog__identity">
               <UserAvatar
@@ -654,10 +652,9 @@ function SearchExperience({
   return (
     <View className="search-experience">
       <View className="search-experience__head">
-        <Button aria-label="退出搜索" className="search-experience__back" onClick={onBack}>
+        <IconButton icon="back" aria-label="退出搜索" className="search-experience__back" onClick={onBack}>
           <Text className="search-experience__mobile-back">←</Text>
-          <Image aria-hidden="true" className="search-experience__back-icon" src={backIcon} />
-        </Button>
+        </IconButton>
         <Text className="search-experience__title">全站搜索</Text>
         <Button className="search-experience__exit" onClick={onBack}>
           退出

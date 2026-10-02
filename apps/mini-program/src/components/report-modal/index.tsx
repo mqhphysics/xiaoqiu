@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { createClientActionId, productRepository } from '../../features/product/product.repository'
 import type { ReportTargetType } from '../../features/product/product.types'
 import { useOverlayFocus } from '../overlay-focus'
+import { IconButton } from '../icon-button'
 
 import './index.scss'
 
@@ -55,9 +56,9 @@ export function ReportModal({
             <Text className="report-modal__kicker">REPORT & FEEDBACK</Text>
             <Text className="report-modal__title">{title}</Text>
           </View>
-          <Button aria-label="关闭" className="report-modal__close" onClick={onClose}>
+          <IconButton icon="close" aria-label="关闭" className="report-modal__close" onClick={onClose}>
             ×
-          </Button>
+          </IconButton>
         </View>
         <Text className="report-modal__label">问题概括</Text>
         <Input
