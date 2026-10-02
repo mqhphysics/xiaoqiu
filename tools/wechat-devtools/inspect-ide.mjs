@@ -28,7 +28,17 @@ function send(method, params = {}) {
 }
 try {
   const expression = process.argv[3] ?? `JSON.stringify({text:document.body.innerText,controls:[...document.querySelectorAll('button,input,a,[role="button"]')].map(el=>({tag:el.tagName,text:el.innerText,value:el.value,placeholder:el.placeholder}))})`
-  const result = await send('Runtime.evaluate', { expression, returnByValue: true })
+  const clickSelector = expression.startsWith('@click:') ? expression.slice(7) : null
+  if (clickSelector) {
+    const location = await send('Runtime.evaluate', {
+      expression: `(()=>{const el=document.querySelector(${JSON.stringify(clickSelector)});if(!el)throw new Error('Control not found');const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`,
+      returnByValue: true,
+    })
+    if (location.exceptionDetails) throw new Error('Control not found')
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...location.result.value, button: 'left', clickCount: 1 })
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...location.result.value, button: 'left', clickCount: 1 })
+  }
+  const result = await send('Runtime.evaluate', { expression: clickSelector ? 'document.body.innerText' : expression, returnByValue: true })
   if (result.exceptionDetails) console.log(JSON.stringify(result.exceptionDetails))
   else console.log(result.result.value ?? result.result.description)
   if (process.argv[4]) {
