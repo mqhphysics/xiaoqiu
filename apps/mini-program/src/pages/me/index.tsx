@@ -20,6 +20,7 @@ import type {
 } from '../../features/product/product.types'
 
 import './index.scss'
+import { DesktopProfile, useDesktopProfile } from './desktop-profile'
 
 type PageState =
   | { phase: 'loading' }
@@ -27,6 +28,7 @@ type PageState =
   | { phase: 'failed'; message: string }
 
 export default function MePage() {
+  const desktop = useDesktopProfile()
   const [state, setState] = useState<PageState>({ phase: 'loading' })
 
   const load = useCallback(async () => {
@@ -69,7 +71,29 @@ export default function MePage() {
           onRetry={() => void load()}
         />
       )}
-      {state.phase === 'ready' && (
+      {state.phase === 'ready' && desktop && (
+        <DesktopProfile
+          key={`${state.user.organizationId}:${state.user.id}`}
+          home={state.home}
+          user={state.user}
+          onUserChange={(user) =>
+            setState((current) => (current.phase === 'ready' ? { ...current, user } : current))
+          }
+          renderService={(service, onServiceLink) => {
+            if (service === 'notifications')
+              return (
+                <NotificationsPanel
+                  onReportLink={(admin) => onServiceLink(admin ? 'adminReports' : 'reports')}
+                  onNavigate={() => onServiceLink(null)}
+                />
+              )
+            if (service === 'reports') return <MyReportsPanel />
+            if (service === 'adminReports') return <AdminReportPanel />
+            return <AdminIdentityDirectory />
+          }}
+        />
+      )}
+      {state.phase === 'ready' && !desktop && (
         <ProfilePanel
           tournamentId={state.home.tournament.id}
           user={state.user}
@@ -341,7 +365,10 @@ function ProfilePanel({
   )
 }
 
-function NotificationsPanel() {
+function NotificationsPanel({
+  onReportLink,
+  onNavigate,
+}: { onReportLink?: (admin: boolean) => void; onNavigate?: () => void } = {}) {
   const [data, setData] = useState<NotificationResponse | null>(null)
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState(false)
@@ -357,6 +384,10 @@ function NotificationsPanel() {
     try {
       setData(await productRepository.readNotification(item.id))
       if (item.type === 'REPORT_CREATED' || item.type === 'REPORT_UPDATED') {
+        if (onReportLink) {
+          onReportLink(item.type === 'REPORT_CREATED')
+          return
+        }
         await Taro.pageScrollTo({
           duration: 240,
           selector: item.type === 'REPORT_CREATED' ? '#admin-reports' : '#my-reports',
@@ -366,11 +397,13 @@ function NotificationsPanel() {
       if (!item.linkPath) return
       const conversationId = readConversationId(item.linkPath)
       if (conversationId) {
+        onNavigate?.()
         openMessaging({ conversationId })
         return
       }
       if (item.linkPath.startsWith('/pages/me/index')) return
       if (item.linkPath.startsWith('/pages/')) {
+        onNavigate?.()
         await Taro.navigateTo({ url: item.linkPath })
       }
     } catch (error) {
