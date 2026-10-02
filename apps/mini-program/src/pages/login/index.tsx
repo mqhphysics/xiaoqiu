@@ -42,7 +42,11 @@ export default function LoginPage() {
   }, [])
 
   const login = async () => {
-    if (!identifier.trim() || password.length < 8 || submitting) return
+    const minimumLength =
+      Taro.getEnv() === Taro.ENV_TYPE.WEB && process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
+        ? 1
+        : 8
+    if (!identifier.trim() || password.length < minimumLength || submitting) return
     setSubmitting(true)
     try {
       await productRepository.login(identifier, password)
@@ -183,7 +187,15 @@ export default function LoginPage() {
                   </Button>
                   <Button
                     className="auth-primary"
-                    disabled={!identifier.trim() || password.length < 8 || submitting}
+                    disabled={
+                      !identifier.trim() ||
+                      password.length <
+                        (Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+                        process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
+                          ? 1
+                          : 8) ||
+                      submitting
+                    }
                     loading={submitting}
                     onClick={() => void login()}
                   >

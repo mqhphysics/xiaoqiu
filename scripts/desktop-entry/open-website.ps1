@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -57,7 +57,7 @@ try {
     throw "服务启动失败（退出码 $LASTEXITCODE），上方是具体错误。"
   }
 
-  Start-Process 'http://127.0.0.1:10087/'
+  Start-Process 'http://127.0.0.1:3000/'
   Write-Host '网站已打开。服务在后台运行，可以关闭此窗口。' -ForegroundColor Green
 } catch {
   $exitCode = 1

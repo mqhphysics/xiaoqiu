@@ -158,11 +158,11 @@ if ($PrepareOnly) {
 
 Write-Host '[4/4] Starting API and H5 in the background...'
 $apiHealthUrl = 'http://127.0.0.1:3001/api/health/ready'
-$h5Url = 'http://127.0.0.1:10087/'
+$h5Url = 'http://127.0.0.1:3000/'
 
 if (-not (Test-ApiReady -Uri $apiHealthUrl)) {
   Assert-PortAvailable -Port 3001
-  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; `$env:DEFAULT_TOURNAMENT_ID='$TournamentId'; npm.cmd --prefix apps/api run dev"
+  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; `$env:LOCAL_DEMO_SHORT_PASSWORDS='1'; `$env:DEFAULT_TOURNAMENT_ID='$TournamentId'; npm.cmd --prefix apps/api run dev"
   $apiReady = $false
   foreach ($attempt in 1..60) {
     Start-Sleep -Seconds 1
@@ -177,8 +177,8 @@ if (-not (Test-ApiReady -Uri $apiHealthUrl)) {
 }
 
 if (-not (Test-H5Ready -Uri $h5Url)) {
-  Assert-PortAvailable -Port 10087
-  Start-BackgroundServer -Name 'h5' -Command "`$env:TARO_APP_API_BASE_URL='http://127.0.0.1:3001'; npm.cmd --prefix apps/mini-program run dev:h5"
+  Assert-PortAvailable -Port 3000
+  Start-BackgroundServer -Name 'h5' -Command "`$env:TARO_APP_API_BASE_URL='http://127.0.0.1:3001'; `$env:TARO_APP_LOCAL_SHORT_PASSWORDS='1'; npm.cmd --prefix apps/mini-program run dev:h5"
   $h5Ready = $false
   foreach ($attempt in 1..90) {
     Start-Sleep -Seconds 1
@@ -188,7 +188,7 @@ if (-not (Test-H5Ready -Uri $h5Url)) {
     }
   }
   if (-not $h5Ready) {
-    throw "H5 did not become ready on port 10087. Check $logDirectory\h5.error.log and h5.log."
+    throw "H5 did not become ready on port 3000. Check $logDirectory\h5.error.log and h5.log."
   }
 }
 

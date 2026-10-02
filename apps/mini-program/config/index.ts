@@ -9,6 +9,7 @@ const buildEnvironment = (
         TARO_ENV?: string
         TARO_APP_API_BASE_URL?: string
         TARO_APP_ORGANIZATION_ID?: string
+        TARO_APP_LOCAL_SHORT_PASSWORDS?: string
       }
     }
   }
@@ -32,6 +33,9 @@ const config: UserConfigExport = {
       buildEnvironment?.TARO_APP_API_BASE_URL ?? 'http://127.0.0.1:3001',
     ),
     TARO_APP_ORGANIZATION_ID: JSON.stringify(buildEnvironment?.TARO_APP_ORGANIZATION_ID ?? ''),
+    TARO_APP_LOCAL_SHORT_PASSWORDS: JSON.stringify(
+      buildEnvironment?.TARO_APP_LOCAL_SHORT_PASSWORDS ?? '0',
+    ),
   },
   defineConstants: {},
   copy: {

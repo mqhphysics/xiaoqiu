@@ -43,7 +43,7 @@ Set-Location -LiteralPath 'D:\MuDevSpace\xiaoqiu'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\scripts\start-local-demo.ps1'
 ```
 
-脚本会按需启动 Docker Desktop，等待数据库就绪、执行迁移、后台启动 API/H5，最后自动打开 `http://127.0.0.1:10087/`。启动成功后可以关闭此 PowerShell 窗口；电脑重启后再运行一次。已运行且健康的服务会复用，普通启动不会重置你测试时修改的数据。
+脚本会按需启动 Docker Desktop，等待数据库就绪、执行迁移、后台启动 API/H5，最后自动打开 `http://127.0.0.1:3000/`。启动成功后可以关闭此 PowerShell 窗口；电脑重启后再运行一次。已运行且健康的服务会复用，普通启动不会重置你测试时修改的数据。
 
 仅首次初始化或明确要恢复演示数据时追加 `-Seed`，它会重写演示账号及部分数据；平时不要添加。日志位于被 Git 忽略的 `private-data/runtime/`。脚本不负责安装 Node.js、依赖或 Docker Desktop；更换电脑/仓库路径后先完成环境准备并修改上述路径。完整账号与逐页步骤见[演示验收手册](docs/testing/演示验收手册.md)。
 
@@ -144,7 +144,7 @@ pnpm check
 
 ## 当前阶段
 
-本轮收束回到main。已合入、未完成及保留的在途修改见[main合并清单](docs/status/本轮收束与main合并清单-2026-10-02.md)。日常只打开10087；3001是后台数据API，人工验收端口已取消。
+本轮已收齐后端、登录、导航、动态和首页轮播成果并回到 **main**。完整功能进度、端口/分支、密码和下一阶段见[整体汇总](docs/status/整体汇总与下一阶段-2026-10-02.md)。日常只打开 **3000**；3001是后台数据API，人工验收端口已取消。本机现有账号密码为 `123`，仅本机演示启动开启短密码支持，正式环境及注册仍要求至少8位。
 
 2026-10-02 的四分支后端整合、真实比赛流程与剩余任务见 [第二轮集成验收](docs/status/后端第二轮集成验收-2026-10-02.md)。集成版保存在 `codex/v2-integrator`，实际规则/人员配置、生产发布和微信验收分别安排；自动提交不代表这些步骤已完成。
 
@@ -152,6 +152,6 @@ P0、P1、P2 以及 P4 体验完善已合入主仓库。当前是可本地体验
 
 ### 自行推送与分支收尾
 
-先核对当前分支。本轮主目录使用 `codex/h5-refinement`，在这里 Commit 不会自动更新 `main`；Push 该分支也不代表 `main` 已包含它。需要发布 main 时，由集成负责人先审查并集成，完成检查后再推送。更换 GitHub 登录账号不会自动更换仓库远端地址，推送前在 Repository Settings 中核对 Remote。
+当前主目录使用 `main`。下一轮并行任务从最新main创建独立分支/worktree，不要在主目录替其它聊天切分支。Commit保存本地版本，Switch只切换版本；其它分支须经过merge/cherry-pick才会纳入main，Push才更新GitHub。本轮用户已授权main合并及推送；后续任务仍按明确授权执行。
 
 P4 开发分支已合并后，可在验收及推送完成后清理。先关闭对应开发任务/服务，逐个检查 `git -C .worktrees/<目录> status --short` 无输出，再执行 `git worktree remove .worktrees/<目录>`，最后 `git branch -d <分支名>`。不要直接删文件夹，不使用 `--force` 或 `-D` 绕过保护；命令拒绝时先保留。归档 Codex 任务与删除 Git worktree 是两回事。

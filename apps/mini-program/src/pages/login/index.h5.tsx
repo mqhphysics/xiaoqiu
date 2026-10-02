@@ -23,6 +23,8 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
   confirmPassword: '',
 }
 
+const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
+
 export default function H5LoginPage() {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   useEffect(() => {
@@ -54,7 +56,7 @@ function ArtLoginPage() {
   }, [])
 
   const login = async () => {
-    if (!identifier.trim() || password.length < 8 || submitting) return
+    if (!identifier.trim() || password.length < minimumLoginPasswordLength || submitting) return
     setSubmitting(true)
     try {
       await productRepository.login(identifier, password)
@@ -251,7 +253,11 @@ function ArtLoginPage() {
                   <button
                     type="submit"
                     className="art-login__control art-login__primary"
-                    disabled={!identifier.trim() || password.length < 8 || submitting}
+                    disabled={
+                      !identifier.trim() ||
+                      password.length < minimumLoginPasswordLength ||
+                      submitting
+                    }
                     aria-busy={submitting}
                   >
                     {submitting ? '登录中…' : '登录'}

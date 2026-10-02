@@ -77,7 +77,7 @@ function resolveCorsOrigins(): string[] {
     'http://127.0.0.1:5174',
     'http://localhost:10086',
     'http://127.0.0.1:10086',
-    'http://localhost:10087',
-    'http://127.0.0.1:10087',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
   ]
 }
