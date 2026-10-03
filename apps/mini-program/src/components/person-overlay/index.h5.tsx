@@ -141,6 +141,8 @@ export function PersonDialog({
                       level={person.verificationLevel}
                       roles={person.roles}
                       official={person.official}
+                      displayedKind={person.displayedBadgeKind}
+                      userId={person.id}
                     />
                   </div>
                   <p>{person.bio || '还没有填写个人简介。'}</p>
@@ -279,6 +281,8 @@ export function PersonHoverCard({
           verificationLevel={person.verificationLevel}
           roles={person.roles}
           official={person.official}
+          displayedKind={person.displayedBadgeKind}
+          userId={person.id}
           onOpen={() => void openPerson(person.id, person.tournamentId)}
           stats={player ? <CompactStats player={player} /> : undefined}
           actions={

@@ -30,13 +30,25 @@ export function identityBadgeKinds(
   const values = new Set(roles.map((role) => (typeof role === 'string' ? role : role.role)))
   const badges: IdentityBadgeKind[] = []
   if (values.has('PLATFORM_ADMIN') || values.has('ORGANIZATION_ADMIN')) badges.push('operator')
-  if (values.has('TEAM_CAPTAIN')) badges.push('captain')
-  if (values.has('MATCH_REPORTER')) badges.push('reporter')
   if (values.has('TOURNAMENT_ADMIN')) badges.push('admin')
-  if (values.has('OFFICIAL')) badges.push('referee')
+  if (values.has('MATCH_REPORTER')) badges.push('reporter')
   if (values.has('REVIEWER')) badges.push('reviewer')
+  if (values.has('OFFICIAL')) badges.push('referee')
+  if (values.has('TEAM_CAPTAIN')) badges.push('captain')
   if (level === 'PLAYER_CONFIRMED') badges.push('player')
   else if (level === 'STUDENT_VERIFIED') badges.push('student')
   else if (level === 'PLAYER_PROFILE') badges.push('profile')
   return badges
+}
+
+export function displayedBadgeKind(
+  level?: string | null,
+  roles: readonly (string | { role: string })[] = [],
+  official = false,
+  preferred?: string | null,
+): IdentityBadgeKind | null {
+  const kinds = identityBadgeKinds(level, roles, official)
+  return preferred && kinds.includes(preferred as IdentityBadgeKind)
+    ? (preferred as IdentityBadgeKind)
+    : (kinds[0] ?? null)
 }

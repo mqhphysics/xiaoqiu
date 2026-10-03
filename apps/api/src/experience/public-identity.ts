@@ -1,5 +1,6 @@
 // Explicit projection: public profiles never read or return identity documents,
 // student IDs, email, login names, credentials, role scopes or session tokens.
+import { preferredBadge } from '../social/badge-preference.rules'
 export const publicIdentitySelect = {
   id: true,
   displayName: true,
@@ -7,6 +8,7 @@ export const publicIdentitySelect = {
   bio: true,
   verificationLevel: true,
   status: true,
+  badgePreferences: { select: { organizationId: true, preferredKind: true } },
   memberships: { select: { organizationId: true, status: true } },
   playerProfile: { select: { id: true, organizationId: true, avatarUrl: true } },
   roleAssignments: {
@@ -29,6 +31,7 @@ export interface PublicIdentitySource {
     scopeType: string
     revokedAt?: Date | null
   }>
+  badgePreferences?: Array<{ organizationId: string; preferredKind: string | null }>
 }
 
 export function publicIdentity(
@@ -66,6 +69,11 @@ export function publicIdentity(
         ? (linked.avatarUrl ?? user.avatarUrl)
         : user.avatarUrl,
     roles: [...new Set(roles)],
+    displayedBadgeKind: preferredBadge(
+      user.verificationLevel,
+      roles,
+      user.badgePreferences?.find((item) => item.organizationId === organizationId)?.preferredKind,
+    ),
     official: false,
     messageable: active && member && user.id !== viewerId,
   }

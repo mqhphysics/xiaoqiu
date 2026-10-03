@@ -53,6 +53,8 @@ export interface PlayerPresentation {
   verificationLevel?: string | null
   roles?: string[] | undefined
   official?: boolean | undefined
+  displayedKind?: string | null | undefined
+  userId?: string | undefined
 }
 function playerVerification(playerId: string, presentation: PlayerPresentation) {
   if (presentation.verificationLevel) return presentation.verificationLevel
@@ -72,6 +74,8 @@ function playerPresentation(
           verificationLevel: account.verificationLevel,
           roles: account.roles,
           official: account.official,
+          displayedKind: account.displayedBadgeKind,
+          userId: account.id,
           messageUser: account.messageable ? account : null,
         }
       : {}),
@@ -385,6 +389,8 @@ export function PlayerProfile({
               level={presentation.verificationLevel}
               roles={presentation.roles}
               official={presentation.official}
+              displayedKind={presentation.displayedKind}
+              userId={presentation.userId}
             />
             {player.isDemo && <span className="player-demo-label">演示档案</span>}
           </div>
@@ -1088,6 +1094,8 @@ export function PlayerHoverCard({
           verificationLevel={playerVerification(state.player.id, presentation)}
           roles={presentation.roles}
           official={presentation.official}
+          displayedKind={presentation.displayedKind}
+          userId={presentation.userId}
           onOpen={() => void openPlayer(request.playerId, request.tournamentId)}
           stats={
             <CompactStats player={state.player} goalkeeperStats={presentation.goalkeeperStats} />
@@ -1111,6 +1119,8 @@ export function PersonHoverPreview({
   verificationLevel,
   roles,
   official,
+  displayedKind,
+  userId,
   onOpen,
   stats,
   actions,
@@ -1122,6 +1132,8 @@ export function PersonHoverPreview({
   verificationLevel?: string | null | undefined
   roles?: readonly string[] | undefined
   official?: boolean | undefined
+  displayedKind?: string | null | undefined
+  userId?: string | undefined
   onOpen: () => void
   stats?: ReactNode
   actions: ReactNode
@@ -1147,7 +1159,13 @@ export function PersonHoverPreview({
             <button type="button" className="player-hover-card__name" onClick={onOpen}>
               {name}
             </button>
-            <VerificationBadge level={verificationLevel} roles={roles} official={official} />
+            <VerificationBadge
+              level={verificationLevel}
+              roles={roles}
+              official={official}
+              displayedKind={displayedKind}
+              userId={userId}
+            />
           </div>
           {meta && <span className="player-hover-card__meta">{meta}</span>}
         </div>

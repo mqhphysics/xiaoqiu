@@ -310,6 +310,7 @@ model Organization {
   snapshotEntries     RosterSnapshotEntry[]
   importBatches       ImportBatch[]
   teamPreferences     UserTeamPreference[]
+  badgePreferences    UserBadgePreference[]
   matchEvents         MatchEvent[]
   matchAppearances    MatchAppearance[]
   matchReviews        MatchReview[]
@@ -360,6 +361,7 @@ model User {
   passwordCredential   PasswordCredential?
   playerProfile        PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
   teamPreferences      UserTeamPreference[]
+  badgePreferences     UserBadgePreference[]
   posts                Post[]                   @relation("PostAuthor")
   postLikes            PostLike[]
   postComments         PostComment[]
@@ -930,6 +932,19 @@ model UserTeamPreference {
   @@unique([userId, teamId], map: "user_team_preferences_user_id_team_id_key")
   @@index([organizationId, userId, isPrimary], map: "user_team_preferences_org_user_primary_idx")
   @@map("user_team_preferences")
+}
+
+model UserBadgePreference {
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  preferredKind  String?      @map("preferred_kind") @db.VarChar(32)
+  version        Int          @default(1)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId], map: "user_badge_preferences_pkey")
+  @@map("user_badge_preferences")
 }
 
 model UserPlayerFollow {

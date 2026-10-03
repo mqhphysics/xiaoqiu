@@ -15,6 +15,7 @@ import type {
   MatchExperienceResponse,
   PlayerDetailResponse,
   PublicPersonResponse,
+  BadgePreferenceResponse,
   PlayerFollowsResponse,
   PostComment,
   PostDetail,
@@ -206,6 +207,12 @@ export const productRepository = {
     }),
 
   getPlayerFollows: () => request<PlayerFollowsResponse>('/me/player-follows'),
+  getBadgePreference: () => request<BadgePreferenceResponse>('/me/profile-badge'),
+  setBadgePreference: (preferredKind: string | null, version: number, clientActionId: string) =>
+    request<BadgePreferenceResponse>('/me/profile-badge', {
+      method: 'PUT',
+      data: { preferredKind, version, clientActionId },
+    }),
   followPlayer: (playerId: string) =>
     request<PlayerFollowsResponse>(`/me/player-follows/${encodeURIComponent(playerId)}`, {
       method: 'PUT',

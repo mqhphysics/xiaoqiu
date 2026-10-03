@@ -1,6 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator'
+import { IsBoolean, IsIn, IsInt, Min, IsOptional, IsString, IsUUID, Length } from 'class-validator'
+import { BADGE_KINDS, type BadgeKind } from './badge-preference.rules'
+
+export class UpdateBadgePreferenceDto {
+  @ApiProperty({ nullable: true, enum: BADGE_KINDS })
+  @IsIn([...BADGE_KINDS, null])
+  preferredKind!: BadgeKind | null
+  @ApiProperty({ minimum: 0 })
+  @IsInt()
+  @Min(0)
+  version!: number
+  @ApiProperty({ type: String })
+  @IsString()
+  @Length(8, 120)
+  clientActionId!: string
+}
 
 const POSITIONS = ['GOALKEEPER', 'DEFENDER', 'MIDFIELDER', 'FORWARD'] as const
 
