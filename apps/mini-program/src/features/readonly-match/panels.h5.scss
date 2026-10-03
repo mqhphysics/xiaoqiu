@@ -365,6 +365,16 @@
     }
   }
 }
+.match-event-player {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 @media (max-width: 720px) {
   .match-lineups__switch {
     display: flex;
@@ -410,6 +420,9 @@
     }
   }
   .match-player-detail button {
+    min-height: 44px;
+  }
+  .match-event-player {
     min-height: 44px;
   }
   .match-events__list {

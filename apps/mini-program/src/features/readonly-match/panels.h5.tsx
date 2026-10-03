@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react'
-import { PersonTrigger } from '../../components/person-trigger'
+import { useMemo, useState, type ReactNode } from 'react'
 import { TeamCrest } from '../../components/product-ui'
 import { eventLabel, positionLabel } from '../product/product.format'
 import { openPlayer } from '../product/player-navigation'
@@ -151,6 +150,7 @@ function LineupCard({
           </span>
           <button
             type="button"
+            data-match-resource="player"
             onClick={() => void openPlayer(activePlayer.id, match.tournamentId)}
           >
             查看球员资料 ↗
@@ -271,26 +271,21 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
               <span className="match-events__type">{eventLabel(event.type)}</span>
               <div>
                 <strong>
-                  <PersonTrigger
-                    playerId={event.player?.id}
-                    tournamentId={match.tournamentId}
-                    name={event.player?.displayName ?? event.team.shortName}
-                  >
+                  <EventPlayerLink player={event.player} tournamentId={match.tournamentId}>
                     {event.type === 'SUBSTITUTION' ? '换下 ' : ''}
                     {event.player?.displayName ?? event.team.shortName}
-                  </PersonTrigger>
+                  </EventPlayerLink>
                 </strong>
                 <span>
                   {event.relatedPlayer ? (
                     <>
                       {event.type === 'SUBSTITUTION' ? '换上 ' : '助攻 '}
-                      <PersonTrigger
-                        playerId={event.relatedPlayer.id}
+                      <EventPlayerLink
+                        player={event.relatedPlayer}
                         tournamentId={match.tournamentId}
-                        name={event.relatedPlayer.displayName}
                       >
                         {event.relatedPlayer.displayName}
-                      </PersonTrigger>
+                      </EventPlayerLink>
                     </>
                   ) : (
                     (event.description ?? event.team.name)
@@ -305,5 +300,28 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
         <p className="match-lineups__empty">暂无已公布比赛事件</p>
       )}
     </section>
+  )
+}
+
+function EventPlayerLink({
+  player,
+  tournamentId,
+  children,
+}: {
+  player: MatchExperienceResponse['events'][number]['player']
+  tournamentId: string
+  children: ReactNode
+}) {
+  if (!player) return <>{children}</>
+  return (
+    <button
+      type="button"
+      className="match-event-player"
+      data-match-resource="player"
+      aria-label={`查看${player.displayName}的球员资料`}
+      onClick={() => void openPlayer(player.id, tournamentId)}
+    >
+      {children}
+    </button>
   )
 }

@@ -333,6 +333,7 @@ function TeamSide({
       className={`experience-scoreboard__team ${team ? 'experience-scoreboard__team--linked' : ''}`}
       disabled={!team}
       aria-label={team ? `查看${team.name}球队资料` : (placeholder ?? '席位待定')}
+      data-match-resource="team"
       onClick={() =>
         team &&
         void (getCurrentInstance().router?.path.includes('readonly-match-detail')

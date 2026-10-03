@@ -21,6 +21,7 @@ import {
 import './index.h5.scss'
 
 const loadContent = () => import('../../features/readonly-match/match-content.h5')
+const MATCH_RESOURCE_EVENT = 'xiaoqiu:match-resource-navigation'
 const focusable = 'button:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'
 function focusIdentity(element: HTMLElement): FocusIdentity {
   return {
@@ -102,6 +103,7 @@ export function MatchOverlayHost() {
     window.addEventListener(OPEN_TEAM_EVENT, routeChanged)
     window.addEventListener(OPEN_PLAYER_EVENT, routeChanged)
     window.addEventListener(OPEN_PERSON_EVENT, routeChanged)
+    window.addEventListener(MATCH_RESOURCE_EVENT, routeChanged)
     window.addEventListener('popstate', navigation.pop)
     window.addEventListener('hashchange', routeChanged)
     Taro.eventCenter.on('__afterTaroRouterChange', taroRouteChanged)
@@ -111,6 +113,7 @@ export function MatchOverlayHost() {
       window.removeEventListener(OPEN_TEAM_EVENT, routeChanged)
       window.removeEventListener(OPEN_PLAYER_EVENT, routeChanged)
       window.removeEventListener(OPEN_PERSON_EVENT, routeChanged)
+      window.removeEventListener(MATCH_RESOURCE_EVENT, routeChanged)
       window.removeEventListener('popstate', navigation.pop)
       window.removeEventListener('hashchange', routeChanged)
       Taro.eventCenter.off('__afterTaroRouterChange', taroRouteChanged)
@@ -171,6 +174,13 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
+        onClickCapture={(event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest('[data-match-resource], .person-trigger')
+          )
+            window.dispatchEvent(new Event(MATCH_RESOURCE_EVENT))
+        }}
       >
         <header className="match-dialog__bar">
           <h1 id={titleId}>比赛详情</h1>
