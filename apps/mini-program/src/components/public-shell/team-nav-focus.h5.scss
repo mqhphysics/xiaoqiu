@@ -10,7 +10,7 @@
       top: 0;
       left: 50%;
       display: block;
-      width: calc(var(--nav-team-slot) * 1.5);
+      width: calc(var(--nav-team-slot) * 1.4);
       height: 80px;
       pointer-events: none;
       transform: translateX(-50%);
@@ -109,7 +109,7 @@
 
 @media (min-width: 721px) and (max-width: 1040px) {
   .public-app--h5 .public-team-focus {
-    width: calc(var(--nav-team-slot) * 1.4);
+    width: calc(var(--nav-team-slot) * 1.35);
   }
 }
 

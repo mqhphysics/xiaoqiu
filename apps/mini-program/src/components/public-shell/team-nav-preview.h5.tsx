@@ -2,10 +2,43 @@ import { createPortal } from 'react-dom'
 
 import type { TeamNavDesignKey } from './team-nav-designs.h5'
 
+export const teamNavPreviewCrestKeys = ['united', 'city', 'liverpool', 'chelsea'] as const
+
+export const teamNavPreviewCrests = {
+  united: {
+    label: '曼联',
+    teamCode: 'DEMO-PHY-1',
+    crestUrl: '/api/media/demo/crests/01.png',
+    primaryColor: null,
+    secondaryColor: null,
+  },
+  city: {
+    label: '曼城',
+    teamCode: 'DEMO-PHY-2',
+    crestUrl: '/api/media/demo/crests/02.png',
+    primaryColor: null,
+    secondaryColor: null,
+  },
+  liverpool: {
+    label: '利物浦',
+    teamCode: 'DEMO-MATH',
+    crestUrl: '/api/media/demo/crests/03.png',
+    primaryColor: null,
+    secondaryColor: null,
+  },
+  chelsea: {
+    label: '切尔西',
+    teamCode: 'DEMO-CHEM',
+    crestUrl: '/api/media/demo/crests/05.png',
+    primaryColor: null,
+    secondaryColor: null,
+  },
+} as const
+
 export interface TeamNavPreviewState {
   enabled: boolean
   design: TeamNavDesignKey
-  crest: 'united' | 'city'
+  crest: (typeof teamNavPreviewCrestKeys)[number]
 }
 
 export function readTeamNavPreview(): TeamNavPreviewState {
@@ -16,8 +49,8 @@ export function readTeamNavPreview(): TeamNavPreviewState {
       window.location.hostname === '127.0.0.1' &&
       window.location.port === '3101' &&
       (design === '04' || design === '15'),
-    design: design === '15' ? '15' : '04',
-    crest: params.get('navCrest') === 'city' ? 'city' : 'united',
+    design: '15',
+    crest: teamNavPreviewCrestKeys.find((crest) => crest === params.get('navCrest')) ?? 'united',
   }
 }
 
@@ -45,38 +78,20 @@ export function TeamNavPreviewControls({
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <div className="team-nav-preview__title">队徽图案对比</div>
-      <div className="team-nav-preview__choices" aria-label="图案版本">
-        <button
-          type="button"
-          aria-pressed={value.design === '04'}
-          onClick={() => update({ ...value, design: '04' })}
-        >
-          04 · 菱形卷线
-        </button>
-        <button
-          type="button"
-          aria-pressed={value.design === '15'}
-          onClick={() => update({ ...value, design: '15' })}
-        >
-          15 · 卷草细纹
-        </button>
-      </div>
+      <div className="team-nav-preview__title">15 · 卷草细纹</div>
       <div className="team-nav-preview__choices" aria-label="示例队徽">
-        <button
-          type="button"
-          aria-pressed={value.crest === 'united'}
-          onClick={() => update({ ...value, crest: 'united' })}
-        >
-          曼联
-        </button>
-        <button
-          type="button"
-          aria-pressed={value.crest === 'city'}
-          onClick={() => update({ ...value, crest: 'city' })}
-        >
-          曼城
-        </button>
+        {teamNavPreviewCrestKeys.map((crest) => (
+          <button
+            type="button"
+            key={crest}
+            aria-pressed={value.crest === crest}
+            onClick={() => update({ ...value, crest })}
+          >
+            {teamNavPreviewCrests[crest].label}
+          </button>
+        ))}
+      </div>
+      <div className="team-nav-preview__choices">
         <button type="button" onClick={onReplay}>
           播放生长
         </button>

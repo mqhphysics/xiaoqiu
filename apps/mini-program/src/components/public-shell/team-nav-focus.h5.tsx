@@ -4,7 +4,11 @@ import type { TeamSummary } from '../../features/product/product.types'
 import { playTeamFocus } from './navigation-transition.h5'
 import { teamNavDesigns } from './team-nav-designs.h5'
 import { getTeamNavOrnamentPalette } from './team-nav-palette.h5'
-import { readTeamNavPreview, TeamNavPreviewControls } from './team-nav-preview.h5'
+import {
+  readTeamNavPreview,
+  teamNavPreviewCrests,
+  TeamNavPreviewControls,
+} from './team-nav-preview.h5'
 
 import './team-nav-focus.h5.scss'
 
@@ -14,27 +18,14 @@ const tones = {
   detail: ['secondary', 'primaryLight', 'secondaryLight'],
 } as const
 
-const previewTeams = {
-  united: {
-    teamCode: 'DEMO-PHY-1',
-    crestUrl: '/api/media/demo/crests/01.png',
-    primaryColor: null,
-    secondaryColor: null,
-  },
-  city: {
-    teamCode: 'DEMO-PHY-2',
-    crestUrl: '/api/media/demo/crests/02.png',
-    primaryColor: null,
-    secondaryColor: null,
-  },
-} as const
-
 export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
   const id = useId().replace(/:/g, '')
   const [preview, setPreview] = useState(readTeamNavPreview)
   const lastPreview = useRef(`${preview.design}:${preview.crest}`)
   const design = teamNavDesigns[preview.design]
-  const palette = getTeamNavOrnamentPalette(preview.enabled ? previewTeams[preview.crest] : team)
+  const palette = getTeamNavOrnamentPalette(
+    preview.enabled ? teamNavPreviewCrests[preview.crest] : team,
+  )
 
   useLayoutEffect(() => {
     const key = `${preview.design}:${preview.crest}`
@@ -125,7 +116,7 @@ export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
         {preview.enabled ? (
           <img
             className="public-team-focus__sample-crest"
-            src={previewTeams[preview.crest].crestUrl}
+            src={teamNavPreviewCrests[preview.crest].crestUrl}
             alt=""
           />
         ) : null}

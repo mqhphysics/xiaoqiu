@@ -69,11 +69,11 @@ export function getTeamNavPalette(team?: TeamPaletteSource | null) {
 export function getTeamNavOrnamentPalette(team?: TeamPaletteSource | null) {
   const colors = getTeamNavPalette(team)
   return {
-    primary: mixColor(colors.primary, '#f7f1e6', 0.46),
-    primaryDark: mixColor(colors.primary, '#f7f1e6', 0.32),
-    primaryLight: mixColor(colors.primary, '#fffaf0', 0.7),
-    secondary: mixColor(colors.secondary, '#f7f1e6', 0.4),
-    secondaryDark: mixColor(colors.secondary, '#f7f1e6', 0.26),
-    secondaryLight: mixColor(colors.secondary, '#fffaf0', 0.74),
+    primary: mixColor(colors.primary, '#f7f1e6', 0.38),
+    primaryDark: mixColor(colors.primary, '#f7f1e6', 0.28),
+    primaryLight: mixColor(colors.primary, '#fffaf0', 0.62),
+    secondary: mixColor(colors.secondary, '#f7f1e6', 0.32),
+    secondaryDark: mixColor(colors.secondary, '#f7f1e6', 0.22),
+    secondaryLight: mixColor(colors.secondary, '#fffaf0', 0.66),
   }
 }
