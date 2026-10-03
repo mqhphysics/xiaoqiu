@@ -9,7 +9,6 @@ import {
   formatTime,
   matchStatusLabel,
   matchStatusTone,
-  verificationLabel,
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
 import { demoCrestUrl } from '../../features/product/demo-media'
@@ -17,6 +16,7 @@ import { productRepository, resolveMediaUrl } from '../../features/product/produ
 import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
 import { PlayerTrigger } from '../player-trigger'
+import { VerificationBadge } from '../verification-badge'
 
 import './index.scss'
 
@@ -180,9 +180,7 @@ export function PostCard({
         <View className="post-card__identity">
           <View className="post-card__name-row">
             <Text className="post-card__name">{post.author.displayName}</Text>
-            <Text className="post-card__verified">
-              {verificationLabel(post.author.verificationLevel)}
-            </Text>
+            <VerificationBadge level={post.author.verificationLevel} className="post-card__verified" />
           </View>
           <Text className="post-card__time">{formatRelativeTime(post.publishedAt)}</Text>
         </View>

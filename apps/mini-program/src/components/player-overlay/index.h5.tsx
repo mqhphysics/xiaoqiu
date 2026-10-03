@@ -28,6 +28,7 @@ import { UserAvatar, TeamCrest, PostCard } from '../product-ui'
 import { useOverlayFocus } from '../overlay-focus'
 import { openMessaging } from '../messaging-drawer/index.h5'
 import { PostIcon } from '../post-social/icons'
+import { VerificationBadge } from '../verification-badge/index.h5'
 import cover from '../../assets/home-visual/home-campus-action.webp'
 import './index.h5.scss'
 
@@ -38,6 +39,12 @@ export interface PlayerPresentation {
   messageUser?: MessageUser | null
   posts?: PostSummary[]
   goalkeeperStats?: { saves: number | null; clearances: number | null }
+  verificationLevel?: string | null
+}
+function playerVerification(playerId: string, presentation: PlayerPresentation) {
+  if (presentation.verificationLevel) return presentation.verificationLevel
+  const user = readSession()?.user
+  return user?.linkedPlayer?.id === playerId ? user.verificationLevel : 'PLAYER_PROFILE'
 }
 type PlayerState =
   | { phase: 'loading' }
@@ -897,7 +904,7 @@ export function PlayerHoverCard({
   const width = Math.min(358, window.innerWidth - 32)
   const left = Math.max(16, Math.min(rect.left - 20, window.innerWidth - width - 16))
   const top =
-    rect.bottom + 12 + 352 <= window.innerHeight ? rect.bottom + 12 : Math.max(16, rect.top - 364)
+    rect.bottom + 12 + 272 <= window.innerHeight ? rect.bottom + 12 : Math.max(16, rect.top - 284)
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -937,34 +944,74 @@ export function PlayerHoverCard({
         <img src={resolveMediaUrl(presentation.coverUrl) ?? cover} alt="" />
       </div>
       {state.phase === 'ready' ? (
-        <div className="player-hover-card__body">
-          <button
-            type="button"
-            className="player-hover-card__identity"
-            onClick={() => void openPlayer(request.playerId, request.tournamentId)}
-          >
-            <UserAvatar
-              name={state.player.displayName}
-              avatarUrl={state.player.avatarUrl}
-              color={state.player.profileColor}
-              size="large"
-            />
-            <div>
-              <strong>{state.player.displayName}</strong>
-              <span>
-                {state.player.team?.name ?? '暂无球队'} · {positionLabel(state.player.position)} · #
-                {state.player.shirtNumber ?? '待定'}
-              </span>
-            </div>
-          </button>
-          {state.player.isDemo && <span className="player-demo-label">演示档案</span>}
-          <CompactStats player={state.player} goalkeeperStats={presentation.goalkeeperStats} />
-          <PlayerActions player={state.player} messageUser={presentation.messageUser} />
-        </div>
+        <PersonHoverPreview
+          name={state.player.displayName}
+          avatarUrl={state.player.avatarUrl}
+          color={state.player.profileColor}
+          meta={`${state.player.team?.name ?? '暂无球队'} · ${positionLabel(state.player.position)}${state.player.shirtNumber ? ` · ${state.player.shirtNumber}号` : ''}`}
+          verificationLevel={playerVerification(state.player.id, presentation)}
+          onOpen={() => void openPlayer(request.playerId, request.tournamentId)}
+          stats={
+            <CompactStats player={state.player} goalkeeperStats={presentation.goalkeeperStats} />
+          }
+          actions={<PlayerActions player={state.player} messageUser={presentation.messageUser} />}
+        />
       ) : (
         <PlayerReadState state={state} retry={retry} />
       )}
     </aside>,
     document.body,
+  )
+}
+
+// Reusable identity body: student/staff callers omit stats entirely.
+export function PersonHoverPreview({
+  name,
+  avatarUrl,
+  color,
+  meta,
+  verificationLevel,
+  onOpen,
+  stats,
+  actions,
+}: {
+  name: string
+  avatarUrl?: string | null | undefined
+  color?: string | null | undefined
+  meta?: string | undefined
+  verificationLevel?: string | null | undefined
+  onOpen: () => void
+  stats?: ReactNode
+  actions: ReactNode
+}) {
+  return (
+    <div className="player-hover-card__body">
+      <div className="player-hover-card__identity">
+        <button
+          type="button"
+          className="player-hover-card__avatar"
+          aria-label={`查看${name}的资料`}
+          onClick={onOpen}
+        >
+          <UserAvatar
+            name={name}
+            {...(avatarUrl ? { avatarUrl } : {})}
+            {...(color ? { color } : {})}
+            size="large"
+          />
+        </button>
+        <div>
+          <div className="player-hover-card__name-row">
+            <button type="button" className="player-hover-card__name" onClick={onOpen}>
+              {name}
+            </button>
+            <VerificationBadge level={verificationLevel} />
+          </div>
+          {meta && <span className="player-hover-card__meta">{meta}</span>}
+        </div>
+      </div>
+      {stats}
+      {actions}
+    </div>
   )
 }
