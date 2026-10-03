@@ -216,7 +216,7 @@ export function PublicShell({
                   aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
                 >
-                  <TeamNavFocus />
+                  <TeamNavFocus team={primaryTeam} />
                   {primaryTeam ? (
                     <TeamCrest team={primaryTeam} size="large" />
                   ) : (

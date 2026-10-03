@@ -3,6 +3,7 @@ import type { NavigationSection } from './navigation-transition.types'
 interface TeamFocusState extends Keyframe {
   transform: string
   opacity: string
+  strokeDashoffset?: string
 }
 
 interface NavigationOrigin {
@@ -20,8 +21,20 @@ interface NavigationOrigin {
 
 const sections: NavigationSection[] = ['home', 'schedule', 'team', 'data', 'me']
 const easing = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const focusEasing = 'cubic-bezier(0.22, 0.61, 0.36, 1)'
 let origin: NavigationOrigin | null = null
 const focusAnimations = new WeakMap<HTMLElement, Animation[]>()
+
+function readTeamFocus(element: Element): TeamFocusState {
+  const style = getComputedStyle(element)
+  return {
+    transform: style.transform,
+    opacity: style.opacity,
+    ...(element.matches('.public-team-focus__stroke')
+      ? { strokeDashoffset: style.strokeDashoffset }
+      : {}),
+  }
+}
 
 function stopTeamFocus(shell: HTMLElement): void {
   focusAnimations.get(shell)?.forEach((animation) => animation.cancel())
@@ -29,6 +42,15 @@ function stopTeamFocus(shell: HTMLElement): void {
 }
 
 export function playTeamFocus(shell: HTMLElement, initialFocus?: TeamFocusState[]): void {
+  const button = shell.querySelector<HTMLElement>('.public-team-nav')
+  const replayFocus = initialFocus
+    ? []
+    : Array.from(
+        button?.querySelectorAll<Element>(
+          '.public-team-focus__stroke, .public-team-focus__jewel',
+        ) ?? [],
+        readTeamFocus,
+      )
   stopTeamFocus(shell)
   if (
     !window.matchMedia('(min-width: 721px)').matches ||
@@ -36,44 +58,46 @@ export function playTeamFocus(shell: HTMLElement, initialFocus?: TeamFocusState[
     document.activeElement?.matches(':focus-visible')
   )
     return
-  const button = shell.querySelector<HTMLElement>('.public-team-nav')
   if (!button?.classList.contains('public-team-nav--active')) return
   const animations: Animation[] = []
   const wings = button.querySelectorAll<HTMLElement>('.public-team-focus__wing')
   for (const [index, wing] of wings.entries()) {
-    const side = Number(wing.dataset.focusSide)
     const pair = Number(wing.dataset.focusPair)
+    const stroke = wing.querySelector<SVGPathElement>('.public-team-focus__stroke')
+    if (!stroke) continue
     const options: KeyframeAnimationOptions = {
-      duration: 220,
-      delay: pair * 30,
-      easing,
+      duration: 760,
+      delay: 60 + pair * 80,
+      easing: focusEasing,
       fill: 'backwards',
     }
-    animations.push(
-      wing.animate(
-        [
-          initialFocus?.[index] ?? {
-            transform: `translate(${-side * 4}px, 2px) scaleX(0.92)`,
-            opacity: '0.3',
-          },
-          { transform: 'none', opacity: 1 },
-        ],
-        options,
-      ),
+    const start: Keyframe = {
+      strokeDashoffset: '1',
+      opacity: '0',
+    }
+    const frames: Keyframe[] = initialFocus
+      ? [initialFocus[index] ?? start]
+      : [replayFocus[index] ?? { strokeDashoffset: '0', opacity: '1' }, { ...start, offset: 0.12 }]
+    frames.push(
+      { strokeDashoffset: '0.25', opacity: 1, offset: 0.65 },
+      { strokeDashoffset: '0', opacity: 1 },
     )
+    animations.push(stroke.animate(frames, options))
   }
   const jewel = button.querySelector<HTMLElement>('.public-team-focus__jewel')
   if (jewel)
     animations.push(
       jewel.animate(
         [
-          initialFocus?.[wings.length] ?? {
-            transform: 'translateY(2px) scale(0.9)',
-            opacity: '0.3',
-          },
+          initialFocus?.[wings.length] ??
+            replayFocus[wings.length] ?? {
+              transform: 'scale(0.85)',
+              opacity: '0.3',
+            },
+          { transform: 'scale(1.18)', opacity: 1, offset: 0.55 },
           { transform: 'none', opacity: 1 },
         ],
-        { duration: 220, delay: 60, easing, fill: 'backwards' },
+        { duration: 300, easing: focusEasing, fill: 'backwards' },
       ),
     )
   focusAnimations.set(shell, animations)
@@ -101,11 +125,8 @@ export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSe
     crest: crest?.getBoundingClientRect() ?? null,
     crestOpacity: crest ? getComputedStyle(crest).opacity : '1',
     teamFocus: Array.from(
-      shell.querySelectorAll<HTMLElement>('.public-team-focus__wing, .public-team-focus__jewel'),
-      (element) => {
-        const style = getComputedStyle(element)
-        return { transform: style.transform, opacity: style.opacity }
-      },
+      shell.querySelectorAll<Element>('.public-team-focus__stroke, .public-team-focus__jewel'),
+      readTeamFocus,
     ),
     animate:
       !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
@@ -163,21 +184,18 @@ export function animateNavigationEntrance(
 
   const animations: Animation[] = []
   if (section === 'team') playTeamFocus(shell, previous.teamFocus)
-  const animate = (element: HTMLElement | null, frames: Keyframe[], duration = 260) => {
+  const animate = (element: Element | null, frames: Keyframe[], duration = 260) => {
     if (element?.animate) animations.push(element.animate(frames, { duration, easing }))
   }
   if (section !== 'team') {
     shell
-      .querySelectorAll<HTMLElement>('.public-team-focus__wing, .public-team-focus__jewel')
+      .querySelectorAll<
+        SVGPathElement | HTMLElement
+      >('.public-team-focus__stroke, .public-team-focus__jewel')
       .forEach((element, index) => {
         const previousFocus = previous.teamFocus[index]
         if (!previousFocus) return
-        const style = getComputedStyle(element)
-        animate(
-          element,
-          [previousFocus, { transform: style.transform, opacity: style.opacity }],
-          220,
-        )
+        animate(element, [previousFocus, readTeamFocus(element)], 420)
       })
   }
   const selection = shell.querySelector<HTMLElement>('.public-nav__selection')

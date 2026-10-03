@@ -1,34 +1,44 @@
 import { useId } from 'react'
 
+import type { TeamSummary } from '../../features/product/product.types'
+import { getTeamNavPalette } from './team-nav-palette.h5'
+
 import './team-nav-focus.h5.scss'
 
-const layers = [
+const contours = [
   {
-    tone: 'outer',
-    path: 'M7 37C20 57 39 64 63 65C37 70 14 57 7 37Z',
-    edge: 'M7 37C20 57 39 64 63 65',
-    colors: ['#fbf8ed', '#dfd1a6', '#9eaa87'],
+    tone: 'inner',
+    path: 'M100 71C80 69 65 57 56 43C50 33 42 27 30 27',
+    width: 2.6,
+    colors: ['primaryDark', 'primary', 'primaryLight'],
   },
   {
     tone: 'middle',
-    path: 'M20 34C29 48 44 58 63 63C39 65 23 55 20 34Z',
-    edge: 'M20 34C29 48 44 58 63 63',
-    colors: ['#fffaf0', '#c9bd92', '#708c71'],
+    path: 'M100 71C71 72 47 62 31 47C21 38 18 27 9 23',
+    width: 1.9,
+    colors: ['secondaryDark', 'secondary', 'secondaryLight'],
   },
   {
-    tone: 'base',
-    path: 'M33 43C39 55 49 61 63 63C45 65 34 56 33 43Z',
-    edge: 'M33 43C39 55 49 61 63 63',
-    colors: ['#d8dfcb', '#718e75', '#244f3c'],
+    tone: 'lower',
+    path: 'M100 71C74 78 47 73 28 62C17 56 10 49 3 41',
+    width: 1.8,
+    colors: ['primaryDark', 'primary', 'primaryLight'],
+  },
+  {
+    tone: 'outer',
+    path: 'M100 71C72 82 42 78 19 66C10 61 4 55 1 48',
+    width: 1,
+    colors: ['secondaryDark', 'secondary', 'secondaryLight'],
   },
 ] as const
 
-export function TeamNavFocus() {
+export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
   const id = useId().replace(/:/g, '')
+  const palette = getTeamNavPalette(team)
 
   return (
     <span aria-hidden="true" className="public-team-focus">
-      {layers.flatMap((layer, pair) =>
+      {contours.flatMap((layer, pair) =>
         [-1, 1].map((side) => {
           const gradientId = `${id}-${layer.tone}-${side}`
           return (
@@ -38,24 +48,37 @@ export function TeamNavFocus() {
               data-focus-pair={pair}
               key={`${layer.tone}-${side}`}
             >
-              <svg focusable="false" viewBox="0 0 132 76" fill="none">
+              <svg focusable="false" viewBox="0 0 200 80" preserveAspectRatio="none" fill="none">
                 <defs>
                   <linearGradient
                     id={gradientId}
-                    x1="14"
-                    y1="43"
-                    x2="62"
-                    y2="67"
+                    x1="100"
+                    y1="71"
+                    x2="14"
+                    y2="32"
                     gradientUnits="userSpaceOnUse"
                   >
-                    <stop stopColor={layer.colors[0]} />
-                    <stop offset="0.48" stopColor={layer.colors[1]} />
-                    <stop offset="1" stopColor={layer.colors[2]} />
+                    <stop stopColor={palette[layer.colors[0]]} />
+                    <stop offset="0.5" stopColor={palette[layer.colors[1]]} />
+                    <stop offset="1" stopColor={palette[layer.colors[2]]} />
                   </linearGradient>
                 </defs>
-                <g transform={side === 1 ? 'translate(132 0) scale(-1 1)' : undefined}>
-                  <path d={layer.path} fill={`url(#${gradientId})`} />
-                  <path d={layer.edge} stroke="#f8f4e5" strokeWidth="0.55" />
+                <g transform={side === 1 ? 'translate(200 0) scale(-1 1)' : undefined}>
+                  <path
+                    className="public-team-focus__trace"
+                    d={layer.path}
+                    stroke={palette[layer.colors[1]]}
+                    strokeWidth={layer.width}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <path
+                    className="public-team-focus__stroke"
+                    d={layer.path}
+                    stroke={`url(#${gradientId})`}
+                    strokeWidth={layer.width}
+                    pathLength="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
                 </g>
               </svg>
             </span>
@@ -63,10 +86,10 @@ export function TeamNavFocus() {
         }),
       )}
       <span className="public-team-focus__jewel">
-        <svg focusable="false" viewBox="0 0 132 76" fill="none">
-          <path d="M66 64L69.5 68L66 72L62.5 68Z" fill="#bb9d57" />
-          <path d="M66 64L66 72L62.5 68Z" fill="#52705a" />
-          <path d="M66 73V76" stroke="#c6ad70" strokeWidth="0.65" />
+        <svg focusable="false" viewBox="0 0 200 80" preserveAspectRatio="none" fill="none">
+          <path d="M100 65L105 71L100 77L95 71Z" fill={palette.secondary} />
+          <path d="M100 65V77L95 71Z" fill={palette.primary} />
+          <path d="M100 77V80" stroke={palette.secondary} strokeWidth="0.8" />
         </svg>
       </span>
     </span>
