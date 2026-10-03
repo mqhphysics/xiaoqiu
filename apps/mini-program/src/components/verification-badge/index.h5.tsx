@@ -1,5 +1,8 @@
 import { useId } from 'react'
-import { VerificationBadge as ExistingBadge, type VerificationBadgeProps } from './index.tsx'
+import {
+  VerificationBadge as ExistingBadge,
+  type VerificationBadgeProps,
+} from './verification-badge.shared'
 import playerIcon from './football.svg'
 import staffIcon from '../../assets/profile-icons/pencil.svg'
 import captainIcon from '../../assets/profile-icons/trophy.svg'

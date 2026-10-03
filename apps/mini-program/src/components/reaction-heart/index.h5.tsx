@@ -1,4 +1,4 @@
-import { ReactionHeart as ExistingHeart } from './index.tsx'
+import { ReactionHeart as ExistingHeart } from './reaction-heart.shared'
 
 export function ReactionHeart({ active }: { active: boolean }) {
   if (window.matchMedia('(max-width: 720px)').matches) return <ExistingHeart active={active} />

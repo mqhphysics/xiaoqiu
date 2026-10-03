@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Taro from '@tarojs/taro'
-import { ReportModal as ExistingReportModal } from './index.tsx'
+import { ReportModal as ExistingReportModal } from './report-modal.shared'
 import { productRepository, createClientActionId } from '../../features/product/product.repository'
 import type { ReportTargetType } from '../../features/product/product.types'
 import { useOverlayFocus } from '../overlay-focus'

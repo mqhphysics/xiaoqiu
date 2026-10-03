@@ -14,8 +14,7 @@ import type {
   PlayerStats,
   TeamSummary,
 } from '../../features/product/product.types'
-// Keep compact H5 on the original entry without resolving back to this file.
-import ExistingDataPage from './index.tsx'
+import ExistingDataPage from './data-center.shared'
 import { KnockoutPanel } from './knockout-tree.h5'
 
 import './index.h5.scss'

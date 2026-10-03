@@ -8,9 +8,7 @@ import { AuthScene } from '../../components/auth-scene/index.h5'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
-// An explicit extension bypasses Taro's multi-platform resolver. Compact H5
-// keeps the existing page; the WeChat entry itself is not modified.
-import ExistingLoginPage from './index.tsx'
+import ExistingLoginPage from './login.shared'
 
 import '../../components/auth-cursor/native-cursors.h5.scss'
 import './index.h5.scss'

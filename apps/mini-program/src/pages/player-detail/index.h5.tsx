@@ -2,7 +2,7 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useEffect, useState } from 'react'
 import { PlayerDialog } from '../../components/player-overlay/index.h5'
 import { PublicShell } from '../../components/public-shell'
-import ExistingPlayerPage from './index.tsx'
+import ExistingPlayerPage from './player-detail.shared'
 
 export default function H5PlayerDetailPage() {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 721px)').matches)
