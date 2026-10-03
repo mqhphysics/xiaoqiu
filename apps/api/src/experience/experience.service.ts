@@ -950,17 +950,16 @@ export class ExperienceService {
         status: 'APPROVED' as const,
       },
     }
-    const [topics, teams, players] = await Promise.all([
-      this.prisma.postTag.findMany({
+    const [usage, teams, players] = await Promise.all([
+      this.prisma.postTag.groupBy({
+        by: ['kind', 'key'],
         where: {
           organizationId,
-          kind: 'TOPIC',
           post: { organizationId, tournamentId: tournament.id, status: PostStatus.PUBLISHED },
-          ...(normalized ? { label: { contains: normalized, mode: 'insensitive' as const } } : {}),
         },
-        distinct: ['key'],
-        orderBy: { createdAt: 'desc' },
-        take: 8,
+        _count: { _all: true },
+        _max: { label: true },
+        orderBy: { key: 'asc' },
       }),
       this.prisma.team.findMany({
         where: {
@@ -979,7 +978,6 @@ export class ExperienceService {
         },
         select: { id: true, name: true, collegeName: true, teamCode: true },
         orderBy: { name: 'asc' },
-        take: 10,
       }),
       this.prisma.playerProfile.findMany({
         where: {
@@ -1008,17 +1006,31 @@ export class ExperienceService {
           },
         },
         orderBy: { displayName: 'asc' },
-        take: 10,
       }),
     ])
     const fixedTopics = ['比赛日', '训练日常', '赛后记录', '校园足球']
       .filter((label) => !normalized || label.includes(normalized))
       .map((label) => ({ kind: 'TOPIC' as const, label }))
     const commonTopics = [
-      ...topics.map((tag) => ({ kind: 'TOPIC' as const, label: tag.label })),
+      ...usage
+        .filter((tag) => tag.kind === 'TOPIC' && tag._max.label)
+        .map((tag) => ({ kind: 'TOPIC' as const, label: tag._max.label! }))
+        .filter((tag) =>
+          tag.label.toLocaleLowerCase('zh-CN').includes(normalized.toLocaleLowerCase('zh-CN')),
+        ),
       ...fixedTopics,
     ]
     const seen = new Set<string>()
+    const counts = new Map(usage.map((tag) => [tag.key, tag._count._all]))
+    const exact = (label: string) =>
+      normalized !== '' &&
+      label.normalize('NFKC').toLocaleLowerCase('zh-CN') === normalized.toLocaleLowerCase('zh-CN')
+    const frequency = (tag: { kind: string; label: string; targetId?: string }) =>
+      counts.get(
+        tag.kind === 'TOPIC'
+          ? `TOPIC:${tag.label.normalize('NFKC').toLocaleLowerCase('zh-CN')}`
+          : `${tag.kind}:${tag.targetId}`,
+      ) ?? 0
     return {
       items: [
         ...commonTopics.filter((tag) => {
@@ -1039,7 +1051,11 @@ export class ExperienceService {
           targetId: player.id,
           description: `${player.snapshotEntries[0]?.rosterSnapshot.team.name ?? '校园球员'}${player.snapshotEntries[0]?.shirtNumber ? ` · #${player.snapshotEntries[0].shirtNumber}` : ''}`,
         })),
-      ],
+      ]
+        .sort(
+          (a, b) => Number(exact(b.label)) - Number(exact(a.label)) || frequency(b) - frequency(a),
+        )
+        .slice(0, 32),
     }
   }
 

@@ -64,6 +64,7 @@ test(
         where: { organizationId: org, teamCode: 'DEMO-MATH' },
       })
       const player = await prisma.playerProfile.findFirstOrThrow({
+        orderBy: { displayName: 'desc' },
         where: {
           organizationId: org,
           snapshotEntries: {
@@ -302,6 +303,75 @@ test(
             )
           },
         )
+        await t.test(
+          'suggestions rank all tag kinds by published usage within the current tenant and season',
+          async () => {
+            const popular = `F_TEST_popular_${suffix}`
+            const recent = `F_TEST_recent_${suffix}`
+            for (let index = 0; index < 4; index += 1) {
+              const ranked = await publish({
+                clientPostId: `tags-${suffix}-frequency-${index}`,
+                tournamentId: tournament.id,
+                body: 'FICTIONAL_TEST 标签频率验证',
+                tags: [
+                  { kind: 'TEAM', targetId: team.id },
+                  ...(index < 3 ? [{ kind: 'PLAYER', targetId: player.id }] : []),
+                  ...(index < 2 ? [{ kind: 'TOPIC', label: popular }] : []),
+                  ...(index === 3 ? [{ kind: 'TOPIC', label: recent }] : []),
+                ],
+              }).expect(201)
+              posts.push(ranked.body.id)
+            }
+            const previousSeason = await prisma.tournament.findFirstOrThrow({
+              where: { organizationId: org, id: { not: tournament.id } },
+            })
+            for (const scope of [
+              { organizationId: org, tournamentId: tournament.id, status: 'HIDDEN' as const },
+              {
+                organizationId: org,
+                tournamentId: previousSeason.id,
+                status: 'PUBLISHED' as const,
+              },
+              { organizationId: otherOrg.id, tournamentId: null, status: 'PUBLISHED' as const },
+            ]) {
+              for (let index = 0; index < 3; index += 1) {
+                const excluded = await prisma.post.create({
+                  data: {
+                    ...scope,
+                    body: 'FICTIONAL_TEST 不应计入本赛事频率的资料',
+                  },
+                })
+                posts.push(excluded.id)
+                await prisma.postTag.create({
+                  data: {
+                    organizationId: scope.organizationId,
+                    postId: excluded.id,
+                    kind: 'TOPIC',
+                    key: `TOPIC:${recent.toLocaleLowerCase('zh-CN')}`,
+                    label: recent,
+                    position: 0,
+                  },
+                })
+              }
+            }
+            const ranked = await publicGet(
+              `/public/post-tags?tournamentId=${tournament.id}`,
+            ).expect(200)
+            assert.deepEqual(
+              ranked.body.items
+                .slice(0, 4)
+                .map((tag: { kind: string; targetId?: string; label: string }) =>
+                  tag.kind === 'TOPIC' ? tag.label : tag.targetId,
+                ),
+              [team.id, player.id, popular, recent],
+              'Counts 4/3/2/1 outrank recency and ignore hidden, other-season and foreign posts',
+            )
+            const exact = await publicGet(
+              `/public/post-tags?query=${encodeURIComponent(player.displayName)}&tournamentId=${tournament.id}`,
+            ).expect(200)
+            assert.equal(exact.body.items[0].targetId, player.id)
+          },
+        )
         await t.test('old publications without tags remain supported', async () => {
           const old = await publish({
             clientPostId: `tags-${suffix}-old`,
@@ -321,7 +391,9 @@ test(
         await prisma.auditLog.deleteMany({
           where: { organizationId: org, targetId: { in: posts } },
         })
-        await prisma.post.deleteMany({ where: { organizationId: org, id: { in: posts } } })
+        await prisma.post.deleteMany({
+          where: { organizationId: { in: [org, otherOrg.id] }, id: { in: posts } },
+        })
         await prisma.team.delete({ where: { id: otherTeam.id } })
         await prisma.organization.delete({ where: { id: otherOrg.id } })
         await prisma.$disconnect()

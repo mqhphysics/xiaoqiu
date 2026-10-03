@@ -10,8 +10,6 @@ export function tagKey(tag: PostTag) {
 function normalizeLabel(label: string) {
   return label.normalize('NFKC').replace(/^#+/, '').trim().toLocaleLowerCase('zh-CN')
 }
-const labels = { TEAM: '球队', PLAYER: '球员', TOPIC: '话题' }
-
 export function PostTagPicker({
   tags,
   onChange,
@@ -111,17 +109,9 @@ export function PostTagPicker({
     }
   }
   const visible = options.filter((tag) => !tags.some((current) => tagKey(current) === tagKey(tag)))
-  const suggestions = query
-    ? visible.slice(0, 18)
-    : ['TOPIC', 'TEAM', 'PLAYER'].flatMap((kind) =>
-        visible.filter((tag) => tag.kind === kind).slice(0, 4),
-      )
+  const suggestions = visible.slice(0, 4)
   return (
     <section className="post-tag-picker" aria-label="添加动态标签">
-      <div className="post-tag-picker__label">
-        <span>添加标签</span>
-        <small>球队、球员或你想记录的话题</small>
-      </div>
       <div className="post-tag-picker__input-area">
         {tags.map((tag) => (
           <span key={tagKey(tag)} className="post-tag post-tag--selected">
@@ -149,7 +139,7 @@ export function PostTagPicker({
               ? '最多 10 个标签，删除后可继续添加'
               : tags.length
                 ? '输入后回车继续添加'
-                : '搜索球队、球员，或输入后回车创建话题'
+                : '添加标签，输入后按回车'
           }
           value={query}
           maxLength={60}
@@ -170,8 +160,7 @@ export function PostTagPicker({
           }}
         />
       </div>
-      <div className="post-tag-picker__suggestions">
-        <span>{query ? '标签建议' : '常用标签'}</span>
+      <div className="post-tag-picker__suggestions" aria-label={query ? '标签建议' : '常用标签'}>
         {resolving ? (
           <small>正在添加标签…</small>
         ) : loading ? (
@@ -182,13 +171,12 @@ export function PostTagPicker({
               type="button"
               data-post-tag
               key={tagKey(tag)}
+              aria-label={`添加标签 ${tag.label}${tag.description ? `，${tag.description}` : ''}`}
+              title={tag.description ? `${tag.label} · ${tag.description}` : tag.label}
               disabled={disabled || resolving || tags.length >= 10}
               onClick={() => add(tag)}
             >
-              <small>{labels[tag.kind]}</small>#{tag.label}
-              {tag.description ? (
-                <span className="post-tag-picker__hint">{tag.description}</span>
-              ) : null}
+              #{tag.label}
             </button>
           ))
         )}
