@@ -55,7 +55,7 @@ export class AuthContextGuard implements CanActivate {
     if (!publicRead && !login && !admin) return true
 
     const session =
-      !login && (admin || request.headers.authorization !== undefined)
+      !login && (admin || publicRead || request.headers.authorization !== undefined)
         ? await this.auth.requireSession(request.headers.authorization)
         : undefined
     const organizationId = resolveOrganizationSelector(request, session?.organizationId)
@@ -144,7 +144,7 @@ export function resolveOrganizationSelector(
     canonical ??
     (process.env.NODE_ENV !== 'production' ? legacy : undefined) ??
     sessionOrganizationId ??
-    process.env.DEFAULT_ORGANIZATION_ID ??
+    (process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined) ??
     (process.env.NODE_ENV !== 'production' ? DEMO_ORGANIZATION_ID : undefined)
   return requireUuid(selected)
 }

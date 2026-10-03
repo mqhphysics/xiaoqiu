@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { clearSession, readSession } from '../product/session'
 
 import { readonlyScheduleMockFixture } from './mock-fixture'
 import { sortMatchesByStartAt } from './readonly-schedule.logic'
@@ -412,16 +413,25 @@ function formatDateRangePoint(value: string | undefined): string {
 }
 
 async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
+  const session = readSession()
+  if (Taro.getEnv() === Taro.ENV_TYPE.WEB && !session) {
+    clearSession()
+    throw new PublicApiRequestError(401, '请先登录账号后再访问晓球')
+  }
   const response = await Taro.request<T>({
     url: `${apiContext.baseUrl}${path}`,
     method: 'GET',
     header: {
-      'x-dev-organization-id': apiContext.organizationId,
+      'x-organization-id': session?.user.organizationId ?? apiContext.organizationId,
+      ...(session ? { Authorization: `Bearer ${session.accessToken}` } : {}),
     },
     timeout: 5000,
+  }).catch(() => {
+    throw new PublicApiRequestError(0, '无法连接晓球 API，请检查网络或联系管理员后重试。')
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (response.statusCode === 401) clearSession()
     throw new PublicApiRequestError(
       response.statusCode,
       readErrorMessage(response.data, response.statusCode),
@@ -449,6 +459,9 @@ function readErrorMessage(data: unknown, statusCode: number): string {
 function getApiContext(): ApiContext | undefined {
   const baseUrl = process.env.TARO_APP_API_BASE_URL
   if (!baseUrl || baseUrl.trim().length === 0) {
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB) {
+      throw new PublicApiRequestError(0, '尚未配置晓球 API 地址，请联系管理员。')
+    }
     return undefined
   }
 

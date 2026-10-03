@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 import { useEffect, type PropsWithChildren } from 'react'
 
 import { mountCursorSkin } from './components/auth-cursor'
+import { AccountBoundary } from './components/account-boundary'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
 import { PostOverlayHost } from './components/post-overlay'
 import { TeamOverlayHost } from './components/team-hub'
@@ -27,12 +28,12 @@ export default function App({ children }: PropsWithChildren) {
   )
 
   return (
-    <>
+    <AccountBoundary>
       {children}
       <PostOverlayHost />
       <TeamOverlayHost />
       <PlayerOverlayHost />
       <MessagingOverlayHost />
-    </>
+    </AccountBoundary>
   )
 }

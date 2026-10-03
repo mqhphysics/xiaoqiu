@@ -328,11 +328,54 @@ test(
         return `Bearer ${response.body.accessToken as string}`
       }
       const studentToken = await login(student)
+      const readPublic = (path: string) =>
+        request(server).get(path).set('authorization', studentToken)
       const adminToken = await login(admin)
       const scopedToken = await login(scopedAdmin)
       const captainToken = await login(captain)
       const reporterToken = await login(reporter)
       const tournamentReporterToken = await login(tournamentReporter)
+
+      await t.test(
+        'account-only public reads reject guests, forged headers and revoked sessions',
+        async () => {
+          for (const url of [
+            '/api/public/seasons',
+            '/api/public/home/',
+            '/api/PUBLIC/search?query=fictional',
+            `/api/public/tournaments/${tournament.id}/competition-data`,
+            `/api/public/teams/${team.id}/dashboard`,
+            `/api/public/players/${player.id}`,
+            `/api/public/matches/${match.id}/experience`,
+            '/api/public/posts',
+          ]) {
+            await request(server)
+              .get(url)
+              .set('x-organization-id', organization.id)
+              .set('x-dev-role', 'ADMIN')
+              .set('x-dev-user-id', admin.id)
+              .expect(401)
+          }
+          await request(server)
+            .get('/api/public/seasons')
+            .set('authorization', 'Bearer fictional-forged-token')
+            .set('x-organization-id', organization.id)
+            .expect(401)
+          const revokedToken = await login(student)
+          await request(server)
+            .post('/api/auth/logout')
+            .set('authorization', revokedToken)
+            .expect(204)
+          await request(server)
+            .get('/api/public/seasons')
+            .set('authorization', revokedToken)
+            .expect(401)
+          const allowed = await readPublic('/api/public/seasons').expect(200)
+          assert.equal(allowed.headers['cache-control'], 'private, no-store')
+          await request(server).get('/api/auth/me').expect(401)
+        },
+      )
+
       const fixturePlan = await request(server)
         .post('/api/admin/schedule-plans')
         .set('authorization', adminToken)
@@ -532,24 +575,21 @@ test(
       await t.test(
         'real published tournaments feed the five-entry APIs without DEMO codes or private fields',
         async () => {
-          const seasons = await request(server)
-            .get('/api/public/seasons')
+          const seasons = await readPublic('/api/public/seasons')
             .set('x-organization-id', organization.id)
             .expect(200)
           assert.equal(seasons.body.length, 2)
           assert.ok(
             seasons.body.every((item: { tournamentId: string }) => item.tournamentId !== draft.id),
           )
-          const home = await request(server)
-            .get('/api/public/home')
+          const home = await readPublic('/api/public/home')
             .set('x-organization-id', organization.id)
             .expect(200)
           assert.equal(home.body.tournament.id, tournament.id)
           assert.ok(
             home.body.focusMatches.every((item: { id: string }) => item.id !== draftMatch.id),
           )
-          const olderHome = await request(server)
-            .get('/api/public/home')
+          const olderHome = await readPublic('/api/public/home')
             .query({ tournamentId: prior.id })
             .set('x-organization-id', organization.id)
             .expect(200)
@@ -561,20 +601,17 @@ test(
             `/api/public/matches/${match.id}/experience`,
             `/api/public/posts?tournamentId=${prior.id}`,
           ]) {
-            const response = await request(server)
-              .get(url)
+            const response = await readPublic(url)
               .set('x-organization-id', organization.id)
               .expect(200)
             const json = JSON.stringify(response.body)
             for (const privateValue of [student.studentId!, student.email!, player.studentId!])
               assert.ok(!json.includes(privateValue))
           }
-          await request(server)
-            .get(`/api/public/players/${player.id}?tournamentId=${tournament.id}`)
+          await readPublic(`/api/public/players/${player.id}?tournamentId=${tournament.id}`)
             .set('x-organization-id', organization.id)
             .expect(404) // No approved locked roster yet; the later search case publishes it.
-          await request(server)
-            .get('/api/public/search')
+          await readPublic('/api/public/search')
             .query({ query: 'FICTIONAL_TEST', tournamentId: prior.id })
             .set('x-organization-id', organization.id)
             .expect(200)
@@ -590,37 +627,28 @@ test(
             .expect(200)
           assert.equal(identity.body.studentId, student.studentId)
           assert.equal(identity.headers['cache-control'], 'private, no-store')
-          await request(server)
-            .get('/api/public/home')
-            .set('authorization', studentToken)
-            .expect(200)
-          await request(server)
-            .get('/api/public/home')
+          await readPublic('/api/public/home').set('authorization', studentToken).expect(200)
+          await readPublic('/api/public/home')
             .set('authorization', studentToken)
             .set('x-organization-id', other.id)
             .expect(403)
           for (const id of [draft.id, foreignTournament.id]) {
-            await request(server)
-              .get('/api/public/home')
+            await readPublic('/api/public/home')
               .query({ tournamentId: id })
               .set('x-organization-id', organization.id)
               .expect(404)
-            await request(server)
-              .get(`/api/public/tournaments/${id}/competition-data`)
+            await readPublic(`/api/public/tournaments/${id}/competition-data`)
               .set('x-organization-id', organization.id)
               .expect(404)
           }
-          await request(server)
-            .get(`/api/public/matches/${draftMatch.id}/experience`)
+          await readPublic(`/api/public/matches/${draftMatch.id}/experience`)
             .set('x-organization-id', organization.id)
             .expect(404)
-          await request(server)
-            .get('/api/public/home')
+          await readPublic('/api/public/home')
             .query({ tournamentId: 'broken-id' })
             .set('x-organization-id', organization.id)
             .expect(400)
-          await request(server)
-            .get('/api/public/home')
+          await readPublic('/api/public/home')
             .set('x-organization-id', organization.id)
             .set('x-dev-organization-id', other.id)
             .expect(400)
@@ -709,8 +737,7 @@ test(
           await snapshot(tournament.id, rival.id, unlockedPlayer.id, 1, false)
           await snapshot(prior.id, rival.id, historicalPlayer.id, 1, true)
           await snapshot(tournament.id, pendingTeam.id, pendingPlayer.id, 1, true)
-          const search = await request(server)
-            .get('/api/public/search')
+          const search = await readPublic('/api/public/search')
             .query({ query: 'FICTIONAL_TEST', tournamentId: tournament.id })
             .set('x-organization-id', organization.id)
             .expect(200)
@@ -726,8 +753,7 @@ test(
             search.body.matches.map((item: { id: string }) => item.id).sort(),
             [match.id, secondMatch.id].sort(),
           )
-          const older = await request(server)
-            .get('/api/public/search')
+          const older = await readPublic('/api/public/search')
             .query({ query: 'FICTIONAL_TEST', tournamentId: prior.id })
             .set('x-organization-id', organization.id)
             .expect(200)
@@ -747,14 +773,12 @@ test(
           ]) {
             assert.ok(!JSON.stringify(search.body).includes(hiddenId))
           }
-          const detail = await request(server)
-            .get(`/api/public/players/${player.id}`)
+          const detail = await readPublic(`/api/public/players/${player.id}`)
             .query({ tournamentId: tournament.id })
             .set('x-organization-id', organization.id)
             .expect(200)
           assert.equal(detail.body.shirtNumber, '2')
-          await request(server)
-            .get(`/api/public/teams/${pendingTeam.id}/dashboard`)
+          await readPublic(`/api/public/teams/${pendingTeam.id}/dashboard`)
             .query({ tournamentId: tournament.id })
             .set('x-organization-id', organization.id)
             .expect(404)
@@ -762,27 +786,25 @@ test(
       )
 
       await t.test(
-        'production requires a real organization selector and never falls back from configured tournament',
+        'production requires an account, accepts its organization and preserves explicit tournament context',
         async () => {
           process.env.NODE_ENV = 'production'
           try {
-            await request(server).get('/api/public/seasons').expect(400)
-            await request(server)
-              .get('/api/public/seasons')
+            await request(server).get('/api/public/seasons').expect(401)
+            await readPublic('/api/public/seasons').expect(200)
+            await readPublic('/api/public/seasons')
               .set('x-dev-organization-id', organization.id)
               .expect(400)
-            await request(server)
-              .get('/api/public/seasons')
+            await readPublic('/api/public/seasons')
               .set('x-organization-id', organization.id)
               .expect(200)
             process.env.DEFAULT_ORGANIZATION_ID = organization.id
             process.env.DEFAULT_TOURNAMENT_ID = prior.id
-            const home = await request(server).get('/api/public/home').expect(200)
+            const home = await readPublic('/api/public/home').expect(200)
             assert.equal(home.body.tournament.id, prior.id)
             process.env.DEFAULT_TOURNAMENT_ID = draft.id
-            await request(server).get('/api/public/home').expect(404)
-            const explicit = await request(server)
-              .get('/api/public/home')
+            await readPublic('/api/public/home').expect(404)
+            const explicit = await readPublic('/api/public/home')
               .query({ tournamentId: tournament.id })
               .expect(200)
             assert.equal(explicit.body.tournament.id, tournament.id)
@@ -989,12 +1011,10 @@ test(
             data: { status: 'DRAFT' },
           })
           try {
-            await request(server)
-              .get(`/api/public/matches/${match.id}`)
+            await readPublic(`/api/public/matches/${match.id}`)
               .set('x-organization-id', organization.id)
               .expect(404)
-            await request(server)
-              .get(`/api/public/matches/${match.id}/experience`)
+            await readPublic(`/api/public/matches/${match.id}/experience`)
               .set('x-organization-id', organization.id)
               .expect(404)
           } finally {
@@ -1128,10 +1148,7 @@ test(
             where: { userId: student.id },
             data: { expiresAt: new Date(0) },
           })
-          await request(server)
-            .get('/api/public/home')
-            .set('authorization', studentToken)
-            .expect(401)
+          await readPublic('/api/public/home').set('authorization', studentToken).expect(401)
           await request(server).get('/api/auth/me').set('authorization', studentToken).expect(401)
           await request(server)
             .post('/api/auth/logout')
@@ -1150,10 +1167,9 @@ test(
             .get('/api/admin/schedule-workbench')
             .set('authorization', newAdminToken)
             .expect(401)
-          await request(server)
-            .get('/api/public/seasons')
+          await readPublic('/api/public/seasons')
             .set('x-organization-id', organization.id)
-            .expect(404)
+            .expect(401)
         },
       )
     } finally {

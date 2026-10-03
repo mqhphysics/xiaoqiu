@@ -21,7 +21,7 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
   confirmPassword: '',
 }
 
-export default function LoginPage() {
+export default function LoginPage({ allowGuest = true }: { allowGuest?: boolean }) {
   const [screenMode, setScreenMode] = useState<ScreenMode>('login')
   const [loginMode, setLoginMode] = useState<LoginMode>('password')
   const [identifier, setIdentifier] = useState('')
@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [emailCode, setEmailCode] = useState('')
   const [registration, setRegistration] = useState(emptyRegistration)
   const [submitting, setSubmitting] = useState(false)
+  const [failureMessage, setFailureMessage] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
   const [recoveryName, setRecoveryName] = useState('')
   const [recoveryStudentId, setRecoveryStudentId] = useState('')
@@ -48,10 +49,12 @@ export default function LoginPage() {
         : 8
     if (!identifier.trim() || password.length < minimumLength || submitting) return
     setSubmitting(true)
+    setFailureMessage('')
     try {
       await productRepository.login(identifier, password)
       await Taro.reLaunch({ url: '/pages/index/index' })
     } catch (error) {
+      setFailureMessage(error instanceof Error ? error.message : '登录失败，请重试。')
       await showError(error, '登录失败')
     } finally {
       setSubmitting(false)
@@ -66,11 +69,13 @@ export default function LoginPage() {
     }
     if (!canRegister(registration)) return
     setSubmitting(true)
+    setFailureMessage('')
     try {
       const { confirmPassword: _confirmPassword, ...input } = registration
       await productRepository.register(input)
       await Taro.reLaunch({ url: '/pages/index/index' })
     } catch (error) {
+      setFailureMessage(error instanceof Error ? error.message : '注册失败，请重试。')
       await showError(error, '注册失败')
     } finally {
       setSubmitting(false)
@@ -145,6 +150,12 @@ export default function LoginPage() {
               注册
             </Button>
           </View>
+
+          {!allowGuest && failureMessage ? (
+            <View className="auth-account-error" role="alert">
+              {failureMessage}
+            </View>
+          ) : null}
 
           {screenMode === 'login' ? (
             <View className="auth-form">
@@ -328,12 +339,16 @@ export default function LoginPage() {
             </View>
           )}
 
-          <View className="guest-entry">
-            <Button className="guest-entry__button" onClick={() => void enterAsGuest()}>
-              以游客身份浏览
-            </Button>
-            <Text className="guest-entry__hint">无需注册，先看赛程、比分和球队</Text>
-          </View>
+          {allowGuest ? (
+            <View className="guest-entry">
+              <Button className="guest-entry__button" onClick={() => void enterAsGuest()}>
+                以游客身份浏览
+              </Button>
+              <Text className="guest-entry__hint">无需注册，先看赛程、比分和球队</Text>
+            </View>
+          ) : (
+            <Text className="guest-entry__hint">当前仅向已登录账号开放，请登录或注册后进入。</Text>
+          )}
           <Text className="auth-version">晓球 V1.0.0</Text>
         </View>
       </View>

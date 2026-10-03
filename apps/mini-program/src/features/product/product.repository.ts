@@ -310,13 +310,17 @@ interface RequestOptions {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const session = readSession()
+  if (Taro.getEnv() === Taro.ENV_TYPE.WEB && options.authenticated !== false && !session) {
+    clearSession()
+    throw new ProductApiError('请先登录账号后再访问晓球', 401)
+  }
   const response = await Taro.request<T>({
     url: `${getApiBaseUrl()}${path}`,
     method: options.method ?? 'GET',
     data: options.data,
     header: {
       'content-type': 'application/json',
-      'x-dev-organization-id':
+      'x-organization-id':
         (session?.user.organizationId ?? process.env.TARO_APP_ORGANIZATION_ID?.trim()) ||
         DEFAULT_ORGANIZATION_ID,
       ...(options.authenticated !== false && session?.accessToken
@@ -324,6 +328,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         : {}),
     },
     timeout: 8000,
+  }).catch(() => {
+    throw new ProductApiError('无法连接晓球 API，请检查网络或联系管理员后重试。', 0)
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {

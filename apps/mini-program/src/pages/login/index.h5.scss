@@ -95,22 +95,16 @@
   opacity: 0;
 }
 
-.art-login__scene-watermark {
-  position: absolute;
-  color: rgba(124, 97, 158, 0.16);
-  font-family: Arial, sans-serif;
-  font-weight: 600;
-  line-height: 1;
-  transform: translate(-50%, -50%);
-  opacity: 0.86;
-  pointer-events: none;
+.art-login__error,
+.auth-account-error {
+  margin: 12px 0 0;
+  color: #9d302d;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .art-login__scene[data-scene-phase='ready'] .art-login__scene-image {
-  visibility: hidden;
-}
-
-.art-login__scene[data-scene-phase='ready'] .art-login__scene-watermark {
   visibility: hidden;
 }
 

@@ -6,7 +6,7 @@ import brandMark from '../../assets/home-visual/brand-mark.png'
 import { AuthRecoveryDialog } from '../../components/auth-recovery/index.h5'
 import { AuthScene } from '../../components/auth-scene/index.h5'
 import { productRepository } from '../../features/product/product.repository'
-import { enterGuestMode, readSession } from '../../features/product/session'
+import { readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
 // An explicit extension bypasses Taro's multi-platform resolver. Compact H5
 // keeps the existing page; the WeChat entry itself is not modified.
@@ -35,7 +35,7 @@ export default function H5LoginPage() {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
-  return desktop ? <ArtLoginPage /> : <ExistingLoginPage />
+  return desktop ? <ArtLoginPage /> : <ExistingLoginPage allowGuest={false} />
 }
 
 function ArtLoginPage() {
@@ -47,6 +47,7 @@ function ArtLoginPage() {
   const [code, setCode] = useState('')
   const [registration, setRegistration] = useState(emptyRegistration)
   const [submitting, setSubmitting] = useState(false)
+  const [failureMessage, setFailureMessage] = useState('')
   const [recovery, setRecovery] = useState(false)
 
   useEffect(() => {
@@ -57,10 +58,12 @@ function ArtLoginPage() {
   const login = async () => {
     if (!identifier.trim() || password.length < minimumLoginPasswordLength || submitting) return
     setSubmitting(true)
+    setFailureMessage('')
     try {
       await productRepository.login(identifier, password)
       await Taro.reLaunch({ url: '/pages/index/index' })
     } catch (error) {
+      setFailureMessage(error instanceof Error ? error.message : '登录失败，请重试。')
       await showError(error, '登录失败')
     } finally {
       setSubmitting(false)
@@ -74,19 +77,17 @@ function ArtLoginPage() {
     }
     if (!canRegister(registration)) return
     setSubmitting(true)
+    setFailureMessage('')
     try {
       const { confirmPassword: _confirmPassword, ...input } = registration
       await productRepository.register(input)
       await Taro.reLaunch({ url: '/pages/index/index' })
     } catch (error) {
+      setFailureMessage(error instanceof Error ? error.message : '注册失败，请重试。')
       await showError(error, '注册失败')
     } finally {
       setSubmitting(false)
     }
-  }
-  const guest = async () => {
-    enterGuestMode()
-    await Taro.reLaunch({ url: '/pages/index/index' })
   }
   const emailPlaceholder = () =>
     Taro.showToast({ title: '邮箱验证码服务正在接入', icon: 'none', duration: 2200 })
@@ -160,6 +161,12 @@ function ArtLoginPage() {
                 : '公开页面显示昵称，实名与学号仅供本人和授权管理员使用。'}
             </p>
           </div>
+
+          {failureMessage ? (
+            <p className="art-login__error" role="alert">
+              {failureMessage}
+            </p>
+          ) : null}
 
           {screen === 'login' ? (
             <>
@@ -345,14 +352,7 @@ function ArtLoginPage() {
             </form>
           )}
 
-          <button
-            type="button"
-            className="art-login__control art-login__guest"
-            onClick={() => void guest()}
-          >
-            以游客身份浏览
-          </button>
-          <p className="art-login__guest-hint">无需注册，先看赛程、比分和球队</p>
+          <p className="art-login__guest-hint">当前仅向已登录账号开放，请登录或注册后进入。</p>
         </div>
       </section>
       {recovery && <AuthRecoveryDialog onClose={() => setRecovery(false)} />}
