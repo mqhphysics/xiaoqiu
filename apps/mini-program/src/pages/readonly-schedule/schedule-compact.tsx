@@ -9,13 +9,13 @@ import { MatchStatus, TeamCrest } from '../../components/product-ui'
 import {
   filterAndSortSchedule,
   groupScheduleMatches,
-  matchDetailUrl,
   teamDetailUrl,
   type ScheduleDirection,
   type ScheduleFilter,
 } from '../../features/competition/competition.logic'
 import { formatLongDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { openMatch } from '../../features/product/match-navigation'
 import type { CompetitionDataResponse, MatchSummary } from '../../features/product/product.types'
 
 import './index.scss'
@@ -179,14 +179,7 @@ function ScheduleMatch({ match }: { match: MatchSummary }) {
   const hasScore = match.homeScore !== null && match.awayScore !== null
   const hasPenalty = match.homePenaltyScore !== null || match.awayPenaltyScore !== null
   return (
-    <View
-      className="schedule-match"
-      onClick={() =>
-        void Taro.navigateTo({
-          url: matchDetailUrl(match.id),
-        })
-      }
-    >
+    <View className="schedule-match" onClick={() => void openMatch(match.id, match.tournamentId)}>
       <View className="schedule-match__head">
         <Text>{match.roundName ?? match.title}</Text>
         <MatchStatus status={match.status} />
