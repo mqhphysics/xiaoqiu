@@ -8,7 +8,7 @@ import type {
   MatchSummary,
   TeamSummary,
 } from '../../features/product/product.types'
-import { matchWinnerId, knockoutRounds } from './knockout-display.logic'
+import { knockoutMatchTime, matchWinnerId, knockoutRounds } from './knockout-display.logic'
 
 type Props = {
   data: CompetitionDataResponse & { resultsMode?: string }
@@ -141,11 +141,11 @@ function TreeMatch({
           aria-label={`${match.homeTeam?.name ?? match.homePlaceholder ?? '待定'} 对 ${match.awayTeam?.name ?? match.awayPlaceholder ?? '待定'}，${scoreLabel(match)}，查看比赛`}
         >
           <strong>{scoreLabel(match)}</strong>
-          {expanded && (!winner || className.includes('--final')) && (
-            <small>
-              {className.includes('--final') ? '决赛 · ' : ''}
-              {matchStatusLabel(match.status)}
-            </small>
+          <time className="data-desktop__tree-date" dateTime={match.scheduledStartAt ?? undefined}>
+            {knockoutMatchTime(match.scheduledStartAt, !expanded)}
+          </time>
+          {expanded && !['FINISHED', 'CONFIRMED', 'SCHEDULED'].includes(match.status) && (
+            <small>{matchStatusLabel(match.status)}</small>
           )}
         </a>
         <TreeTeam
@@ -184,26 +184,42 @@ function TreeTeam({
         'data-desktop__tree-team ' + (winner && team?.id !== winner ? 'is-eliminated' : '')
       }
       title={team?.name ?? placeholder ?? '席位待定'}
+      data-team-id={team?.id ?? 'pending'}
+      data-team-code={team?.teamCode ?? ''}
+      data-team-tournament={tournamentId}
     >
-      {team ? (
-        <TeamCrest team={team} size="small" />
-      ) : (
-        <svg
-          viewBox="0 0 32 36"
-          className="data-desktop__empty-crest"
-          fill="none"
-          aria-label="席位待定"
-        >
-          <path
-            d="M3 4 16 1l13 3v14c0 8-13 16-13 16S3 26 3 18Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-          <path d="M12 14h8M16 10v8" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
-      )}
+      <div className="data-desktop__tree-badge">
+        {team ? (
+          <TeamCrest team={team} size="small" />
+        ) : (
+          <svg
+            viewBox="0 0 64 64"
+            className="data-desktop__empty-crest"
+            role="img"
+            aria-label="待定球队队徽"
+          >
+            <circle cx="32" cy="32" r="29" fill="#edf2e8" stroke="#b5c4ac" strokeWidth="1.5" />
+            <circle cx="32" cy="32" r="23.5" fill="#f8faf4" stroke="#cad5c3" />
+            <path
+              d="M25.5 24.5a6.5 6.5 0 0 1 13 0c0 4.5-6.5 5.5-6.5 10"
+              fill="none"
+              stroke="#7a9070"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+            />
+            <circle cx="32" cy="41.5" r="2" fill="#7a9070" />
+          </svg>
+        )}
+      </div>
       {expanded && (
-        <TeamName team={team} tournamentId={tournamentId} fallback={placeholder ?? '席位待定'} />
+        <div className="data-desktop__tree-name">
+          <TeamName
+            team={team}
+            tournamentId={tournamentId}
+            className="data-desktop__tree-team-label"
+            fallback={placeholder ?? '席位待定'}
+          />
+        </div>
       )}
     </div>
   )

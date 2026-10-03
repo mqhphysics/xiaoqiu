@@ -794,10 +794,12 @@
     align-items: start;
   }
   .data-desktop__tree-team {
-    display: flex;
+    --tree-badge-width: 40px;
+    --tree-badge-height: 44px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
     min-width: 0;
-    align-items: center;
-    flex-direction: column;
     gap: 9px;
     color: #254632;
     text-align: center;
@@ -805,18 +807,49 @@
   .data-desktop__tree-team.is-eliminated {
     opacity: 0.35;
   }
-  .data-desktop__tree-team .team-crest,
-  .data-desktop__empty-crest {
-    flex: 0 0 auto;
-    width: 40px;
-    height: 42px;
+  .data-desktop__tree-badge {
+    display: grid;
+    place-items: center;
+    width: var(--tree-badge-width);
+    height: var(--tree-badge-height);
   }
-  .data-desktop__tree-team > .team-name-link,
-  .data-desktop__tree-team > span {
+  .data-desktop__tree-badge > .team-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  .data-desktop__tree-badge .team-crest,
+  .data-desktop__tree-badge .data-desktop__empty-crest {
     display: block;
+    width: var(--tree-badge-width);
+    height: var(--tree-badge-height);
+    margin: 0;
+  }
+  .data-desktop__tree-name {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     min-width: 0;
-    font-size: 12px;
+    min-height: 18px;
+    text-align: center;
+  }
+  .data-desktop__tree-name > .team-trigger {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+  .data-desktop__tree-team-label {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 18px;
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -839,6 +872,16 @@
     color: #92a186;
     font-size: 9px;
   }
+  .data-desktop__tree-date {
+    display: block;
+    color: #687b5f;
+    font-size: 11px;
+    line-height: 14px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    white-space: nowrap;
+  }
   .data-desktop__tree-score:hover {
     color: #193b27;
   }
@@ -855,13 +898,12 @@
     font-size: 9px;
     text-align: center;
   }
-  .data-desktop__tree-match--final .team-crest,
-  .data-desktop__tree-match--final .data-desktop__empty-crest {
-    width: 55px;
-    height: 59px;
+  .data-desktop__tree-match--final .data-desktop__tree-team {
+    --tree-badge-width: 56px;
+    --tree-badge-height: 60px;
   }
   .data-desktop__tree-match--final .data-desktop__tree-score {
-    padding-top: 18px;
+    padding-top: 15px;
     font-size: 25px;
   }
   .data-desktop__final-label {
@@ -874,30 +916,29 @@
     letter-spacing: 5px;
     text-align: center;
   }
-  .data-desktop__knockout-panel.is-collapsed .data-desktop__tree-team .team-crest {
-    width: 25px;
-    height: 29px;
-  }
-  .data-desktop__knockout-panel.is-collapsed .data-desktop__empty-crest {
-    width: 25px;
-    height: 29px;
+  .data-desktop__knockout-panel.is-collapsed .data-desktop__tree-team {
+    --tree-badge-width: 26px;
+    --tree-badge-height: 30px;
   }
   .data-desktop__knockout-panel.is-collapsed .data-desktop__tree-score {
-    padding-top: 5px;
+    padding-top: 8px;
     font-size: 12px;
   }
-  .data-desktop__knockout-panel.is-collapsed .data-desktop__tree-match--final .team-crest,
   .data-desktop__knockout-panel.is-collapsed
     .data-desktop__tree-match--final
-    .data-desktop__empty-crest {
-    width: 40px;
-    height: 45px;
+    .data-desktop__tree-team {
+    --tree-badge-width: 40px;
+    --tree-badge-height: 44px;
   }
   .data-desktop__knockout-panel.is-collapsed
     .data-desktop__tree-match--final
     .data-desktop__tree-score {
-    padding-top: 13px;
+    padding-top: 12px;
     font-size: 17px;
+  }
+  .data-desktop__knockout-panel.is-collapsed .data-desktop__tree-date {
+    font-size: 9px;
+    line-height: 12px;
   }
   .data-desktop__knockout-foot {
     display: flex;

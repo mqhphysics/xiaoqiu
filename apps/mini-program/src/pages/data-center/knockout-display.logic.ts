@@ -1,5 +1,23 @@
 import type { CompetitionDataResponse, MatchSummary } from '../../features/product/product.types'
 
+const matchTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Shanghai',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+export function knockoutMatchTime(value: string | null, compact = false): string {
+  if (!value || !Number.isFinite(Date.parse(value))) return '时间待定'
+  const parts = matchTimeFormatter.formatToParts(new Date(value))
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? ''
+  const date = `${part('month')}/${part('day')}`
+  return compact ? date : `${date} ${part('hour')}:${part('minute')}`
+}
+
 export function matchWinnerId(match: MatchSummary): string | null {
   if (
     !['FINISHED', 'CONFIRMED'].includes(match.status) ||

@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { matchWinnerId, knockoutRounds } from './knockout-display.logic.ts'
+import { knockoutMatchTime, matchWinnerId, knockoutRounds } from './knockout-display.logic.ts'
 import type { CompetitionDataResponse, MatchSummary } from '../../features/product/product.types'
+
+test('dates stay short and use the campus time zone including midnight boundaries', () => {
+  assert.equal(knockoutMatchTime('2026-09-01T02:00:00Z'), '09/01 10:00')
+  assert.equal(knockoutMatchTime('2026-09-01T02:00:00Z', true), '09/01')
+  assert.equal(knockoutMatchTime('2026-08-31T16:00:00Z'), '09/01 00:00')
+})
+
+test('missing or invalid kickoff times remain explicitly pending', () => {
+  assert.equal(knockoutMatchTime(null), '时间待定')
+  assert.equal(knockoutMatchTime('invalid'), '时间待定')
+})
 
 const match = {
   id: 'match',
