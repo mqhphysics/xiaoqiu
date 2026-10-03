@@ -9,6 +9,7 @@ import { PlayerOverlayHost } from './components/player-overlay'
 import { MessagingOverlayHost } from './components/messaging-drawer/host'
 
 import './app.scss'
+import './app-box-sizing'
 
 export default function App({ children }: PropsWithChildren) {
   useEffect(() => mountCursorSkin(), [])

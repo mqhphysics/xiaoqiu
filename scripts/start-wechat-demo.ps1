@@ -43,7 +43,7 @@ function Assert-WeChatToolSucceeded {
   param([object]$Reply)
 
   if ($Reply.ok -and $Reply.result.success -ne $false) { return }
-  $code = if ($Reply.errorType) { $Reply.errorType } else { $Reply.result.code }
+  $code = if ($Reply.code) { $Reply.code } elseif ($Reply.result.code) { $Reply.result.code } else { $Reply.errorType }
   $detail = if ($Reply.message) { $Reply.message } else { $Reply.result.message }
   $reason = "[$code] $detail"
   if ($code -in @('CONNECT_ERROR', 'AUTH_TASK_ERROR')) {
@@ -68,6 +68,30 @@ function Test-WeChatConfirmationPending {
 }
 
 # Check the official connection before starting services or rebuilding the package.
+function Open-WeChatDesktop {
+  # Use the same large Electron executable that the official CLI selects.
+  $guiExecutable = Get-ChildItem -LiteralPath $DevToolsRoot -Filter '*.exe' -File |
+    Where-Object { $_.Length -gt 50MB } | Sort-Object Length -Descending | Select-Object -First 1
+  if (-not $guiExecutable) { throw 'The WeChat desktop executable is missing.' }
+  $visibleWindow = @(Get-Process | Where-Object {
+    $_.Path -eq $guiExecutable.FullName -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle
+  })
+  if ($visibleWindow.Count) { return }
+  Write-Host 'Starting the WeChat desktop window before connecting its CLI...'
+  Start-Process -FilePath $guiExecutable.FullName -WorkingDirectory $DevToolsRoot
+  $deadline = (Get-Date).AddSeconds(20)
+  do {
+    Start-Sleep -Milliseconds 250
+    $visibleWindow = @(Get-Process | Where-Object {
+      $_.Path -eq $guiExecutable.FullName -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle
+    })
+  } while (-not $visibleWindow.Count -and (Get-Date) -lt $deadline)
+  if (-not $visibleWindow.Count) {
+    throw 'The WeChat desktop window did not become ready. Open the tool manually and retry.'
+  }
+}
+
+Open-WeChatDesktop
 Write-Host 'Checking the official WeChat connection first. If a Codex authorization window appears, click Allow there.'
 $skillFile = Join-Path $DevToolsRoot 'resources\app.asar.unpacked\wechatide-skill\SKILL.md'
 if (-not (Test-Path -LiteralPath $skillFile)) {
@@ -97,7 +121,7 @@ if (-not $apiReady) {
   if ($ApiBaseUrl -ne 'http://127.0.0.1:3001') {
     throw "Configured API is not ready: $ApiBaseUrl"
   }
-  & (Join-Path $PSScriptRoot 'start-local-demo.ps1') -NoBrowser
+  & (Join-Path $repoRoot 'scripts\start-local-demo.ps1') -NoBrowser
   if ($LASTEXITCODE -ne 0) { throw 'Local API startup failed.' }
 }
 

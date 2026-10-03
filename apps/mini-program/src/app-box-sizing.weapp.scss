@@ -1,0 +1,19 @@
+// The WXSS compiler rejects the universal selector used by the H5 reset.
+page,
+view,
+text,
+button,
+input,
+textarea,
+image,
+scroll-view,
+rich-text,
+form,
+cover-view,
+cover-image,
+view::before,
+view::after,
+button::before,
+button::after {
+  box-sizing: border-box;
+}
