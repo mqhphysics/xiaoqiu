@@ -975,8 +975,8 @@
 
     .public-team-nav .team-crest,
     .public-team-nav__crest {
-      width: 64PX;
-      height: 64PX;
+      width: 56PX;
+      height: 56PX;
       opacity: 0.86;
       transform: scale(1);
       transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
@@ -1071,10 +1071,10 @@
       opacity: 1;
       transform: translateY(-1PX) scale(1.08);
     }
-    .public-team-nav:hover > .team-crest,
-    .public-team-nav:hover .public-team-nav__crest {
+    .public-team-nav:hover:not(.public-team-nav--active) .team-crest,
+    .public-team-nav:hover:not(.public-team-nav--active) .public-team-nav__crest {
       opacity: 1;
-      transform: translateY(-3PX) scale(1.42);
+      transform: translateY(-1PX) scale(1.025);
     }
   }
 }
