@@ -88,6 +88,7 @@ export function AdminCenter({
   const [search, setSearch] = useState('')
   const [directorySearch, setDirectorySearch] = useState('')
   const [directoryRevision, setDirectoryRevision] = useState(0)
+  const [eventStartTab, setEventStartTab] = useState('reports')
   const schedule = useAdminData<AdminScheduleSnapshot>(
     context,
     '/admin/schedule-workbench',
@@ -95,14 +96,18 @@ export function AdminCenter({
   )
   const [tournamentId, setTournamentId] = useState('')
   const selectedTournament =
-    schedule.data?.tournaments.find((t) => t.id === tournamentId) ?? schedule.data?.tournaments[0]
+    schedule.data?.tournaments.find((t) => t.id === tournamentId) ??
+    schedule.data?.tournaments.find((t) => t.status === 'PUBLISHED') ??
+    schedule.data?.tournaments.find((t) => t.status === 'DRAFT') ??
+    schedule.data?.tournaments[0]
   const item = NAV.find((n) => n.id === section)!
   useEffect(() => {
     const change = () => setSection(currentSection())
     window.addEventListener('hashchange', change)
     return () => window.removeEventListener('hashchange', change)
   }, [])
-  function navigate(next: Section) {
+  function navigate(next: Section, eventTab = 'reports') {
+    if (next === 'events') setEventStartTab(eventTab)
     window.location.hash = next
     setSection(next)
   }
@@ -233,12 +238,14 @@ export function AdminCenter({
             ) : null}
             {section === 'events' ? (
               <Events
+                key={eventStartTab}
                 context={context}
                 displayName={displayName}
                 onLogout={onLogout}
                 tournamentId={selectedTournament?.id ?? ''}
                 schedule={schedule.data}
                 onSnapshotChange={schedule.refresh}
+                initialTab={eventStartTab}
               />
             ) : null}
             {section === 'content' ? (
@@ -258,7 +265,7 @@ export function AdminCenter({
           </div>
           <footer className="mc-footer">
             <span>晓球 · 为每一场校园足球</span>
-            <span>当前组织 {context.organizationId}</span>
+            <span>保存后的修改可在操作记录中查询</span>
           </footer>
         </main>
       </div>
@@ -310,7 +317,7 @@ function Overview({
   schedule,
 }: {
   context: OrganizationContext
-  navigate: (s: Section) => void
+  navigate: (s: Section, eventTab?: string) => void
   schedule: AdminScheduleSnapshot | null
 }) {
   const result = useAdminData<OverviewData>(
@@ -325,38 +332,20 @@ function Overview({
   ] as const
   return (
     <>
-      <section className="mc-welcome">
-        <div>
-          <span className="mc-badge">
-            {result.data?.organization.name || '当前组织'} · 工作空间
-          </span>
-          <h2>
-            球场上的精彩，
-            <br />
-            从这里有序开始。
-          </h2>
-          <p>
-            把资料维护好，把比赛记录清楚。
-            <br />
-            今天的待办，一件一件完成。
-          </p>
-          <button onClick={() => navigate('events')}>
-            进入赛事管理 <span>↗</span>
-          </button>
-        </div>
-        <div className="mc-field-art" aria-hidden="true">
-          <span className="mc-pitch">
-            <span />
-          </span>
-          <span className="mc-art-label">FOR EVERY GAME.</span>
-        </div>
-      </section>
+      <div className="mc-overview-intro">
+        <strong>{result.data?.organization.name || '当前组织'}</strong>
+        <span>先处理待办，再维护资料。右上角可切换要管理的赛事。</span>
+      </div>
       {context.canManageOrganization ? (
         <>
           <DataState {...result} onRetry={result.refresh} />
           <section className="mc-metrics" aria-label="当前组织数据">
             {metrics.map(([field, title, to]) => (
-              <button key={field} className="mc-metric" onClick={() => navigate(to)}>
+              <button
+                key={field}
+                className="mc-metric"
+                onClick={() => navigate(to, field === 'pendingRosters' ? 'rosters' : 'reports')}
+              >
                 <span>
                   {title}
                   <span>↗</span>
@@ -421,7 +410,11 @@ function Overview({
             ['content', '回复反馈', '查看问题、处理与通知', 'bell'],
             ['people', '维护档案', '修改球队介绍与球员资料', 'pencil'],
           ].map(([to, title, description, icon]) => (
-            <button key={title} className="mc-shortcut" onClick={() => navigate(to as Section)}>
+            <button
+              key={title}
+              className="mc-shortcut"
+              onClick={() => navigate(to as Section, title === '名单审核' ? 'rosters' : 'reports')}
+            >
               <Icon name={icon!} />
               <span>
                 <strong>{title}</strong>
@@ -463,6 +456,7 @@ function Events({
   tournamentId,
   schedule,
   onSnapshotChange,
+  initialTab,
 }: {
   context: OrganizationContext
   displayName: string
@@ -470,8 +464,9 @@ function Events({
   tournamentId: string
   schedule: AdminScheduleSnapshot | null
   onSnapshotChange: () => void
+  initialTab: string
 }) {
-  const [tab, setTab] = useState('reports')
+  const [tab, setTab] = useState(initialTab)
   const tabs = [
     ['reports', '比赛战报'],
     ['rosters', '名单审核'],

@@ -76,7 +76,7 @@ export function Directory({
   const [notice, setNotice] = useState('')
   const params = new URLSearchParams({
     page: String(page),
-    pageSize: '20',
+    pageSize: '10',
     query,
     ...(status ? { status } : {}),
   })
@@ -240,84 +240,90 @@ export function Directory({
           </>
         ) : null}
       </section>
-      {selected ? (
-        <section className="mc-panel mc-detail">
-          <div className="mc-panel-heading">
-            <div>
-              <h2>{String(selected.name ?? selected.displayName)}</h2>
-              <p>稳定编号 {selected.id}</p>
-            </div>
-            <button className="secondary-button" onClick={() => setSelected(null)}>
-              收起详情
-            </button>
-          </div>
-          <dl className="mc-facts">
-            {(kind === 'users'
-              ? [
-                  ['登录名', selected.username],
-                  ['学号（脱敏）', selected.studentIdMasked],
-                  ['邮箱（脱敏）', selected.emailMasked],
-                  ['组织角色', roles(selected)],
-                  ['账号状态', label(selected.userStatus)],
-                  ['组织成员状态', label(selected.membershipStatus)],
-                  [
-                    '关联球员',
-                    (selected.linkedPlayer as { displayName: string } | null)?.displayName,
-                  ],
-                  ['有效会话', selected.activeSessionCount],
-                ]
-              : (kind === 'teams' ? TEAM_FIELDS : PLAYER_FIELDS).map((f) => [
-                  f.title,
-                  f.key === 'dominantFoot' && selected[f.key] === 'LEFT'
-                    ? '左脚'
-                    : f.options
-                      ? label(selected[f.key])
-                      : selected[f.key],
-                ])
-            ).map(([key, value]) => (
-              <div key={String(key)}>
-                <dt>{String(key)}</dt>
-                <dd>{textValue(value)}</dd>
+      {selected && !operation ? (
+        <Modal
+          title={kind === 'users' ? '账号详情' : kind === 'teams' ? '球队详情' : '球员详情'}
+          variant="drawer"
+          onClose={() => setSelected(null)}
+        >
+          <section className="mc-panel mc-detail">
+            <div className="mc-panel-heading">
+              <div>
+                <h2>{String(selected.name ?? selected.displayName)}</h2>
+                <p>稳定编号 {selected.id}</p>
               </div>
-            ))}
-          </dl>
-          <div className="mc-actions">
-            {kind !== 'users' ? (
-              <button onClick={() => setOperation('edit')}>编辑资料</button>
+              <button className="secondary-button" onClick={() => setSelected(null)}>
+                收起详情
+              </button>
+            </div>
+            <dl className="mc-facts">
+              {(kind === 'users'
+                ? [
+                    ['登录名', selected.username],
+                    ['学号（脱敏）', selected.studentIdMasked],
+                    ['邮箱（脱敏）', selected.emailMasked],
+                    ['组织角色', roles(selected)],
+                    ['账号状态', label(selected.userStatus)],
+                    ['组织成员状态', label(selected.membershipStatus)],
+                    [
+                      '关联球员',
+                      (selected.linkedPlayer as { displayName: string } | null)?.displayName,
+                    ],
+                    ['有效会话', selected.activeSessionCount],
+                  ]
+                : (kind === 'teams' ? TEAM_FIELDS : PLAYER_FIELDS).map((f) => [
+                    f.title,
+                    f.key === 'dominantFoot' && selected[f.key] === 'LEFT'
+                      ? '左脚'
+                      : f.options
+                        ? label(selected[f.key])
+                        : selected[f.key],
+                  ])
+              ).map(([key, value]) => (
+                <div key={String(key)}>
+                  <dt>{String(key)}</dt>
+                  <dd>{textValue(value)}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mc-actions">
+              {kind !== 'users' ? (
+                <button onClick={() => setOperation('edit')}>编辑资料</button>
+              ) : (
+                <>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setOperation('sessions')}
+                    disabled={selected.activeSessionCount === 0 || selected.id === context.userId}
+                  >
+                    撤销本组织登录会话
+                  </button>
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      selected.id === context.userId ||
+                      !['ACTIVE', 'SUSPENDED'].includes(String(selected.membershipStatus)) ||
+                      (selected.roles as { role: string }[]).some((r) =>
+                        ['ORGANIZATION_ADMIN', 'PLATFORM_ADMIN'].includes(r.role),
+                      )
+                    }
+                    onClick={() => setOperation('membership')}
+                  >
+                    {selected.membershipStatus === 'SUSPENDED' ? '恢复组织访问' : '停用组织访问'}
+                  </button>
+                </>
+              )}
+            </div>
+            {kind === 'users' ? (
+              <PendingCapability
+                title="密码恢复与角色调整"
+                description="一次性密码重置、身份核验和角色授权待专门后台流程接通。当前可停用本组织成员、撤销其本组织登录会话；账号主队偏好不影响工作人员权限。"
+              />
             ) : (
-              <>
-                <button
-                  className="secondary-button"
-                  onClick={() => setOperation('sessions')}
-                  disabled={selected.activeSessionCount === 0 || selected.id === context.userId}
-                >
-                  撤销本组织登录会话
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={
-                    selected.id === context.userId ||
-                    !['ACTIVE', 'SUSPENDED'].includes(String(selected.membershipStatus)) ||
-                    (selected.roles as { role: string }[]).some((r) =>
-                      ['ORGANIZATION_ADMIN', 'PLATFORM_ADMIN'].includes(r.role),
-                    )
-                  }
-                  onClick={() => setOperation('membership')}
-                >
-                  {selected.membershipStatus === 'SUSPENDED' ? '恢复组织访问' : '停用组织访问'}
-                </button>
-              </>
+              <p className="mc-muted">本次修改公开档案，不覆盖已锁定的参赛名单和历史比赛事实。</p>
             )}
-          </div>
-          {kind === 'users' ? (
-            <PendingCapability
-              title="密码恢复与角色调整"
-              description="一次性密码重置、身份核验和角色授权待专门后台流程接通。当前可停用本组织成员、撤销其本组织登录会话；账号主队偏好不影响工作人员权限。"
-            />
-          ) : (
-            <p className="mc-muted">本次修改公开档案，不覆盖已锁定的参赛名单和历史比赛事实。</p>
-          )}
-        </section>
+          </section>
+        </Modal>
       ) : null}
       {selected && operation ? (
         <Modal

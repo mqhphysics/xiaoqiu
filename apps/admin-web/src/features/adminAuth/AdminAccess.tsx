@@ -3,7 +3,13 @@ import type { FormEvent } from 'react'
 
 import { AdminCenter } from '../adminCenter/AdminCenter'
 import type { OrganizationContext } from '../adminSchedule/types'
-import { AdminApiError, currentAdminUser, loginAdmin, revokeAdminSession } from './request'
+import {
+  AdminApiError,
+  currentAdminUser,
+  loginAdmin,
+  revokeAdminSession,
+  readAdminResponse,
+} from './request'
 import { adminSession, validCredential } from './session'
 import { adminKind, isUuid } from './types'
 import type { AdminCredential } from './types'
@@ -252,6 +258,101 @@ function SessionCheck({
 }
 
 function AdminLogin({ api, message }: { api: string; message: string }) {
+  const [mode, setMode] = useState<'loading' | 'single' | 'account' | 'unavailable'>(
+    import.meta.env.DEV ? 'loading' : 'account',
+  )
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const controller = new AbortController()
+    setMode('loading')
+    void readAdminResponse('/__admin-center/status', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(({ response, payload }) => {
+        if (controller.signal.aborted) return
+        if (response.status === 404) {
+          setMode('account')
+          return
+        }
+        const source = payload as { singleOwner?: boolean; message?: string }
+        if (!response.ok) {
+          setError(source?.message || '本机管理服务尚未就绪')
+          setMode('unavailable')
+          return
+        }
+        setMode(source.singleOwner ? 'single' : 'account')
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : '本机服务读取失败')
+          setMode('unavailable')
+        }
+      })
+    return () => controller.abort()
+  }, [revision])
+  if (mode === 'account') return <AccountLogin api={api} message={message} />
+  async function enter() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const { response, payload } = await readAdminResponse('/__admin-center/session', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      })
+      if (!response.ok)
+        throw new Error((payload as { message?: string })?.message || '暂时无法进入管理中心')
+      if (!validCredential(payload)) throw new Error('本机管理会话无效，请重新进入')
+      adminSession.start(payload)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '本机服务连接失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <main className="admin-auth-shell">
+      <section className="admin-auth-panel panel">
+        <p className="eyebrow">晓球 · 本机管理中心</p>
+        <h1>开始管理晓球</h1>
+        <p>
+          维护球队资料、处理比赛和反馈。
+          <br />
+          当前使用本机单人管理方式。
+        </p>
+        {error || message ? (
+          <p className="error-text" role="alert">
+            {error || message}
+          </p>
+        ) : null}
+        {mode === 'unavailable' ? (
+          <button onClick={() => setRevision((v) => v + 1)}>重新准备管理服务</button>
+        ) : (
+          <button
+            className="admin-one-click"
+            onClick={() => {
+              void enter()
+            }}
+            disabled={mode === 'loading' || busy}
+          >
+            {mode === 'loading' ? '正在准备…' : busy ? '正在进入…' : '进入管理中心'}
+          </button>
+        )}
+        <a className="admin-public-link" href="http://127.0.0.1:3000/">
+          打开晓球网站 ↗
+        </a>
+      </section>
+    </main>
+  )
+}
+
+function AccountLogin({ api, message }: { api: string; message: string }) {
   const [organizationId, setOrganizationId] = useState(
     import.meta.env.VITE_ORGANIZATION_ID?.trim() ?? '',
   )

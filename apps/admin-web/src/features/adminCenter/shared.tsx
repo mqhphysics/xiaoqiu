@@ -173,13 +173,13 @@ export function Badge({ value }: { value: unknown }) {
 }
 export function PendingCapability({ title, description }: { title: string; description: string }) {
   return (
-    <div className="mc-capability">
-      <span className="mc-badge">待接通</span>
-      <div>
+    <details className="mc-capability">
+      <summary>
+        <span className="mc-badge">待接通</span>
         <strong>{title}</strong>
-        <p>{description}</p>
-      </div>
-    </div>
+      </summary>
+      <p>{description}</p>
+    </details>
   )
 }
 export function Pager({
@@ -215,20 +215,27 @@ export function Modal({
   title,
   children,
   onClose,
+  variant = 'dialog',
 }: {
   title: string
   children: ReactNode
   onClose: () => void
+  variant?: 'dialog' | 'drawer'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
-  const titleId = 'mc-modal-title'
+  const titleId = useId()
   useEffect(() => {
     const dialog = ref.current
     dialog?.showModal()
     return () => dialog?.close()
   }, [])
   return (
-    <dialog ref={ref} className="mc-modal" onCancel={onClose} aria-labelledby={titleId}>
+    <dialog
+      ref={ref}
+      className={`mc-modal ${variant === 'drawer' ? 'mc-drawer' : ''}`}
+      onCancel={onClose}
+      aria-labelledby={titleId}
+    >
       <header>
         <h2 id={titleId}>{title}</h2>
         <button type="button" className="secondary-button" onClick={onClose}>

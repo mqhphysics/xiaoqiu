@@ -202,6 +202,7 @@ function ReportDetail({
   const [localError, setLocalError] = useState('')
   const [confirmation, setConfirmation] = useState<ReportAction | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [detailView, setDetailView] = useState<'result' | 'events'>('result')
   const hasUnsaved = dirty || Boolean(reason.trim())
   useEffect(() => {
     onDirty(hasUnsaved)
@@ -346,240 +347,278 @@ function ReportDetail({
               。你的本机修改仍保留；请先核对历史，再取消编辑以读取新版本。
             </p>
           ) : null}
-          <fieldset className="wf-report-fields" disabled={!editable}>
+          <div className="wf-subtabs" role="group" aria-label="战报详情内容">
+            <button
+              className={detailView === 'result' && !historyOpen ? 'active' : ''}
+              onClick={() => {
+                setDetailView('result')
+                setHistoryOpen(false)
+              }}
+            >
+              比分与判定
+            </button>
+            <button
+              className={detailView === 'events' && !historyOpen ? 'active' : ''}
+              onClick={() => {
+                setDetailView('events')
+                setHistoryOpen(false)
+              }}
+            >
+              比赛事件（{fields.events.length}）
+            </button>
+            <button
+              disabled={!data.permissions.canViewHistory}
+              className={historyOpen ? 'active' : ''}
+              onClick={() => setHistoryOpen(true)}
+            >
+              版本历史
+            </button>
+          </div>
+          {!data.latest && Boolean(data.blockingReasons?.length) && !historyOpen ? <p className="mc-muted mc-setup-note">当前先查看现存比赛资料。完成上方赛事配置后，再创建新的战报；未录入的比分不会显示成 0:0。</p> : null}
+          <fieldset className="wf-report-fields" disabled={!editable} hidden={historyOpen || (!data.latest && Boolean(data.blockingReasons?.length))}>
             <legend>比赛结果与事件</legend>
-            <div className="wf-score-grid">
+            <div hidden={detailView !== 'result'}>
+              <div className="wf-score-grid">
+                <label className="mc-field">
+                  主队普通比分
+                  <input
+                    inputMode="numeric"
+                    aria-label="主队普通比分"
+                    maxLength={2}
+                    value={fields.homeScore}
+                    onChange={(event) => update({ ...fields, homeScore: event.target.value })}
+                  />
+                </label>
+                <label className="mc-field">
+                  客队普通比分
+                  <input
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={fields.awayScore}
+                    aria-label="客队普通比分"
+                    onChange={(event) => update({ ...fields, awayScore: event.target.value })}
+                  />
+                </label>
+                <label className="mc-field">
+                  主队点球
+                  <input
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={fields.homePenaltyScore}
+                    onChange={(event) =>
+                      update({ ...fields, homePenaltyScore: event.target.value })
+                    }
+                    placeholder="无点球留空"
+                  />
+                </label>
+                <label className="mc-field">
+                  客队点球
+                  <input
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={fields.awayPenaltyScore}
+                    onChange={(event) =>
+                      update({ ...fields, awayPenaltyScore: event.target.value })
+                    }
+                    placeholder="无点球留空"
+                  />
+                </label>
+              </div>
               <label className="mc-field">
-                主队普通比分
-                <input
-                  inputMode="numeric"
-                  aria-label="主队普通比分"
-                  maxLength={2}
-                  value={fields.homeScore}
-                  onChange={(event) => update({ ...fields, homeScore: event.target.value })}
-                />
+                比赛判定
+                <select
+                  value={fields.outcome}
+                  onChange={(event) =>
+                    update({ ...fields, outcome: event.target.value as ReportFields['outcome'] })
+                  }
+                >
+                  {['FINISHED', 'HOME_FORFEIT', 'AWAY_FORFEIT', 'ABANDONED'].map((outcome) => (
+                    <option key={outcome} value={outcome}>
+                      {workflowLabels[outcome]}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <label className="mc-field">
-                客队普通比分
-                <input
-                  inputMode="numeric"
-                  maxLength={2}
-                  value={fields.awayScore}
-                  aria-label="客队普通比分"
-                  onChange={(event) => update({ ...fields, awayScore: event.target.value })}
-                />
-              </label>
-              <label className="mc-field">
-                主队点球
-                <input
-                  inputMode="numeric"
-                  maxLength={2}
-                  value={fields.homePenaltyScore}
-                  onChange={(event) => update({ ...fields, homePenaltyScore: event.target.value })}
-                  placeholder="无点球留空"
-                />
-              </label>
-              <label className="mc-field">
-                客队点球
-                <input
-                  inputMode="numeric"
-                  maxLength={2}
-                  value={fields.awayPenaltyScore}
-                  onChange={(event) => update({ ...fields, awayPenaltyScore: event.target.value })}
-                  placeholder="无点球留空"
-                />
-              </label>
+              <p className="mc-muted">
+                点球大战单独记录；弃权比分按已发布规程核对。中止比赛不会当作双方弃权。
+              </p>
             </div>
-            <label className="mc-field">
-              比赛判定
-              <select
-                value={fields.outcome}
-                onChange={(event) =>
-                  update({ ...fields, outcome: event.target.value as ReportFields['outcome'] })
-                }
-              >
-                {['FINISHED', 'HOME_FORFEIT', 'AWAY_FORFEIT', 'ABANDONED'].map((outcome) => (
-                  <option key={outcome} value={outcome}>
-                    {workflowLabels[outcome]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="mc-muted">
-              点球大战单独记录；弃权比分按已发布规程核对。中止比赛不会当作双方弃权。
-            </p>
-            <div className="mc-toolbar">
-              <h3>
-                事件时间线 <small className="mc-muted">{fields.events.length} 条</small>
-              </h3>
-              <button
-                type="button"
-                disabled={fields.events.length >= 500}
-                onClick={() =>
-                  update({
-                    ...fields,
-                    events: [
-                      ...fields.events,
-                      {
-                        clientEventId: actionId(),
-                        kind: 'GOAL',
-                        side: 'HOME',
-                        minute: '0',
-                        addedMinute: '',
-                        playerId: '',
-                        relatedPlayerId: '',
-                      },
-                    ],
-                  })
-                }
-              >
-                添加事件
-              </button>
-            </div>
-            <div className="wf-events">
-              {fields.events.map((event, index) => {
-                const players =
-                  event.side === 'HOME' ? data.homeTeam.players : data.awayTeam.players
-                const change = (values: Partial<typeof event>) =>
-                  update({
-                    ...fields,
-                    events: fields.events.map((item) =>
-                      item.clientEventId === event.clientEventId ? { ...item, ...values } : item,
-                    ),
-                  })
-                return (
-                  <div className="wf-event" key={event.clientEventId}>
-                    <div className="wf-event-head">
-                      <strong>事件 {index + 1}</strong>
-                      <button
-                        type="button"
-                        className="wf-text-button"
-                        onClick={() =>
-                          update({
-                            ...fields,
-                            events: fields.events.filter(
-                              (item) => item.clientEventId !== event.clientEventId,
-                            ),
-                          })
-                        }
-                      >
-                        移除
-                      </button>
-                    </div>
-                    <div className="wf-event-grid">
-                      <label className="mc-field">
-                        类型
-                        <select
-                          aria-label="类型"
-                          value={event.kind}
-                          onChange={(input) =>
-                            change({ kind: input.target.value as EventKind, relatedPlayerId: '' })
-                          }
-                        >
-                          {['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'].map(
-                            (kind) => (
-                              <option key={kind} value={kind}>
-                                {workflowLabels[kind]}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-                      <label className="mc-field">
-                        球队
-                        <select
-                          value={event.side}
-                          aria-label="球队"
-                          onChange={(input) =>
-                            change({
-                              side: input.target.value as ReportSide,
-                              playerId: '',
-                              relatedPlayerId: '',
+            <div hidden={detailView !== 'events'}>
+              <div className="mc-toolbar">
+                <h3>
+                  事件时间线 <small className="mc-muted">{fields.events.length} 条</small>
+                </h3>
+                <button
+                  type="button"
+                  disabled={fields.events.length >= 500}
+                  onClick={() =>
+                    update({
+                      ...fields,
+                      events: [
+                        ...fields.events,
+                        {
+                          clientEventId: actionId(),
+                          kind: 'GOAL',
+                          side: 'HOME',
+                          minute: '0',
+                          addedMinute: '',
+                          playerId: '',
+                          relatedPlayerId: '',
+                        },
+                      ],
+                    })
+                  }
+                >
+                  添加事件
+                </button>
+              </div>
+              <div className="wf-events">
+                {fields.events.map((event, index) => {
+                  const players =
+                    event.side === 'HOME' ? data.homeTeam.players : data.awayTeam.players
+                  const change = (values: Partial<typeof event>) =>
+                    update({
+                      ...fields,
+                      events: fields.events.map((item) =>
+                        item.clientEventId === event.clientEventId ? { ...item, ...values } : item,
+                      ),
+                    })
+                  return (
+                    <div className="wf-event" key={event.clientEventId}>
+                      <div className="wf-event-head">
+                        <strong>事件 {index + 1}</strong>
+                        <button
+                          type="button"
+                          className="wf-text-button"
+                          onClick={() =>
+                            update({
+                              ...fields,
+                              events: fields.events.filter(
+                                (item) => item.clientEventId !== event.clientEventId,
+                              ),
                             })
                           }
                         >
-                          <option value="HOME">{data.homeTeam.name}</option>
-                          <option value="AWAY">{data.awayTeam.name}</option>
-                        </select>
-                      </label>
-                      <label className="mc-field">
-                        分钟
-                        <input
-                          inputMode="numeric"
-                          maxLength={3}
-                          value={event.minute}
-                          aria-label="分钟"
-                          onChange={(input) => change({ minute: input.target.value })}
-                        />
-                      </label>
-                      <label className="mc-field">
-                        补时
-                        <input
-                          inputMode="numeric"
-                          maxLength={2}
-                          value={event.addedMinute}
-                          aria-label="补时"
-                          onChange={(input) => change({ addedMinute: input.target.value })}
-                          placeholder="可留空"
-                        />
-                      </label>
-                    </div>
-                    <div className="wf-player-grid">
-                      <label className="mc-field">
-                        {event.kind === 'SUBSTITUTION' ? '换下球员' : '事件球员'}
-                        <select
-                          value={event.playerId}
-                          aria-label={event.kind === 'SUBSTITUTION' ? '换下球员' : '事件球员'}
-                          onChange={(input) => change({ playerId: input.target.value })}
-                        >
-                          <option value="">选择名单球员</option>
-                          {players.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.shirtNumber ?? '—'} · {player.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {['GOAL', 'SUBSTITUTION'].includes(event.kind) ? (
+                          移除
+                        </button>
+                      </div>
+                      <div className="wf-event-grid">
                         <label className="mc-field">
-                          {event.kind === 'SUBSTITUTION' ? '换上球员' : '助攻球员'}
+                          类型
                           <select
-                            value={event.relatedPlayerId}
-                            aria-label={event.kind === 'SUBSTITUTION' ? '换上球员' : '助攻球员'}
-                            onChange={(input) => change({ relatedPlayerId: input.target.value })}
+                            aria-label="类型"
+                            value={event.kind}
+                            onChange={(input) =>
+                              change({ kind: input.target.value as EventKind, relatedPlayerId: '' })
+                            }
                           >
-                            <option value="">
-                              {event.kind === 'SUBSTITUTION' ? '选择换上球员' : '无助攻'}
-                            </option>
-                            {players
-                              .filter((player) => player.id !== event.playerId)
-                              .map((player) => (
-                                <option key={player.id} value={player.id}>
-                                  {player.shirtNumber ?? '—'} · {player.displayName}
+                            {['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'].map(
+                              (kind) => (
+                                <option key={kind} value={kind}>
+                                  {workflowLabels[kind]}
                                 </option>
-                              ))}
+                              ),
+                            )}
                           </select>
                         </label>
-                      ) : null}
+                        <label className="mc-field">
+                          球队
+                          <select
+                            value={event.side}
+                            aria-label="球队"
+                            onChange={(input) =>
+                              change({
+                                side: input.target.value as ReportSide,
+                                playerId: '',
+                                relatedPlayerId: '',
+                              })
+                            }
+                          >
+                            <option value="HOME">{data.homeTeam.name}</option>
+                            <option value="AWAY">{data.awayTeam.name}</option>
+                          </select>
+                        </label>
+                        <label className="mc-field">
+                          分钟
+                          <input
+                            inputMode="numeric"
+                            maxLength={3}
+                            value={event.minute}
+                            aria-label="分钟"
+                            onChange={(input) => change({ minute: input.target.value })}
+                          />
+                        </label>
+                        <label className="mc-field">
+                          补时
+                          <input
+                            inputMode="numeric"
+                            maxLength={2}
+                            value={event.addedMinute}
+                            aria-label="补时"
+                            onChange={(input) => change({ addedMinute: input.target.value })}
+                            placeholder="可留空"
+                          />
+                        </label>
+                      </div>
+                      <div className="wf-player-grid">
+                        <label className="mc-field">
+                          {event.kind === 'SUBSTITUTION' ? '换下球员' : '事件球员'}
+                          <select
+                            value={event.playerId}
+                            aria-label={event.kind === 'SUBSTITUTION' ? '换下球员' : '事件球员'}
+                            onChange={(input) => change({ playerId: input.target.value })}
+                          >
+                            <option value="">选择名单球员</option>
+                            {players.map((player) => (
+                              <option key={player.id} value={player.id}>
+                                {player.shirtNumber ?? '—'} · {player.displayName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {['GOAL', 'SUBSTITUTION'].includes(event.kind) ? (
+                          <label className="mc-field">
+                            {event.kind === 'SUBSTITUTION' ? '换上球员' : '助攻球员'}
+                            <select
+                              value={event.relatedPlayerId}
+                              aria-label={event.kind === 'SUBSTITUTION' ? '换上球员' : '助攻球员'}
+                              onChange={(input) => change({ relatedPlayerId: input.target.value })}
+                            >
+                              <option value="">
+                                {event.kind === 'SUBSTITUTION' ? '选择换上球员' : '无助攻'}
+                              </option>
+                              {players
+                                .filter((player) => player.id !== event.playerId)
+                                .map((player) => (
+                                  <option key={player.id} value={player.id}>
+                                    {player.shirtNumber ?? '—'} · {player.displayName}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+              {!fields.events.length ? (
+                <p className="mc-muted">暂无事件。草稿可以暂缺进球明细，提交前需与普通比分一致。</p>
+              ) : null}
             </div>
-            {!fields.events.length ? (
-              <p className="mc-muted">暂无事件。草稿可以暂缺进球明细，提交前需与普通比分一致。</p>
-            ) : null}
-            <label className="mc-field">
-              比赛备注
-              <textarea
-                maxLength={800}
-                value={fields.notes}
-                aria-label="比赛备注"
-                onChange={(event) => update({ ...fields, notes: event.target.value })}
-              />
-            </label>
+            <div hidden={detailView !== 'result'}>
+              <label className="mc-field">
+                比赛备注
+                <textarea
+                  maxLength={800}
+                  value={fields.notes}
+                  aria-label="比赛备注"
+                  onChange={(event) => update({ ...fields, notes: event.target.value })}
+                />
+              </label>
+            </div>
           </fieldset>
-          <label className="mc-field">
+          <label className="mc-field" hidden={historyOpen || (!data.latest && Boolean(data.blockingReasons?.length))}>
             保存或处理原因
             <textarea
               maxLength={240}
@@ -595,7 +634,7 @@ function ReportDetail({
               {localError}
             </p>
           ) : null}
-          <div className="mc-actions">
+          <div className="mc-actions wf-report-actions">
             {actions
               .filter((item) => item.allowed)
               .map((item) => (

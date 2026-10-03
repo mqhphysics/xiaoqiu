@@ -874,6 +874,8 @@ textarea:focus-visible {
   margin-bottom: 18px;
 }
 .wf-match-list {
+  align-content: start;
+  grid-auto-rows: min-content;
   max-height: 650px;
   overflow-y: auto;
   padding-right: 4px;
@@ -1272,4 +1274,231 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Compact desktop workspace: fixed navigation, bounded lists and focused details. */
+@media (min-width: 761px) {
+  .mc-shell {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+  .mc-body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .mc-topbar {
+    height: 58px;
+    min-height: 58px;
+    padding-inline: 24px;
+  }
+  .mc-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    padding: 22px 24px 10px;
+    overflow: hidden;
+  }
+  .mc-page-heading {
+    flex: none;
+    margin-bottom: 16px;
+  }
+  .mc-page-heading h1 {
+    font-size: 25px;
+    margin-bottom: 7px;
+  }
+  .mc-kicker {
+    display: none;
+  }
+  .mc-page-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    align-content: start;
+    gap: 14px;
+    padding-right: 3px;
+  }
+  .mc-footer {
+    flex: none;
+    padding: 12px 0 2px;
+  }
+  .mc-metric {
+    padding: 16px 20px;
+  }
+  .mc-metric > strong {
+    font-size: 30px;
+    margin-block: 8px 4px;
+  }
+  .mc-table th,
+  .mc-table td {
+    padding: 10px 16px;
+  }
+  .mc-panel-heading {
+    padding: 16px 20px;
+  }
+  .mc-shortcut {
+    padding: 16px 20px;
+  }
+  .wf-report-layout {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.4fr);
+  }
+  .wf-report-layout > .mc-panel {
+    height: 100%;
+    overflow: auto;
+    padding: 18px;
+  }
+  .wf-report-layout > .mc-panel:first-child {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .wf-match-list {
+    max-height: none;
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+  }
+  .wf-match-card {
+    padding: 12px 14px;
+    gap: 6px;
+  }
+}
+.mc-overview-intro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: baseline;
+  padding: 2px 0 8px;
+}
+.mc-overview-intro strong {
+  font-size: 15px;
+}
+.mc-overview-intro span {
+  font-size: 12px;
+  color: var(--mc-muted);
+}
+.mc-capability {
+  display: block;
+  padding: 10px 14px;
+  font-size: 11px;
+}
+.mc-capability summary {
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.mc-capability p {
+  margin: 10px 0 2px;
+}
+.mc-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: min(570px, 100%);
+  border-radius: 12px 0 0 12px;
+}
+.mc-drawer > header {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+  padding: 17px 22px;
+}
+.mc-drawer .mc-detail {
+  border: 0;
+  border-radius: 0;
+}
+.mc-drawer .mc-detail > .mc-panel-heading button {
+  display: none;
+}
+.wf-subtabs {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  background: #eef1e9;
+  border-radius: 8px;
+  margin-block: 14px;
+}
+.wf-subtabs button {
+  flex: 1;
+  background: transparent;
+  color: #62715b;
+  padding: 8px;
+  min-height: 34px;
+  font-size: 12px;
+}
+.wf-subtabs button.active {
+  background: #fff;
+  color: #294530;
+}
+.wf-subtabs button:not(:disabled):hover {
+  background: #f7f9f3;
+}
+.wf-report-fields {
+  margin-top: 14px;
+}
+.wf-report-fields legend {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.wf-official-result {
+  padding: 12px 16px;
+  margin-block: 12px;
+}
+.wf-report-actions {
+  position: sticky;
+  bottom: -18px;
+  background: #fff;
+  padding-block: 14px;
+  border-top: 1px solid var(--mc-line);
+  z-index: 1;
+}
+.wf-report-actions button {
+  font-size: 11px;
+  min-height: 34px;
+  padding: 7px 11px;
+}
+.mc-setup-note {
+  padding: 14px;
+  border: 1px solid var(--mc-line);
+  border-radius: 8px;
+  background: #f7f9f2;
+}
+.admin-one-click {
+  width: 100%;
+  margin-top: 25px;
+  min-height: 46px;
+}
+[hidden] {
+  display: none !important;
+}
+.wf-rule-editor-shell {
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.wf-rule-editor-shell > summary {
+  padding: 15px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wf-rule-editor-shell > summary span {
+  margin-left: 16px;
+  color: var(--mc-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.wf-rule-editor-shell > .mc-panel {
+  border: 0;
+  padding: 20px;
 }

@@ -132,7 +132,7 @@ function Feedbacks({ context }: { context: OrganizationContext }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.slice((page - 1) * 20, page * 20).map((r) => (
+                  {filtered.slice((page - 1) * 10, page * 10).map((r) => (
                     <tr key={r.id}>
                       <td>
                         <strong>{r.reason}</strong>
@@ -154,62 +154,64 @@ function Feedbacks({ context }: { context: OrganizationContext }) {
               </table>
             </div>
             <Pager
-              data={{ items: filtered, total: filtered.length, page, pageSize: 20 }}
+              data={{ items: filtered, total: filtered.length, page, pageSize: 10 }}
               page={page}
               onPage={setPage}
             />
           </>
         ) : null}
       </section>
-      {selected ? (
-        <section className="mc-panel mc-detail">
-          <div className="mc-panel-heading">
-            <h2>{selected.reason}</h2>
-            <button className="secondary-button" onClick={() => setSelected(null)}>
-              收起详情
+      {selected && !editing ? (
+        <Modal title="反馈详情" variant="drawer" onClose={() => setSelected(null)}>
+          <section className="mc-panel mc-detail">
+            <div className="mc-panel-heading">
+              <h2>{selected.reason}</h2>
+              <button className="secondary-button" onClick={() => setSelected(null)}>
+                收起详情
+              </button>
+            </div>
+            <dl className="mc-facts">
+              <div>
+                <dt>提交者</dt>
+                <dd>{selected.reporter.displayName}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd>
+                  <Badge value={selected.status} />
+                </dd>
+              </div>
+              <div>
+                <dt>工单编号</dt>
+                <dd>{selected.id}</dd>
+              </div>
+              <div>
+                <dt>处理人</dt>
+                <dd>{selected.handledBy?.displayName || '尚未分配'}</dd>
+              </div>
+            </dl>
+            <p className="mc-prose">{selected.details || '没有补充说明'}</p>
+            {selected.targetPreview ? (
+              <blockquote className="mc-quote">
+                <strong>{selected.targetPreview.title}</strong>
+                <p>{selected.targetPreview.body}</p>
+              </blockquote>
+            ) : null}
+            {selected.resolution ? (
+              <div className="mc-alert">
+                <strong>处理回复</strong>
+                <p className="mc-prose">{selected.resolution}</p>
+              </div>
+            ) : null}
+            <button
+              disabled={['RESOLVED', 'REJECTED'].includes(selected.status)}
+              onClick={() => setEditing(true)}
+            >
+              处理并回复
             </button>
-          </div>
-          <dl className="mc-facts">
-            <div>
-              <dt>提交者</dt>
-              <dd>{selected.reporter.displayName}</dd>
-            </div>
-            <div>
-              <dt>状态</dt>
-              <dd>
-                <Badge value={selected.status} />
-              </dd>
-            </div>
-            <div>
-              <dt>工单编号</dt>
-              <dd>{selected.id}</dd>
-            </div>
-            <div>
-              <dt>处理人</dt>
-              <dd>{selected.handledBy?.displayName || '尚未分配'}</dd>
-            </div>
-          </dl>
-          <p className="mc-prose">{selected.details || '没有补充说明'}</p>
-          {selected.targetPreview ? (
-            <blockquote className="mc-quote">
-              <strong>{selected.targetPreview.title}</strong>
-              <p>{selected.targetPreview.body}</p>
-            </blockquote>
-          ) : null}
-          {selected.resolution ? (
-            <div className="mc-alert">
-              <strong>处理回复</strong>
-              <p className="mc-prose">{selected.resolution}</p>
-            </div>
-          ) : null}
-          <button
-            disabled={['RESOLVED', 'REJECTED'].includes(selected.status)}
-            onClick={() => setEditing(true)}
-          >
-            处理并回复
-          </button>
-          <p className="mc-muted">已完成的工单保留处理结果；内容隐藏后仍保留记录。</p>
-        </section>
+            <p className="mc-muted">已完成的工单保留处理结果；内容隐藏后仍保留记录。</p>
+          </section>
+        </Modal>
       ) : null}
       {selected && editing ? (
         <Modal title="处理反馈" onClose={() => setEditing(false)}>
@@ -330,7 +332,7 @@ function Posts({ context, tournamentId }: { context: OrganizationContext; tourna
   const [creating, setCreating] = useState(false)
   const result = useAdminData<PageData>(
     context,
-    `/admin/center/posts?${new URLSearchParams({ page: String(page), pageSize: '20', query })}`,
+    `/admin/center/posts?${new URLSearchParams({ page: String(page), pageSize: '10', query })}`,
   )
   function done() {
     setEditing(false)
@@ -413,22 +415,24 @@ function Posts({ context, tournamentId }: { context: OrganizationContext; tourna
           </>
         ) : null}
       </section>
-      {selected ? (
-        <section className="mc-panel mc-detail">
-          <div className="mc-panel-heading">
-            <h2>{textValue(selected.title)}</h2>
-            <button className="secondary-button" onClick={() => setSelected(null)}>
-              收起详情
-            </button>
-          </div>
-          <div className="mc-actions">
-            <Badge value={selected.type} />
-            <Badge value={selected.status} />
-            <span className="mc-muted">{time(selected.publishedAt)}</span>
-          </div>
-          <p className="mc-prose">{textValue(selected.body)}</p>
-          <button onClick={() => setEditing(true)}>编辑与调整可见状态</button>
-        </section>
+      {selected && !editing ? (
+        <Modal title="内容详情" variant="drawer" onClose={() => setSelected(null)}>
+          <section className="mc-panel mc-detail">
+            <div className="mc-panel-heading">
+              <h2>{textValue(selected.title)}</h2>
+              <button className="secondary-button" onClick={() => setSelected(null)}>
+                收起详情
+              </button>
+            </div>
+            <div className="mc-actions">
+              <Badge value={selected.type} />
+              <Badge value={selected.status} />
+              <span className="mc-muted">{time(selected.publishedAt)}</span>
+            </div>
+            <p className="mc-prose">{textValue(selected.body)}</p>
+            <button onClick={() => setEditing(true)}>编辑与调整可见状态</button>
+          </section>
+        </Modal>
       ) : null}
       {creating || (selected && editing) ? (
         <Modal

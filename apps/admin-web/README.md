@@ -2,16 +2,20 @@
 
 项目内独立的 React + Vite 管理网站，复用晓球统一 NestJS API 和 PostgreSQL。公开网站仍为 `apps/mini-program`，管理站源码在本目录。
 
-在已经集成本轮管理 API 的项目根目录，双击 **打开晓球管理中心.cmd**。管理中心固定打开 `http://127.0.0.1:5173/`，与现有“打开晓球网站”和微信入口并排；使用当前组织获授权的管理员账号登录，不在页面提供公共密码。
+在本任务目录双击 **打开晓球管理中心.cmd**，页面打开后点击 **进入管理中心**，无需填写账号和密码。入口固定为 `http://127.0.0.1:5173/`，与原网站/微信启动文件并排。操作仍使用现有、有效的组织管理员身份，普通网站登录保持原有方式。
+
+页面安排、常用操作和设计理由见[管理中心使用与设计说明](../../docs/guides/晓球管理中心使用与设计说明.md)。
 
 无浏览器启动或指定现有 API：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-admin-center.ps1 -NoBrowser
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-admin-center.ps1 -NoBrowser -ApiBaseUrl http://127.0.0.1:3011 -OrganizationId 00000000-0000-4000-8000-000000000001
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-admin-center.ps1 -NoBrowser -RequireAccountLogin
 ```
 
-第二条仅示范明确指定隔离测试服务，日常不使用测试库。启动器先检查 API 健康和管理中心接口版本；已有 API 未集成时报告具体原因，不自行关闭或替换服务。默认需要准备数据服务时复用项目原启动器并传 `-NoBrowser`，不传 `-Seed`。5173 被其他应用占用时明确失败，不改变端口。
+第二条是以后团队使用时的账号登录方式；更换方式前需关闭当前管理服务。启动器复用已就绪的当前工作树服务，不重复编译正在运行的原生数据库驱动。管理扩展在本机Vite服务内运行，调用原NestJS应用服务并连接同一数据库；其他公开/V2接口仍转发到已运行的API，修复前后端版本不一致的404，无需替换主目录API。默认需要准备数据服务时复用项目原启动器并传`-NoBrowser`，不传`-Seed`。其他工作树或运行方式占用5173时明确失败，不自动改变端口。
+
+只有本地开发入口启用一键管理：服务绑定回环地址，进入请求检查本机地址、Host、Origin及同源请求；服务器确认配置的账号本来就有管理权限，再创建普通会话并记录审计。生产构建不会开放一键入口，客户端不包含管理员密码。自定义`ApiBaseUrl`时须同时配置匹配的`DatabaseUrl`，避免连接不同数据库。
 
 手动开发使用 `.env.example` 对应的公开配置。生产构建必须配置实际 `VITE_API_BASE_URL`；Vite 本地 `/api` 代理不是生产 Nginx 的部署配置。`VITE_LOCAL_SHORT_PASSWORDS=1` 只影响开发环境登录表单，服务端仍独立决定是否允许本机短密码。
 

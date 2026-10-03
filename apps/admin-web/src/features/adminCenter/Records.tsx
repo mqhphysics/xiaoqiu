@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import type { OrganizationContext } from '../adminSchedule/types'
-import { Badge, DataState, Pager, PendingCapability, textValue, time, useAdminData } from './shared'
+import {
+  Badge,
+  DataState,
+  Pager,
+  PendingCapability,
+  Modal,
+  textValue,
+  time,
+  useAdminData,
+} from './shared'
 import type { PageData, Row } from './shared'
 
 interface SystemData {
@@ -47,7 +56,7 @@ function RecordList({ context, kind }: { context: OrganizationContext; kind: 'me
   const [selected, setSelected] = useState<Row | null>(null)
   const result = useAdminData<PageData>(
     context,
-    `/admin/center/${kind}?${new URLSearchParams({ page: String(page), pageSize: '20', query })}`,
+    `/admin/center/${kind}?${new URLSearchParams({ page: String(page), pageSize: '10', query })}`,
   )
   return (
     <>
@@ -145,71 +154,78 @@ function RecordList({ context, kind }: { context: OrganizationContext; kind: 'me
         ) : null}
       </section>
       {selected ? (
-        <section className="mc-panel mc-detail">
-          <div className="mc-panel-heading">
-            <h2>{kind === 'audit' ? '操作详情' : '媒体引用详情'}</h2>
-            <button className="secondary-button" onClick={() => setSelected(null)}>
-              收起详情
-            </button>
-          </div>
-          {kind === 'audit' ? (
-            <>
-              <dl className="mc-facts">
-                {[
-                  ['记录编号', selected.id],
-                  ['操作者编号', selected.actorUserId],
-                  ['动作', selected.action],
-                  ['对象类型', selected.targetType],
-                  ['对象编号', selected.targetId],
-                  ['修改原因', selected.reason],
-                  ['请求编号', selected.requestId],
-                  ['时间', time(selected.createdAt)],
-                ].map(([k, v]) => (
-                  <div key={String(k)}>
-                    <dt>{String(k)}</dt>
-                    <dd>{textValue(v)}</dd>
+        <Modal
+          title={kind === 'audit' ? '操作详情' : '媒体引用详情'}
+          variant="drawer"
+          onClose={() => setSelected(null)}
+        >
+          <section className="mc-panel mc-detail">
+            <div className="mc-panel-heading">
+              <h2>{kind === 'audit' ? '操作详情' : '媒体引用详情'}</h2>
+              <button className="secondary-button" onClick={() => setSelected(null)}>
+                收起详情
+              </button>
+            </div>
+            {kind === 'audit' ? (
+              <>
+                <dl className="mc-facts">
+                  {[
+                    ['记录编号', selected.id],
+                    ['操作者编号', selected.actorUserId],
+                    ['动作', selected.action],
+                    ['对象类型', selected.targetType],
+                    ['对象编号', selected.targetId],
+                    ['修改原因', selected.reason],
+                    ['请求编号', selected.requestId],
+                    ['时间', time(selected.createdAt)],
+                  ].map(([k, v]) => (
+                    <div key={String(k)}>
+                      <dt>{String(k)}</dt>
+                      <dd>{textValue(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mc-compare">
+                  <div>
+                    <h3>修改前（可公开摘要）</h3>
+                    <pre>{JSON.stringify(selected.before, null, 2) || '未记录安全摘要'}</pre>
                   </div>
-                ))}
+                  <div>
+                    <h3>修改后（可公开摘要）</h3>
+                    <pre>{JSON.stringify(selected.after, null, 2) || '未记录安全摘要'}</pre>
+                  </div>
+                </div>
+                <p className="mc-muted">
+                  旧记录只显示服务端允许的状态与版本字段。比赛完整历史在“赛事与比赛 /
+                  比赛战报”查看。
+                </p>
+              </>
+            ) : (
+              <dl className="mc-facts">
+                <div>
+                  <dt>所属对象</dt>
+                  <dd>{textValue(selected.ownerName)}</dd>
+                </div>
+                <div>
+                  <dt>对象编号</dt>
+                  <dd>{textValue(selected.ownerId)}</dd>
+                </div>
+                <div className="mc-wide">
+                  <dt>图片引用</dt>
+                  <dd className="mc-break">{textValue(selected.url)}</dd>
+                </div>
+                <div>
+                  <dt>用途</dt>
+                  <dd>{KIND_LABELS[String(selected.kind)]}</dd>
+                </div>
+                <div>
+                  <dt>引用状态</dt>
+                  <dd>{KIND_LABELS[String(selected.visibility)]}</dd>
+                </div>
               </dl>
-              <div className="mc-compare">
-                <div>
-                  <h3>修改前（可公开摘要）</h3>
-                  <pre>{JSON.stringify(selected.before, null, 2) || '未记录安全摘要'}</pre>
-                </div>
-                <div>
-                  <h3>修改后（可公开摘要）</h3>
-                  <pre>{JSON.stringify(selected.after, null, 2) || '未记录安全摘要'}</pre>
-                </div>
-              </div>
-              <p className="mc-muted">
-                旧记录只显示服务端允许的状态与版本字段。比赛完整历史在“赛事与比赛 / 比赛战报”查看。
-              </p>
-            </>
-          ) : (
-            <dl className="mc-facts">
-              <div>
-                <dt>所属对象</dt>
-                <dd>{textValue(selected.ownerName)}</dd>
-              </div>
-              <div>
-                <dt>对象编号</dt>
-                <dd>{textValue(selected.ownerId)}</dd>
-              </div>
-              <div className="mc-wide">
-                <dt>图片引用</dt>
-                <dd className="mc-break">{textValue(selected.url)}</dd>
-              </div>
-              <div>
-                <dt>用途</dt>
-                <dd>{KIND_LABELS[String(selected.kind)]}</dd>
-              </div>
-              <div>
-                <dt>引用状态</dt>
-                <dd>{KIND_LABELS[String(selected.visibility)]}</dd>
-              </div>
-            </dl>
-          )}
-        </section>
+            )}
+          </section>
+        </Modal>
       ) : null}
       {kind === 'media' ? (
         <PendingCapability

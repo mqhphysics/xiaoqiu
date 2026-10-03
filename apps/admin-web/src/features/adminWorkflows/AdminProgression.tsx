@@ -13,6 +13,7 @@ import type { OfficialResults, ProgressionPreview, RuleVersion, WorkflowProps } 
 import './workflows.css'
 
 interface ScheduleRulesSnapshot {
+  tournaments: { id: string; status: string }[]
   ruleVersions: RuleVersion[]
   teams: { id: string; name: string }[]
   matches: { id: string; title?: string; tournamentId: string }[]
@@ -48,15 +49,19 @@ export function AdminProgression(props: WorkflowProps) {
 
 function ProgressionWorkspace({ context, tournamentId }: WorkflowProps) {
   const snapshot = useWorkflowRead<ScheduleRulesSnapshot>(context, '/admin/schedule-workbench')
-  const results = useWorkflowRead<OfficialResults>(
-    context,
-    `/public/tournaments/${encodeURIComponent(tournamentId)}/results`,
-  )
   const [ruleId, setRuleId] = useState('')
   const versions = (snapshot.data?.ruleVersions ?? [])
     .filter((rule) => rule.tournamentId === tournamentId)
     .sort((a, b) => b.version - a.version)
   const selected = versions.find((rule) => rule.id === ruleId) ?? versions[0]
+  const ruleProblem = selected ? validateRuleDocument(selected.rules) : '尚无规程'
+  const canReadResults =
+    snapshot.data?.tournaments.find((t) => t.id === tournamentId)?.status === 'PUBLISHED' &&
+    !ruleProblem
+  const results = useWorkflowRead<OfficialResults>(
+    context,
+    canReadResults ? `/public/tournaments/${encodeURIComponent(tournamentId)}/results` : null,
+  )
   const [preview, setPreview] = useState<ProgressionPreview | null>(null)
   const [previewBusy, setPreviewBusy] = useState(false)
   const [previewError, setPreviewError] = useState('')
@@ -131,6 +136,12 @@ function ProgressionWorkspace({ context, tournamentId }: WorkflowProps) {
             刷新数据
           </button>
         </div>
+        {snapshot.data && !canReadResults ? (
+          <p className="mc-muted mc-setup-note">
+            该赛事尚未具备公开的 V2
+            正式结果。可查看赛程和战报；完整规程配置好后再核对正式统计与晋级。
+          </p>
+        ) : null}
         {results.loading ? (
           <p className="mc-muted" role="status">
             正在读取正式结果…
@@ -205,7 +216,7 @@ function ProgressionWorkspace({ context, tournamentId }: WorkflowProps) {
           </label>
           <button
             type="button"
-            disabled={!selected || command.locked || previewBusy}
+            disabled={!selected || Boolean(ruleProblem) || command.locked || previewBusy}
             onClick={() => {
               void loadPreview()
             }}
@@ -300,18 +311,23 @@ function ProgressionWorkspace({ context, tournamentId }: WorkflowProps) {
         <CommandStatus command={command} />
       </section>
       {snapshot.data ? (
-        <RuleVersionEditor
-          key={`${context.accessToken}:${tournamentId}`}
-          context={context}
-          tournamentId={tournamentId}
-          versions={versions}
-          unavailable={snapshot.loading || Boolean(snapshot.error)}
-          onPublished={() => {
-            snapshot.refresh()
-            results.refresh()
-            setPreview(null)
-          }}
-        />
+        <details className="wf-rule-editor-shell">
+          <summary>
+            赛事规程配置 <span>首次配置或开赛前调整时展开</span>
+          </summary>
+          <RuleVersionEditor
+            key={`${context.accessToken}:${tournamentId}`}
+            context={context}
+            tournamentId={tournamentId}
+            versions={versions}
+            unavailable={snapshot.loading || Boolean(snapshot.error)}
+            onPublished={() => {
+              snapshot.refresh()
+              results.refresh()
+              setPreview(null)
+            }}
+          />
+        </details>
       ) : null}
     </div>
   )
