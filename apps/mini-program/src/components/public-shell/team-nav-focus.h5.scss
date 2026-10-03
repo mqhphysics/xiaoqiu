@@ -32,7 +32,8 @@
     }
 
     .public-team-focus__trace,
-    .public-team-focus__stroke {
+    .public-team-focus__stroke,
+    .public-team-focus__engraving {
       stroke-linecap: round;
       stroke-linejoin: round;
     }
@@ -42,10 +43,16 @@
       transition: opacity 380ms ease;
     }
 
-    .public-team-focus__stroke {
+    .public-team-focus__stroke,
+    .public-team-focus__engraving {
       opacity: 0;
       stroke-dasharray: 1;
       stroke-dashoffset: 1;
+    }
+
+    .public-team-focus__body {
+      opacity: 0;
+      clip-path: inset(0 0 100% 0) fill-box;
     }
 
     .public-team-focus__jewel {
@@ -66,6 +73,16 @@
 
       .public-team-focus__wing--detail .public-team-focus__stroke {
         opacity: 0.64;
+      }
+
+      .public-team-focus__body {
+        opacity: 0.34;
+        clip-path: inset(0 0 0 0) fill-box;
+      }
+
+      .public-team-focus__engraving {
+        opacity: 0.58;
+        stroke-dashoffset: 0;
       }
 
       .public-team-focus__jewel {

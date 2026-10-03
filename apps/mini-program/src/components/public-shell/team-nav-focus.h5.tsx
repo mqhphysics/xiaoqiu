@@ -34,7 +34,7 @@ export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
     if (!preview.enabled) return
     const element = document.getElementById(id)
     const shell = element?.closest<HTMLElement>('.public-app')
-    if (shell?.querySelector('.public-team-nav--active')) playTeamFocus(shell, [])
+    if (shell?.querySelector('.public-team-nav--active')) playTeamFocus(shell, {})
   }, [id, preview.enabled, preview.design, preview.crest])
 
   const replay = () => {
@@ -81,6 +81,14 @@ export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
                     </linearGradient>
                   </defs>
                   <g transform={side === 1 ? 'translate(200 0) scale(-1 1)' : undefined}>
+                    {layer.bodyPath ? (
+                      <path
+                        className="public-team-focus__body"
+                        data-focus-key={`${layer.key}-${side}-body`}
+                        d={layer.bodyPath}
+                        fill={`url(#${gradientId})`}
+                      />
+                    ) : null}
                     {layer.seedPath ? (
                       <path
                         className="public-team-focus__trace"
@@ -92,19 +100,32 @@ export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
                     ) : null}
                     <path
                       className="public-team-focus__stroke"
+                      data-focus-key={`${layer.key}-${side}-stroke`}
                       d={layer.path}
                       stroke={`url(#${gradientId})`}
                       strokeWidth={layer.width}
                       pathLength="1"
                       vectorEffect="non-scaling-stroke"
                     />
+                    {layer.engravings?.map((path, index) => (
+                      <path
+                        className="public-team-focus__engraving"
+                        data-focus-key={`${layer.key}-${side}-grain-${index}`}
+                        key={index}
+                        d={path}
+                        stroke={palette.primaryDark}
+                        strokeWidth="0.42"
+                        pathLength="1"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
                   </g>
                 </svg>
               </span>
             )
           }),
         )}
-        <span className="public-team-focus__jewel">
+        <span className="public-team-focus__jewel" data-focus-key="jewel">
           <svg focusable="false" viewBox="0 0 200 80" preserveAspectRatio="none" fill="none">
             {design.key === '04' ? (
               <path d="M100 57L104 61L100 65L96 61Z" stroke={palette.primary} strokeWidth="1.25" />
