@@ -53,7 +53,30 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
               aria-hidden="true"
             >
               <g fill="none" stroke="currentColor" strokeWidth="0.45">
-                <path d="M10 14V19H26V22M40 14V19H26 M60 14V19H74V22M90 14V19H74 M26 36V40H50V44M74 36V40H50 M50 61V63H26V65M50 63H74V65 M26 79V82H25V83M74 79V82H75V83 M10 83V82H25M40 83V82H25M60 83V82H75M90 83V82H75" />
+                <g data-branch="q0">
+                  <polyline points="10,14 10,19 25,19 25,22" />
+                  <polyline points="40,14 40,19 25,19" />
+                </g>
+                <g data-branch="q1">
+                  <polyline points="60,14 60,19 75,19 75,22" />
+                  <polyline points="90,14 90,19 75,19" />
+                </g>
+                <g data-branch="s0">
+                  <polyline points="25,36 25,40 50,40 50,44" />
+                  <polyline points="75,36 75,40 50,40" />
+                </g>
+                <g data-branch="s1">
+                  <polyline points="50,61 50,63 25,63 25,65" />
+                  <polyline points="50,63 75,63 75,65" />
+                </g>
+                <g data-branch="q2">
+                  <polyline points="25,79 25,82 10,82 10,83" />
+                  <polyline points="25,82 40,82 40,83" />
+                </g>
+                <g data-branch="q3">
+                  <polyline points="75,79 75,82 60,82 60,83" />
+                  <polyline points="75,82 90,82 90,83" />
+                </g>
               </g>
             </svg>
             {rounds[0]!.matches.map((match, index) => (
@@ -91,13 +114,18 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
           </div>
         )}
       </div>
+      {thirdPlace && (
+        <section className="data-desktop__third-place" aria-label="季军赛">
+          <h3>季军赛</h3>
+          <TreeMatch
+            match={thirdPlace}
+            expanded={expanded}
+            className="data-desktop__tree-match--third"
+          />
+        </section>
+      )}
       <div className="data-desktop__knockout-foot">
         <span>{eightTeam ? '八强 → 半决赛 → 决赛' : '淘汰赛晋级路线'}</span>
-        {expanded && thirdPlace && (
-          <a href={matchDetailUrl(thirdPlace.id)} onClick={openMatch}>
-            三四名赛 <span>{scoreLabel(thirdPlace)}</span> ↗
-          </a>
-        )}
         {data.resultsMode === 'DEMO' && <span>演示赛季 · 对阵来自比赛记录</span>}
       </div>
       {!expanded && (
@@ -136,6 +164,7 @@ function TreeMatch({
         />
         <a
           className="data-desktop__tree-score"
+          tabIndex={expanded ? 0 : -1}
           href={matchDetailUrl(match.id)}
           onClick={openMatch}
           aria-label={`${match.homeTeam?.name ?? match.homePlaceholder ?? '待定'} 对 ${match.awayTeam?.name ?? match.awayPlaceholder ?? '待定'}，${scoreLabel(match)}，查看比赛`}
@@ -190,7 +219,7 @@ function TreeTeam({
     >
       <div className="data-desktop__tree-badge">
         {team ? (
-          <TeamCrest team={team} size="small" />
+          <TeamCrest team={team} size="small" interactive={expanded} />
         ) : (
           <svg
             viewBox="0 0 64 64"
