@@ -121,8 +121,10 @@ export function AccountBoundary({
         <main className="account-boundary" aria-busy={!error}>
           <section className="account-boundary__panel" role={error ? 'alert' : 'status'}>
             <div className="account-boundary__brand">晓球</div>
-            <h1>{error ? '暂时无法验证账号' : token ? '正在验证登录状态…' : '请先登录账号'}</h1>
-            <p>
+            <h1 className="account-boundary__title">
+              {error ? '暂时无法验证账号' : token ? '正在验证登录状态…' : '请先登录账号'}
+            </h1>
+            <p className="account-boundary__message">
               {error
                 ? verification.message
                 : token
@@ -131,10 +133,18 @@ export function AccountBoundary({
             </p>
             {error ? (
               <div className="account-boundary__actions">
-                <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+                <button
+                  className="account-boundary__button"
+                  type="button"
+                  onClick={() => setAttempt((value) => value + 1)}
+                >
                   重试连接
                 </button>
-                <button type="button" onClick={() => clearSession()}>
+                <button
+                  className="account-boundary__button"
+                  type="button"
+                  onClick={() => clearSession()}
+                >
                   返回登录
                 </button>
               </div>
