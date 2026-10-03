@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getTeamNavOrnamentPalette, getTeamNavPalette } from './team-nav-palette.h5.ts'
+import {
+  getTeamNavOrnamentColor,
+  getTeamNavOrnamentPalette,
+  getTeamNavPalette,
+} from './team-nav-palette.h5.ts'
 
 const team = {
   teamCode: 'DEMO-PHY-1',
@@ -72,4 +76,28 @@ test('light team colors retain a visible shaded edge rather than disappearing in
   })
   assert.notEqual(palette.primaryDark, palette.primary)
   assert.notEqual(palette.secondaryDark, palette.secondary)
+})
+
+test('monochrome ornaments follow the visible club primary color and change with the team', () => {
+  const colors = ['DEMO-PHY-1', 'DEMO-PHY-2', 'DEMO-MATH', 'DEMO-CHEM'].map((teamCode) =>
+    getTeamNavOrnamentColor({ ...team, teamCode }),
+  )
+  assert.equal(new Set(colors).size, 4)
+  for (const color of colors) assert.match(color, /^#[a-f\d]{6}$/)
+  const red = getTeamNavOrnamentColor(team)
+  const rgb = [1, 3, 5].map((offset) => parseInt(red.slice(offset, offset + 2), 16))
+  assert.ok(rgb[0] > rgb[1] && rgb[0] > rgb[2])
+})
+
+test('white primary colors use the declared accent and custom crests do not get a demo tint', () => {
+  const custom = {
+    ...team,
+    crestUrl: '/api/media/crests/custom.png',
+    primaryColor: '#ffffff',
+    secondaryColor: '#0033aa',
+  }
+  const color = getTeamNavOrnamentColor(custom)
+  const rgb = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16))
+  assert.ok(rgb[2] > rgb[0])
+  assert.notEqual(color, getTeamNavOrnamentColor(team))
 })

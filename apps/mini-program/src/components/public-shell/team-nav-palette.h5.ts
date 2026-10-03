@@ -77,3 +77,12 @@ export function getTeamNavOrnamentPalette(team?: TeamPaletteSource | null) {
     secondaryLight: mixColor(colors.secondary, '#fffaf0', 0.66),
   }
 }
+
+export function getTeamNavOrnamentColor(team?: TeamPaletteSource | null): string {
+  const palette = getTeamNavPalette(team)
+  const channels = [1, 3, 5].map((offset) =>
+    parseInt(palette.primary.slice(offset, offset + 2), 16),
+  )
+  const anchor = channels.every((channel) => channel > 225) ? palette.secondary : palette.primary
+  return mixColor(anchor, '#f7f1e6', 0.28)
+}

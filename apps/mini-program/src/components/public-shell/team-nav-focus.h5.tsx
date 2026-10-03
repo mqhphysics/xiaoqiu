@@ -3,6 +3,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { TeamSummary } from '../../features/product/product.types'
 import { playTeamFocus } from './navigation-transition.h5'
 import { goldLeafLines } from './team-nav-leaf-lines.h5'
+import { getTeamNavOrnamentColor } from './team-nav-palette.h5'
 import {
   readTeamNavPreview,
   teamNavPreviewCrests,
@@ -11,10 +12,15 @@ import {
 
 import './team-nav-focus.h5.scss'
 
-export function TeamNavFocus(_props: { team?: TeamSummary | null }) {
+const idleHintKeys = new Set(['leaf-72', 'leaf-30', 'bud-rim'])
+
+export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
   const id = useId().replace(/:/g, '')
   const [preview, setPreview] = useState(readTeamNavPreview)
   const lastPreview = useRef(`${preview.design}:${preview.crest}`)
+  const color = getTeamNavOrnamentColor(
+    preview.enabled ? teamNavPreviewCrests[preview.crest] : team,
+  )
 
   useLayoutEffect(() => {
     const key = `${preview.design}:${preview.crest}`
@@ -39,6 +45,7 @@ export function TeamNavFocus(_props: { team?: TeamSummary | null }) {
         aria-hidden="true"
         id={id}
         data-nav-design="15"
+        style={{ color }}
         className={`public-team-focus ${preview.enabled ? 'public-team-focus--preview' : ''}`}
       >
         <svg
@@ -63,6 +70,14 @@ export function TeamNavFocus(_props: { team?: TeamSummary | null }) {
                       className="public-team-focus__trace"
                       d={line.seedPath}
                       strokeWidth={line.width}
+                    />
+                  ) : null}
+                  {idleHintKeys.has(line.key) ? (
+                    <path
+                      className="public-team-focus__hint"
+                      d={line.path}
+                      strokeWidth={Math.max(line.width, 0.75)}
+                      strokeLinecap="round"
                     />
                   ) : null}
                   <path
