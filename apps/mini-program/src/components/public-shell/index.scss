@@ -872,9 +872,9 @@
     }
 
     .public-nav {
-      --nav-slot: 76PX;
-      --nav-team-slot: 132PX;
-      --nav-gap: 14PX;
+      --nav-slot: 64PX;
+      --nav-team-slot: 120PX;
+      --nav-gap: 10PX;
       --nav-index: 0;
       --nav-offset: 0PX;
       position: relative;
@@ -1076,7 +1076,7 @@
 
 @media (min-width: 721px) and (max-width: 1040px) {
   .public-app--h5 {
-    .public-nav { --nav-slot: 64PX; --nav-team-slot: 112PX; --nav-gap: 8PX; }
+    .public-nav { --nav-slot: 56PX; --nav-team-slot: 104PX; --nav-gap: 6PX; }
     .public-team-nav { --team-focus-travel: 22PX; }
     .public-nav__icon { width: 22PX; height: 22PX; background-size: 88PX 22PX; }
     .public-nav__icon--schedule { background-position: -22PX 0; }

@@ -1,40 +1,109 @@
+import { useId, useLayoutEffect, useRef, useState } from 'react'
+
+import type { TeamSummary } from '../../features/product/product.types'
+import { playTeamFocus } from './navigation-transition.h5'
+import { goldLeafLines } from './team-nav-leaf-lines.h5'
+import { getTeamNavOrnamentColor } from './team-nav-palette.h5'
+import {
+  readTeamNavPreview,
+  teamNavPreviewCrests,
+  TeamNavPreviewControls,
+} from './team-nav-preview.h5'
+
 import './team-nav-focus.h5.scss'
 
-const contours = [
-  { side: -1, tone: 'primary', path: 'M52 7C37 12 30 22 30 35C30 47 37 58 49 63' },
-  { side: 1, tone: 'primary', path: 'M80 7C95 12 102 22 102 35C102 47 95 58 83 63' },
-  { side: -1, tone: 'outer', path: 'M46 3C26 13 19 31 25 48' },
-  { side: 1, tone: 'outer', path: 'M86 3C106 13 113 31 107 48' },
-  { side: -1, tone: 'base', path: 'M37 63C45 70 55 74 63 74' },
-  { side: 1, tone: 'base', path: 'M95 63C87 70 77 74 69 74' },
-] as const
+const idleHintKeys = new Set(['leaf-72', 'leaf-30', 'bud-rim'])
 
-export function TeamNavFocus() {
+export function TeamNavFocus({ team }: { team?: TeamSummary | null }) {
+  const id = useId().replace(/:/g, '')
+  const [preview, setPreview] = useState(readTeamNavPreview)
+  const lastPreview = useRef(`${preview.design}:${preview.crest}`)
+  const color = getTeamNavOrnamentColor(
+    preview.enabled ? teamNavPreviewCrests[preview.crest] : team,
+  )
+
+  useLayoutEffect(() => {
+    const key = `${preview.design}:${preview.crest}`
+    if (lastPreview.current === key) return
+    lastPreview.current = key
+    if (!preview.enabled) return
+    const element = document.getElementById(id)
+    const shell = element?.closest<HTMLElement>('.public-app')
+    if (shell?.querySelector('.public-team-nav--active')) playTeamFocus(shell, {})
+  }, [id, preview.enabled, preview.design, preview.crest])
+
+  const replay = () => {
+    document
+      .getElementById(id)
+      ?.closest('.public-team-nav')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  }
+
   return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      className="public-team-focus"
-      viewBox="0 0 132 76"
-      width="132"
-      height="76"
-      fill="none"
-    >
-      {contours.map((contour, index) => (
-        <g
-          className={`public-team-focus__wing public-team-focus__wing--${contour.tone}`}
-          data-focus-side={contour.side}
-          data-focus-pair={Math.floor(index / 2)}
-          key={`${contour.tone}-${contour.side}`}
+    <>
+      <span
+        aria-hidden="true"
+        id={id}
+        data-nav-design="15"
+        style={{ color }}
+        className={`public-team-focus ${preview.enabled ? 'public-team-focus--preview' : ''}`}
+      >
+        <svg
+          className="public-team-focus__drawing"
+          viewBox="0 0 200 84"
+          preserveAspectRatio="none"
+          fill="none"
+          focusable="false"
         >
-          <path
-            className="public-team-focus__stroke"
-            d={contour.path}
-            pathLength="1"
-            vectorEffect="non-scaling-stroke"
+          {[-1, 1].map((side) => (
+            <g key={side} transform={side === 1 ? 'translate(200 0) scale(-1 1)' : undefined}>
+              {goldLeafLines.map((line) => (
+                <g
+                  key={line.key}
+                  className="public-team-focus__line"
+                  data-focus-delay={line.delay}
+                  data-focus-duration={line.duration}
+                  data-focus-region={line.region}
+                >
+                  {line.seedPath ? (
+                    <path
+                      className="public-team-focus__trace"
+                      d={line.seedPath}
+                      strokeWidth={line.width}
+                    />
+                  ) : null}
+                  {idleHintKeys.has(line.key) ? (
+                    <path
+                      className="public-team-focus__hint"
+                      d={line.path}
+                      strokeWidth={Math.max(line.width, 0.75)}
+                      strokeLinecap="round"
+                    />
+                  ) : null}
+                  <path
+                    className="public-team-focus__stroke"
+                    data-focus-key={`${line.key}-${side}`}
+                    d={line.path}
+                    strokeWidth={line.width}
+                    strokeLinecap={
+                      line.region === 'stem' || line.key.startsWith('bud-') ? 'round' : 'butt'
+                    }
+                    pathLength="1"
+                  />
+                </g>
+              ))}
+            </g>
+          ))}
+        </svg>
+        {preview.enabled ? (
+          <img
+            className="public-team-focus__sample-crest"
+            src={teamNavPreviewCrests[preview.crest].crestUrl}
+            alt=""
           />
-        </g>
-      ))}
-    </svg>
+        ) : null}
+      </span>
+      <TeamNavPreviewControls value={preview} onChange={setPreview} onReplay={replay} />
+    </>
   )
 }
