@@ -188,10 +188,10 @@ export async function seedDemoTournament(
     }
   }
 
-  const knockoutRoundNames =
-    year === '2026' ? ['十六强', '八强赛', '半决赛', '决赛日'] : ['八强赛', '半决赛', '决赛日']
+  const knockoutRoundNames = ['八强赛', '半决赛', '决赛日']
   for (const [index, name] of knockoutRoundNames.entries()) {
-    const number = index + 1
+    // Keep existing QF/SF/final IDs stable when normalizing an older demo database.
+    const number = index + (year === '2026' ? 2 : 1)
     const id = fixtureId(`round:${year}:knockout:${number}`)
     await tx.competitionRound.upsert({
       where: { stageId_roundNumber: { stageId: knockoutStageId, roundNumber: number } },
@@ -255,7 +255,7 @@ export async function seedDemoRosters(
   fixture: SeedTournamentFixture,
   teams: Array<{ id: string }>,
 ): Promise<void> {
-  const participatingTeams = fixture.year === '2026' ? teams : teams.slice(0, 8)
+  const participatingTeams = teams.slice(0, 8)
   const coachSurnames = [
     '王',
     '李',
@@ -464,7 +464,7 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
-        ? '前 8 支球队的小组赛记录作为历史数据保留；为完整演示淘汰树，淘汰阶段假设 16 支球队均已入围并使用演示签位，不表示由现存小组赛成绩自然晋级。冠军主线依次进行十六强、八强、半决赛和决赛，三四名赛为独立支线。'
+        ? '8 支球队参加小组赛与演示淘汰赛，冠军主线为八强、半决赛和决赛，三四名赛独立展示。演示签位用于展示晋级路径；小组前两名的绿色标记不替代正式晋级规程。'
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
