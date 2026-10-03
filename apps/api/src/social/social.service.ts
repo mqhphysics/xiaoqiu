@@ -5,6 +5,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
+import { commandHash, publicProfilePatch } from '../admin-center/admin-center.policy'
 import { PrismaService } from '../database/prisma.service'
 import {
   AuditActorType,
@@ -25,6 +26,8 @@ import type {
   ReviewReportDto,
   ReviewTeamApplicationDto,
   UpdateTeamMemberDto,
+  UpdateTeamProfileDto,
+  TeamManagementCommandDto,
 } from './social.dto'
 
 export interface NotificationInput {
@@ -311,7 +314,10 @@ export class SocialService {
           teamId,
           status: TeamMembershipStatus.ACTIVE,
         },
-        include: { playerProfile: true, user: true },
+        include: {
+          playerProfile: { include: { linkedUser: { select: { id: true } } } },
+          user: true,
+        },
         orderBy: [{ position: 'asc' }, { joinedAt: 'asc' }],
       }),
       this.prisma.teamJoinApplication.findMany({
@@ -333,7 +339,14 @@ export class SocialService {
     if (!team) throw notFound('球队不存在')
     const captainUserIds = new Set(captainAssignments.map(({ userId }) => userId))
     return {
-      team: mapTeam(team),
+      team: {
+        ...mapTeam(team),
+        description: team.description,
+        motto: team.motto,
+        foundedYear: team.foundedYear,
+        crestUrl: team.crestUrl,
+        updatedAt: team.updatedAt.toISOString(),
+      },
       members: members.map((membership) => ({
         id: membership.id,
         userId: membership.userId,
@@ -342,7 +355,12 @@ export class SocialService {
           membership.playerProfile?.displayName ?? membership.user?.displayName ?? '未命名成员',
         avatarUrl: membership.playerProfile?.avatarUrl ?? membership.user?.avatarUrl ?? null,
         position: membership.position ?? membership.playerProfile?.position ?? null,
-        isCaptain: membership.userId ? captainUserIds.has(membership.userId) : false,
+        isCaptain: Boolean(
+          (membership.userId && captainUserIds.has(membership.userId)) ||
+          (membership.playerProfile?.linkedUser?.id &&
+            captainUserIds.has(membership.playerProfile.linkedUser.id)),
+        ),
+        updatedAt: membership.updatedAt.toISOString(),
       })),
       applications: applications.map((application) => ({
         id: application.id,
@@ -488,56 +506,125 @@ export class SocialService {
     return this.getCaptainWorkspace(authorization, teamId)
   }
 
+  async updateTeamProfile(
+    authorization: string | undefined,
+    teamId: string,
+    input: UpdateTeamProfileDto,
+    requestId: string,
+    key: string | undefined,
+  ) {
+    const patch = publicProfilePatch('Team', input.patch)
+    return this.teamCommand(
+      authorization,
+      teamId,
+      `PUT /captain/teams/${teamId}/profile`,
+      { ...input, patch },
+      key,
+      async (tx, session) => {
+        const team = await tx.team.findFirst({
+          where: { id: teamId, organizationId: session.organizationId },
+        })
+        if (!team) throw notFound('球队不存在')
+        const claimed = await tx.team.updateMany({
+          where: {
+            id: teamId,
+            organizationId: session.organizationId,
+            updatedAt: new Date(input.expectedUpdatedAt),
+          },
+          data: {
+            ...patch,
+            updatedAt: nextUpdatedAt(team.updatedAt),
+          } as Prisma.TeamUpdateManyMutationInput,
+        })
+        if (claimed.count !== 1) throw conflict('球队资料已被更新，请刷新后重新核对')
+        const result = await tx.team.findFirstOrThrow({
+          where: { id: teamId, organizationId: session.organizationId },
+        })
+        await this.auditTeamCommand(
+          tx,
+          session,
+          'TEAM_PROFILE_UPDATED',
+          'Team',
+          teamId,
+          input.reason,
+          requestId,
+          { fields: patch, changedFields: Object.keys(patch) },
+          {
+            fields: Object.fromEntries(
+              Object.keys(patch).map((field) => [
+                field,
+                (team as unknown as Record<string, string | number | null>)[field] ?? null,
+              ]),
+            ),
+          },
+        )
+        return {
+          ...mapTeam(result),
+          description: result.description,
+          motto: result.motto,
+          foundedYear: result.foundedYear,
+          crestUrl: result.crestUrl,
+          updatedAt: result.updatedAt.toISOString(),
+        }
+      },
+    )
+  }
+
   async updateTeamMember(
     authorization: string | undefined,
     teamId: string,
     membershipId: string,
     input: UpdateTeamMemberDto,
     requestId: string,
+    key?: string,
   ) {
-    const session = await this.requireTeamManager(authorization, teamId)
-    const membership = await this.prisma.teamMembership.findFirst({
-      where: {
-        id: membershipId,
-        organizationId: session.organizationId,
-        teamId,
-        status: TeamMembershipStatus.ACTIVE,
-      },
-    })
-    if (!membership) throw notFound('球队成员不存在')
-    await this.prisma.$transaction(async (tx) => {
-      const claimed = await tx.teamMembership.updateMany({
-        where: {
-          id: membership.id,
-          organizationId: session.organizationId,
-          teamId,
-          status: TeamMembershipStatus.ACTIVE,
-          updatedAt: membership.updatedAt,
-        },
-        data: { position: input.position as PlayerPosition },
-      })
-      if (claimed.count !== 1) throw conflict('该成员信息刚刚已被修改，请刷新后重试')
-      await tx.auditLog.create({
-        data: {
-          organizationId: session.organizationId,
-          actorType: AuditActorType.USER,
-          actorUserId: session.userId,
-          actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
-            role,
-            scopeType,
-            scopeId,
-          })),
-          action: 'TEAM_MEMBER_POSITION_UPDATED',
-          targetType: 'TeamMembership',
-          targetId: membership.id,
-          beforeSummary: { position: membership.position },
-          afterSummary: { position: input.position },
-          reason: '队长调整球队成员位置',
+    await this.teamCommand(
+      authorization,
+      teamId,
+      `PUT /captain/teams/${teamId}/members/${membershipId}`,
+      input,
+      key,
+      async (tx, session) => {
+        const membership = await tx.teamMembership.findFirst({
+          where: {
+            id: membershipId,
+            organizationId: session.organizationId,
+            teamId,
+            status: TeamMembershipStatus.ACTIVE,
+          },
+        })
+        if (!membership) throw notFound('球队成员不存在')
+        const claimed = await tx.teamMembership.updateMany({
+          where: {
+            id: membership.id,
+            organizationId: session.organizationId,
+            teamId,
+            status: TeamMembershipStatus.ACTIVE,
+            updatedAt: input.expectedUpdatedAt
+              ? new Date(input.expectedUpdatedAt)
+              : membership.updatedAt,
+          },
+          data: {
+            position: input.position as PlayerPosition,
+            updatedAt: nextUpdatedAt(membership.updatedAt),
+          },
+        })
+        if (claimed.count !== 1) throw conflict('该成员信息刚刚已被修改，请刷新后重试')
+        await this.auditTeamCommand(
+          tx,
+          session,
+          'TEAM_MEMBER_POSITION_UPDATED',
+          'TeamMembership',
+          membership.id,
+          input.reason ?? '队长调整球队成员位置',
           requestId,
-          source: 'API',
-        },
-      })
-    })
+          { position: input.position },
+          { position: membership.position },
+        )
+        return { id: membership.id }
+      },
+      true,
+    )
     return this.getCaptainWorkspace(authorization, teamId)
   }
 
@@ -546,60 +633,75 @@ export class SocialService {
     teamId: string,
     membershipId: string,
     requestId: string,
+    input: TeamManagementCommandDto = {},
+    key?: string,
   ) {
-    const session = await this.requireTeamManager(authorization, teamId)
-    const membership = await this.prisma.teamMembership.findFirst({
-      where: {
-        id: membershipId,
-        organizationId: session.organizationId,
-        teamId,
-        status: TeamMembershipStatus.ACTIVE,
-      },
-    })
-    if (!membership) throw notFound('球队成员不存在')
-    if (membership.userId) {
-      const captainRole = await this.prisma.roleAssignment.findFirst({
-        where: {
-          userId: membership.userId,
-          role: 'TEAM_CAPTAIN',
-          scopeType: 'TEAM',
-          scopeId: teamId,
-          revokedAt: null,
-        },
-      })
-      if (captainRole) throw conflict('不能从球队中移除现任队长')
-    }
-    await this.prisma.$transaction(async (tx) => {
-      const claimed = await tx.teamMembership.updateMany({
-        where: {
-          id: membership.id,
-          organizationId: session.organizationId,
-          teamId,
-          status: TeamMembershipStatus.ACTIVE,
-          updatedAt: membership.updatedAt,
-        },
-        data: { status: TeamMembershipStatus.REMOVED, removedAt: new Date() },
-      })
-      if (claimed.count !== 1) throw conflict('该成员刚刚已被其他管理者修改，请刷新后重试')
-      await tx.auditLog.create({
-        data: {
-          organizationId: session.organizationId,
-          actorType: AuditActorType.USER,
-          actorUserId: session.userId,
-          actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
-            role,
-            scopeType,
-            scopeId,
-          })),
-          action: 'TEAM_MEMBER_REMOVED',
-          targetType: 'TeamMembership',
-          targetId: membership.id,
-          reason: '队长移除球队成员',
+    await this.teamCommand(
+      authorization,
+      teamId,
+      `DELETE /captain/teams/${teamId}/members/${membershipId}`,
+      input,
+      key,
+      async (tx, session) => {
+        const membership = await tx.teamMembership.findFirst({
+          where: {
+            id: membershipId,
+            organizationId: session.organizationId,
+            teamId,
+            status: TeamMembershipStatus.ACTIVE,
+          },
+        })
+        if (!membership) throw notFound('球队成员不存在')
+        if (membership.userId || membership.playerProfileId) {
+          const captainRole = await tx.roleAssignment.findFirst({
+            where: {
+              organizationId: session.organizationId,
+              OR: [
+                ...(membership.userId ? [{ userId: membership.userId }] : []),
+                ...(membership.playerProfileId
+                  ? [{ user: { playerProfileId: membership.playerProfileId } }]
+                  : []),
+              ],
+              role: 'TEAM_CAPTAIN',
+              scopeType: 'TEAM',
+              scopeId: teamId,
+              revokedAt: null,
+            },
+          })
+          if (captainRole) throw conflict('不能从球队中移除现任队长')
+        }
+        const claimed = await tx.teamMembership.updateMany({
+          where: {
+            id: membership.id,
+            organizationId: session.organizationId,
+            teamId,
+            status: TeamMembershipStatus.ACTIVE,
+            updatedAt: input.expectedUpdatedAt
+              ? new Date(input.expectedUpdatedAt)
+              : membership.updatedAt,
+          },
+          data: {
+            status: TeamMembershipStatus.REMOVED,
+            removedAt: new Date(),
+            updatedAt: nextUpdatedAt(membership.updatedAt),
+          },
+        })
+        if (claimed.count !== 1) throw conflict('该成员刚刚已被其他管理者修改，请刷新后重试')
+        await this.auditTeamCommand(
+          tx,
+          session,
+          'TEAM_MEMBER_REMOVED',
+          'TeamMembership',
+          membership.id,
+          input.reason ?? '队长移除球队成员',
           requestId,
-          source: 'API',
-        },
-      })
-    })
+          { status: 'REMOVED' },
+          { status: membership.status },
+        )
+        return { id: membership.id }
+      },
+      true,
+    )
     return this.getCaptainWorkspace(authorization, teamId)
   }
 
@@ -1036,6 +1138,174 @@ export class SocialService {
     })
   }
 
+  private async teamCommand<T>(
+    authorization: string | undefined,
+    teamId: string,
+    route: string,
+    input: unknown,
+    key: string | undefined,
+    run: (tx: Prisma.TransactionClient, session: AuthenticatedSession) => Promise<T>,
+    allowLegacy = false,
+  ): Promise<T> {
+    const session = await this.requireTeamManager(authorization, teamId)
+    const metadata = input as { expectedUpdatedAt?: string; reason?: string }
+    const legacy =
+      allowLegacy &&
+      key === undefined &&
+      metadata.expectedUpdatedAt === undefined &&
+      metadata.reason === undefined
+    if (
+      !legacy &&
+      (!key ||
+        !/^[A-Za-z0-9_.:-]{8,128}$/.test(key) ||
+        !metadata.expectedUpdatedAt ||
+        !metadata.reason)
+    )
+      throw badRequest('请同时提供有效幂等键、当前资料版本和修改原因')
+    const requestHash = commandHash({ organizationId: session.organizationId, input })
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const fresh = await this.freshTeamManager(tx, session, teamId)
+            if (!legacy) {
+              const previous = await tx.idempotencyRecord.findUnique({
+                where: {
+                  userId_route_idempotencyKey: {
+                    userId: session.userId,
+                    route,
+                    idempotencyKey: key!,
+                  },
+                },
+              })
+              if (previous) {
+                if (
+                  previous.organizationId !== session.organizationId ||
+                  previous.requestHash !== requestHash
+                )
+                  throw conflict('同一幂等键不能用于不同请求')
+                if (previous.responseBody === null) throw conflict('请求正在处理，请用原键重试')
+                return previous.responseBody as T
+              }
+            }
+            const result = await run(tx, fresh)
+            if (!legacy)
+              await tx.idempotencyRecord.create({
+                data: {
+                  organizationId: session.organizationId,
+                  userId: session.userId,
+                  route,
+                  idempotencyKey: key!,
+                  requestHash,
+                  responseStatus: 200,
+                  responseBody: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue,
+                  expiresAt: new Date(Date.now() + 7 * 86400000),
+                },
+              })
+            return result
+          },
+          { isolationLevel: 'Serializable', timeout: 15000 },
+        )
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        if (code === 'P2002' || code === 'P2034') {
+          if (attempt < 2) continue
+          throw conflict('正在处理并发变更，请用原键重试')
+        }
+        throw error
+      }
+    }
+    throw conflict('请重新尝试')
+  }
+
+  private async freshTeamManager(
+    tx: Prisma.TransactionClient,
+    session: AuthenticatedSession,
+    teamId: string,
+  ) {
+    const now = new Date()
+    const [validSession, membership, team, roles] = await Promise.all([
+      tx.userSession.findFirst({
+        where: {
+          id: session.sessionId,
+          userId: session.userId,
+          organizationId: session.organizationId,
+          revokedAt: null,
+          expiresAt: { gt: now },
+          user: { status: 'ACTIVE' },
+          organization: { status: 'ACTIVE' },
+        },
+        select: { id: true },
+      }),
+      tx.organizationMembership.findFirst({
+        where: { organizationId: session.organizationId, userId: session.userId, status: 'ACTIVE' },
+        select: { id: true },
+      }),
+      tx.team.findFirst({
+        where: { id: teamId, organizationId: session.organizationId },
+        select: { id: true },
+      }),
+      tx.roleAssignment.findMany({
+        where: {
+          userId: session.userId,
+          revokedAt: null,
+          grantedAt: { lte: now },
+          OR: [
+            { organizationId: session.organizationId },
+            { organizationId: null, role: 'PLATFORM_ADMIN', scopeType: 'PLATFORM' },
+          ],
+        },
+        select: { role: true, scopeType: true, scopeId: true },
+      }),
+    ])
+    if (!validSession || !membership)
+      throw new ApiHttpException(HttpStatus.UNAUTHORIZED, {
+        code: ERROR_CODES.UNAUTHORIZED,
+        message: '登录或组织成员身份已失效',
+      })
+    const fresh = { ...session, user: { ...session.user, roles } }
+    if (!canManageTeam(fresh, teamId))
+      throw new ApiHttpException(HttpStatus.FORBIDDEN, {
+        code: ERROR_CODES.FORBIDDEN,
+        message: '仅球队队长或组织管理员可管理该球队',
+      })
+    if (!team) throw notFound('本组织中不存在该球队')
+    return fresh
+  }
+
+  private auditTeamCommand(
+    tx: Prisma.TransactionClient,
+    session: AuthenticatedSession,
+    action: string,
+    targetType: string,
+    targetId: string,
+    reason: string,
+    requestId: string,
+    after: Prisma.InputJsonObject,
+    before?: Prisma.InputJsonObject,
+  ) {
+    return tx.auditLog.create({
+      data: {
+        organizationId: session.organizationId,
+        actorType: AuditActorType.USER,
+        actorUserId: session.userId,
+        actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+          role,
+          scopeType,
+          scopeId,
+        })),
+        action,
+        targetType,
+        targetId,
+        reason,
+        requestId,
+        source: 'API',
+        afterSummary: after,
+        ...(before ? { beforeSummary: before } : {}),
+      },
+    })
+  }
+
   private async requireTeamManager(authorization: string | undefined, teamId: string) {
     const session = await this.authService.requireSession(authorization)
     if (!canManageTeam(session, teamId)) {
@@ -1115,10 +1385,14 @@ export class SocialService {
   }
 }
 
+function nextUpdatedAt(previous: Date): Date {
+  return new Date(Math.max(Date.now(), previous.getTime() + 1))
+}
+
 function canManageTeam(session: AuthenticatedSession, teamId: string): boolean {
   return session.user.roles.some(
     (role) =>
-      role.role === 'PLATFORM_ADMIN' ||
+      (role.role === 'PLATFORM_ADMIN' && role.scopeType === 'PLATFORM') ||
       (role.role === 'ORGANIZATION_ADMIN' &&
         role.scopeType === 'ORGANIZATION' &&
         role.scopeId === session.organizationId) ||

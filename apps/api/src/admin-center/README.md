@@ -25,6 +25,16 @@
 
 球队编辑字段：`name/shortName/collegeName/description/motto/primaryColor/secondaryColor/foundedYear`。球员编辑字段：`displayName/jerseyName/position/secondaryPosition/dominantFoot/heightCm/academicYear/major/hometown/bio/profileColor`。字段可设null清空（name/displayName除外），颜色为 `#RRGGBB`。ID、来源键、学号、头像URL、队伍归属和赛事统计不在白名单；头像继续通过已有媒体API。
 
+## 组织球队与成员创建（2026-10-04）
+
+`POST /api/admin/center/teams` 接受 `{teamCode,profile,reason}`；`profile` 使用上面的球队公开字段白名单，必须包含非空 `name`。`teamCode` 是组织内唯一稳定编号，1–64 字符，使用字母、数字与 `_.:-`，首字符为字母或数字。返回真实 `id`、资料、`updatedAt` 与 `memberCount:0`。创建组织球队不会自动报名赛事。
+
+`POST /api/admin/center/players` 接受 `{teamId,profile,reason}`；`profile` 使用球员公开字段白名单，必须包含非空 `displayName`。`teamId` 必须属于当前组织；事务同时创建球员和 ACTIVE 球队成员，返回真实球员 `id`、资料、`updatedAt` 与 `teams:[{id,name}]`。相同姓名可以有独立档案，不会按姓名覆盖。此入口不创建锁定名单、球衣号码、官方首发或出场记录。两种创建均使用上述管理员授权、幂等键与审计规则。
+
+队长资料入口 `PUT /api/captain/teams/:teamId/profile` 接受 `{expectedUpdatedAt,patch,reason}` 与 `Idempotency-Key`，只允许本队队长和本组织管理员。管理台 `GET /api/captain/teams/:teamId` 返回球队资料与成员的 `updatedAt`，供保存时做版本校验。资料字段规则与管理员编辑相同；保存结果为更新后的球队资料对象。
+
+成员位置 PUT 和移除 DELETE `/api/captain/teams/:teamId/members/:membershipId` 支持完整 `{expectedUpdatedAt,reason,position?}` 与幂等键。提供任意版本、原因或键时必须全齐；旧客户端完全不带这些元数据的请求暂兼容服务器事务 CAS 和审计。上线 H5 始终走完整路径。成员变化不改写已锁定的官方名单；移除保留成员历史与球员档案，现任队长即使仅通过关联球员入队也不能移除。
+
 ## 验证
 
 在独立新库 `xiaoqiu_admin_center_test_20261003_2c42` 部署14个现有迁移；测试代码创建标为 FICTIONAL_TEST 的组织/账号/资料，没有 Seed、迁移或写入日常数据库。测试使用真实 Nest HTTP、AuthService、Prisma/PostgreSQL。

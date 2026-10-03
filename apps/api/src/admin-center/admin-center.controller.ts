@@ -18,6 +18,8 @@ import { getRequestId, type RequestWithId } from '../common/request-context'
 import {
   AdminCenterAuditQueryDto,
   AdminCenterCreatePostDto,
+  AdminCenterCreateTeamDto,
+  AdminCenterCreatePlayerDto,
   AdminCenterEditDto,
   AdminCenterMembershipDto,
   AdminCenterPageDto,
@@ -32,6 +34,8 @@ import { AdminCenterService } from './admin-center.service'
 @ApiExtraModels(
   AdminCenterAuditQueryDto,
   AdminCenterCreatePostDto,
+  AdminCenterCreateTeamDto,
+  AdminCenterCreatePlayerDto,
   AdminCenterEditDto,
   AdminCenterMembershipDto,
   AdminCenterPageDto,
@@ -89,6 +93,28 @@ export class AdminCenterController {
   @Get('players')
   players(@Headers('authorization') auth: string | undefined, @Query() query: AdminCenterPageDto) {
     return this.center.players(auth, query)
+  }
+
+  @Post('teams')
+  @HttpCode(200)
+  createTeam(
+    @Headers('authorization') auth: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() body: AdminCenterCreateTeamDto,
+    @Req() req: RequestWithId,
+  ) {
+    return this.center.createTeam(auth, body, key, getRequestId(req))
+  }
+
+  @Post('players')
+  @HttpCode(200)
+  createPlayer(
+    @Headers('authorization') auth: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() body: AdminCenterCreatePlayerDto,
+    @Req() req: RequestWithId,
+  ) {
+    return this.center.createPlayer(auth, body, key, getRequestId(req))
   }
 
   @Patch('teams/:id')

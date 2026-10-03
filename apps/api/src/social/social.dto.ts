@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsBoolean, IsIn, IsInt, Min, IsOptional, IsString, IsUUID, Length } from 'class-validator'
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsObject,
+  Min,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator'
 import { BADGE_KINDS, type BadgeKind } from './badge-preference.rules'
 
 export class UpdateBadgePreferenceDto {
@@ -46,7 +57,37 @@ export class ReviewTeamApplicationDto {
   note?: string
 }
 
-export class UpdateTeamMemberDto {
+export class TeamManagementCommandDto {
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  expectedUpdatedAt?: string
+
+  @ApiPropertyOptional({ type: String, maxLength: 500 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @Length(2, 500)
+  reason?: string
+}
+
+export class UpdateTeamProfileDto {
+  @ApiProperty({ type: String, format: 'date-time' })
+  @IsISO8601({ strict: true })
+  expectedUpdatedAt!: string
+
+  @ApiProperty({ type: String, maxLength: 500 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(2, 500)
+  reason!: string
+
+  @ApiProperty({ type: Object })
+  @IsObject()
+  patch!: Record<string, unknown>
+}
+
+export class UpdateTeamMemberDto extends TeamManagementCommandDto {
   @ApiProperty({ type: String, enum: POSITIONS })
   @IsIn(POSITIONS)
   position!: (typeof POSITIONS)[number]

@@ -7,6 +7,8 @@ import { Prisma } from '../generated/prisma/client'
 import type {
   AdminCenterAuditQueryDto,
   AdminCenterCreatePostDto,
+  AdminCenterCreateTeamDto,
+  AdminCenterCreatePlayerDto,
   AdminCenterEditDto,
   AdminCenterMembershipDto,
   AdminCenterPageDto,
@@ -536,6 +538,108 @@ export class AdminCenterService {
         })),
       )
     })
+  }
+
+  createTeam(
+    authorization: string | undefined,
+    body: AdminCenterCreateTeamDto,
+    key: string | undefined,
+    requestId: string,
+  ) {
+    const profile = publicProfilePatch('Team', body.profile)
+    if (typeof profile.name !== 'string') throw centerError(400, '请填写球队名称')
+    const teamCode = body.teamCode.trim()
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/.test(teamCode))
+      throw centerError(400, '球队编号应使用字母、数字、点、横线或下划线')
+    return this.write(
+      authorization,
+      'POST /admin/center/teams',
+      { ...body, teamCode, profile },
+      key,
+      async (tx, actor) => {
+        const duplicate = await tx.team.findUnique({
+          where: { organizationId_teamCode: { organizationId: actor.organizationId, teamCode } },
+          select: { id: true },
+        })
+        if (duplicate) throw centerError(409, '球队编号已存在，请使用另一个稳定编号')
+        const result = await tx.team.create({
+          data: {
+            ...profile,
+            organizationId: actor.organizationId,
+            teamCode,
+            name: profile.name as string,
+          } as Prisma.TeamUncheckedCreateInput,
+          select: teamFields,
+        })
+        await this.auditWrite(
+          tx,
+          actor,
+          'TEAM_CREATED',
+          'Team',
+          result.id,
+          body.reason,
+          requestId,
+          null,
+          { changedFields: Object.keys(profile) },
+        )
+        // Creating an organization team does not enroll it in a tournament.
+        return { ...result, updatedAt: result.updatedAt.toISOString(), memberCount: 0 }
+      },
+    )
+  }
+
+  createPlayer(
+    authorization: string | undefined,
+    body: AdminCenterCreatePlayerDto,
+    key: string | undefined,
+    requestId: string,
+  ) {
+    const profile = publicProfilePatch('PlayerProfile', body.profile)
+    if (typeof profile.displayName !== 'string') throw centerError(400, '请填写球员显示名')
+    const teamId = body.teamId.toLowerCase()
+    return this.write(
+      authorization,
+      'POST /admin/center/players',
+      { ...body, teamId, profile },
+      key,
+      async (tx, actor) => {
+        const team = await tx.team.findFirst({
+          where: { id: teamId, organizationId: actor.organizationId },
+          select: { id: true, name: true },
+        })
+        if (!team) throw centerError(404, '本组织中不存在该球队')
+        const result = await tx.playerProfile.create({
+          data: {
+            ...profile,
+            organizationId: actor.organizationId,
+            displayName: profile.displayName as string,
+          } as Prisma.PlayerProfileUncheckedCreateInput,
+          select: playerFields,
+        })
+        const membership = await tx.teamMembership.create({
+          data: {
+            organizationId: actor.organizationId,
+            teamId,
+            playerProfileId: result.id,
+            position: result.position,
+          },
+          select: { id: true },
+        })
+        await this.auditWrite(
+          tx,
+          actor,
+          'PLAYER_CREATED',
+          'PlayerProfile',
+          result.id,
+          body.reason,
+          requestId,
+          null,
+          { changedFields: Object.keys(profile), membershipId: membership.id },
+        )
+        // Membership is a club roster fact, never an official match lineup or locked roster snapshot.
+        return { ...result, updatedAt: result.updatedAt.toISOString(), teams: [team] }
+      },
+    )
   }
 
   edit(

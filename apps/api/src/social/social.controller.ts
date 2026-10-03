@@ -6,6 +6,7 @@ import {
   Headers,
   Inject,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -23,6 +24,8 @@ import {
   ReviewReportDto,
   ReviewTeamApplicationDto,
   UpdateTeamMemberDto,
+  UpdateTeamProfileDto,
+  TeamManagementCommandDto,
   UpdateBadgePreferenceDto,
 } from './social.dto'
 import { SocialService } from './social.service'
@@ -102,9 +105,28 @@ export class SocialController {
   @ApiOperation({ summary: '读取队长管理台、成员和入队申请' })
   captainWorkspace(
     @Headers('authorization') authorization: string | undefined,
-    @Param('teamId') teamId: string,
+    @Param('teamId', ParseUUIDPipe) teamId: string,
   ) {
     return this.socialService.getCaptainWorkspace(authorization, teamId)
+  }
+
+  @Put('captain/teams/:teamId/profile')
+  @ApiOperation({ summary: '保存本队公开资料，不改变赛事报名或历史名单' })
+  @ApiBody({ type: UpdateTeamProfileDto })
+  updateTeamProfile(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Param('teamId', ParseUUIDPipe) teamId: string,
+    @Body() body: UpdateTeamProfileDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.socialService.updateTeamProfile(
+      authorization,
+      teamId,
+      body,
+      getRequestId(request),
+      key,
+    )
   }
 
   @Put('captain/teams/:teamId/applications/:applicationId')
@@ -131,8 +153,9 @@ export class SocialController {
   @ApiBody({ type: UpdateTeamMemberDto })
   updateMember(
     @Headers('authorization') authorization: string | undefined,
-    @Param('teamId') teamId: string,
-    @Param('membershipId') membershipId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Param('teamId', ParseUUIDPipe) teamId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: UpdateTeamMemberDto,
     @Req() request: RequestWithId,
   ) {
@@ -142,15 +165,19 @@ export class SocialController {
       membershipId,
       body,
       getRequestId(request),
+      key,
     )
   }
 
   @Delete('captain/teams/:teamId/members/:membershipId')
   @ApiOperation({ summary: '将成员移出球队' })
+  @ApiBody({ type: TeamManagementCommandDto })
   removeMember(
     @Headers('authorization') authorization: string | undefined,
-    @Param('teamId') teamId: string,
-    @Param('membershipId') membershipId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Param('teamId', ParseUUIDPipe) teamId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
+    @Body() body: TeamManagementCommandDto,
     @Req() request: RequestWithId,
   ) {
     return this.socialService.removeTeamMember(
@@ -158,6 +185,8 @@ export class SocialController {
       teamId,
       membershipId,
       getRequestId(request),
+      body,
+      key,
     )
   }
 

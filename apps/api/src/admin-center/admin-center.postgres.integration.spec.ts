@@ -399,6 +399,7 @@ test(
           assert.deepEqual(repeat.body, created.body)
           const publicResult = await http
             .get(`/api/public/posts?tournamentId=${tournament.id}`)
+            .set('authorization', `Bearer ${studentToken}`)
             .set('x-organization-id', org.id)
             .expect(200)
           assert.ok(
@@ -416,6 +417,7 @@ test(
             .expect(200)
           const hidden = await http
             .get(`/api/public/posts?tournamentId=${tournament.id}`)
+            .set('authorization', `Bearer ${studentToken}`)
             .set('x-organization-id', org.id)
             .expect(200)
           assert.ok(!hidden.body.items.some((item: { id: string }) => item.id === created.body.id))

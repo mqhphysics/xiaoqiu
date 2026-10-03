@@ -75,6 +75,24 @@ export class AdminCenterEditDto extends AdminCenterReasonDto {
   patch!: Record<string, unknown>
 }
 
+export class AdminCenterCreateTeamDto extends AdminCenterReasonDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(1, 64)
+  teamCode!: string
+
+  @IsObject()
+  profile!: Record<string, unknown>
+}
+
+export class AdminCenterCreatePlayerDto extends AdminCenterReasonDto {
+  @IsUUID()
+  teamId!: string
+
+  @IsObject()
+  profile!: Record<string, unknown>
+}
+
 export class AdminCenterCreatePostDto extends AdminCenterReasonDto {
   @IsUUID()
   tournamentId!: string
