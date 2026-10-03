@@ -11,7 +11,7 @@ export async function selectPublicTournament(
   organizationId: string,
   tournamentId?: string,
 ) {
-  const selectedId = tournamentId ?? process.env.DEFAULT_TOURNAMENT_ID
+  const selectedId = tournamentId ?? (process.env.DEFAULT_TOURNAMENT_ID?.trim() || undefined)
   if (selectedId !== undefined && !isUUID(selectedId)) {
     throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
       code: ERROR_CODES.BAD_REQUEST,

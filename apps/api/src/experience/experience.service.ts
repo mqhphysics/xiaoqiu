@@ -54,7 +54,7 @@ export class ExperienceService {
   async getHome(organizationId: string, authorization?: string, tournamentId?: string) {
     const session = await this.authService.getSession(authorization)
     const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
-    const [matches, registrations, posts] = await Promise.all([
+    const [matches, registrations, posts, directoryTeams] = await Promise.all([
       this.prisma.match.findMany({
         where: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
         include: matchSummaryInclude,
@@ -71,6 +71,7 @@ export class ExperienceService {
         orderBy: { publishedAt: 'desc' },
         take: 20,
       }),
+      this.prisma.team.findMany({ where: { organizationId }, orderBy: { name: 'asc' } }),
     ])
 
     const live = matches.filter((match) => match.status === MatchStatus.LIVE)
@@ -94,9 +95,14 @@ export class ExperienceService {
         .slice(0, 3)
         .map((post) => mapPost(post, session?.userId)),
       focusMatches: [...live, ...upcoming, ...finished].slice(0, 5).map(mapMatch),
-      teams: registrations.map((registration) => ({
-        ...mapTeam(registration.team),
-        groupName: registration.group?.name ?? null,
+      teams: directoryTeams.map((team) => ({
+        ...mapTeam(team),
+        groupName:
+          registrations.find((registration) => registration.teamId === team.id)?.group?.name ??
+          null,
+        registeredInTournament: registrations.some(
+          (registration) => registration.teamId === team.id,
+        ),
       })),
       posts: posts
         .filter((post) => post.type === PostType.COMMUNITY)
@@ -126,13 +132,32 @@ export class ExperienceService {
         ? this.prisma.playerProfile.findMany({
             where: {
               organizationId,
-              snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
+              AND: [
+                {
+                  OR: [
+                    {
+                      snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
+                    },
+                    {
+                      teamMemberships: {
+                        some: { organizationId, status: 'ACTIVE', team: { organizationId } },
+                      },
+                    },
+                  ],
+                },
+              ],
               OR: [
                 { displayName: { contains: query, mode: 'insensitive' } },
                 { jerseyName: { contains: query, mode: 'insensitive' } },
               ],
             },
             include: {
+              teamMemberships: {
+                where: { organizationId, status: 'ACTIVE', team: { organizationId } },
+                include: { team: true },
+                orderBy: { joinedAt: 'desc' },
+                take: 1,
+              },
               snapshotEntries: {
                 where: { organizationId, rosterSnapshot: snapshotScope },
                 include: { rosterSnapshot: { include: { team: true } } },
@@ -148,9 +173,6 @@ export class ExperienceService {
         ? this.prisma.team.findMany({
             where: {
               organizationId,
-              registrations: {
-                some: { organizationId, tournamentId: tournament.id, status: 'APPROVED' },
-              },
               OR: [
                 { name: { contains: query, mode: 'insensitive' } },
                 { shortName: { contains: query, mode: 'insensitive' } },
@@ -207,7 +229,9 @@ export class ExperienceService {
         avatarUrl: player.avatarUrl,
         team: player.snapshotEntries[0]?.rosterSnapshot.team
           ? mapTeam(player.snapshotEntries[0].rosterSnapshot.team)
-          : null,
+          : player.teamMemberships[0]
+            ? mapTeam(player.teamMemberships[0].team)
+            : null,
       })),
       teams: teams.map(mapTeam),
       matches: matches.map(mapMatch),
@@ -438,18 +462,25 @@ export class ExperienceService {
       where: {
         id: teamId,
         organizationId,
-        registrations: {
-          some: { organizationId, tournamentId: selectedTournamentId, status: 'APPROVED' },
-        },
       },
       include: {
+        memberships: {
+          where: { organizationId, status: 'ACTIVE', playerProfileId: { not: null } },
+          include: { playerProfile: true },
+          orderBy: { joinedAt: 'asc' },
+        },
         registrations: {
           where: { organizationId, tournamentId: selectedTournamentId, status: 'APPROVED' },
           include: { group: true },
           take: 1,
         },
         rosterSnapshots: {
-          where: { tournamentId: selectedTournamentId, lockedAt: { not: null } },
+          where: {
+            organizationId,
+            tournamentId: selectedTournamentId,
+            lockedAt: { not: null },
+            teamRegistration: { status: 'APPROVED' },
+          },
           orderBy: { snapshotVersion: 'desc' },
           take: 1,
           include: { entries: { include: { playerProfile: true }, orderBy: { sortOrder: 'asc' } } },
@@ -458,7 +489,23 @@ export class ExperienceService {
     })
     if (!team) throw notFound('球队不存在')
 
-    const roster = team.rosterSnapshots[0]?.entries ?? []
+    const officialRoster = team.rosterSnapshots[0]?.entries ?? []
+    const officialPlayerIds = new Set(officialRoster.map((entry) => entry.playerProfileId))
+    const roster = [
+      ...officialRoster.map((entry) => ({ ...entry, rosterSource: 'OFFICIAL_SNAPSHOT' as const })),
+      ...team.memberships.flatMap((member) =>
+        member.playerProfile && !officialPlayerIds.has(member.playerProfile.id)
+          ? [
+              {
+                playerProfileId: member.playerProfile.id,
+                playerProfile: member.playerProfile,
+                shirtNumber: null,
+                rosterSource: 'TEAM_MEMBERSHIP' as const,
+              },
+            ]
+          : [],
+      ),
+    ]
     const playerIds = roster.map((entry) => entry.playerProfileId)
     const [matches, events, appearances, teamPosts, memberships] = await Promise.all([
       prisma.match.findMany({
@@ -538,6 +585,12 @@ export class ExperienceService {
         groupName: team.registrations[0]?.group?.name ?? null,
       },
       stats,
+      rosterSource:
+        officialRoster.length > 0
+          ? roster.length > officialRoster.length
+            ? 'MIXED'
+            : 'OFFICIAL_SNAPSHOT'
+          : 'TEAM_MEMBERSHIP',
       resultsMode: resultContext.mode,
       posts: teamPosts.map((post) => mapPost(post, viewerUserId)),
       recentMatches: matches
@@ -565,6 +618,7 @@ export class ExperienceService {
           displayName: player.displayName,
           jerseyName: player.jerseyName,
           shirtNumber: entry.shirtNumber,
+          rosterSource: entry.rosterSource,
           position: memberPositions.get(player.id) ?? player.position,
           secondaryPosition: player.secondaryPosition,
           academicYear: player.academicYear,
@@ -622,10 +676,23 @@ export class ExperienceService {
       where: {
         id: playerId,
         organizationId,
-        snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
+        OR: [
+          { snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } } },
+          {
+            teamMemberships: {
+              some: { organizationId, status: 'ACTIVE', team: { organizationId } },
+            },
+          },
+        ],
       },
       include: {
         linkedUser: { select: publicIdentitySelect },
+        teamMemberships: {
+          where: { organizationId, status: 'ACTIVE', team: { organizationId } },
+          include: { team: true },
+          orderBy: { joinedAt: 'desc' },
+          take: 1,
+        },
         snapshotEntries: {
           where: {
             organizationId,
@@ -708,7 +775,12 @@ export class ExperienceService {
         passing: player.ratingPassing,
         defending: player.ratingDefending,
       },
-      team: snapshot ? mapTeam(snapshot.rosterSnapshot.team) : null,
+      team: snapshot
+        ? mapTeam(snapshot.rosterSnapshot.team)
+        : player.teamMemberships[0]
+          ? mapTeam(player.teamMemberships[0].team)
+          : null,
+      rosterSource: snapshot ? 'OFFICIAL_SNAPSHOT' : 'TEAM_MEMBERSHIP',
       tournamentName: snapshot?.rosterSnapshot.tournament.name ?? null,
       stats: stats ?? emptyPlayerStats(player.id, player.displayName),
       resultsMode: resultContext.mode,
@@ -871,6 +943,11 @@ export class ExperienceService {
         .filter((team): team is NonNullable<typeof team> => Boolean(team))
         .map((team) => ({
           team: mapTeam(team),
+          formation: null,
+          lineupSource:
+            isOfficialFact && match.appearances.some((appearance) => appearance.teamId === team.id)
+              ? 'CONFIRMED_APPEARANCES'
+              : 'UNAVAILABLE',
           players: (isOfficialFact ? match.appearances : [])
             .filter((appearance) => appearance.teamId === team.id)
             .map((appearance) => ({
@@ -880,6 +957,7 @@ export class ExperienceService {
               position: appearance.player.position,
               starter: appearance.starter,
               minutesPlayed: appearance.minutesPlayed,
+              pitchPosition: null,
             })),
         })),
       reviews: {
@@ -1104,11 +1182,10 @@ export class ExperienceService {
       include: { team: true },
       orderBy: [{ isPrimary: 'desc' }, { team: { name: 'asc' } }],
     })
-    const tournament = await this.getFeaturedTournament(session.organizationId, tournamentId)
+    if (tournamentId) await this.getFeaturedTournament(session.organizationId, tournamentId)
     const available = await this.prisma.team.findMany({
       where: {
         organizationId: session.organizationId,
-        registrations: { some: { tournamentId: tournament.id, status: 'APPROVED' } },
       },
       orderBy: { name: 'asc' },
     })

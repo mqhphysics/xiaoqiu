@@ -111,6 +111,7 @@ test(
         const publicGet = (path: string, organizationId = org) =>
           request(app.getHttpServer())
             .get(`/api${path}`)
+            .set('Authorization', `Bearer ${token}`)
             .set('x-dev-organization-id', organizationId)
         const payload = {
           clientPostId: `tags-${suffix}-roundtrip`,
@@ -218,7 +219,7 @@ test(
               clientPostId: `tags-${suffix}-long`,
               tags: [{ kind: 'TOPIC', label: '长'.repeat(31) }],
             }).expect(400)
-            await publicGet(`/public/posts/${first.body.id}`, otherOrg.id).expect(404)
+            await publicGet(`/public/posts/${first.body.id}`, otherOrg.id).expect(403)
             assert.equal(
               await prisma.post.count({
                 where: {

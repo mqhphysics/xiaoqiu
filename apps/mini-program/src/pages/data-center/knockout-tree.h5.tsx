@@ -1,4 +1,4 @@
-import Taro from '@tarojs/taro'
+import { openMatchFromUrl } from '../../features/product/match-navigation'
 import { TeamCrest, TeamName } from '../../components/product-ui'
 import { DataState } from '../../components/public-ui'
 import { matchStatusLabel } from '../../features/product/product.format'
@@ -263,5 +263,5 @@ function scoreLabel(match: MatchSummary) {
 function openMatch(event: React.MouseEvent<HTMLAnchorElement>) {
   if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
   event.preventDefault()
-  void Taro.navigateTo({ url: event.currentTarget.getAttribute('href') ?? '' })
+  openMatchFromUrl(event.currentTarget.getAttribute('href') ?? '')
 }

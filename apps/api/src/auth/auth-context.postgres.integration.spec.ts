@@ -656,7 +656,7 @@ test(
       )
 
       await t.test(
-        'search only returns approved teams, locked-roster players and public matches of the selected tournament',
+        'search exposes organization teams while player eligibility and public matches retain tournament scope',
         async () => {
           const createPlayer = (label: string) =>
             prisma.playerProfile.create({
@@ -747,7 +747,7 @@ test(
           )
           assert.deepEqual(
             search.body.teams.map((item: { id: string }) => item.id).sort(),
-            [team.id, rival.id].sort(),
+            [team.id, rival.id, pendingTeam.id].sort(),
           )
           assert.deepEqual(
             search.body.matches.map((item: { id: string }) => item.id).sort(),
@@ -778,10 +778,14 @@ test(
             .set('x-organization-id', organization.id)
             .expect(200)
           assert.equal(detail.body.shirtNumber, '2')
-          await readPublic(`/api/public/teams/${pendingTeam.id}/dashboard`)
+          const pendingDashboard = await readPublic(`/api/public/teams/${pendingTeam.id}/dashboard`)
             .query({ tournamentId: tournament.id })
             .set('x-organization-id', organization.id)
-            .expect(404)
+            .expect(200)
+          assert.equal(pendingDashboard.body.rosterSource, 'TEAM_MEMBERSHIP')
+          assert.deepEqual(pendingDashboard.body.roster, [])
+          assert.equal(pendingDashboard.body.team.groupName, null)
+          assert.equal(JSON.stringify(pendingDashboard.body).includes(pendingPlayer.id), false)
         },
       )
 

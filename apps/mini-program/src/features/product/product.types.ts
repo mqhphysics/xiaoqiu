@@ -1,3 +1,5 @@
+import type { IdentityBadgeKind } from './identity-badges'
+
 export type MatchStatus =
   | 'DRAFT'
   | 'SCHEDULED'
@@ -244,6 +246,7 @@ export interface CompetitionDataResponse {
 }
 
 export interface TeamDashboardResponse {
+  rosterSource?: 'OFFICIAL_SNAPSHOT' | 'TEAM_MEMBERSHIP' | 'MIXED'
   team: TeamSummary & {
     description: string | null
     motto: string | null
@@ -266,6 +269,7 @@ export interface TeamDashboardResponse {
   recentMatches: MatchSummary[]
   upcomingMatches: MatchSummary[]
   roster: Array<{
+    rosterSource?: 'OFFICIAL_SNAPSHOT' | 'TEAM_MEMBERSHIP'
     id: string
     displayName: string
     jerseyName: string | null
@@ -283,6 +287,7 @@ export interface TeamDashboardResponse {
 }
 
 export interface PlayerDetailResponse {
+  rosterSource?: 'OFFICIAL_SNAPSHOT' | 'TEAM_MEMBERSHIP'
   id: string
   person?: PublicPersonIdentity | null
   posts?: PostSummary[]
@@ -329,6 +334,8 @@ export interface MatchExperienceResponse extends MatchSummary {
   }>
   lineups: Array<{
     team: TeamSummary
+    formation?: string | null
+    lineupSource?: 'CONFIRMED_APPEARANCES' | 'UNAVAILABLE'
     players: Array<{
       id: string
       displayName: string
@@ -336,6 +343,7 @@ export interface MatchExperienceResponse extends MatchSummary {
       position: string | null
       starter: boolean
       minutesPlayed: number
+      pitchPosition?: { x: number; y: number } | null
     }>
   }>
   reviews: {
@@ -409,7 +417,12 @@ export interface TeamRelationshipResponse {
 }
 
 export interface CaptainWorkspaceResponse {
-  team: TeamSummary
+  team: TeamSummary & {
+    description: string | null
+    motto: string | null
+    foundedYear: number | null
+    updatedAt: string
+  }
   members: Array<{
     id: string
     userId: string | null
@@ -418,6 +431,7 @@ export interface CaptainWorkspaceResponse {
     avatarUrl: string | null
     position: string | null
     isCaptain: boolean
+    updatedAt: string
   }>
   applications: Array<{
     id: string
@@ -495,7 +509,7 @@ export interface ConversationListResponse {
 }
 
 export interface BadgePreferenceResponse {
-  availableKinds: import('./identity-badges').IdentityBadgeKind[]
+  availableKinds: IdentityBadgeKind[]
   preferredKind: string | null
   displayedKind: string | null
   version: number

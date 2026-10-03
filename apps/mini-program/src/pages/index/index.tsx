@@ -12,6 +12,7 @@ import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
 import { openTeam } from '../../features/product/team-navigation'
 import { openPlayer } from '../../features/product/player-navigation'
+import { openMatch } from '../../features/product/match-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
@@ -899,9 +900,7 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
 }
 
 async function goToMatch(matchId: string) {
-  await Taro.navigateTo({
-    url: `/pages/readonly-match-detail/index?matchId=${encodeURIComponent(matchId)}`,
-  })
+  await openMatch(matchId)
 }
 
 async function goToSchedule(tournamentId: string) {

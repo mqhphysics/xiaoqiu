@@ -21,6 +21,7 @@ const ADMIN_HEADERS = {
   'x-dev-role': 'TOURNAMENT_ADMIN',
 }
 const PUBLIC_HEADERS = {
+  authorization: 'Bearer fictional-schedule-admin',
   'x-dev-organization-id': ORGANIZATION_ID,
 }
 

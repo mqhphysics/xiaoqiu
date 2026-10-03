@@ -20,6 +20,7 @@ import {
   usePostInteraction,
 } from '../../features/product/post-navigation'
 import { openTeam } from '../../features/product/team-navigation'
+import { openMatch } from '../../features/product/match-navigation'
 import { readSession } from '../../features/product/session'
 import type {
   CompetitionDataResponse,
@@ -554,11 +555,7 @@ function TeamSchedule({
                   type="button"
                   className="th-score"
                   aria-label={`查看${match.title}比赛详情`}
-                  onClick={() =>
-                    void Taro.navigateTo({
-                      url: `/pages/readonly-match-detail/index?matchId=${encodeURIComponent(match.id)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-                    })
-                  }
+                  onClick={() => void openMatch(match.id, tournamentId)}
                 >
                   {match.homeScore !== null && match.awayScore !== null
                     ? `${match.homeScore} : ${match.awayScore}`

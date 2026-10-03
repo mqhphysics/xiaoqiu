@@ -230,7 +230,6 @@ test('PostgreSQL roster import is idempotent, transactional and privacy scoped',
     configureApp(app)
     await app.init()
 
-    const publicHeaders = { 'x-dev-organization-id': organization.id }
     const loginAdmin = async (orgId: string, username: string) => {
       const digest = hashPassword('RosterFixture2026!')
       await prisma.user.create({
@@ -257,10 +256,11 @@ test('PostgreSQL roster import is idempotent, transactional and privacy scoped',
       return { Authorization: `Bearer ${login.body.accessToken}` }
     }
     const adminHeaders = await loginAdmin(organization.id, `roster-admin-${suffix}`)
+    const publicHeaders = { ...adminHeaders, 'x-dev-organization-id': organization.id }
     const foreignAdminHeaders = await loginAdmin(otherOrganization.id, `roster-foreign-${suffix}`)
     await request(app.getHttpServer())
       .get(`/api/admin/tournaments/${publishedTournament.id}/team-registrations`)
-      .set({ ...publicHeaders, 'x-dev-role': 'TOURNAMENT_ADMIN' })
+      .set({ 'x-dev-organization-id': organization.id, 'x-dev-role': 'TOURNAMENT_ADMIN' })
       .expect(401)
     const publicList = await request(app.getHttpServer())
       .get(`/api/public/tournaments/${publishedTournament.id}/teams`)

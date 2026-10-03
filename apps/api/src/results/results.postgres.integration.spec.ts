@@ -363,6 +363,7 @@ test(
       const read = () =>
         request(server)
           .get(`/api/public/tournaments/${tournament.id}/results`)
+          .set('authorization', studentToken)
           .set('x-organization-id', org.id)
       const preview = (token = adminToken) =>
         request(server)
@@ -397,12 +398,14 @@ test(
           assert.equal(JSON.stringify(response.body).includes('PRIVATE'), false)
           await request(server)
             .get(`/api/public/tournaments/${draft.id}/results`)
+            .set('authorization', studentToken)
             .set('x-organization-id', org.id)
             .expect(404)
           await request(server)
             .get(`/api/public/tournaments/${tournament.id}/results`)
+            .set('authorization', studentToken)
             .set('x-organization-id', otherOrg.id)
-            .expect(404)
+            .expect(403)
         },
       )
       await t.test(

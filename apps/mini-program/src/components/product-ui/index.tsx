@@ -19,6 +19,7 @@ import {
   usePostInteraction,
 } from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
+import { openMatch } from '../../features/product/match-navigation'
 import { openDesktopTeam, openTeamCrest } from '../../features/product/team-navigation'
 import { PostTags } from '../post-tags'
 import { PlayerTrigger } from '../player-trigger'
@@ -159,7 +160,15 @@ export function MatchStatus({ status }: { status: MatchSummary['status'] }) {
 export function MatchCard({ match, onClick }: { match: MatchSummary; onClick?: () => void }) {
   const hasScore = match.homeScore !== null && match.awayScore !== null
   return (
-    <View className="product-match-card" {...(onClick ? { onClick } : {})}>
+    <View
+      className="product-match-card"
+      onClick={
+        onClick ??
+        (() => {
+          void openMatch(match.id, match.tournamentId)
+        })
+      }
+    >
       <View className="product-match-card__head">
         <Text className="product-match-card__meta">
           {match.title} · {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}

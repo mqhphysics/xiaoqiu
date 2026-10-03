@@ -11,7 +11,7 @@ import request from 'supertest'
 import { AppModule } from '../app.module'
 import { configureApp } from '../app.setup'
 import { PrismaClient } from '../generated/prisma/client'
-import { DEMO_ORGANIZATION_ID, DEMO_TEAMS, fixtureId } from './demo-fixture'
+import { DEMO_ORGANIZATION_ID, DEMO_TEAMS, DEMO_PASSWORD, fixtureId } from './demo-fixture'
 import { seedDemoFixture } from './seed-demo-fixture'
 
 test(
@@ -129,8 +129,15 @@ test(
       app = module.createNestApplication({ logger: false })
       configureApp(app)
       await app.init()
+      const login = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('X-Organization-Id', DEMO_ORGANIZATION_ID)
+        .send({ username: 'student', password: DEMO_PASSWORD })
+        .expect(200)
+      const authorization = `Bearer ${login.body.accessToken}`
       const home = await request(app.getHttpServer())
         .get('/api/public/home')
+        .set('authorization', authorization)
         .set('X-Organization-Id', DEMO_ORGANIZATION_ID)
         .expect(200)
       assert.equal(home.body.tournament.teamCount, 16)
@@ -138,6 +145,7 @@ test(
       assert.equal(home.body.tournament.matchCount, 32)
       const competition = await request(app.getHttpServer())
         .get(`/api/public/tournaments/${tournamentId}/competition-data`)
+        .set('authorization', authorization)
         .set('X-Organization-Id', DEMO_ORGANIZATION_ID)
         .expect(200)
       const data = competition.body as {
@@ -172,6 +180,7 @@ test(
       const teamId = fixtureId(`team:${DEMO_TEAMS[15]!.code}`)
       const dashboard = await request(app.getHttpServer())
         .get(`/api/public/teams/${teamId}/dashboard?tournamentId=${tournamentId}`)
+        .set('authorization', authorization)
         .set('X-Organization-Id', DEMO_ORGANIZATION_ID)
         .expect(200)
       assert.equal(dashboard.body.roster.length, 14)

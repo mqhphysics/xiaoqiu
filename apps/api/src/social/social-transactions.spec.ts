@@ -450,7 +450,12 @@ function makeMessageUser(id: string): MessageUser {
   return { id, displayName: `用户${id.slice(-2)}`, avatarUrl: null, playerProfile: null }
 }
 
-function makeMessagingService(prisma: MessagingPrismaFake, session = makeSession()) {
+function makeMessagingService(
+  prisma: MessagingPrismaFake,
+  session = makeSession(ACTOR_ID, [
+    { role: 'PLATFORM_ADMIN', scopeType: 'PLATFORM', scopeId: 'PLATFORM' },
+  ]),
+) {
   const auth = authStub(session)
   const social = new SocialService(prisma as unknown as PrismaService, auth)
   return new MessagingService(prisma as unknown as PrismaService, auth, social)

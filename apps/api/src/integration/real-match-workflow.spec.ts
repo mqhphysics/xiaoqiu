@@ -270,7 +270,10 @@ test(
         return value
       }
       const publicGet = (path: string) =>
-        request(server).get(path).set('x-organization-id', organization.id)
+        request(server)
+          .get(path)
+          .set('authorization', token(student.id))
+          .set('x-organization-id', organization.id)
       const rosterPath = (teamId: string) =>
         `/api/roster/tournaments/${tournament.id}/teams/${teamId}`
       const rosterCommand = (

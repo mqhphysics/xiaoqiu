@@ -7,6 +7,7 @@ import { readSession, subscribeToExternalSessionChanges } from './features/produ
 import { PostOverlayHost } from './components/post-overlay'
 import { TeamOverlayHost } from './components/team-hub'
 import { PlayerOverlayHost } from './components/player-overlay'
+import { MatchOverlayHost } from './components/match-overlay'
 import { MessagingOverlayHost } from './components/messaging-drawer/host'
 
 import './app.scss'
@@ -33,6 +34,7 @@ export default function App({ children }: PropsWithChildren) {
       <PostOverlayHost />
       <TeamOverlayHost />
       <PlayerOverlayHost />
+      <MatchOverlayHost />
       <MessagingOverlayHost />
     </AccountBoundary>
   )

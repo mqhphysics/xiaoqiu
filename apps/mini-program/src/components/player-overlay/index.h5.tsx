@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { openTeam } from '../../features/product/team-navigation'
+import { openMatch } from '../../features/product/match-navigation'
 import { OPEN_TEAM_EVENT, HOVER_TEAM_EVENT } from '../../features/product/team-navigation.h5'
 import { createPortal } from 'react-dom'
 import {
@@ -677,11 +678,7 @@ export function PlayerProfileSections({
                     type="button"
                     className="player-match-record"
                     key={match.id}
-                    onClick={() =>
-                      void Taro.navigateTo({
-                        url: `/pages/readonly-match-detail/index?matchId=${encodeURIComponent(match.id)}`,
-                      })
-                    }
+                    onClick={() => void openMatch(match.id, match.tournamentId)}
                   >
                     <div className="player-match-record__meta">
                       <span

@@ -160,7 +160,10 @@ function ProfilePanel({
     if (loggingOut) return
     const confirmation = await Taro.showModal({
       title: '退出登录',
-      content: '退出后仍可使用游客模式浏览公开赛事数据。',
+      content:
+        Taro.getEnv() === Taro.ENV_TYPE.WEB
+          ? '退出后需重新登录账号才能访问球队与赛事。'
+          : '退出后仍可使用游客模式浏览公开赛事数据。',
       confirmText: '退出',
     })
     if (!confirmation.confirm) return
@@ -279,9 +282,7 @@ function ProfilePanel({
       {user.linkedPlayer && (
         <View
           className="linked-player"
-          onClick={() =>
-            void openPlayer(user.linkedPlayer!.id, tournamentId)
-          }
+          onClick={() => void openPlayer(user.linkedPlayer!.id, tournamentId)}
         >
           <View>
             <Text className="linked-player__eyebrow">已认领球员</Text>
@@ -320,9 +321,7 @@ function ProfilePanel({
             <ServiceItem
               title="球员档案"
               note="数据与出场记录"
-              action={() =>
-                void openPlayer(user.linkedPlayer!.id, tournamentId)
-              }
+              action={() => void openPlayer(user.linkedPlayer!.id, tournamentId)}
             />
           )}
         </View>
@@ -710,7 +709,9 @@ function AdminIdentityDirectory() {
             <View className="identity-card" key={identity.id}>
               <View className="identity-card__heading">
                 <View>
-                  <PersonTrigger userId={identity.id} name={identity.displayName}><Text className="identity-card__nickname">{identity.displayName}</Text></PersonTrigger>
+                  <PersonTrigger userId={identity.id} name={identity.displayName}>
+                    <Text className="identity-card__nickname">{identity.displayName}</Text>
+                  </PersonTrigger>
                   <Text className="identity-card__username">@{identity.username}</Text>
                 </View>
                 <Text className="identity-card__verification">
