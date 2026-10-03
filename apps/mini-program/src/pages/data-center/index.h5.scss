@@ -42,9 +42,8 @@
       text-decoration: none;
     }
     a:hover {
-      color: #286341;
-      text-decoration: underline;
-      text-underline-offset: 4px;
+      color: #354f40;
+      text-decoration: none;
     }
     button:focus-visible,
     select:focus-visible,
@@ -587,9 +586,6 @@
   }
   .data-desktop__leaders--compact .data-desktop__leader-value {
     font-size: 14px;
-  }
-  .data-desktop tbody tr:hover {
-    background: #f5f8f3;
   }
   .data-desktop__updated {
     display: flex;

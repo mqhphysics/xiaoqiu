@@ -7,6 +7,7 @@ import { openMessaging } from '../../components/messaging-drawer'
 import { ReportModal } from '../../components/report-modal'
 import { DataState } from '../../components/public-ui'
 import { UserAvatar } from '../../components/product-ui'
+import { PersonTrigger } from '../../components/person-trigger'
 import { formatRelativeTime, verificationLabel } from '../../features/product/product.format'
 import {
   createClientActionId,
@@ -156,11 +157,12 @@ export default function PostDetailPage() {
               <UserAvatar
                 avatarUrl={state.post.author.avatarUrl}
                 name={state.post.author.displayName}
+                userId={state.post.author.id}
               />
               <View className="post-detail__author-copy">
                 <Text className="post-detail__author-label">动态作者</Text>
                 <View className="post-detail__author-row">
-                  <Text>{state.post.author.displayName}</Text>
+                  <PersonTrigger userId={state.post.author.id} name={state.post.author.displayName}><Text>{state.post.author.displayName}</Text></PersonTrigger>
                   <Text>{verificationLabel(state.post.author.verificationLevel)}</Text>
                 </View>
                 <Text className="post-detail__time">
@@ -276,11 +278,12 @@ export default function PostDetailPage() {
                   <UserAvatar
                     avatarUrl={item.author.avatarUrl}
                     name={item.author.displayName}
+                    userId={item.author.id}
                     size="small"
                   />
                   <View className="comment-item__copy">
                     <View>
-                      <Text>{item.author.displayName}</Text>
+                      <PersonTrigger userId={item.author.id} name={item.author.displayName}><Text>{item.author.displayName}</Text></PersonTrigger>
                       <Text>{formatRelativeTime(item.createdAt)}</Text>
                     </View>
                     <Text>{item.body}</Text>

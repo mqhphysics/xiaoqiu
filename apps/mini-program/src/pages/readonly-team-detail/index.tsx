@@ -3,6 +3,7 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { PersonTrigger } from '../../components/person-trigger'
 import { DataState } from '../../components/public-ui'
 import {
   MatchCard,
@@ -13,6 +14,7 @@ import {
 } from '../../components/product-ui'
 import { positionLabel } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { openPlayer } from '../../features/product/player-navigation'
 import { readSession } from '../../features/product/session'
 import { useDetailBack } from '../readonly-schedule/detail-back'
 import type {
@@ -330,24 +332,20 @@ function TeamContent({
                     className="public-roster__row"
                     key={player.id}
                     onClick={() =>
-                      void Taro.navigateTo({
-                        url:
-                          '/pages/player-detail/index?playerId=' +
-                          encodeURIComponent(player.id) +
-                          '&tournamentId=' +
-                          encodeURIComponent(tournamentId),
-                      })
+                      void openPlayer(player.id, tournamentId)
                     }
                   >
                     <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
                     <View className="public-roster__player">
                       <UserAvatar
                         avatarUrl={player.avatarUrl}
+                        playerId={player.id}
+                        tournamentId={tournamentId}
                         name={player.displayName}
                         color={player.profileColor}
                         size="small"
                       />
-                      <Text>{player.displayName}</Text>
+                      <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                     </View>
                     <Text>
                       {positionLabel(player.position)} · {player.academicYear}

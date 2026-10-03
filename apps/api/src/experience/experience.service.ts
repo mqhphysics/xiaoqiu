@@ -34,6 +34,12 @@ import type {
   UpdateTeamPreferencesDto,
 } from './experience.dto'
 import { calculateStandings } from './ranking'
+import {
+  officialIdentity,
+  publicIdentity,
+  publicIdentitySelect,
+  type PublicIdentitySource,
+} from './public-identity'
 
 @Injectable()
 export class ExperienceService {
@@ -619,6 +625,7 @@ export class ExperienceService {
         snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
       },
       include: {
+        linkedUser: { select: publicIdentitySelect },
         snapshotEntries: {
           where: {
             organizationId,
@@ -632,7 +639,7 @@ export class ExperienceService {
     })
     if (!player) throw notFound('球员不存在')
 
-    const [events, appearances, posts] = await Promise.all([
+    const [events, appearances] = await Promise.all([
       prisma.matchEvent.findMany({
         where: {
           organizationId,
@@ -650,23 +657,35 @@ export class ExperienceService {
         include: { player: true, team: true, match: { include: matchSummaryInclude } },
         orderBy: { match: { scheduledStartAt: 'desc' } },
       }),
-      prisma.post.findMany({
-        where: {
-          organizationId,
-          tournamentId: selectedTournamentId,
-          status: PostStatus.PUBLISHED,
-          tags: { some: { organizationId, playerId } },
-        },
-        include: postSummaryInclude(viewerUserId),
-        orderBy: { publishedAt: 'desc' },
-        take: 20,
-      }),
     ])
     const stats = buildPlayerStats(events, appearances).find((item) => item.id === playerId)
     const snapshot = player.snapshotEntries[0]
+    const account =
+      player.linkedUser?.status === 'ACTIVE' &&
+      player.linkedUser.memberships.some(
+        (item) => item.organizationId === organizationId && item.status === 'ACTIVE',
+      )
+        ? publicIdentity(player.linkedUser, organizationId, viewerUserId)
+        : null
+    const posts = await prisma.post.findMany({
+      where: {
+        organizationId,
+        tournamentId: selectedTournamentId,
+        OR: [
+          { tags: { some: { organizationId, playerId } } },
+          ...(account ? [{ authorUserId: account.id }] : []),
+        ],
+        status: PostStatus.PUBLISHED,
+      },
+      include: postSummaryInclude(viewerUserId),
+      orderBy: { publishedAt: 'desc' },
+      take: 50,
+    })
 
     return {
       id: player.id,
+      person: account,
+      posts: posts.map((post) => mapPost(post, viewerUserId)),
       displayName: player.displayName,
       jerseyName: player.jerseyName,
       shirtNumber: snapshot?.shirtNumber ?? null,
@@ -694,13 +713,86 @@ export class ExperienceService {
       stats: stats ?? emptyPlayerStats(player.id, player.displayName),
       resultsMode: resultContext.mode,
       appearanceRecording: resultContext.mode === 'DEMO' ? 'DEMO' : 'EXISTING_MATCH_RECORDS',
-      posts: posts.map((post) => mapPost(post, viewerUserId)),
       recentMatches: appearances.slice(0, 5).map((appearance) => ({
         ...mapResultMatch(appearance.match, resultContext.official),
         starter: appearance.starter,
         minutesPlayed: appearance.minutesPlayed,
       })),
     }
+  }
+
+  async getPerson(
+    organizationId: string,
+    userId: string,
+    tournamentId?: string,
+    authorization?: string,
+  ) {
+    if (
+      userId !== 'official' &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+    )
+      throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
+        code: ERROR_CODES.BAD_REQUEST,
+        message: '人物标识不可用',
+      })
+    const session = await this.authService.getSession(authorization)
+    return this.prisma.$transaction(
+      async (prisma) => {
+        const tournament = await this.getFeaturedTournament(organizationId, tournamentId, prisma)
+        const membership =
+          userId === 'official'
+            ? null
+            : await prisma.organizationMembership.findFirst({
+                where: { organizationId, userId, status: 'ACTIVE', user: { status: 'ACTIVE' } },
+                include: {
+                  user: { select: publicIdentitySelect },
+                  organization: { select: { name: true } },
+                },
+              })
+        if (userId !== 'official' && !membership) throw notFound('人物资料不可用')
+        const user = membership?.user
+        let player: Awaited<ReturnType<ExperienceService['getPlayerSnapshot']>> | null = null
+        if (user?.playerProfile?.organizationId === organizationId) {
+          try {
+            player = await this.getPlayerSnapshot(
+              organizationId,
+              user.playerProfile.id,
+              tournament.id,
+              prisma,
+              session?.userId,
+            )
+          } catch (error) {
+            if (!(error instanceof ApiHttpException) || error.getStatus() !== HttpStatus.NOT_FOUND)
+              throw error
+          }
+        }
+        const posts =
+          player?.posts ??
+          (
+            await prisma.post.findMany({
+              where: {
+                organizationId,
+                tournamentId: tournament.id,
+                status: PostStatus.PUBLISHED,
+                authorUserId: user?.id ?? null,
+              },
+              include: postSummaryInclude(session?.userId),
+              orderBy: { publishedAt: 'desc' },
+              take: 50,
+            })
+          ).map((post) => mapPost(post, session?.userId))
+        return {
+          ...(user ? publicIdentity(user, organizationId, session?.userId) : officialIdentity),
+          bio: user?.bio ?? null,
+          organizationName: membership?.organization.name ?? null,
+          player,
+          posts,
+          tournamentId: tournament.id,
+          tournamentName: tournament.name,
+        }
+      },
+      { isolationLevel: 'RepeatableRead' },
+    )
   }
 
   async getMatchExperience(organizationId: string, matchId: string, authorization?: string) {
@@ -739,7 +831,7 @@ export class ExperienceService {
           orderBy: [{ teamId: 'asc' }, { starter: 'desc' }, { shirtNumber: 'asc' }],
         },
         reviews: {
-          include: { user: true },
+          include: { user: { select: publicIdentitySelect } },
           orderBy: { updatedAt: 'desc' },
         },
       },
@@ -806,13 +898,7 @@ export class ExperienceService {
             rating: review.rating,
             body: review.body!,
             createdAt: review.createdAt.toISOString(),
-            author: {
-              id: review.user.id,
-              displayName: review.user.displayName,
-              verificationLevel: review.user.verificationLevel,
-              avatarUrl: review.user.avatarUrl,
-              messageable: review.user.id !== session?.userId,
-            },
+            author: publicIdentity(review.user, organizationId, session?.userId),
           })),
       },
     }
@@ -977,7 +1063,7 @@ export class ExperienceService {
         ...postSummaryInclude(session?.userId),
         comments: {
           where: { hiddenAt: null },
-          include: { user: true },
+          include: { user: { select: publicIdentitySelect } },
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -990,13 +1076,7 @@ export class ExperienceService {
         body: comment.body,
         parentCommentId: comment.parentCommentId,
         createdAt: comment.createdAt.toISOString(),
-        author: {
-          id: comment.user.id,
-          displayName: comment.user.displayName,
-          verificationLevel: comment.user.verificationLevel,
-          avatarUrl: comment.user.avatarUrl,
-          messageable: comment.user.id !== session?.userId,
-        },
+        author: publicIdentity(comment.user, organizationId, session?.userId),
       })),
     }
   }
@@ -1263,7 +1343,7 @@ export class ExperienceService {
             organizationId: session.organizationId,
             hiddenAt: null,
           },
-          include: { user: true },
+          include: { user: { select: publicIdentitySelect } },
         })
       : null
     if (input.parentCommentId && !parent) throw notFound('要回复的评论不存在')
@@ -1288,7 +1368,7 @@ export class ExperienceService {
           body,
         },
         update: {},
-        include: { user: true },
+        include: { user: { select: publicIdentitySelect } },
       })
       if (
         stored.organizationId !== session.organizationId ||
@@ -1320,13 +1400,7 @@ export class ExperienceService {
       body: comment.body,
       parentCommentId: comment.parentCommentId,
       createdAt: comment.createdAt.toISOString(),
-      author: {
-        id: comment.user.id,
-        displayName: comment.user.displayName,
-        verificationLevel: comment.user.verificationLevel,
-        avatarUrl: comment.user.avatarUrl,
-        messageable: false,
-      },
+      author: publicIdentity(comment.user, session.organizationId, session.userId),
     }
     return mappedComment
   }
@@ -1397,7 +1471,7 @@ const matchSummaryInclude = {
 
 function postSummaryInclude(userId?: string) {
   return {
-    author: true,
+    author: { select: publicIdentitySelect },
     team: true,
     tags: { orderBy: { position: 'asc' } },
     _count: { select: { likes: true, comments: { where: { hiddenAt: null } } } },
@@ -1502,17 +1576,13 @@ function mapPost(
     id: string
     tournamentId?: string | null
     tags?: Array<Pick<ResolvedPostTag, 'kind' | 'label' | 'teamId' | 'playerId'>>
+    organizationId?: string
     type: PostType
     title: string | null
     body: string
     imageUrl: string | null
     publishedAt: Date
-    author: {
-      id: string
-      displayName: string
-      verificationLevel: string
-      avatarUrl: string | null
-    } | null
+    author: PublicIdentitySource | null
     team: Parameters<typeof mapTeam>[0] | null
     _count: { likes: number; comments: number }
     likes: Array<{ id: string }>
@@ -1521,7 +1591,7 @@ function mapPost(
 ) {
   return {
     id: post.id,
-    tournamentId: post.tournamentId ?? null,
+    ...(post.tournamentId ? { tournamentId: post.tournamentId } : {}),
     tags: mapPostTags(post.tags ?? []),
     type: post.type,
     title: post.title,
@@ -1530,20 +1600,8 @@ function mapPost(
     imageUrls: postImageUrls(post.imageUrl),
     publishedAt: post.publishedAt.toISOString(),
     author: post.author
-      ? {
-          id: post.author.id,
-          displayName: post.author.displayName,
-          verificationLevel: post.author.verificationLevel,
-          avatarUrl: post.author.avatarUrl,
-          messageable: post.author.id !== viewerUserId,
-        }
-      : {
-          id: 'official',
-          displayName: '晓球赛事组',
-          verificationLevel: 'STAFF_VERIFIED',
-          avatarUrl: null,
-          messageable: false,
-        },
+      ? publicIdentity(post.author, post.organizationId, viewerUserId)
+      : officialIdentity,
     team: post.team ? mapTeam(post.team) : null,
     likeCount: post._count.likes,
     commentCount: post._count.comments,

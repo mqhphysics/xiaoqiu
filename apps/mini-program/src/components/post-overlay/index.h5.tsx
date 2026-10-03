@@ -7,7 +7,7 @@ import {
   productRepository,
   resolveMediaUrl,
 } from '../../features/product/product.repository'
-import { formatRelativeTime, verificationLabel } from '../../features/product/product.format'
+import { formatRelativeTime } from '../../features/product/product.format'
 import { readSession } from '../../features/product/session'
 import type {
   PostComment,
@@ -15,6 +15,8 @@ import type {
   ReportTargetType,
 } from '../../features/product/product.types'
 import { UserAvatar } from '../product-ui'
+import { PersonTrigger } from '../person-trigger'
+import { VerificationBadge } from '../verification-badge'
 import { useOverlayFocus } from '../overlay-focus'
 import { ReportModal } from '../report-modal'
 import { openMessaging } from '../messaging-drawer'
@@ -213,11 +215,24 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
       <UserAvatar
         avatarUrl={comment.author.avatarUrl}
         name={comment.author.displayName}
+        userId={comment.author.id}
+        tournamentId={post?.tournamentId}
         size="small"
       />
       <div className="post-comment__copy">
         <div className="post-comment__head">
-          <strong>{comment.author.displayName}</strong>
+          <PersonTrigger
+            userId={comment.author.id}
+            tournamentId={post?.tournamentId}
+            name={comment.author.displayName}
+          >
+            <strong>{comment.author.displayName}</strong>
+          </PersonTrigger>
+          <VerificationBadge
+            level={comment.author.verificationLevel}
+            roles={comment.author.roles}
+            official={comment.author.official}
+          />
           {post?.author.id === comment.author.id && (
             <span className="post-comment__author-label">作者</span>
           )}
@@ -238,7 +253,14 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
             comment.parentCommentId &&
             byId.get(comment.parentCommentId)?.parentCommentId && (
               <span className="post-comment__reply-name">
-                回复 {byId.get(comment.parentCommentId)?.author.displayName}：
+                回复{' '}
+                <PersonTrigger
+                  userId={byId.get(comment.parentCommentId)?.author.id}
+                  name={byId.get(comment.parentCommentId)?.author.displayName ?? '用户'}
+                >
+                  {byId.get(comment.parentCommentId)?.author.displayName}
+                </PersonTrigger>
+                ：
               </span>
             )}
           <EmojiText>{comment.body}</EmojiText>
@@ -321,11 +343,23 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                   <UserAvatar
                     avatarUrl={post.author.avatarUrl}
                     name={post.author.displayName}
+                    userId={post.author.id}
+                    tournamentId={post.tournamentId}
                     size="small"
                   />
                   <div>
-                    <strong>{post.author.displayName}</strong>
-                    <span>{verificationLabel(post.author.verificationLevel)}</span>
+                    <PersonTrigger
+                      userId={post.author.id}
+                      tournamentId={post.tournamentId}
+                      name={post.author.displayName}
+                    >
+                      <strong>{post.author.displayName}</strong>
+                    </PersonTrigger>
+                    <VerificationBadge
+                      level={post.author.verificationLevel}
+                      roles={post.author.roles}
+                      official={post.author.official}
+                    />
                   </div>
                   {signedIn && post.author.messageable && (
                     <button
@@ -430,7 +464,10 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                   <div className="post-comment-composer">
                     {replyTo && (
                       <div className="post-comment-composer__reply">
-                        回复 {replyTo.author.displayName}
+                        回复{' '}
+                        <PersonTrigger userId={replyTo.author.id} name={replyTo.author.displayName}>
+                          {replyTo.author.displayName}
+                        </PersonTrigger>
                         <button
                           type="button"
                           aria-label="取消回复"

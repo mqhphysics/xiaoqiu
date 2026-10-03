@@ -9,6 +9,8 @@ import { formatDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { openTeamFromUrl } from '../../features/product/team-navigation'
+import { openPlayer } from '../../features/product/player-navigation'
+import { HOVER_PLAYER_EVENT, LEAVE_PLAYER_EVENT } from '../../features/product/player-navigation.h5'
 import type {
   CompetitionDataResponse,
   PlayerStats,
@@ -572,7 +574,19 @@ function LeaderRow({
       <td>
         <a
           href={`/pages/player-detail/index?playerId=${encodeURIComponent(player.id)}&tournamentId=${encodeURIComponent(tournamentId)}`}
-          onClick={navigateLink}
+          onClick={(event) => {
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            void openPlayer(player.id, tournamentId)
+          }}
+          onMouseEnter={(event) =>
+            window.dispatchEvent(
+              new CustomEvent(HOVER_PLAYER_EVENT, {
+                detail: { playerId: player.id, tournamentId, anchor: event.currentTarget },
+              }),
+            )
+          }
+          onMouseLeave={() => window.dispatchEvent(new Event(LEAVE_PLAYER_EVENT))}
         >
           {player.displayName}
         </a>
@@ -664,12 +678,20 @@ function KnockoutCard({ data }: { data: CompetitionData }) {
                   </div>
                   <div className="data-desktop__match-team">
                     <TeamCrest team={match.homeTeam} size="small" />
-                    <TeamName team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '待定'} />
+                    <TeamName
+                      team={match.homeTeam}
+                      tournamentId={match.tournamentId}
+                      fallback={match.homePlaceholder ?? '待定'}
+                    />
                     <strong>{match.homeScore ?? '—'}</strong>
                   </div>
                   <div className="data-desktop__match-team">
                     <TeamCrest team={match.awayTeam} size="small" />
-                    <TeamName team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '待定'} />
+                    <TeamName
+                      team={match.awayTeam}
+                      tournamentId={match.tournamentId}
+                      fallback={match.awayPlaceholder ?? '待定'}
+                    />
                     <strong>{match.awayScore ?? '—'}</strong>
                   </div>
                 </a>

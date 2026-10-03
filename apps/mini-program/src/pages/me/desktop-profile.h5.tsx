@@ -8,6 +8,10 @@ import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { TeamCrest, TeamName, UserAvatar } from '../../components/product-ui'
 import { PostTags } from '../../components/post-tags'
+import { openPlayer } from '../../features/product/player-navigation'
+import { PersonTrigger } from '../../components/person-trigger'
+import { VerificationBadge } from '../../components/verification-badge'
+import { identityBadgeKinds, identityLabels } from '../../features/product/identity-badges'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
 import { ReportModal } from '../../components/report-modal'
@@ -282,7 +286,10 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   }
   const openTeam = (teamId: string, manage = false) => {
     setModal(null)
-    if (!manage) { void openTeamDetail(teamId, home.tournament.id).catch(toastError); return }
+    if (!manage) {
+      void openTeamDetail(teamId, home.tournament.id).catch(toastError)
+      return
+    }
     const page = manage ? 'my-team' : 'readonly-team-detail'
     void Taro.navigateTo({
       url: `/pages/${page}/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(home.tournament.id)}`,
@@ -365,12 +372,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               </span>
             </button>
             <div className="profile-person__copy">
-              <h1>{user.displayName}</h1>
+              <h1>
+                <PersonTrigger userId={user.id} name={user.displayName}>
+                  {user.displayName}
+                </PersonTrigger>
+              </h1>
               <p>{user.bio || '写一句简介，让球友更了解你。'}</p>
               <div className="profile-person__meta">
                 <span>
                   <ProfileIcon name="shield" />
-                  {verificationLabel(user.verificationLevel)}
+                  {identityBadgeKinds(user.verificationLevel, user.roles)
+                    .map((kind) => identityLabels[kind])
+                    .join('、') || verificationLabel(user.verificationLevel)}
                 </span>
                 <span>
                   <ProfileIcon name="user" />
@@ -1005,9 +1018,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               className="profile-button profile-button--primary"
               onClick={() => {
                 setModal(null)
-                void Taro.navigateTo({
-                  url: `/pages/player-detail/index?playerId=${encodeURIComponent(user.linkedPlayer!.id)}&tournamentId=${encodeURIComponent(home.tournament.id)}`,
-                }).catch(toastError)
+                void openPlayer(user.linkedPlayer!.id, home.tournament.id).catch(toastError)
               }}
             >
               查看球员档案
@@ -1374,12 +1385,24 @@ function ProfileMatch({
       >
         <span>
           <TeamCrest team={match.homeTeam} size="small" />
-          <strong><TeamName team={match.homeTeam} tournamentId={match.tournamentId} fallback={match.homePlaceholder ?? '待定'} /></strong>
+          <strong>
+            <TeamName
+              team={match.homeTeam}
+              tournamentId={match.tournamentId}
+              fallback={match.homePlaceholder ?? '待定'}
+            />
+          </strong>
         </span>
         <b>{hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}</b>
         <span>
           <TeamCrest team={match.awayTeam} size="small" />
-          <strong><TeamName team={match.awayTeam} tournamentId={match.tournamentId} fallback={match.awayPlaceholder ?? '待定'} /></strong>
+          <strong>
+            <TeamName
+              team={match.awayTeam}
+              tournamentId={match.tournamentId}
+              fallback={match.awayPlaceholder ?? '待定'}
+            />
+          </strong>
         </span>
       </button>
       <div className="profile-match__footer">
@@ -1467,11 +1490,23 @@ function ProfilePost({
   return (
     <article className="profile-post">
       <div className="profile-post__avatar">
-        <UserAvatar name={post.author.displayName} avatarUrl={post.author.avatarUrl} size="small" />
+        <UserAvatar
+          name={post.author.displayName}
+          avatarUrl={post.author.avatarUrl}
+          userId={post.author.id}
+          size="small"
+        />
       </div>
       <div className="profile-post__content">
         <header>
-          <strong>{post.author.displayName}</strong>
+          <PersonTrigger userId={post.author.id} name={post.author.displayName}>
+            <strong>{post.author.displayName}</strong>
+          </PersonTrigger>
+          <VerificationBadge
+            level={post.author.verificationLevel}
+            roles={post.author.roles}
+            official={post.author.official}
+          />
           <time>
             {formatDate(post.publishedAt)} {formatTime(post.publishedAt)}
           </time>

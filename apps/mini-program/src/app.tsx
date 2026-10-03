@@ -5,6 +5,8 @@ import { mountCursorSkin } from './components/auth-cursor'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
 import { PostOverlayHost } from './components/post-overlay'
 import { TeamOverlayHost } from './components/team-hub'
+import { PlayerOverlayHost } from './components/player-overlay'
+import { MessagingOverlayHost } from './components/messaging-drawer/host'
 
 import './app.scss'
 
@@ -28,6 +30,8 @@ export default function App({ children }: PropsWithChildren) {
       {children}
       <PostOverlayHost />
       <TeamOverlayHost />
+      <PlayerOverlayHost />
+      <MessagingOverlayHost />
     </>
   )
 }

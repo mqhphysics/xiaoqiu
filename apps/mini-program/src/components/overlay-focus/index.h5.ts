@@ -9,9 +9,11 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-// Only the foremost overlay handles keyboard input; nested details retain focus.
-const overlayStack: symbol[] = []
-let initialOverflow = ''
+interface OverlayEntry {
+  panel: HTMLElement | null
+}
+const overlays: OverlayEntry[] = []
+let unlockedOverflow = ''
 
 export function useOverlayFocus(
   enabled: boolean,
@@ -24,16 +26,23 @@ export function useOverlayFocus(
     if (!enabled) return
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const entry = Symbol(panelSelector)
-    if (overlayStack.length === 0) initialOverflow = document.body.style.overflow
-    overlayStack.push(entry)
     const panel = document.querySelector<HTMLElement>(panelSelector)
+    const entry = { panel }
+    if (overlays.length === 0) unlockedOverflow = document.body.style.overflow
+    overlays.push(entry)
     const focusFirst = () => {
       panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
     const timer = window.setTimeout(focusFirst, 0)
     const onKeyDown = (event: KeyboardEvent) => {
-      if (overlayStack.at(-1) !== entry) return
+      // A profile and the message drawer can remain interactive together. Route
+      // keyboard handling to the panel with focus, falling back to the newest.
+      const active =
+        overlays
+          .slice()
+          .reverse()
+          .find((overlay) => overlay.panel?.contains(document.activeElement)) ?? overlays.at(-1)
+      if (active !== entry || event.defaultPrevented) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onCloseRef.current()
@@ -63,12 +72,18 @@ export function useOverlayFocus(
     document.addEventListener('keydown', onKeyDown)
     return () => {
       window.clearTimeout(timer)
-      const wasTop = overlayStack.at(-1) === entry
-      const index = overlayStack.indexOf(entry)
-      if (index >= 0) overlayStack.splice(index, 1)
-      if (overlayStack.length === 0) document.body.style.overflow = initialOverflow
+      const index = overlays.indexOf(entry)
+      if (index !== -1) overlays.splice(index, 1)
+      if (overlays.length === 0) document.body.style.overflow = unlockedOverflow
       document.removeEventListener('keydown', onKeyDown)
-      if (wasTop && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+      if (
+        previousFocus?.isConnected &&
+        previousFocus.offsetParent !== null &&
+        (overlays.length === 0 ||
+          overlays.some((overlay) => overlay.panel?.contains(previousFocus)))
+      )
+        previousFocus.focus()
+      else overlays.at(-1)?.panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
     }
   }, [enabled, panelSelector])
 }
