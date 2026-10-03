@@ -3,9 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
-import { MatchStatus, TeamCrest, TeamName } from '../../components/product-ui'
-import { createBracketLayout } from '../../features/competition/competition.logic'
-import { formatDate, formatTime } from '../../features/product/product.format'
+import { TeamCrest } from '../../components/product-ui'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { openTeamFromUrl } from '../../features/product/team-navigation'
@@ -18,6 +16,7 @@ import type {
 } from '../../features/product/product.types'
 // Keep compact H5 on the original entry without resolving back to this file.
 import ExistingDataPage from './index.tsx'
+import { KnockoutPanel } from './knockout-tree.h5'
 
 import './index.h5.scss'
 
@@ -26,12 +25,11 @@ type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
   | { phase: 'ready'; data: CompetitionData }
-type DataTab = 'teams' | 'scorers' | 'assists' | 'bracket'
+type DataTab = 'teams' | 'players'
 
 const tabs = [
   { key: 'teams', label: '球队排名' },
-  { key: 'scorers', label: '射手榜' },
-  { key: 'assists', label: '助攻榜' },
+  { key: 'players', label: '球员数据' },
 ] as const
 
 export default function H5DataCenterPage() {
@@ -49,6 +47,8 @@ function DesktopDataPage() {
   const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
   const [state, setState] = useState<PageState>({ phase: 'loading' })
   const [tab, setTab] = useState<DataTab>('teams')
+  const [expandedPanel, setExpandedPanel] = useState<'groups' | 'knockout'>('groups')
+  const [instantSwitch, setInstantSwitch] = useState(false)
   const [groupId, setGroupId] = useState('all')
   const [primaryTeamId, setPrimaryTeamId] = useState<string | null>(null)
   const requestSequence = useRef(0)
@@ -111,6 +111,13 @@ function DesktopDataPage() {
 
   const tournamentId =
     state.phase === 'ready' ? state.data.tournament.id : requestedTournament.current
+  const expandPanel = (
+    panel: 'groups' | 'knockout',
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    setInstantSwitch(event.detail === 0)
+    setExpandedPanel(panel)
+  }
   return (
     <PublicShell active="data" tournamentId={tournamentId}>
       <div className="data-desktop">
@@ -156,43 +163,39 @@ function DesktopDataPage() {
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className={'data-desktop__bracket-link ' + (tab === 'bracket' ? 'is-active' : '')}
-                aria-pressed={tab === 'bracket'}
-                onClick={() => setTab('bracket')}
-              >
-                淘汰赛对阵 <span aria-hidden="true">↗</span>
-              </button>
+              <p className="data-desktop__toolbar-copy">
+                用数据记录每一场奔跑，见证校园足球的热爱与成长。
+              </p>
             </div>
             {tab === 'teams' && (
-              <div className="data-desktop__grid">
+              <div
+                className={
+                  'data-desktop__competition-panels is-expanded-' +
+                  expandedPanel +
+                  (instantSwitch ? ' is-instant' : '')
+                }
+              >
                 <StandingsCard
                   data={state.data}
                   groupId={groupId}
                   onGroupChange={setGroupId}
                   primaryTeamId={primaryTeamId}
+                  expanded={expandedPanel === 'groups'}
+                  onExpand={(event) => expandPanel('groups', event)}
                 />
-                <aside className="data-desktop__side" aria-label="球员榜单摘要">
-                  <LeaderboardCard
-                    data={state.data}
-                    mode="scorers"
-                    compact
-                    onExpand={() => setTab('scorers')}
-                  />
-                  <LeaderboardCard
-                    data={state.data}
-                    mode="assists"
-                    compact
-                    onExpand={() => setTab('assists')}
-                  />
-                </aside>
+                <KnockoutPanel
+                  data={state.data}
+                  expanded={expandedPanel === 'knockout'}
+                  onExpand={(event) => expandPanel('knockout', event)}
+                />
               </div>
             )}
-            {(tab === 'scorers' || tab === 'assists') && (
-              <LeaderboardCard data={state.data} mode={tab} />
+            {tab === 'players' && (
+              <div className="data-desktop__player-panels">
+                <LeaderboardCard data={state.data} mode="scorers" />
+                <LeaderboardCard data={state.data} mode="assists" />
+              </div>
             )}
-            {tab === 'bracket' && <KnockoutCard data={state.data} />}
             <div className="data-desktop__updated">
               <span className="data-desktop__updated-dot" />
               数据更新于 {formatDataTimestamp(state.data.updatedAt)}
@@ -257,7 +260,6 @@ function DataHero({
             <span className="data-desktop__demo">演示赛季</span>
           )}
         </div>
-        <p>用数据记录每一场奔跑，见证校园足球的热爱与成长。</p>
       </div>
       <div className="data-desktop__kpis">
         <Stat icon="teams" label="参赛球队" value={unavailable ? '—' : teams.size} unit="支" />
@@ -326,11 +328,15 @@ function StandingsCard({
   groupId,
   onGroupChange,
   primaryTeamId,
+  expanded,
+  onExpand,
 }: {
   data: CompetitionData
   groupId: string
   onGroupChange: (id: string) => void
   primaryTeamId: string | null
+  expanded: boolean
+  onExpand: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
   const teams = useMemo(() => {
     const map = new Map<string, TeamSummary>()
@@ -360,13 +366,28 @@ function StandingsCard({
     groupId === 'all' ? data.groups : data.groups.filter((group) => group.id === groupId)
   const demo = data.resultsMode === 'DEMO'
   return (
-    <section className="data-desktop__card data-desktop__standings">
+    <section
+      className={
+        'data-desktop__card data-desktop__standings data-desktop__panel ' +
+        (expanded ? 'is-expanded' : 'is-collapsed')
+      }
+      aria-label="小组赛面板"
+    >
       <div className="data-desktop__card-head">
         <div className="data-desktop__heading">
-          <h2>小组赛积分</h2>
-          {demo && <span>* 以下为演示数据</span>}
+          <button
+            type="button"
+            className="data-desktop__panel-toggle"
+            aria-expanded={expanded}
+            aria-controls="data-group-content"
+            onClick={onExpand}
+          >
+            <h2>小组赛积分</h2>
+            <span aria-hidden="true">{expanded ? '详细积分' : '展开 ↗'}</span>
+          </button>
+          {demo && expanded && <span>* 以下为演示数据</span>}
         </div>
-        {data.groups.length > 0 && (
+        {expanded && data.groups.length > 0 && (
           <label className="data-desktop__select data-desktop__select--group">
             <span className="sr-only">选择小组</span>
             <select value={groupId} onChange={(event) => onGroupChange(event.target.value)}>
@@ -380,94 +401,143 @@ function StandingsCard({
           </label>
         )}
       </div>
-      {groups.length === 0 ? (
-        <DataState
-          kind="empty"
-          title="本赛季暂无小组积分"
-          description="采用淘汰赛赛制的赛事，可通过上方入口查看对阵。"
-        />
-      ) : (
-        groups.map((group) => (
-          <div className="data-desktop__group" key={group.id}>
-            {groups.length > 1 && <h3>{group.name}</h3>}
-            <table className="data-desktop__standing-table">
-              <caption className="sr-only">{group.name}积分榜</caption>
-              <colgroup>
-                <col className="data-desktop__rank-col" />
-                <col className="data-desktop__team-col" />
-                {Array.from({ length: 8 }, (_, index) => (
-                  <col key={index} />
-                ))}
-              </colgroup>
-              <thead>
-                <tr>
-                  {['排名', '球队', '场次', '胜', '平', '负', '进球', '失球', '净胜球', '积分'].map(
-                    (label) => (
-                      <th key={label} scope="col">
-                        {label}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {group.standings.map((row) => (
-                  <tr
-                    key={row.teamId}
-                    className={
-                      (row.rank === 1 ? 'is-leading ' : '') +
-                      (row.teamId === primaryTeamId ? 'is-primary' : '')
-                    }
-                  >
-                    <td className="data-desktop__standing-rank">{row.rank}</td>
-                    <td>
-                      <div className="data-desktop__team-cell">
-                        <TeamCrest team={teams.get(row.teamId) ?? null} size="small" />
-                        <a href={teamUrl(row.teamId, data.tournament.id)} onClick={navigateLink}>
-                          {row.teamName}
-                        </a>
-                        {row.teamId === primaryTeamId && (
-                          <span className="data-desktop__primary-tag">主队</span>
-                        )}
-                        {row.isLive && <span className="data-desktop__live-tag">暂定</span>}
-                      </div>
-                    </td>
-                    <td>{row.played}</td>
-                    <td>{row.won}</td>
-                    <td>{row.drawn}</td>
-                    <td>{row.lost}</td>
-                    <td>{row.goalsFor}</td>
-                    <td>{row.goalsAgainst}</td>
-                    <td>{row.goalDifference}</td>
-                    <td className="data-desktop__points">{row.points}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {group.standings.length === 0 && (
-              <p className="data-desktop__empty">该小组暂未产生积分数据。</p>
-            )}
-          </div>
-        ))
-      )}
+      <div id="data-group-content">
+        {groups.length === 0 ? (
+          <DataState
+            kind="empty"
+            title="本赛季暂无小组积分"
+            description="采用淘汰赛赛制的赛事，可通过上方入口查看对阵。"
+          />
+        ) : (
+          groups.map((group) => (
+            <div className="data-desktop__group" key={group.id}>
+              {groups.length > 1 && <h3>{group.name}</h3>}
+              {!expanded ? (
+                <div className="data-desktop__compact-standings">
+                  {group.standings.map((row) => (
+                    <div
+                      className={
+                        'data-desktop__compact-standing ' + (row.rank <= 2 ? 'is-qualifying' : '')
+                      }
+                      key={row.teamId}
+                      title={`${row.teamName} · ${row.points} 分`}
+                    >
+                      <span>{row.rank}</span>
+                      <TeamCrest team={teams.get(row.teamId) ?? null} size="small" />
+                      <span className="data-desktop__compact-team">{row.shortName}</span>
+                      <strong>
+                        {row.points}
+                        <small>分</small>
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <table className="data-desktop__standing-table">
+                  <caption className="sr-only">{group.name}积分榜</caption>
+                  <colgroup>
+                    <col className="data-desktop__rank-col" />
+                    <col className="data-desktop__team-col" />
+                    {Array.from({ length: 8 }, (_, index) => (
+                      <col key={index} />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      {[
+                        '排名',
+                        '球队',
+                        '场次',
+                        '胜',
+                        '平',
+                        '负',
+                        '进球',
+                        '失球',
+                        '净胜球',
+                        '积分',
+                      ].map((label) => (
+                        <th key={label} scope="col">
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.standings.map((row) => (
+                      <tr
+                        key={row.teamId}
+                        className={
+                          (row.rank <= 2 ? 'is-qualifying ' : '') +
+                          (row.teamId === primaryTeamId ? 'is-primary' : '')
+                        }
+                      >
+                        <td className="data-desktop__standing-rank">{row.rank}</td>
+                        <td>
+                          <div className="data-desktop__team-cell">
+                            <TeamCrest team={teams.get(row.teamId) ?? null} size="small" />
+                            <a
+                              href={teamUrl(row.teamId, data.tournament.id)}
+                              onClick={navigateLink}
+                            >
+                              {row.teamName}
+                            </a>
+                            {row.teamId === primaryTeamId && (
+                              <span className="data-desktop__primary-tag">主队</span>
+                            )}
+                            {row.isLive && <span className="data-desktop__live-tag">暂定</span>}
+                          </div>
+                        </td>
+                        <td>{row.played}</td>
+                        <td>{row.won}</td>
+                        <td>{row.drawn}</td>
+                        <td>{row.lost}</td>
+                        <td>{row.goalsFor}</td>
+                        <td>{row.goalsAgainst}</td>
+                        <td>{row.goalDifference}</td>
+                        <td className="data-desktop__points">{row.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {group.standings.length === 0 && (
+                <p className="data-desktop__empty">该小组暂未产生积分数据。</p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
       <div className="data-desktop__table-note">
         {demo ? (
           <>
             <span>
-              <i />胜 3 分 · 平 1 分 · 负 0 分
+              <i />
+              小组前两名
             </span>
-            <span>同分优先比较净胜球</span>
+            {expanded && <span>胜 3 分 · 平 1 分 · 负 0 分</span>}
           </>
         ) : (
           <span>积分与同分排序依据赛事规程，由赛事系统计算。</span>
         )}
-        <span>
-          净胜球 = 进球 − 失球
-          {data.groups.some((group) => group.standings.some((row) => row.isLive))
-            ? ' · 暂定积分含进行中比赛'
-            : ''}
-        </span>
+        {expanded && (
+          <span>
+            净胜球 = 进球 − 失球
+            {data.groups.some((group) => group.standings.some((row) => row.isLive))
+              ? ' · 暂定积分含进行中比赛'
+              : ''}
+          </span>
+        )}
       </div>
+      {!expanded && (
+        <button
+          type="button"
+          className="data-desktop__panel-cover"
+          aria-label="展开小组赛"
+          onClick={onExpand}
+        >
+          <span className="sr-only">展开小组赛</span>
+        </button>
+      )}
     </section>
   )
 }
@@ -608,99 +678,6 @@ function LeaderRow({
         {mode === 'scorers' ? player.goals : player.assists}
       </td>
     </tr>
-  )
-}
-
-function KnockoutCard({ data }: { data: CompetitionData }) {
-  const layout = useMemo(() => createBracketLayout(data.bracket), [data.bracket])
-  const matches = useMemo(
-    () => new Map(data.bracket.flatMap((round) => round.matches).map((match) => [match.id, match])),
-    [data.bracket],
-  )
-  return (
-    <section className="data-desktop__card data-desktop__knockout">
-      <div className="data-desktop__card-head">
-        <h2>淘汰赛对阵</h2>
-        <span className="data-desktop__leader-note">
-          点击比赛查看战报{data.resultsMode === 'DEMO' ? ' · 演示签位' : ''}
-        </span>
-      </div>
-      {data.bracket.length === 0 ? (
-        <DataState kind="empty" title="暂无淘汰赛对阵" description="晋级席位确认后将在这里显示。" />
-      ) : (
-        <div
-          className="data-desktop__bracket-scroll"
-          tabIndex={0}
-          aria-label="可横向滚动的淘汰赛对阵"
-        >
-          <div
-            className="data-desktop__bracket-canvas"
-            style={{ width: layout.width, height: layout.height }}
-          >
-            {layout.rounds.map((round) => (
-              <h3
-                key={round.id}
-                className="data-desktop__round"
-                style={{ left: round.x, width: round.width }}
-              >
-                {round.name}
-              </h3>
-            ))}
-            {layout.connectors.map((connector) => (
-              <div
-                key={connector.id}
-                className="data-desktop__connector"
-                style={{
-                  left: connector.x,
-                  top: connector.y,
-                  width: connector.width,
-                  height: connector.height,
-                }}
-              />
-            ))}
-            {layout.nodes.map((node) => {
-              const match = matches.get(node.matchId)
-              if (!match) return null
-              return (
-                <a
-                  key={node.id}
-                  className="data-desktop__bracket-match"
-                  href={`/pages/readonly-match-detail/index?matchId=${encodeURIComponent(match.id)}`}
-                  onClick={navigateLink}
-                  style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
-                >
-                  {node.placement && <span className="data-desktop__placement">三四名赛</span>}
-                  <div className="data-desktop__match-meta">
-                    <span>
-                      {formatDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
-                    </span>
-                    <MatchStatus status={match.status} />
-                  </div>
-                  <div className="data-desktop__match-team">
-                    <TeamCrest team={match.homeTeam} size="small" />
-                    <TeamName
-                      team={match.homeTeam}
-                      tournamentId={match.tournamentId}
-                      fallback={match.homePlaceholder ?? '待定'}
-                    />
-                    <strong>{match.homeScore ?? '—'}</strong>
-                  </div>
-                  <div className="data-desktop__match-team">
-                    <TeamCrest team={match.awayTeam} size="small" />
-                    <TeamName
-                      team={match.awayTeam}
-                      tournamentId={match.tournamentId}
-                      fallback={match.awayPlaceholder ?? '待定'}
-                    />
-                    <strong>{match.awayScore ?? '—'}</strong>
-                  </div>
-                </a>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </section>
   )
 }
 
