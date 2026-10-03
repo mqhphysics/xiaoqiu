@@ -14,6 +14,7 @@ import type {
   MessageUser,
   MatchExperienceResponse,
   PlayerDetailResponse,
+  PublicPersonResponse,
   PlayerFollowsResponse,
   PostComment,
   PostDetail,
@@ -64,10 +65,19 @@ export const productRepository = {
       `/public/players/${encodeURIComponent(playerId)}${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
     ),
 
+  getPerson: (userId: string, tournamentId?: string) => request<PublicPersonResponse>(
+    `/public/people/${encodeURIComponent(userId)}${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+  ),
+
   getMatch: (matchId: string) =>
     request<MatchExperienceResponse>(`/public/matches/${encodeURIComponent(matchId)}/experience`),
 
   getPost: (postId: string) => request<PostDetail>(`/public/posts/${encodeURIComponent(postId)}`),
+
+  getPosts: (tournamentId?: string) =>
+    request<{ items: PostSummary[] }>(
+      `/public/posts${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+    ),
 
   login: async (identifier: string, password: string) => {
     const session = await request<AuthSession>('/auth/login', {

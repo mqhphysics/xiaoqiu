@@ -9,13 +9,19 @@ import {
   formatTime,
   matchStatusLabel,
   matchStatusTone,
-  verificationLabel,
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
 import { demoCrestUrl } from '../../features/product/demo-media'
 import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
-import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
+import {
+  openPost,
+  updatePostInteraction,
+  usePostInteraction,
+} from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
+import { PlayerTrigger } from '../player-trigger'
+import { VerificationBadge } from '../verification-badge'
+import { PersonTrigger } from '../person-trigger'
 
 import './index.scss'
 
@@ -57,14 +63,20 @@ export function UserAvatar({
   color,
   avatarUrl,
   size = 'medium',
+  playerId,
+  tournamentId,
+  userId,
 }: {
   name: string
   color?: string | null
   avatarUrl?: string | null
   size?: 'small' | 'medium' | 'large'
+  playerId?: string | undefined
+  tournamentId?: string | undefined
+  userId?: string | undefined
 }) {
   const source = resolveMediaUrl(avatarUrl)
-  return source ? (
+  const avatar = source ? (
     <Image
       aria-label={`${name}的头像`}
       className={`user-avatar user-avatar--${size}`}
@@ -78,6 +90,17 @@ export function UserAvatar({
     >
       {name.slice(0, 1)}
     </Text>
+  )
+  return userId ? (
+    <PersonTrigger userId={userId} tournamentId={tournamentId} name={name}>
+      {avatar}
+    </PersonTrigger>
+  ) : playerId ? (
+    <PlayerTrigger playerId={playerId} {...(tournamentId ? { tournamentId } : {})} name={name}>
+      {avatar}
+    </PlayerTrigger>
+  ) : (
+    avatar
   )
 }
 
@@ -134,7 +157,8 @@ export function PostCard({
 }) {
   const post = usePostInteraction(originalPost)
   const open = () => {
-    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) void openPost(post.id)
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches)
+      void openPost(post.id)
     else onOpen()
   }
   const [imageFailed, setImageFailed] = useState(false)
@@ -142,18 +166,30 @@ export function PostCard({
   const imageUrl = variant === 'home' && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
-    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB || !window.matchMedia('(min-width: 721px)').matches) { onLike?.(); return }
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB || !window.matchMedia('(min-width: 721px)').matches) {
+      onLike?.()
+      return
+    }
     if (likePending.current) return
     if (!readSession()) {
       void Taro.showToast({ title: '登录后可以点赞', icon: 'none' })
       return
     }
     likePending.current = true
-    void productRepository.setLike(post.id, !post.likedByMe).then(result => {
-      updatePostInteraction({ ...post, likedByMe: result.liked, likeCount: result.likeCount })
-    }).catch(issue => {
-      void Taro.showToast({ title: issue instanceof Error ? issue.message : '点赞失败，请重试', icon: 'none' })
-    }).finally(() => { likePending.current = false })
+    void productRepository
+      .setLike(post.id, !post.likedByMe)
+      .then((result) => {
+        updatePostInteraction({ ...post, likedByMe: result.liked, likeCount: result.likeCount })
+      })
+      .catch((issue) => {
+        void Taro.showToast({
+          title: issue instanceof Error ? issue.message : '点赞失败，请重试',
+          icon: 'none',
+        })
+      })
+      .finally(() => {
+        likePending.current = false
+      })
   }
   const stopAndMessage = (event: BaseEventOrig) => {
     if (!onMessageAuthor) return
@@ -166,13 +202,28 @@ export function PostCard({
       onClick={open}
     >
       <View className="post-card__author">
-        <UserAvatar avatarUrl={post.author.avatarUrl} name={post.author.displayName} size="small" />
+        <UserAvatar
+          avatarUrl={post.author.avatarUrl}
+          name={post.author.displayName}
+          userId={post.author.id}
+          tournamentId={post.tournamentId}
+          size="small"
+        />
         <View className="post-card__identity">
           <View className="post-card__name-row">
-            <Text className="post-card__name">{post.author.displayName}</Text>
-            <Text className="post-card__verified">
-              {verificationLabel(post.author.verificationLevel)}
-            </Text>
+            <PersonTrigger
+              userId={post.author.id}
+              tournamentId={post.tournamentId}
+              name={post.author.displayName}
+            >
+              <Text className="post-card__name">{post.author.displayName}</Text>
+            </PersonTrigger>
+            <VerificationBadge
+              level={post.author.verificationLevel}
+              roles={post.author.roles}
+              official={post.author.official}
+              className="post-card__verified"
+            />
           </View>
           <Text className="post-card__time">{formatRelativeTime(post.publishedAt)}</Text>
         </View>
@@ -195,12 +246,18 @@ export function PostCard({
           onError={() => setImageFailed(true)}
           onClick={(event) => {
             event.stopPropagation()
-            if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) open()
+            if (
+              Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+              window.matchMedia('(min-width: 721px)').matches
+            )
+              open()
             else void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
           }}
         />
       )}
-      {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>}
+      {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && (
+        <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>
+      )}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
       <View className="post-card__actions">

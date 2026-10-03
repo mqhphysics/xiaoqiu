@@ -3,6 +3,7 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { PersonTrigger } from '../../components/person-trigger'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
 import { openMessaging } from '../../components/messaging-drawer'
@@ -15,6 +16,7 @@ import {
   positionLabel,
 } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { openPlayer } from '../../features/product/player-navigation'
 import { readSession } from '../../features/product/session'
 import { MatchReportEntry } from '../../features/match-report/MatchReportEntry'
 import { useDetailBack } from '../readonly-schedule/detail-back'
@@ -234,10 +236,10 @@ function MatchContent({
                     {eventLabel(event.type)}
                   </Text>
                   <View className="event-row__copy">
-                    <Text>{event.player?.displayName ?? event.team.shortName}</Text>
+                    <PersonTrigger playerId={event.player?.id} tournamentId={match.tournamentId} name={event.player?.displayName ?? event.team.shortName}><Text>{event.player?.displayName ?? event.team.shortName}</Text></PersonTrigger>
                     <Text>
                       {event.relatedPlayer
-                        ? `助攻 ${event.relatedPlayer.displayName}`
+                        ? <>助攻 <PersonTrigger playerId={event.relatedPlayer.id} tournamentId={match.tournamentId} name={event.relatedPlayer.displayName}>{event.relatedPlayer.displayName}</PersonTrigger></>
                         : (event.description ?? event.team.name)}
                     </Text>
                   </View>
@@ -276,19 +278,13 @@ function MatchContent({
                     className="lineup-player"
                     key={player.id}
                     onClick={() =>
-                      void Taro.navigateTo({
-                        url:
-                          '/pages/player-detail/index?playerId=' +
-                          encodeURIComponent(player.id) +
-                          '&tournamentId=' +
-                          encodeURIComponent(match.tournamentId),
-                      })
+                      void openPlayer(player.id, match.tournamentId)
                     }
                   >
                     <Text className="lineup-player__number">{player.shirtNumber ?? '-'}</Text>
-                    <UserAvatar name={player.displayName} size="small" />
+                    <UserAvatar name={player.displayName} playerId={player.id} tournamentId={match.tournamentId} size="small" />
                     <View className="lineup-player__copy">
-                      <Text>{player.displayName}</Text>
+                      <PersonTrigger playerId={player.id} tournamentId={match.tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                       <Text>
                         {positionLabel(player.position)} · {player.starter ? '首发' : '替补'}
                       </Text>
@@ -393,11 +389,12 @@ function RatingsPanel({
                 <UserAvatar
                   avatarUrl={review.author.avatarUrl}
                   name={review.author.displayName}
+                  userId={review.author.id}
                   size="small"
                 />
                 <View className="match-review__copy">
                   <View className="match-review__heading">
-                    <Text>{review.author.displayName}</Text>
+                    <PersonTrigger userId={review.author.id} name={review.author.displayName}><Text>{review.author.displayName}</Text></PersonTrigger>
                     <Text>{renderStars(review.rating)}</Text>
                     <Text>{formatRelativeTime(review.createdAt)}</Text>
                   </View>

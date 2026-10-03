@@ -8,9 +8,11 @@ import { openMessaging } from '../../components/messaging-drawer'
 import { ReportModal } from '../../components/report-modal'
 import { DataState } from '../../components/public-ui'
 import { ProductSection, UserAvatar } from '../../components/product-ui'
+import { PersonTrigger } from '../../components/person-trigger'
 import { positionLabel, roleLabel, verificationLabel } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { openPlayer } from '../../features/product/player-navigation'
 import type {
   AdminIdentity,
   AuthUser,
@@ -278,13 +280,7 @@ function ProfilePanel({
         <View
           className="linked-player"
           onClick={() =>
-            void Taro.navigateTo({
-              url:
-                '/pages/player-detail/index?playerId=' +
-                encodeURIComponent(user.linkedPlayer!.id) +
-                '&tournamentId=' +
-                encodeURIComponent(tournamentId),
-            })
+            void openPlayer(user.linkedPlayer!.id, tournamentId)
           }
         >
           <View>
@@ -325,13 +321,7 @@ function ProfilePanel({
               title="球员档案"
               note="数据与出场记录"
               action={() =>
-                void Taro.navigateTo({
-                  url:
-                    '/pages/player-detail/index?playerId=' +
-                    encodeURIComponent(user.linkedPlayer!.id) +
-                    '&tournamentId=' +
-                    encodeURIComponent(tournamentId),
-                })
+                void openPlayer(user.linkedPlayer!.id, tournamentId)
               }
             />
           )}
@@ -458,6 +448,7 @@ function NotificationsPanel({
               <UserAvatar
                 avatarUrl={item.actor?.avatarUrl ?? null}
                 name={item.actor?.displayName ?? '晓球'}
+                userId={item.actor?.id}
                 size="small"
               />
               <View>
@@ -719,7 +710,7 @@ function AdminIdentityDirectory() {
             <View className="identity-card" key={identity.id}>
               <View className="identity-card__heading">
                 <View>
-                  <Text className="identity-card__nickname">{identity.displayName}</Text>
+                  <PersonTrigger userId={identity.id} name={identity.displayName}><Text className="identity-card__nickname">{identity.displayName}</Text></PersonTrigger>
                   <Text className="identity-card__username">@{identity.username}</Text>
                 </View>
                 <Text className="identity-card__verification">

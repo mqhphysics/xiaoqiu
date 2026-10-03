@@ -8,6 +8,8 @@ import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../compon
 import { createBracketLayout } from '../../features/competition/competition.logic'
 import { formatDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
+import { openPlayer } from '../../features/product/player-navigation'
+import { PersonTrigger } from '../../components/person-trigger'
 import type {
   CompetitionDataResponse,
   PlayerStats,
@@ -198,9 +200,9 @@ function Overview({
             {data.leaders.scorers.slice(0, 5).map((player, index) => (
               <View className="overview-leader" key={player.id}>
                 <Text className="overview-leader__rank">{index + 1}</Text>
-                <UserAvatar name={player.displayName} size="small" />
+                <UserAvatar name={player.displayName} playerId={player.id} tournamentId={data.tournament.id} size="small" />
                 <View className="overview-leader__copy">
-                  <Text>{player.displayName}</Text>
+                  <PersonTrigger playerId={player.id} tournamentId={data.tournament.id} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                   <Text>{player.team?.name ?? '暂无球队'}</Text>
                 </View>
                 <Text className="overview-leader__value">{player.goals}</Text>
@@ -470,19 +472,13 @@ function Leaders({
               className="leader-table__row"
               key={player.id}
               onClick={() =>
-                void Taro.navigateTo({
-                  url:
-                    '/pages/player-detail/index?playerId=' +
-                    encodeURIComponent(player.id) +
-                    '&tournamentId=' +
-                    encodeURIComponent(tournamentId),
-                })
+                void openPlayer(player.id, tournamentId)
               }
             >
               <Text className="leader-table__rank">{index + 1}</Text>
               <View className="leader-table__player">
-                <UserAvatar name={player.displayName} size="small" />
-                <Text>{player.displayName}</Text>
+                <UserAvatar name={player.displayName} playerId={player.id} tournamentId={tournamentId} size="small" />
+                <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
               </View>
               <Text>{player.team?.shortName ?? '-'}</Text>
               <Text>{player.appearances}</Text>

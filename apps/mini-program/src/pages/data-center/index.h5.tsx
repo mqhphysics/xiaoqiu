@@ -8,6 +8,8 @@ import { createBracketLayout } from '../../features/competition/competition.logi
 import { formatDate, formatTime } from '../../features/product/product.format'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { openPlayer } from '../../features/product/player-navigation'
+import { HOVER_PLAYER_EVENT, LEAVE_PLAYER_EVENT } from '../../features/product/player-navigation.h5'
 import type {
   CompetitionDataResponse,
   PlayerStats,
@@ -571,7 +573,19 @@ function LeaderRow({
       <td>
         <a
           href={`/pages/player-detail/index?playerId=${encodeURIComponent(player.id)}&tournamentId=${encodeURIComponent(tournamentId)}`}
-          onClick={navigateLink}
+          onClick={(event) => {
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            void openPlayer(player.id, tournamentId)
+          }}
+          onMouseEnter={(event) =>
+            window.dispatchEvent(
+              new CustomEvent(HOVER_PLAYER_EVENT, {
+                detail: { playerId: player.id, tournamentId, anchor: event.currentTarget },
+              }),
+            )
+          }
+          onMouseLeave={() => window.dispatchEvent(new Event(LEAVE_PLAYER_EVENT))}
         >
           {player.displayName}
         </a>
