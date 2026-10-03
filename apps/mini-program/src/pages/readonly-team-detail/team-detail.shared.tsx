@@ -316,8 +316,8 @@ function TeamContent({
           note={data.roster.length + ' 名球员'}
         />
         {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
-          <Text className="public-team-empty">
-            球队成员与赛事锁定名单分别维护，正式参赛资格以赛事审核结果为准。
+            <Text className="public-team-eligibility-note">
+              球队成员与赛事锁定名单分别维护，正式参赛资格以赛事审核结果为准。
           </Text>
         ) : null}
         <View className="public-roster-groups">
