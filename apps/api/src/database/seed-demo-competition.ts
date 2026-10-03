@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 
 import {
   CompetitionRuleVersionStatus,
@@ -15,6 +16,7 @@ import {
 import type { Prisma } from '../generated/prisma/client'
 import {
   DEMO_MATCHES,
+  DEMO_GROUP_CODES,
   DEMO_PLAYERS,
   DEMO_TEAMS,
   fixtureId,
@@ -29,7 +31,7 @@ export interface SeedTournamentFixture {
   scheduleRevisionId: string
   groupStageId?: string | undefined
   knockoutStageId: string
-  groups: Partial<Record<'A' | 'B', string>>
+  groups: Partial<Record<(typeof DEMO_GROUP_CODES)[number], string>>
   rounds: Record<string, string>
 }
 
@@ -99,23 +101,30 @@ export async function seedDemoTournament(
     },
   })
 
-  await tx.competitionRuleVersion.upsert({
-    where: { tournamentId_version: { tournamentId, version: 1 } },
-    create: {
-      id: fixtureId(`rule:${year}:1`),
-      organizationId,
-      tournamentId,
-      version: 1,
-      name: `${year} 绿茵杯竞赛规程`,
-      status: CompetitionRuleVersionStatus.PUBLISHED,
-      rules: competitionRules(year),
-    },
-    update: {
-      name: `${year} 绿茵杯竞赛规程`,
-      status: CompetitionRuleVersionStatus.PUBLISHED,
-      rules: competitionRules(year),
-    },
+  const rules = competitionRules(year)
+  const currentRule = await tx.competitionRuleVersion.findFirst({
+    where: { tournamentId },
+    orderBy: { version: 'desc' },
   })
+  // Published rule content is immutable, including on an older demo database.
+  if (
+    !currentRule ||
+    currentRule.status !== CompetitionRuleVersionStatus.PUBLISHED ||
+    !isDeepStrictEqual(currentRule.rules, rules)
+  ) {
+    const version = (currentRule?.version ?? 0) + 1
+    await tx.competitionRuleVersion.create({
+      data: {
+        id: fixtureId(`rule:${year}:${version}`),
+        organizationId,
+        tournamentId,
+        version,
+        name: `${year} 绿茵杯竞赛规程`,
+        status: CompetitionRuleVersionStatus.PUBLISHED,
+        rules,
+      },
+    })
+  }
 
   const groupStageId = year === '2026' ? fixtureId(`stage:${year}:group`) : undefined
   if (groupStageId) {
@@ -151,7 +160,7 @@ export async function seedDemoTournament(
 
   const groups: SeedTournamentFixture['groups'] = {}
   if (groupStageId) {
-    for (const [index, code] of ['A', 'B'].entries()) {
+    for (const [index, code] of DEMO_GROUP_CODES.entries()) {
       const groupId = fixtureId(`group:${year}:${code}`)
       await tx.tournamentGroup.upsert({
         where: { stageId_groupCode: { stageId: groupStageId, groupCode: code } },
@@ -165,7 +174,7 @@ export async function seedDemoTournament(
         },
         update: { name: `${code} 组`, sortOrder: index + 1 },
       })
-      groups[code as 'A' | 'B'] = groupId
+      groups[code] = groupId
     }
   }
 
@@ -255,7 +264,7 @@ export async function seedDemoRosters(
   fixture: SeedTournamentFixture,
   teams: Array<{ id: string }>,
 ): Promise<void> {
-  const participatingTeams = teams.slice(0, 8)
+  const participatingTeams = fixture.year === '2026' ? teams : teams.slice(0, 8)
   const coachSurnames = [
     '王',
     '李',
@@ -284,8 +293,8 @@ export async function seedDemoRosters(
       .update(`DEMO_FIXTURE:${fixture.year}:${definition.code}`)
       .digest('hex')
     const groupId =
-      fixture.year === '2026' && teamIndex < 8
-        ? (fixture.groups[teamIndex < 4 ? 'A' : 'B'] ?? null)
+      fixture.year === '2026'
+        ? (fixture.groups[DEMO_GROUP_CODES[Math.floor(teamIndex / 4)]!] ?? null)
         : null
     const coachDisplayName = `${coachSurnames[teamIndex] ?? '林'}教练`
 
@@ -464,7 +473,7 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
-        ? '8 支球队参加小组赛与演示淘汰赛，冠军主线为八强、半决赛和决赛，三四名赛独立展示。演示签位用于展示晋级路径；小组前两名的绿色标记不替代正式晋级规程。'
+        ? '16 支球队分为 A/B/C/D 四组，每组 4 队进行单循环，小组前两名晋级八强。八强签位为 A1-B1、B2-D1、C1-D2、A2-C2；冠军主线为八强、半决赛和决赛，三四名赛独立展示。这是演示赛制，不替代真实赛事规程。'
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],

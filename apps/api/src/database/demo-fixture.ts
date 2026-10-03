@@ -11,6 +11,7 @@ import {
 
 export const DEMO_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001'
 export const DEMO_PASSWORD = 'Xiaoqiu2026!'
+export const DEMO_GROUP_CODES = ['A', 'B', 'C', 'D'] as const
 
 export interface DemoTeamDefinition {
   code: string
@@ -57,7 +58,7 @@ export interface DemoMatchDefinition {
   title: string
   tournament: '2025' | '2026'
   stage: 'GROUP' | 'KNOCKOUT'
-  group?: 'A' | 'B' | undefined
+  group?: (typeof DEMO_GROUP_CODES)[number] | undefined
   round: number
   homeTeamIndex?: number | undefined
   awayTeamIndex?: number | undefined
@@ -293,8 +294,8 @@ export const DEMO_TEAMS: DemoTeamDefinition[] = [
   },
 ]
 
-// The competition has eight registered teams. Retain the wider profile library for existing accounts.
-export const DEMO_TOURNAMENT_TEAMS = DEMO_TEAMS.slice(0, 8)
+// All sixteen teams enter the 2026 competition; only eight advance to the knockout stage.
+export const DEMO_TOURNAMENT_TEAMS = DEMO_TEAMS
 
 const surnames = [
   '周',
@@ -598,9 +599,38 @@ export const DEMO_MATCHES: DemoMatchDefinition[] = [
     '2026-08-30T19:00:00+08:00',
     1,
     1,
-    '青藤守住平局，凭净胜球优势晋级半决赛。',
+    '青藤守住平局，凭净胜球优势取得八强席位。',
     294,
   ),
+  ...(['C', 'D'] as const).flatMap((group, groupIndex) => {
+    const offset = 8 + groupIndex * 4
+    const fixtures = [
+      [1, 0, 1, 2, 1],
+      [1, 2, 3, 1, 1],
+      [2, 0, 2, 3, 0],
+      [2, 1, 3, 2, 2],
+      [3, 0, 3, 2, 0],
+      [3, 1, 2, 2, 1],
+    ] as const
+    return fixtures.map(([round, home, away, homeScore, awayScore], index) =>
+      match(
+        `GC26-${group}-R${round}-${String((index % 2) + 1).padStart(2, '0')}`,
+        `${group}组第${round}轮`,
+        '2026',
+        'GROUP',
+        group,
+        round,
+        offset + home,
+        offset + away,
+        MatchStatus.FINISHED,
+        `2026-08-${round === 1 ? '25' : round === 2 ? '28' : '30'}T${index % 2 === 0 ? '10' : '16'}:00:00+08:00`,
+        homeScore,
+        awayScore,
+        `${DEMO_TEAMS[offset + home]!.name}与${DEMO_TEAMS[offset + away]!.name}完成小组赛演示对阵。`,
+        250 + index * 10,
+      ),
+    )
+  }),
   match(
     'GC26-QF-01',
     '八强赛 1',
@@ -625,12 +655,12 @@ export const DEMO_MATCHES: DemoMatchDefinition[] = [
     undefined,
     2,
     5,
-    4,
+    12,
     MatchStatus.FINISHED,
     '2026-09-01T10:00:00+08:00',
     1,
     0,
-    '青藤依靠一次快速反击淘汰原子。',
+    '青藤依靠一次快速反击取得四强席位。',
     327,
   ),
   match(
@@ -640,13 +670,13 @@ export const DEMO_MATCHES: DemoMatchDefinition[] = [
     'KNOCKOUT',
     undefined,
     2,
-    2,
-    3,
+    8,
+    13,
     MatchStatus.FINISHED,
     '2026-09-01T16:00:00+08:00',
     2,
     1,
-    '星火在下半场打入制胜球，赢下八强焦点战。',
+    '文院队在下半场打入制胜球，赢下八强焦点战。',
     398,
   ),
   match(
@@ -657,12 +687,12 @@ export const DEMO_MATCHES: DemoMatchDefinition[] = [
     undefined,
     2,
     1,
-    6,
+    9,
     MatchStatus.FINISHED,
     '2026-09-01T16:00:00+08:00',
     2,
     1,
-    '物院二队顶住山岳反扑，拿到最后一个四强席位。',
+    '物院二队顶住反扑，拿到最后一个四强席位。',
     344,
   ),
   match(
@@ -688,7 +718,7 @@ export const DEMO_MATCHES: DemoMatchDefinition[] = [
     'KNOCKOUT',
     undefined,
     3,
-    2,
+    8,
     1,
     MatchStatus.SCHEDULED,
     '2026-09-02T19:00:00+08:00',
@@ -1012,8 +1042,8 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
   {
     key: 'official-round-two',
     type: PostType.OFFICIAL,
-    title: '16 队演示淘汰赛签位确认',
-    body: '为完整演示淘汰树，本页按 16 队均已入围的假设生成演示签位。前 8 队的历史小组赛仍予保留，但演示签位不表示球队由小组赛成绩自然晋级。十六强、八强、半决赛与决赛路径已同步到数据页。',
+    title: '16 队参赛，8 队晋级淘汰赛',
+    body: '16 支演示球队分为 A/B/C/D 四组，每组 4 队进行单循环，小组前两名晋级八强。八强签位为 A1-B1、B2-D1、C1-D2、A2-C2；冠军主线为八强、半决赛与决赛，三四名赛独立展示。这是演示赛制，不替代真实赛事规程。',
     publishedAt: '2026-08-30T21:30:00+08:00',
   },
   {
@@ -1128,7 +1158,7 @@ function match(
   title: string,
   tournament: '2025' | '2026',
   stage: 'GROUP' | 'KNOCKOUT',
-  group: 'A' | 'B' | undefined,
+  group: DemoMatchDefinition['group'],
   round: number,
   homeTeamIndex: number | undefined,
   awayTeamIndex: number | undefined,

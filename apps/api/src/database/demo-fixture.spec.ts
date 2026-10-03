@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  DEMO_GROUP_CODES,
   DEMO_MATCHES,
   DEMO_PLAYERS,
   DEMO_POSTS,
@@ -9,6 +10,7 @@ import {
   DEMO_TOURNAMENT_TEAMS,
   type DemoMatchDefinition,
 } from './demo-fixture'
+import { calculateStandings } from '../experience/ranking'
 import {
   DEMO_STARTERS_PER_TEAM,
   getDemoMinutesPlayed,
@@ -16,11 +18,9 @@ import {
 } from './seed-demo-competition'
 import { DEMO_MATCH_REVIEWS } from './seed-demo-social'
 
-test('2026 tournament has 8 teams while retaining the existing demo profile library', () => {
-  const tournamentPlayers = DEMO_PLAYERS.filter((player) => player.teamIndex < 8)
-  assert.equal(DEMO_TOURNAMENT_TEAMS.length, 8)
-  assert.equal(tournamentPlayers.length, 112)
-  assert.equal(new Set(DEMO_TOURNAMENT_TEAMS.map((team) => team.code)).size, 8)
+test('2026 tournament registers all 16 teams with 14 players each', () => {
+  assert.equal(DEMO_TOURNAMENT_TEAMS.length, 16)
+  assert.equal(new Set(DEMO_TOURNAMENT_TEAMS.map((team) => team.code)).size, 16)
   assert.ok(DEMO_TEAMS.every((team) => team.code.startsWith('DEMO-')))
   assert.equal(new Set(DEMO_PLAYERS.map((player) => player.id)).size, 224)
   assert.equal(new Set(DEMO_PLAYERS.map((player) => player.sourceKey)).size, 224)
@@ -30,6 +30,54 @@ test('2026 tournament has 8 teams while retaining the existing demo profile libr
     assert.equal(players.length, 14)
     assert.ok(players.every((player) => player.sourceKey.startsWith('DEMO-2026-DEMO-')))
   }
+})
+
+test('four complete group round robins qualify exactly the eight quarterfinal teams', () => {
+  const qualified = new Set<number>()
+  for (const [groupIndex, group] of DEMO_GROUP_CODES.entries()) {
+    const offset = groupIndex * 4
+    const matches = DEMO_MATCHES.filter(
+      (match) => match.tournament === '2026' && match.group === group,
+    )
+    assert.equal(matches.length, 6)
+    assert.equal(
+      new Set(matches.map((match) => [match.homeTeamIndex, match.awayTeamIndex].sort().join(':')))
+        .size,
+      6,
+    )
+    assert.ok(
+      matches.every((match) =>
+        [match.homeTeamIndex, match.awayTeamIndex].every(
+          (index) => index !== undefined && index >= offset && index < offset + 4,
+        ),
+      ),
+    )
+    const standings = calculateStandings(
+      DEMO_TEAMS.slice(offset, offset + 4).map((team, index) => ({
+        id: String(offset + index),
+        name: team.name,
+        shortName: team.shortName,
+        primaryColor: team.primaryColor,
+      })),
+      matches.map((match) => ({
+        homeTeamId: String(match.homeTeamIndex),
+        awayTeamId: String(match.awayTeamIndex),
+        homeScore: match.homeScore!,
+        awayScore: match.awayScore!,
+        isLive: false,
+        startedAt: new Date(match.scheduledStartAt),
+      })),
+    )
+    assert.ok(standings.every((row) => row.played === 3))
+    standings.slice(0, 2).forEach((row) => qualified.add(Number(row.id)))
+  }
+  const quarterfinalTeams = DEMO_MATCHES.filter(
+    (match) => match.tournament === '2026' && match.stage === 'KNOCKOUT' && match.round === 2,
+  ).flatMap((match) => [match.homeTeamIndex, match.awayTeamIndex])
+  assert.equal(qualified.size, 8)
+  assert.deepEqual(new Set(quarterfinalTeams), qualified)
+  assert.equal(DEMO_MATCHES.filter((match) => match.tournament === '2026').length, 32)
+  assert.equal(DEMO_MATCHES.filter((match) => match.tournament === '2025').length, 8)
 })
 
 test('2026 knockout facts form an 8-team champion path with an independent third-place branch', () => {
@@ -60,7 +108,7 @@ test('2026 knockout facts form an 8-team champion path with an independent third
     true,
   )
   assert.equal(new Set(openingTeamIndexes).size, 8)
-  assert.ok(openingTeamIndexes.every((index) => index !== undefined && index < 8))
+  assert.ok(openingTeamIndexes.every((index) => index !== undefined && index < 16))
 
   assertProgression(quarterfinals, semifinals)
 

@@ -141,6 +141,10 @@ export class DemoEightTeamService {
   }
 
   private async authorize(authorization: string) {
+    if (DEMO_TOURNAMENT_TEAMS.length !== 8)
+      throw new Error(
+        'Eight-team normalization is retired: 16 teams enter, 8 qualify for knockouts.',
+      )
     const session = await this.auth.requireSession(authorization)
     if (session.organizationId !== DEMO_ORGANIZATION_ID)
       throw new Error('Only the local demo organization is supported.')
