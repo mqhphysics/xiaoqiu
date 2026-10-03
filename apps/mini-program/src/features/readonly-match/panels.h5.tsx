@@ -33,6 +33,7 @@ export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
         {match.lineups.map((lineup) => (
           <button
             type="button"
+            className="match-lineups__team-switch"
             aria-pressed={selectedId === lineup.team.id}
             key={lineup.team.id}
             onClick={() => setTeamId(lineup.team.id)}
@@ -151,6 +152,7 @@ function LineupCard({
           <button
             type="button"
             data-match-resource="player"
+            className="match-player-detail__profile"
             onClick={() => void openPlayer(activePlayer.id, match.tournamentId)}
           >
             查看球员资料 ↗

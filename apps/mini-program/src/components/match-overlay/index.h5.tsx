@@ -95,6 +95,11 @@ export function MatchOverlayHost() {
       cancelRestore()
       navigation.routeChanged()
     }
+    const prepareResourceNavigation = () => {
+      origin = null
+      cancelRestore()
+      navigation.prepareResourceNavigation()
+    }
     const taroRouteChanged = () => {
       // Taro push/replace changes the hash without a native hashchange event.
       if (sourceHash && window.location.hash !== sourceHash) routeChanged()
@@ -103,7 +108,7 @@ export function MatchOverlayHost() {
     window.addEventListener(OPEN_TEAM_EVENT, routeChanged)
     window.addEventListener(OPEN_PLAYER_EVENT, routeChanged)
     window.addEventListener(OPEN_PERSON_EVENT, routeChanged)
-    window.addEventListener(MATCH_RESOURCE_EVENT, routeChanged)
+    window.addEventListener(MATCH_RESOURCE_EVENT, prepareResourceNavigation)
     window.addEventListener('popstate', navigation.pop)
     window.addEventListener('hashchange', routeChanged)
     Taro.eventCenter.on('__afterTaroRouterChange', taroRouteChanged)
@@ -113,7 +118,7 @@ export function MatchOverlayHost() {
       window.removeEventListener(OPEN_TEAM_EVENT, routeChanged)
       window.removeEventListener(OPEN_PLAYER_EVENT, routeChanged)
       window.removeEventListener(OPEN_PERSON_EVENT, routeChanged)
-      window.removeEventListener(MATCH_RESOURCE_EVENT, routeChanged)
+      window.removeEventListener(MATCH_RESOURCE_EVENT, prepareResourceNavigation)
       window.removeEventListener('popstate', navigation.pop)
       window.removeEventListener('hashchange', routeChanged)
       Taro.eventCenter.off('__afterTaroRouterChange', taroRouteChanged)

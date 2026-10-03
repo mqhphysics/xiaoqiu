@@ -103,3 +103,35 @@ test('rapid close and reopen wait for the asynchronous browser history acknowled
   assert.equal(pushes, 2)
   assert.deepEqual(current, first)
 })
+
+test('resource capture releases the history marker while preserving the clicked button until navigation', () => {
+  let state: unknown = { router: 'source' }
+  let current: MatchRequest | null = null
+  let back = 0
+  const history = {
+    get state() {
+      return state
+    },
+    pushState(value: unknown) {
+      state = value
+    },
+    replaceState(value: unknown) {
+      state = value
+    },
+    back() {
+      back++
+    },
+  }
+  const overlay = createMatchOverlayHistory(history, 'test', (next) => {
+    current = next
+  })
+  const request = { matchId: 'one', tournamentId: 't' }
+  overlay.open(request)
+  overlay.prepareResourceNavigation()
+  assert.deepEqual(state, { router: 'source' })
+  assert.deepEqual(current, request)
+  assert.equal(back, 0)
+  overlay.routeChanged()
+  assert.equal(current, null)
+  assert.equal(back, 0)
+})

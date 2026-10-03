@@ -53,7 +53,7 @@
     line-height: 1;
   }
 }
-.match-dialog button {
+.match-dialog [type='button'] {
   transition:
     background-color 120ms ease,
     color 120ms ease;
@@ -93,7 +93,7 @@
     line-height: 1.7;
     overflow-wrap: anywhere;
   }
-  button {
+  [type='button'] {
     min-height: 44px;
     padding: 8px 24px;
     color: #fff;
@@ -119,11 +119,11 @@
 }
 .match-dialog .match-detail-tab,
 .match-dialog .rating-star,
-.match-dialog .match-review__actions button {
+.match-dialog .match-review__actions [type='button'] {
   border: 0;
   cursor: pointer;
 }
-.match-dialog button:disabled {
+.match-dialog [type='button']:disabled {
   cursor: default;
 }
 @media (max-width: 720px) {

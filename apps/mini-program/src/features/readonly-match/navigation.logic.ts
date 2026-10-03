@@ -47,6 +47,12 @@ export function createMatchOverlayHistory(
       ? readMatchRequest(marker.request)
       : null
   }
+  const releaseEntry = () => {
+    if (!current()) return
+    const state = stateRecord(history.state)
+    delete state[MATCH_HISTORY_KEY]
+    history.replaceState(state, '')
+  }
   return {
     open(request: MatchRequest) {
       if (closing) return
@@ -72,13 +78,14 @@ export function createMatchOverlayHistory(
       closing = false
       onChange(current())
     },
+    prepareResourceNavigation() {
+      // Keep the clicked resource button mounted until its bubble handler runs.
+      closing = false
+      releaseEntry()
+    },
     routeChanged() {
       closing = false
-      if (current()) {
-        const state = stateRecord(history.state)
-        delete state[MATCH_HISTORY_KEY]
-        history.replaceState(state, '')
-      }
+      releaseEntry()
       onChange(null)
     },
   }
