@@ -6,6 +6,7 @@ import { openTeam } from '../../features/product/team-navigation'
 import type { TeamDashboardResponse } from '../../features/product/product.types'
 import { TeamCrest } from '../product-ui'
 import { TeamIcon } from './icons.h5'
+import { useTeamFollow } from './follow.h5'
 
 export interface TeamHoverRequest {
   teamId: string
@@ -43,10 +44,12 @@ export function TeamHoverCard({
   const [data, setData] = useState<TeamDashboardResponse | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const follow = useTeamFollow(request.teamId)
   const card = useRef<HTMLElement>(null)
   const [position, setPosition] = useState({ left: 16, top: 16 })
   useEffect(() => {
     let active = true
+    setData(null)
     setError('')
     void readTeam(request)
       .then((result) => {
@@ -69,7 +72,7 @@ export function TeamHoverCard({
     const top =
       below + height <= window.innerHeight - 16 ? below : Math.max(16, anchor.top - height - 10)
     setPosition({ left, top })
-  }, [request.anchor, data, error])
+  }, [request.anchor, data, error, follow.error])
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -103,18 +106,45 @@ export function TeamHoverCard({
       onMouseLeave={onLeave}
       onFocus={onEnter}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) onLeave()
+        if (
+          !event.currentTarget.contains(event.relatedTarget) &&
+          !event.currentTarget.matches(':hover')
+        )
+          onLeave()
       }}
     >
       {data ? (
         <>
-          <div className="team-hover-card__identity">
-            <TeamCrest team={data.team} size="large" interactive={false} />
-            <div>
-              <strong>{data.team.name}</strong>
-              <span>{data.team.collegeName ?? '校园球队'}</span>
-              {data.team.motto ? <small>{data.team.motto}</small> : null}
-            </div>
+          <div className="team-hover-card__cover th-team-cover">
+            <button
+              data-team-control
+              type="button"
+              className="team-hover-card__follow"
+              aria-pressed={follow.followed}
+              aria-busy={follow.busy || follow.loading}
+              disabled={follow.busy || follow.loading || follow.primary}
+              onClick={(event) => {
+                event.stopPropagation()
+                void follow.toggle()
+              }}
+            >
+              <TeamIcon name="heart" />
+              {follow.followed ? '已关注' : '关注'}
+            </button>
+            <button
+              data-team-action
+              type="button"
+              className="team-hover-card__identity"
+              aria-label={`查看${data.team.name}详细资料`}
+              onClick={() => void openTeam(request.teamId, request.tournamentId)}
+            >
+              <TeamCrest team={data.team} size="large" interactive={false} />
+              <div>
+                <strong>{data.team.name}</strong>
+                <span>{data.team.collegeName ?? '校园球队'}</span>
+                {data.team.motto ? <small>{data.team.motto}</small> : null}
+              </div>
+            </button>
           </div>
           <div className="team-hover-card__stats">
             <div>
@@ -138,14 +168,14 @@ export function TeamHoverCard({
             {data.team.coachName ? `教练 ${data.team.coachName}` : '教练暂未登记'}
             {data.team.captainName ? ` · 队长 ${data.team.captainName}` : ''}
           </p>
-          <button
-            data-team-control
-            type="button"
-            onClick={() => void openTeam(request.teamId, request.tournamentId)}
-          >
-            查看完整球队资料
-            <TeamIcon name="arrow" />
-          </button>
+          {follow.error ? (
+            <p className="team-hover-card__error" role="alert">
+              {follow.error}
+              <button data-team-control type="button" onClick={follow.retry}>
+                重试读取
+              </button>
+            </p>
+          ) : null}
         </>
       ) : error ? (
         <div className="team-hover-card__state" role="alert">
