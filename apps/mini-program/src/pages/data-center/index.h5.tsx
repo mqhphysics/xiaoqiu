@@ -163,9 +163,9 @@ function DesktopDataPage() {
                   </button>
                 ))}
               </div>
-              <span className="data-desktop__view-hint">
-                {tab === 'teams' ? '小组赛与淘汰赛 · 点击面板展开' : '进球与助攻 · 同屏查看'}
-              </span>
+              <p className="data-desktop__toolbar-copy">
+                用数据记录每一场奔跑，见证校园足球的热爱与成长。
+              </p>
             </div>
             {tab === 'teams' && (
               <div
@@ -260,7 +260,6 @@ function DataHero({
             <span className="data-desktop__demo">演示赛季</span>
           )}
         </div>
-        <p>用数据记录每一场奔跑，见证校园足球的热爱与成长。</p>
       </div>
       <div className="data-desktop__kpis">
         <Stat icon="teams" label="参赛球队" value={unavailable ? '—' : teams.size} unit="支" />

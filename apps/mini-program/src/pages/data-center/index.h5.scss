@@ -8,7 +8,7 @@
       position: relative;
       width: calc(100% - 112px);
       max-width: 1380px;
-      padding: 40px 0 20px;
+      padding: 28px 0 20px;
     }
 
     .public-footer {
@@ -144,7 +144,7 @@
     display: flex;
     align-items: center;
     gap: 30px;
-    margin-bottom: 30px;
+    margin-bottom: 18px;
   }
   .data-desktop__intro {
     min-width: 0;
@@ -161,12 +161,6 @@
     font-weight: 950;
     letter-spacing: -1.5px;
     line-height: 1.25;
-  }
-  .data-desktop__intro p {
-    margin-top: 10px;
-    color: #677773;
-    font-size: 15px;
-    line-height: 1.6;
   }
   .data-desktop__select {
     position: relative;
@@ -594,9 +588,12 @@
   .data-desktop__tab {
     width: 160px;
   }
-  .data-desktop__view-hint {
-    color: #839286;
-    font-size: 12px;
+  .data-desktop__toolbar-copy {
+    min-width: 0;
+    color: #758475;
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: right;
   }
   .data-desktop__competition-panels {
     display: grid;
