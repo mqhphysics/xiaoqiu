@@ -32,7 +32,9 @@ socket.addEventListener('message', ({ data }) => {
 socket.addEventListener('close', () => {
   for (const operation of pending.values()) {
     clearTimeout(operation.timer)
-    operation.reject(new Error('The IDE window closed before responding; verify the action separately.'))
+    operation.reject(
+      new Error('The IDE window closed before responding; verify the action separately.'),
+    )
   }
   pending.clear()
 })
@@ -64,7 +66,7 @@ try {
       if (node.contentDocument) collect(node.contentDocument)
     }
     collect(tree.root)
-    console.log(visibleText.join('\n').slice(0,20000))
+    console.log(visibleText.join('\n').slice(0, 20000))
   }
   if (clickSelector) {
     const location = await send('Runtime.evaluate', {
@@ -93,7 +95,12 @@ try {
     })
   }
   const result = await send('Runtime.evaluate', {
-    expression: expression === '@ui-text' ? "'UI text collected.'" : clickSelector ? "'Mouse click sent; verify the resulting state separately.'" : expression,
+    expression:
+      expression === '@ui-text'
+        ? "'UI text collected.'"
+        : clickSelector
+          ? "'Mouse click sent; verify the resulting state separately.'"
+          : expression,
     returnByValue: true,
     awaitPromise: true,
   })
@@ -109,3 +116,4 @@ try {
 } finally {
   socket.close()
 }
+import { setTimeout, clearTimeout } from 'node:timers'
