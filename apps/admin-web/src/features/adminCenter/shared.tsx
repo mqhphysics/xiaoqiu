@@ -13,8 +13,7 @@ export interface PageData<T = Row> {
   pageSize: number
 }
 export function message(error: unknown): string {
-  if (error instanceof AdminApiError && error.status === 409)
-    return '资料已被其他人修改。请刷新后核对最新版本，再重新提交。'
+  if (error instanceof AdminApiError && error.status === 409) return error.message
   return error instanceof Error ? error.message : '读取失败，请重试。'
 }
 export function textValue(value: unknown): string {
@@ -65,6 +64,28 @@ const LABELS: Record<string, string> = {
   MIDFIELDER: '中场',
   FORWARD: '前锋',
   RIGHT: '右脚',
+  LOGIN: '登录',
+  SESSION_REVOKED: '会话撤销',
+  POST_CREATED: '发布帖子',
+  COMMENT_CREATED: '发表评论',
+  CURRENT_LIKE: '当前点赞关系',
+  USER_PROFILE_UPDATED: '修改用户资料',
+  USER_IDENTITY_VIEWED: '查看用户身份',
+  USER_DIRECTORY_VIEWED: '查看用户目录',
+  POST_APPROVED: '批准帖子',
+  POST_BLOCKED: '封禁帖子',
+  POST_RESTORED: '恢复帖子',
+  MEDIA_BLOCKED: '封禁图片',
+  MEDIA_RESTORED: '恢复图片',
+  MEDIA_PREVIEWED: '查看图片',
+  LOCAL_OWNER_SESSION_STARTED: '本机一键进入',
+  USER_ACCESS_FROZEN: '冻结账号',
+  USER_ACCESS_BANNED: '封禁账号',
+  USER_ACCESS_RESTORED: '恢复账号访问',
+  AI_MODERATION_REVIEWED: 'AI审核记录',
+  ALLOW: '建议通过',
+  REVIEW: '需要复核',
+  BLOCK: '建议封禁',
 }
 export function label(value: unknown) {
   return LABELS[String(value)] || textValue(value)

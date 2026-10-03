@@ -15,11 +15,10 @@ test('management lists mask identities and email addresses', () => {
   assert.equal(maskEmail('student@example.test'), 's***@example.test')
 })
 
-test('profile changes reject identities, source keys, relationships and prototype fields', () => {
+test('profile changes reject immutable keys, relationships and prototype fields', () => {
   for (const field of [
     'id',
     'organizationId',
-    'studentId',
     'sourceKey',
     'teamMemberships',
     'constructor',

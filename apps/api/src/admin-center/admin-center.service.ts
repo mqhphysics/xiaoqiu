@@ -13,6 +13,7 @@ import type {
   AdminCenterReasonDto,
   AdminCenterRuleVersionDto,
   AdminCenterUsersQueryDto,
+  AdminCenterPostsQueryDto,
 } from './admin-center.dto'
 import {
   centerError,
@@ -23,6 +24,7 @@ import {
   safeAuditSummary,
 } from './admin-center.policy'
 import { validateManagementRules } from './admin-center.rules'
+import { MediaService, postImageUrls } from '../media/media.service'
 
 type Tx = Prisma.TransactionClient
 const teamFields = {
@@ -55,6 +57,7 @@ const playerFields = {
   avatarUrl: true,
   portraitUrl: true,
   isDemo: true,
+  studentId: true,
   updatedAt: true,
 } as const
 const postFields = {
@@ -77,6 +80,7 @@ export class AdminCenterService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuthService) private readonly auth: AuthService,
     @Inject(AccessPolicyService) private readonly policy: AccessPolicyService,
+    @Inject(MediaService) private readonly mediaStorage: MediaService,
   ) {}
 
   private async session(authorization: string | undefined) {
@@ -119,7 +123,7 @@ export class AdminCenterService {
     return { ...actor, user: { ...actor.user, roles } }
   }
 
-  private async read<T>(
+  async read<T>(
     authorization: string | undefined,
     run: (tx: Tx, actor: AuthenticatedSession) => Promise<T>,
   ): Promise<T> {
@@ -129,7 +133,7 @@ export class AdminCenterService {
     })
   }
 
-  private async write<T>(
+  async write<T>(
     authorization: string | undefined,
     route: string,
     body: unknown,
@@ -189,7 +193,7 @@ export class AdminCenterService {
     throw centerError(409, '请重试')
   }
 
-  private auditWrite(
+  auditWrite(
     tx: Tx,
     actor: AuthenticatedSession,
     action: string,
@@ -267,6 +271,9 @@ export class AdminCenterService {
                 OR: [
                   { displayName: { contains: term, mode: 'insensitive' } },
                   { loginNameNormalized: { contains: term, mode: 'insensitive' } },
+                  { realName: { contains: term, mode: 'insensitive' } },
+                  { studentId: { contains: term, mode: 'insensitive' } },
+                  { email: { contains: term, mode: 'insensitive' } },
                 ],
               },
             }
@@ -286,6 +293,9 @@ export class AdminCenterService {
                 id: true,
                 loginNameNormalized: true,
                 displayName: true,
+                realName: true,
+                bio: true,
+                updatedAt: true,
                 studentId: true,
                 email: true,
                 avatarUrl: true,
@@ -319,6 +329,17 @@ export class AdminCenterService {
         _count: { _all: true },
       })
       const counts = new Map(sessions.map((row) => [row.userId, row._count._all]))
+      await this.auditWrite(
+        tx,
+        actor,
+        'USER_DIRECTORY_VIEWED',
+        'Organization',
+        actor.organizationId,
+        '管理员查看完整用户目录',
+        'admin-directory-read',
+        null,
+        { count: members.length },
+      )
       return page(
         query,
         total,
@@ -326,6 +347,11 @@ export class AdminCenterService {
           id: user.id,
           username: user.loginNameNormalized ?? '',
           displayName: user.displayName,
+          realName: user.realName,
+          bio: user.bio,
+          updatedAt: user.updatedAt.toISOString(),
+          studentId: user.studentId,
+          email: user.email,
           studentIdMasked: maskIdentity(user.studentId),
           emailMasked: maskEmail(user.email),
           avatarUrl: user.avatarUrl,
@@ -526,6 +552,17 @@ export class AdminCenterService {
           ...paging(query),
         }),
       ])
+      await this.auditWrite(
+        tx,
+        actor,
+        'PLAYER_DIRECTORY_VIEWED',
+        'Organization',
+        actor.organizationId,
+        '管理员查看球员学号和完整资料',
+        'admin-player-read',
+        null,
+        { count: rows.length },
+      )
       return page(
         query,
         total,
@@ -762,10 +799,11 @@ export class AdminCenterService {
     })
   }
 
-  posts(authorization: string | undefined, query: AdminCenterPageDto) {
+  posts(authorization: string | undefined, query: AdminCenterPostsQueryDto) {
     return this.read(authorization, async (tx, actor) => {
       const where: Prisma.PostWhereInput = {
         organizationId: actor.organizationId,
+        ...(query.status ? { status: query.status } : {}),
         ...(query.query
           ? {
               OR: [
@@ -800,13 +838,20 @@ export class AdminCenterService {
         select: { id: true },
       })
       if (!tournament) throw centerError(409, '请选择本组织已发布的赛事')
+      const image = await this.mediaStorage.storePostImages(
+        actor.organizationId,
+        actor.userId,
+        body.imageDataUrls ?? [],
+      )
+      const imageUrl = image ? (process.env.ADMIN_PUBLIC_MEDIA_ORIGIN ?? '') + image.imageUrl : null
       const result = await tx.post.create({
         data: {
           organizationId: actor.organizationId,
           tournamentId: tournament.id,
           authorUserId: actor.userId,
-          type: 'OFFICIAL',
-          status: 'PUBLISHED',
+          type: body.type ?? 'OFFICIAL',
+          status: body.status ?? 'PUBLISHED',
+          imageUrl,
           title: body.title,
           body: body.body,
         },
@@ -815,13 +860,13 @@ export class AdminCenterService {
       await this.auditWrite(
         tx,
         actor,
-        'OFFICIAL_POST_PUBLISHED',
+        body.status === 'DRAFT' ? 'POST_SUBMITTED_FOR_REVIEW' : 'OFFICIAL_POST_PUBLISHED',
         'Post',
         result.id,
         body.reason,
         requestId,
         null,
-        { status: 'PUBLISHED', changedFields: ['title', 'body'] },
+        { status: body.status ?? 'PUBLISHED', changedFields: ['title', 'body', 'imageUrl'] },
       )
       return postView(result)
     })
@@ -990,6 +1035,7 @@ function json(value: unknown): Prisma.InputJsonValue {
 function postView(row: Prisma.PostGetPayload<{ select: typeof postFields }>) {
   return {
     ...row,
+    imageUrls: postImageUrls(row.imageUrl),
     type: row.type === 'OFFICIAL' ? 'OFFICIAL' : row.teamId ? 'TEAM' : 'COMMUNITY',
     publishedAt: row.publishedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

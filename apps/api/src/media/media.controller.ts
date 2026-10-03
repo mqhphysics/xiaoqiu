@@ -11,6 +11,11 @@ import { MediaService } from './media.service'
 export class MediaController {
   constructor(@Inject(MediaService) private readonly mediaService: MediaService) {}
 
+  @Get('media/guard-status')
+  guardStatus() {
+    return { guardVersion: 1, cacheControl: 'no-store' }
+  }
+
   @Put('me/avatar')
   @ApiBearerAuth()
   @ApiOperation({ summary: '保存浏览器裁剪压缩后的当前用户头像' })
@@ -46,7 +51,8 @@ export class MediaController {
   @ApiOperation({ summary: '读取公开头像文件' })
   async avatar(@Param('fileName') fileName: string, @Res() response: Response): Promise<void> {
     const avatar = await this.mediaService.readAvatar(fileName)
-    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    response.setHeader('Cache-Control', 'no-store')
+    response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.type(avatar.mimeType).send(avatar.body)
   }
@@ -59,7 +65,8 @@ export class MediaController {
     @Res() response: Response,
   ): Promise<void> {
     const media = await this.mediaService.readDemoMedia(kind, fileName)
-    response.setHeader('Cache-Control', 'public, max-age=86400')
+    response.setHeader('Cache-Control', 'no-store')
+    response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.type(media.mimeType).send(media.body)
   }
@@ -73,7 +80,8 @@ export class MediaController {
     @Res() response: Response,
   ): Promise<void> {
     const image = await this.mediaService.readPostImage(organizationId, authorUserId, fileName)
-    response.setHeader('Cache-Control', 'public, max-age=60')
+    response.setHeader('Cache-Control', 'no-store')
+    response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.type(image.mimeType).send(image.body)
   }
