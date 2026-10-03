@@ -11,6 +11,7 @@ import { RosterModule } from './roster/roster.module'
 import { ResultsModule } from './results/results.module'
 import { ScheduleModule } from './schedule/schedule.module'
 import { SocialModule } from './social/social.module'
+import { AdminCenterModule } from './admin-center/admin-center.module'
 
 @Module({
   controllers: [AppController],
@@ -24,6 +25,7 @@ import { SocialModule } from './social/social.module'
     ResultsModule,
     ScheduleModule,
     SocialModule,
+    AdminCenterModule,
   ],
   providers: [AppService],
 })

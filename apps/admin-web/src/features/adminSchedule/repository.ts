@@ -254,7 +254,7 @@ interface ApiScheduleRevision {
   publishedAt: string
 }
 
-interface ApiAdminScheduleSnapshot {
+export interface ApiAdminScheduleSnapshot {
   seasons: ApiSeason[]
   tournaments: ApiTournament[]
   ruleVersions: ApiRuleVersion[]
@@ -269,7 +269,7 @@ function normalizeApiBaseUrl(value: string): string {
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
 }
 
-function mapSnapshot(snapshot: ApiAdminScheduleSnapshot): AdminScheduleSnapshot {
+export function mapSnapshot(snapshot: ApiAdminScheduleSnapshot): AdminScheduleSnapshot {
   return {
     seasons: snapshot.seasons.map(mapSeason),
     tournaments: snapshot.tournaments.map(mapTournament),

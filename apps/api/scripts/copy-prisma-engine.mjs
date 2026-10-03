@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
@@ -18,7 +18,18 @@ if (engineFiles.length !== 1) {
 }
 
 await mkdir(destinationDirectory, { recursive: true })
-await copyFile(
-  resolve(sourceDirectory, engineFiles[0]),
-  resolve(destinationDirectory, engineFiles[0]),
-)
+const sourceEngine = resolve(sourceDirectory, engineFiles[0])
+const destinationEngine = resolve(destinationDirectory, engineFiles[0])
+let unchanged = false
+try {
+  const [sourceBytes, destinationBytes] = await Promise.all([
+    readFile(sourceEngine),
+    readFile(destinationEngine),
+  ])
+  unchanged = sourceBytes.equals(destinationBytes)
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error
+}
+// Windows locks loaded native libraries. An identical engine already satisfies
+// the build; a genuinely changed engine must still be copied or fail visibly.
+if (!unchanged) await copyFile(sourceEngine, destinationEngine)
