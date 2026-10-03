@@ -973,23 +973,28 @@
       padding-bottom: 8PX;
     }
 
-    .public-team-nav > .team-crest,
+    .public-team-nav .team-crest,
     .public-team-nav__crest {
-      width: 40PX;
-      height: 40PX;
+      width: 64PX;
+      height: 64PX;
       opacity: 0.86;
       transform: scale(1);
       transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
     }
 
-    .public-team-nav--active > .team-crest,
+    .public-team-nav__crest {
+      width: 36PX;
+      height: 36PX;
+    }
+
+    .public-team-nav--active .team-crest,
     .public-team-nav--active .public-team-nav__crest {
       opacity: 1;
       transform: scale(1.16);
     }
 
     .public-nav__item:active .public-nav__icon,
-    .public-team-nav:active > .team-crest,
+    .public-team-nav:active .team-crest,
     .public-team-nav:active .public-team-nav__crest {
       transform: scale(0.97);
     }
@@ -1083,18 +1088,16 @@
     .public-nav__icon--data { background-position: -44PX 0; }
     .public-nav__icon--me { background-position: -66PX 0; }
     .public-nav__label { font-size: 14PX; }
-    .public-team-nav > .team-crest,
-    .public-team-nav__crest { width: 38PX; height: 38PX; }
   }
 }
 
 @media (min-width: 721px) and (prefers-reduced-motion: reduce) {
   .public-app--h5 {
     .public-nav__icon,
-    .public-team-nav > .team-crest,
+    .public-team-nav .team-crest,
     .public-team-nav__crest { transition: none; }
     .public-nav__item:hover .public-nav__icon,
-    .public-team-nav:hover > .team-crest,
+    .public-team-nav:hover .team-crest,
     .public-team-nav:hover .public-team-nav__crest { transform: none; }
   }
 }
