@@ -310,7 +310,16 @@ function TeamContent({
       </View>
 
       <View className="public-team-section">
-        <ProductSection kicker="SQUAD" title="完整阵容" note={data.roster.length + ' 名球员'} />
+        <ProductSection
+          kicker="SQUAD"
+          title={Taro.getEnv() === Taro.ENV_TYPE.WEB ? '球队球员' : '完整阵容'}
+          note={data.roster.length + ' 名球员'}
+        />
+        {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+          <Text className="public-team-empty">
+            球队成员与赛事锁定名单分别维护，正式参赛资格以赛事审核结果为准。
+          </Text>
+        ) : null}
         <View className="public-roster-groups">
           {rosterGroups.map((group) => (
             <View className="public-roster-group surface" key={group.key}>
@@ -331,9 +340,7 @@ function TeamContent({
                   <View
                     className="public-roster__row"
                     key={player.id}
-                    onClick={() =>
-                      void openPlayer(player.id, tournamentId)
-                    }
+                    onClick={() => void openPlayer(player.id, tournamentId)}
                   >
                     <Text className="public-roster__number">{player.shirtNumber ?? '-'}</Text>
                     <View className="public-roster__player">
@@ -345,10 +352,23 @@ function TeamContent({
                         color={player.profileColor}
                         size="small"
                       />
-                      <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
+                      <PersonTrigger
+                        playerId={player.id}
+                        tournamentId={tournamentId}
+                        name={player.displayName}
+                      >
+                        <Text>{player.displayName}</Text>
+                      </PersonTrigger>
                     </View>
                     <Text>
                       {positionLabel(player.position)} · {player.academicYear}
+                      {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+                        <Text className="public-roster__source">
+                          {(player as { rosterSource?: string }).rosterSource === 'TEAM_MEMBERSHIP'
+                            ? '球队成员 · 未在赛事锁定名单中'
+                            : '赛事锁定名单'}
+                        </Text>
+                      ) : null}
                     </Text>
                     <Text>{player.appearances}</Text>
                     <Text>{player.goals}</Text>
