@@ -78,7 +78,7 @@ export function TeamHero({
   children?: React.ReactNode
 }) {
   return (
-    <header className="th-hero">
+    <header className="th-hero th-team-cover">
       <div className="th-hero__identity" data-team-action>
         <TeamCrest team={data.team} size="large" interactive={false} />
         <div>

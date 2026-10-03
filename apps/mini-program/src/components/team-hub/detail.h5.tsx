@@ -4,7 +4,7 @@ import { DataState } from '../public-ui'
 import { TeamContent, TeamHero } from './content.h5'
 import { useTeamData } from './data.h5'
 import { TeamIcon } from './icons.h5'
-import { publishPreferences } from './picker.h5'
+import { saveTeamPreference } from './follow.h5'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type {
@@ -171,25 +171,7 @@ function TeamActions({ teamId, tournamentId }: { teamId: string; tournamentId: s
     setBusy(true)
     setError('')
     try {
-      const current = await productRepository.getTeamPreferences()
-      const primaryId = mode === 'primary' ? teamId : current.primaryTeam?.id
-      if (!primaryId) {
-        setError('请先设置一支主队，再关注其他球队。')
-        return
-      }
-      const ids = current.followedTeams.map((team) => team.id)
-      const nextFollowed =
-        mode === 'follow'
-          ? ids.includes(teamId)
-            ? ids.filter((id) => id !== teamId)
-            : [...ids, teamId]
-          : ids
-      const next = await productRepository.updateTeamPreferences(
-        primaryId,
-        nextFollowed.filter((id) => id !== primaryId),
-      )
-      setPreferences(next)
-      publishPreferences(next)
+      setPreferences(await saveTeamPreference(teamId, mode))
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : '保存失败，请重试')
     } finally {
