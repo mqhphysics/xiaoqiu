@@ -22,6 +22,7 @@ import type {
 } from '../../features/product/product.types'
 import ExistingMyTeamPage from './my-team.shared'
 import '../../components/team-hub/index.h5.scss'
+import './index.h5.scss'
 
 export default function H5MyTeamPage() {
   const desktop = useDesktopTeamView()
