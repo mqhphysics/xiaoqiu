@@ -6,6 +6,7 @@ import {
   DEMO_PLAYERS,
   DEMO_POSTS,
   DEMO_TEAMS,
+  DEMO_TOURNAMENT_TEAMS,
   type DemoMatchDefinition,
 } from './demo-fixture'
 import {
@@ -15,22 +16,23 @@ import {
 } from './seed-demo-competition'
 import { DEMO_MATCH_REVIEWS } from './seed-demo-social'
 
-test('2026 demo fixture contains 16 teams and 14 stable demo players per team', () => {
-  assert.equal(DEMO_TEAMS.length, 16)
-  assert.equal(DEMO_PLAYERS.length, 224)
-  assert.equal(new Set(DEMO_TEAMS.map((team) => team.code)).size, 16)
+test('2026 tournament has 8 teams while retaining the existing demo profile library', () => {
+  const tournamentPlayers = DEMO_PLAYERS.filter((player) => player.teamIndex < 8)
+  assert.equal(DEMO_TOURNAMENT_TEAMS.length, 8)
+  assert.equal(tournamentPlayers.length, 112)
+  assert.equal(new Set(DEMO_TOURNAMENT_TEAMS.map((team) => team.code)).size, 8)
   assert.ok(DEMO_TEAMS.every((team) => team.code.startsWith('DEMO-')))
   assert.equal(new Set(DEMO_PLAYERS.map((player) => player.id)).size, 224)
   assert.equal(new Set(DEMO_PLAYERS.map((player) => player.sourceKey)).size, 224)
 
-  for (const teamIndex of DEMO_TEAMS.keys()) {
+  for (const teamIndex of DEMO_TOURNAMENT_TEAMS.keys()) {
     const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
     assert.equal(players.length, 14)
     assert.ok(players.every((player) => player.sourceKey.startsWith('DEMO-2026-DEMO-')))
   }
 })
 
-test('2026 knockout facts form a 16-team champion path with an independent third-place branch', () => {
+test('2026 knockout facts form an 8-team champion path with an independent third-place branch', () => {
   const knockoutMatches = DEMO_MATCHES.filter(
     (match) => match.tournament === '2026' && match.stage === 'KNOCKOUT',
   )
@@ -46,10 +48,10 @@ test('2026 knockout facts form a 16-team champion path with an independent third
   const finalRound = rounds.get(4) ?? []
   assert.deepEqual(
     [roundOf16.length, quarterfinals.length, semifinals.length, finalRound.length],
-    [8, 4, 2, 2],
+    [0, 4, 2, 2],
   )
 
-  const openingTeamIndexes = roundOf16.flatMap((match) => [
+  const openingTeamIndexes = quarterfinals.flatMap((match) => [
     match.homeTeamIndex,
     match.awayTeamIndex,
   ])
@@ -57,9 +59,9 @@ test('2026 knockout facts form a 16-team champion path with an independent third
     openingTeamIndexes.every((teamIndex) => teamIndex !== undefined),
     true,
   )
-  assert.equal(new Set(openingTeamIndexes).size, 16)
+  assert.equal(new Set(openingTeamIndexes).size, 8)
+  assert.ok(openingTeamIndexes.every((index) => index !== undefined && index < 8))
 
-  assertProgression(roundOf16, quarterfinals)
   assertProgression(quarterfinals, semifinals)
 
   const championshipFinal = finalRound.find((match) => match.code === 'GC26-FINAL')
