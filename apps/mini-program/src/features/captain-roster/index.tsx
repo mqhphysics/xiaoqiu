@@ -55,13 +55,17 @@ export function CaptainRosterWorkflow({ teamId, tournamentId, captain, roster, m
       <LineupBoard
         key={`${session?.user.id}:${tournamentId}:${teamId}`}
         players={players}
-        lockedPlayers={roster.map((player) => ({
-          id: player.id,
-          displayName: player.displayName,
-          avatarUrl: player.avatarUrl,
-          shirtNumber: player.shirtNumber,
-          position: player.position,
-        }))}
+        lockedPlayers={roster
+          .filter(
+            (player) => (player as { rosterSource?: string }).rosterSource !== 'TEAM_MEMBERSHIP',
+          )
+          .map((player) => ({
+            id: player.id,
+            displayName: player.displayName,
+            avatarUrl: player.avatarUrl,
+            shirtNumber: player.shirtNumber,
+            position: player.position,
+          }))}
         matches={matches}
         teamId={teamId}
         tournamentId={tournamentId}

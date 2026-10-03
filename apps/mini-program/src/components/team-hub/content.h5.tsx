@@ -264,6 +264,9 @@ export function TeamContent({
                 <h2>球队人员</h2>
                 <span className="th-muted">{data.roster.length} 名球员</span>
               </div>
+              <p className="th-small-note">
+                球队成员与赛事锁定名单分别维护；球队成员身份不代表已取得当前赛事参赛资格。
+              </p>
               <div className="th-staff">
                 <div>
                   <h3>主教练</h3>
@@ -325,6 +328,12 @@ export function TeamContent({
                             <span className="th-player__name">
                               <strong>{player.displayName}</strong>
                               <small>{positionLabel(player.position)}</small>
+                              <small>
+                                {(player as { rosterSource?: string }).rosterSource ===
+                                'TEAM_MEMBERSHIP'
+                                  ? '球队成员 · 未在赛事锁定名单中'
+                                  : '赛事锁定名单'}
+                              </small>
                             </span>
                             <span className="th-player__stats">
                               <span>

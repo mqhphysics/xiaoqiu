@@ -1,6 +1,6 @@
 import { Button, Input, Picker, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell, updatePrimaryTeamCache } from '../../components/public-shell'
 import { PersonTrigger } from '../../components/person-trigger'
@@ -23,7 +23,10 @@ import { ProductApiError, productRepository } from '../../features/product/produ
 import { readSession } from '../../features/product/session'
 import { openTeam } from '../../features/product/team-navigation'
 import { CaptainRosterWorkflow } from '../../features/captain-roster'
-import { captainRequest } from '../../features/captain-roster/roster.repository'
+import CaptainProfileEditor from '../../features/captain-roster/profile-editor'
+import { captainRequest, RosterApiError } from '../../features/captain-roster/roster.repository'
+import { teamManagementRepository } from '../../features/captain-roster/team-management.repository'
+import { createClientActionId } from '../../features/product/product.repository'
 import { RosterReviewWorkspace } from '../../features/captain-roster/roster-review'
 import type {
   HomeResponse,
@@ -352,7 +355,23 @@ export default function MyTeamPage() {
               playerBusy={playerBusy}
               captain={state.captain}
               captainError={state.captainError}
-              onCaptainChange={(captain) => setState({ ...state, captain, captainError: null })}
+              onCaptainChange={(captain) =>
+                setState((current) =>
+                  current.phase === 'ready'
+                    ? {
+                        ...current,
+                        captain,
+                        captainError: null,
+                        dashboard: current.dashboard
+                          ? {
+                              ...current.dashboard,
+                              team: { ...current.dashboard.team, ...captain.team },
+                            }
+                          : null,
+                      }
+                    : current,
+                )
+              }
               onCaptainRetry={() => void retryCaptain()}
               onFollowPlayer={(playerId) => void followPlayer(playerId)}
               onUnfollowPlayer={(playerId) => void unfollowPlayer(playerId)}
@@ -742,6 +761,7 @@ function TeamDashboard({
       )}
       {captain && (
         <>
+          <CaptainProfileEditor teamId={data.team.id} onChange={onCaptainChange} />
           {Taro.getEnv() === Taro.ENV_TYPE.WEB && (
             <CaptainRosterWorkflow
               teamId={data.team.id}
@@ -771,8 +791,8 @@ function TeamDashboard({
       <View className="team-roster-section">
         <ProductSection
           kicker="SQUAD"
-          title={captain ? '赛事锁定阵容' : '全部球员'}
-          note={`${captain ? '报名快照 · ' : ''}${data.roster.length} 名`}
+          title="球队球员"
+          note={`${data.roster.length} 名 · 正式参赛以锁定名单为准`}
         />
         <GroupedRoster roster={data.roster} tournamentId={tournamentId} />
       </View>
@@ -852,7 +872,13 @@ function PlayerFollowBar({
                 size="small"
               />
               <View>
-                <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
+                <PersonTrigger
+                  playerId={player.id}
+                  tournamentId={tournamentId}
+                  name={player.displayName}
+                >
+                  <Text>{player.displayName}</Text>
+                </PersonTrigger>
                 <Text>{player.team?.shortName ?? positionLabel(player.position)}</Text>
               </View>
               <Button
@@ -888,7 +914,13 @@ function PlayerFollowBar({
                   size="small"
                 />
                 <View>
-                  <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
+                  <PersonTrigger
+                    playerId={player.id}
+                    tournamentId={tournamentId}
+                    name={player.displayName}
+                  >
+                    <Text>{player.displayName}</Text>
+                  </PersonTrigger>
                   <Text>{player.team?.name ?? positionLabel(player.position)}</Text>
                 </View>
                 <Button
@@ -922,18 +954,45 @@ function CaptainWorkspace({
   const positionKeys = POSITION_GROUPS.map((item) => item.key)
   const positionNames = POSITION_GROUPS.map((item) => item.label)
   const [busy, setBusy] = useState<string | null>(null)
-  const run = async (key: string, action: () => Promise<CaptainWorkspaceResponse>) => {
-    if (busy) return
+  const [memberReason, setMemberReason] = useState('队长维护本队成员资料')
+  const [memberError, setMemberError] = useState('')
+  const [pendingMember, setPendingMember] = useState<{
+    key: string
+    action: () => Promise<CaptainWorkspaceResponse>
+  } | null>(null)
+  const actionLock = useRef(false)
+  const run = async (
+    key: string,
+    action: () => Promise<CaptainWorkspaceResponse>,
+    retainOnFailure = false,
+    retry = false,
+  ) => {
+    if (actionLock.current || (pendingMember && !retry)) return
+    actionLock.current = true
     setBusy(key)
+    setMemberError('')
     try {
       onChange(await action())
+      setPendingMember(null)
       await Taro.showToast({ title: '球队信息已更新', icon: 'success' })
     } catch (error) {
+      const message = error instanceof Error ? error.message : '操作失败'
+      if (retainOnFailure) {
+        setMemberError(
+          error instanceof RosterApiError && error.status === 409
+            ? '成员资料已被更新，请重新读取球队管理后再操作。'
+            : message,
+        )
+        if (!(error instanceof RosterApiError) || error.status === 0 || error.status >= 500)
+          setPendingMember({ key, action })
+        else setPendingMember(null)
+      }
       await Taro.showToast({
         title: error instanceof Error ? error.message : '操作失败',
         icon: 'none',
       })
     } finally {
+      actionLock.current = false
       setBusy(null)
     }
   }
@@ -948,16 +1007,62 @@ function CaptainWorkspace({
         productRepository.reviewTeamApplication(teamId, applicationId, decision),
       )
   }
+  const reloadMembers = async () => {
+    if (actionLock.current) return
+    if (pendingMember) {
+      const answer = await Taro.showModal({
+        title: '重新读取球队管理',
+        content:
+          '上次操作结果尚未确认。可以继续用原请求重试；重新读取会显示服务器当前状态，并结束本次重试。',
+        confirmText: '重新读取',
+      })
+      if (!answer.confirm) return
+    }
+    actionLock.current = true
+    setBusy('reload')
+    setMemberError('')
+    try {
+      onChange(await productRepository.getCaptainWorkspace(teamId))
+      setPendingMember(null)
+    } catch (issue) {
+      setMemberError(issue instanceof Error ? issue.message : '球队管理读取失败')
+    } finally {
+      actionLock.current = false
+      setBusy(null)
+    }
+  }
   const remove = async (membershipId: string, name: string) => {
+    if (busy || pendingMember) return
+    const member = data.members.find((item) => item.id === membershipId)
+    const updatedAt = (member as { updatedAt?: string } | undefined)?.updatedAt
+    const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+    if (h5 && (!updatedAt || memberReason.trim().length < 2)) {
+      setMemberError('请重新读取成员版本，并填写至少 2 个字的修改原因。')
+      return
+    }
     const confirmation = await Taro.showModal({
       title: '移出球队',
       content: `确认将 ${name} 移出球队？`,
       confirmText: '移出',
     })
-    if (confirmation.confirm)
-      await run(`member:${membershipId}`, () =>
-        productRepository.removeTeamMember(teamId, membershipId),
+    if (confirmation.confirm) {
+      const commandKey = createClientActionId('team-member')
+      const reason = memberReason.trim()
+      await run(
+        `member:${membershipId}`,
+        () =>
+          h5
+            ? teamManagementRepository.removeMember(
+                teamId,
+                membershipId,
+                updatedAt!,
+                reason,
+                commandKey,
+              )
+            : productRepository.removeTeamMember(teamId, membershipId),
+        h5,
       )
+    }
   }
   return (
     <View className="my-team-section captain-workspace">
@@ -977,7 +1082,12 @@ function CaptainWorkspace({
                 />
                 <View>
                   <Text>
-                    <PersonTrigger userId={application.applicant.id} name={application.player?.displayName ?? application.applicant.displayName}>{application.player?.displayName ?? application.applicant.displayName}</PersonTrigger>
+                    <PersonTrigger
+                      userId={application.applicant.id}
+                      name={application.player?.displayName ?? application.applicant.displayName}
+                    >
+                      {application.player?.displayName ?? application.applicant.displayName}
+                    </PersonTrigger>
                   </Text>
                   <Text>
                     {positionLabel(application.requestedPosition)} ·{' '}
@@ -1007,12 +1117,50 @@ function CaptainWorkspace({
         </View>
         <View className="surface captain-members">
           <Text className="captain-card-title">成员与位置</Text>
+          {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+            <Button disabled={Boolean(busy)} onClick={() => void reloadMembers()}>
+              重新读取球队管理
+            </Button>
+          ) : null}
+          {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+            <View>
+              <Input
+                aria-label="成员修改原因"
+                value={memberReason}
+                maxlength={500}
+                disabled={Boolean(busy || pendingMember)}
+                placeholder="成员修改原因"
+                onInput={(event) => setMemberReason(event.detail.value)}
+              />
+              {memberError ? <div role="alert">{memberError}</div> : null}
+              {pendingMember ? (
+                <Button
+                  disabled={Boolean(busy)}
+                  onClick={() => void run(pendingMember.key, pendingMember.action, true, true)}
+                >
+                  重试原成员操作
+                </Button>
+              ) : null}
+            </View>
+          ) : null}
           {data.members.map((member) => (
             <View className="captain-member" key={member.id}>
-              <UserAvatar avatarUrl={member.avatarUrl} name={member.displayName} userId={member.userId ?? undefined} playerId={member.playerId ?? undefined} size="small" />
+              <UserAvatar
+                avatarUrl={member.avatarUrl}
+                name={member.displayName}
+                userId={member.userId ?? undefined}
+                playerId={member.playerId ?? undefined}
+                size="small"
+              />
               <View>
                 <Text>
-                  <PersonTrigger userId={member.userId ?? undefined} playerId={member.playerId ?? undefined} name={member.displayName}>{member.displayName}</PersonTrigger>
+                  <PersonTrigger
+                    userId={member.userId ?? undefined}
+                    playerId={member.playerId ?? undefined}
+                    name={member.displayName}
+                  >
+                    {member.displayName}
+                  </PersonTrigger>
                   {member.isCaptain ? ' · 队长' : ''}
                 </Text>
                 <Text>{positionLabel(member.position)}</Text>
@@ -1024,21 +1172,39 @@ function CaptainWorkspace({
                   0,
                   positionKeys.indexOf(member.position as (typeof positionKeys)[number]),
                 )}
-                onChange={(event) =>
-                  void run(`position:${member.id}`, () =>
-                    productRepository.updateTeamMember(
-                      teamId,
-                      member.id,
-                      positionKeys[Number(event.detail.value)] ?? 'MIDFIELDER',
-                    ),
+                disabled={Boolean(busy || pendingMember)}
+                onChange={(event) => {
+                  const position = positionKeys[Number(event.detail.value)] ?? 'MIDFIELDER'
+                  const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+                  const updatedAt = (member as { updatedAt?: string }).updatedAt
+                  if (h5 && (!updatedAt || memberReason.trim().length < 2)) {
+                    setMemberError('请重新读取成员版本，并填写至少 2 个字的修改原因。')
+                    return
+                  }
+                  const commandKey = createClientActionId('team-member')
+                  const reason = memberReason.trim()
+                  void run(
+                    `position:${member.id}`,
+                    () =>
+                      h5
+                        ? teamManagementRepository.updateMember(
+                            teamId,
+                            member.id,
+                            position,
+                            updatedAt!,
+                            reason,
+                            commandKey,
+                          )
+                        : productRepository.updateTeamMember(teamId, member.id, position),
+                    h5,
                   )
-                }
+                }}
               >
-                <Button disabled={Boolean(busy)}>设置位置</Button>
+                <Button disabled={Boolean(busy || pendingMember)}>设置位置</Button>
               </Picker>
               <Button
                 className="captain-member__remove"
-                disabled={member.isCaptain || Boolean(busy)}
+                disabled={member.isCaptain || Boolean(busy || pendingMember)}
                 loading={busy === `member:${member.id}`}
                 onClick={() => void remove(member.id, member.displayName)}
               >
@@ -1218,10 +1384,23 @@ function GroupedRoster({
                   tournamentId={tournamentId}
                 />
                 <View className="squad-player__copy">
-                  <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
+                  <PersonTrigger
+                    playerId={player.id}
+                    tournamentId={tournamentId}
+                    name={player.displayName}
+                  >
+                    <Text>{player.displayName}</Text>
+                  </PersonTrigger>
                   <Text>
                     {positionLabel(player.position)} · {player.academicYear}
                   </Text>
+                  {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+                    <Text>
+                      {(player as { rosterSource?: string }).rosterSource === 'TEAM_MEMBERSHIP'
+                        ? '球队成员 · 尚未列入赛事锁定名单'
+                        : '赛事锁定名单'}
+                    </Text>
+                  ) : null}
                 </View>
                 <View className="squad-player__stats">
                   <Text>{player.appearances} 场</Text>

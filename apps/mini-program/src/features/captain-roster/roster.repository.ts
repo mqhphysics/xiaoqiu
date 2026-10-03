@@ -43,7 +43,12 @@ export class RosterApiError extends Error {
     super(message)
   }
 }
-export async function captainRequest<T>(path: string, command?: unknown, key?: string): Promise<T> {
+export async function captainRequest<T>(
+  path: string,
+  command?: unknown,
+  key?: string,
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE',
+): Promise<T> {
   const session = readSession()
   if (!session) throw new RosterApiError('请先登录队长账号', 401)
   const configured = process.env.TARO_APP_API_BASE_URL?.trim().replace(/\/+$/, '')
@@ -51,7 +56,7 @@ export async function captainRequest<T>(path: string, command?: unknown, key?: s
   const base = configured.endsWith('/api') ? configured : `${configured}/api`
   const response = await Taro.request<T | { message?: string; error?: { message?: string } }>({
     url: `${base}${path}`,
-    method: command ? 'POST' : 'GET',
+    method: method ?? (command ? 'POST' : 'GET'),
     data: command,
     header: {
       'content-type': 'application/json',

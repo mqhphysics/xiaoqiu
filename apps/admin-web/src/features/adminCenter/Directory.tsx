@@ -13,6 +13,7 @@ import {
   useAdminData,
 } from './shared'
 import type { PageData, Row } from './shared'
+import { DirectoryCreate } from './DirectoryCreate'
 
 type Kind = 'users' | 'teams' | 'players'
 type Field = {
@@ -74,6 +75,7 @@ export function Directory({
   const [selected, setSelected] = useState<Row | null>(null)
   const [operation, setOperation] = useState<'edit' | 'membership' | 'sessions' | null>(null)
   const [notice, setNotice] = useState('')
+  const [creating, setCreating] = useState(false)
   const params = new URLSearchParams({
     page: String(page),
     pageSize: '10',
@@ -96,17 +98,30 @@ export function Directory({
             <h2>{title}</h2>
             <p>按稳定编号维护资料，所有修改需记录原因。</p>
           </div>
-          <button
-            className="secondary-button"
-            onClick={() => {
-              setSelected(null)
-              setOperation(null)
-              setNotice('')
-              result.refresh()
-            }}
-          >
-            刷新
-          </button>
+          <div className="mc-toolbar">
+            {kind !== 'users' ? (
+              <button
+                onClick={() => {
+                  setSelected(null)
+                  setOperation(null)
+                  setCreating(true)
+                }}
+              >
+                {kind === 'teams' ? '新增球队' : '新增球员'}
+              </button>
+            ) : null}
+            <button
+              className="secondary-button"
+              onClick={() => {
+                setSelected(null)
+                setOperation(null)
+                setNotice('')
+                result.refresh()
+              }}
+            >
+              刷新
+            </button>
+          </div>
         </div>
         <form
           className="mc-toolbar"
@@ -323,6 +338,29 @@ export function Directory({
               <p className="mc-muted">本次修改公开档案，不覆盖已锁定的参赛名单和历史比赛事实。</p>
             )}
           </section>
+        </Modal>
+      ) : null}
+      {creating && kind !== 'users' ? (
+        <Modal
+          title={kind === 'teams' ? '新增球队档案' : '新增球员档案'}
+          onClose={() => setCreating(false)}
+        >
+          <DirectoryCreate
+            context={context}
+            kind={kind}
+            onDone={() => {
+              setCreating(false)
+              setInput('')
+              setQuery('')
+              setPage(1)
+              setNotice(
+                kind === 'teams'
+                  ? '球队档案已创建，可在前端球队目录查看；尚未报名赛事。'
+                  : '球员已创建并加入球队，可在前端查看；参赛资格需另行审核。',
+              )
+              result.refresh()
+            }}
+          />
         </Modal>
       ) : null}
       {selected && operation ? (

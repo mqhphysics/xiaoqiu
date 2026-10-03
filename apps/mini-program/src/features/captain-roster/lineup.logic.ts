@@ -153,7 +153,7 @@ export function createFormation(name = '4-3-3', previous?: LineupDraft): LineupD
     name: formation.name,
     custom: false,
     slots,
-    ...(bench ? { benchPlayerIds: [...bench] } : {}),
+    benchPlayerIds: bench ? [...bench] : [],
   }
 }
 
@@ -193,6 +193,33 @@ export function moveSlot(draft: LineupDraft, slotId: string, x: number, y: numbe
             y: Math.round(Math.max(9, Math.min(91, y)) * 10) / 10,
           }
         : slot,
+    ),
+  }
+}
+
+export function clearStarters(draft: LineupDraft): LineupDraft {
+  return {
+    ...draft,
+    slots: draft.slots.map((slot) => ({ ...slot, playerId: null })),
+    benchPlayerIds: [
+      ...new Set([
+        ...(draft.benchPlayerIds ?? []),
+        ...draft.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])),
+      ]),
+    ],
+  }
+}
+
+export function groupLineupPlayers(draft: LineupDraft, players: LineupPlayer[]) {
+  const starterIds = new Set(draft.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])))
+  const substituteIds = new Set(draft.benchPlayerIds ?? [])
+  return {
+    starters: players.filter((player) => starterIds.has(player.id)),
+    substitutes: players.filter(
+      (player) => !starterIds.has(player.id) && substituteIds.has(player.id),
+    ),
+    unselected: players.filter(
+      (player) => !starterIds.has(player.id) && !substituteIds.has(player.id),
     ),
   }
 }
@@ -279,8 +306,23 @@ export function restoreDraft(value: unknown, players: LineupPlayer[]): LineupDra
     name: draft.name.slice(0, 32),
     custom: draft.custom === true,
     slots,
-    ...(benchPlayerIds ? { benchPlayerIds } : {}),
+    // Legacy drafts without an explicit bench never imply every registered player was selected.
+    benchPlayerIds: benchPlayerIds ?? [],
   }
+}
+
+export function selectSavedLineupPlan<
+  T extends { id: string; tournamentId: string | null; updatedAt: string },
+>(plans: T[], tournamentId: string, preferredId: string): T | undefined {
+  const relevant = plans.filter(
+    (plan) => plan.tournamentId === null || plan.tournamentId === tournamentId,
+  )
+  return (
+    relevant.find((plan) => plan.id === preferredId) ??
+    relevant
+      .slice()
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0]
+  )
 }
 
 export function draftStorageKey(

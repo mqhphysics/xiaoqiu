@@ -20,11 +20,14 @@ import {
 import {
   assignPlayer,
   createFormation,
+  clearStarters,
   draftStorageKey,
   fillByPosition,
   FORMATIONS,
+  groupLineupPlayers,
   moveSlot,
   restoreDraft,
+  selectSavedLineupPlan,
   type LineupDraft,
   type LineupPlayer,
 } from './lineup.logic'
@@ -53,6 +56,8 @@ export default function LineupBoard({
   const owner = useRef({ userId: session?.user.id, organizationId: session?.user.organizationId })
   const [ownerInvalid, setOwnerInvalid] = useState(false)
   const [kind, setKind] = useState<'TACTIC' | 'MATCH_LINEUP'>('TACTIC')
+  const [tacticScope, setTacticScope] = useState<'TEAM' | 'TOURNAMENT'>('TEAM')
+  const [matchFormat, setMatchFormat] = useState<5 | 7 | 8 | 11>(8)
   const [matchId, setMatchId] = useState('')
   const [boundPlayers, setBoundPlayers] = useState<LineupPlayer[] | null>(null)
   const [boundSnapshotId, setBoundSnapshotId] = useState<string | null>(null)
@@ -89,6 +94,8 @@ export default function LineupBoard({
   const [query, setQuery] = useState('')
   const [freeMove, setFreeMove] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
   const [history, setHistory] = useState<LineupDraft[]>([])
   const [future, setFuture] = useState<LineupDraft[]>([])
   const [plans, setPlans] = useState<LineupPlanView[]>([])
@@ -101,6 +108,7 @@ export default function LineupBoard({
     null,
   )
   const sending = useRef(false)
+  const initialPlanLoaded = useRef(false)
   const alive = useRef(true)
   const pitch = useRef<HTMLDivElement>(null)
   const ghost = useRef<HTMLDivElement>(null)
@@ -110,16 +118,7 @@ export default function LineupBoard({
   const previousRects = useRef(new Map<string, DOMRect>())
   const playerMap = new Map(players.map((player) => [player.id, player]))
   const starters = new Set(draft.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])))
-  const benchIds = draft.benchPlayerIds ? new Set(draft.benchPlayerIds) : null
-  const substitutes = draft.benchPlayerIds
-    ? draft.benchPlayerIds.flatMap((id) => {
-        const player = playerMap.get(id)
-        return player && !starters.has(id) ? [player] : []
-      })
-    : players.filter((player) => !starters.has(player.id))
-  const unassigned = players.filter(
-    (player) => !starters.has(player.id) && benchIds && !benchIds.has(player.id),
-  )
+  const { substitutes, unselected: unassigned } = groupLineupPlayers(draft, players)
   const bench = substitutes.filter((player) =>
     `${player.displayName} ${player.shirtNumber ?? ''}`.includes(query.trim()),
   )
@@ -129,7 +128,11 @@ export default function LineupBoard({
   const candidateIds = players.map((player) => player.id).join(',')
   useEffect(() => {
     const allowed = new Set(players.map((player) => player.id))
-    if (!draft.slots.some((slot) => slot.playerId && !allowed.has(slot.playerId))) return
+    if (
+      !draft.slots.some((slot) => slot.playerId && !allowed.has(slot.playerId)) &&
+      !draft.benchPlayerIds?.some((id) => !allowed.has(id))
+    )
+      return
     setHistory([])
     setFuture([])
     setSelected(null)
@@ -140,6 +143,7 @@ export default function LineupBoard({
       slots: current.slots.map((slot) =>
         slot.playerId && !allowed.has(slot.playerId) ? { ...slot, playerId: null } : slot,
       ),
+      benchPlayerIds: current.benchPlayerIds?.filter((id) => allowed.has(id)) ?? [],
     }))
   }, [candidateIds])
 
@@ -172,6 +176,17 @@ export default function LineupBoard({
       if (alive.current) {
         setPlans(result.items)
         setCloudError('')
+        if (!initialPlanLoaded.current) {
+          initialPlanLoaded.current = true
+          let selectedPlanId = ''
+          try {
+            selectedPlanId = Taro.getStorageSync(`${storageKey}:cloud-plan`)
+          } catch {
+            /* Read from the server list below. */
+          }
+          const saved = selectSavedLineupPlan(result.items, tournamentId, selectedPlanId)
+          if (saved && !dirtyRef.current) await openPlan(saved.id, saved)
+        }
       }
     } catch (error) {
       if (alive.current) setCloudError(error instanceof Error ? error.message : '云端战术加载失败')
@@ -330,7 +345,7 @@ export default function LineupBoard({
               .map((player) => player.id)
               .filter((id) => id !== current.playerId),
           },
-          '球员已移至未安排。',
+          '球员已移至未入选。',
         )
       } else if (target?.hasAttribute('data-lineup-bench') && current.playerId) {
         change(assignPlayer(draft, current.playerId, null), '球员已移至替补。')
@@ -461,6 +476,8 @@ export default function LineupBoard({
       return
     }
     setKind(plan.kind)
+    setTacticScope(plan.tournamentId ? 'TOURNAMENT' : 'TEAM')
+    if (plan.kind === 'MATCH_LINEUP') setMatchFormat(plan.payload.format)
     setBoundPlayers(plan.kind === 'MATCH_LINEUP' ? plan.snapshotPlayers : null)
     setBoundSnapshotId(plan.rosterSnapshotId)
     setBoundSnapshotVersion(plan.rosterSnapshotVersion)
@@ -473,6 +490,11 @@ export default function LineupBoard({
     setCloudError('')
     setPlanHistory(null)
     setNotice(`已读取云端「${plan.name}」v${plan.version}。`)
+    try {
+      Taro.setStorageSync(`${storageKey}:cloud-plan`, plan.id)
+    } catch {
+      /* Server plan remains available in the selector. */
+    }
   }
   const chooseKind = async (nextKind: 'TACTIC' | 'MATCH_LINEUP') => {
     if (cloudBusy || pendingSave || cloudPlan) return
@@ -487,6 +509,7 @@ export default function LineupBoard({
         if (!format) throw new Error('赛事尚未配置首发人数，请联系赛事管理员。')
         if (!workflow.lockedSnapshot) throw new Error('本队尚无赛事锁定名单，不能编排单场阵容。')
         setBoundPlayers(workflow.lockedSnapshot.players)
+        setMatchFormat(format)
         setBoundSnapshotId(workflow.lockedSnapshot.id)
         setBoundSnapshotVersion(workflow.lockedSnapshot.version)
         next = restoreDraft(next, workflow.lockedSnapshot.players) ?? createFormation('3-3-1')
@@ -543,7 +566,11 @@ export default function LineupBoard({
             name: draft.name.trim(),
             kind,
             expectedVersion: cloudPlan?.version ?? 0,
-            tournamentId: cloudPlan ? cloudPlan.tournamentId : tournamentId,
+            tournamentId: cloudPlan
+              ? cloudPlan.tournamentId
+              : kind === 'MATCH_LINEUP' || tacticScope === 'TOURNAMENT'
+                ? tournamentId
+                : null,
             matchId: kind === 'MATCH_LINEUP' ? matchId : null,
             rosterSnapshotId: kind === 'MATCH_LINEUP' ? boundSnapshotId : null,
             payload: {
@@ -581,6 +608,12 @@ export default function LineupBoard({
       setDirty(false)
       setPlanHistory(null)
       setNotice(`已保存到云端「${result.name}」v${result.version}；本队获授权队长可重新读取。`)
+      try {
+        Taro.setStorageSync(`${storageKey}:cloud-plan`, result.id)
+        Taro.setStorageSync(storageKey, draft)
+      } catch {
+        /* A successful server save does not depend on local storage. */
+      }
     } catch (error) {
       if (!alive.current) return
       setCloudError(error instanceof Error ? error.message : '云端保存失败')
@@ -647,6 +680,24 @@ export default function LineupBoard({
             <option value="MATCH_LINEUP">单场阵容</option>
           </select>
         </label>
+        {kind === 'TACTIC' ? (
+          <label className="lineup-label">
+            战术归属
+            <select
+              className="lineup-select"
+              aria-label="战术归属"
+              value={tacticScope}
+              disabled={cloudBusy || Boolean(pendingSave) || Boolean(cloudPlan)}
+              onChange={(event) => {
+                setTacticScope(event.target.value as 'TEAM' | 'TOURNAMENT')
+                setDirty(true)
+              }}
+            >
+              <option value="TEAM">全队通用（无需赛事报名）</option>
+              <option value="TOURNAMENT">当前赛事（需有效报名）</option>
+            </select>
+          </label>
+        ) : null}
         {kind === 'MATCH_LINEUP' && (
           <label className="lineup-label">
             本队比赛
@@ -763,350 +814,358 @@ export default function LineupBoard({
           )}
         </div>
       )}
-      <div className="lineup-toolbar">
-        <label className="lineup-label">
-          阵型
-          <select
-            className="lineup-select"
-            aria-label="选择阵型"
-            value={draft.custom ? 'custom' : draft.formation}
-            onChange={(event) => {
-              if (event.target.value !== 'custom')
-                change(
-                  createFormation(event.target.value, draft),
-                  '阵型已切换，已选首发保留；人数减少时多余球员转入替补。',
-                )
-            }}
-          >
-            {draft.custom && <option value="custom">自定义站位</option>}
-            {FORMATIONS.map((formation) => (
-              <option key={formation.name} value={formation.name}>
-                {formation.name} · {formation.format} 人制
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className={freeMove ? 'lineup-button is-active' : 'lineup-button'}
-          aria-pressed={freeMove}
-          onClick={() => {
-            setFreeMove(!freeMove)
-            setNotice(
-              freeMove
-                ? '拖拽球员可交换首发位置。'
-                : '自由站位：拖动场上标记，调整战术坐标；方向键也可微调。',
-            )
-          }}
-        >
-          {freeMove ? '自由站位：开启' : '自定义站位'}
-        </button>
-        <button
-          className="lineup-button"
-          onClick={() =>
-            change(fillByPosition(draft, players), '已按球员登记位置填入空位，请核对首发。')
-          }
-        >
-          按位置填入
-        </button>
-        <div className="lineup-toolbar__history">
-          <button
-            className="lineup-button"
-            disabled={!history.length}
-            aria-label="撤销排阵"
-            onClick={() => {
-              const previous = history[history.length - 1]!
-              setFuture([...future, draft])
-              setHistory(history.slice(0, -1))
-              setDraft(previous)
-              setDirty(true)
-            }}
-          >
-            撤销
-          </button>
-          <button
-            className="lineup-button"
-            disabled={!future.length}
-            aria-label="重做排阵"
-            onClick={() => {
-              const next = future[future.length - 1]!
-              setHistory([...history, draft])
-              setFuture(future.slice(0, -1))
-              setDraft(next)
-              setDirty(true)
-            }}
-          >
-            重做
-          </button>
-        </div>
-      </div>
-      <div className="lineup-layout">
-        <div className="lineup-pitch-panel">
-          <div className="lineup-pitch-caption">
-            <span>{draft.custom ? draft.name || '自定义战术' : draft.formation}</span>
-            <span>
-              {kind === 'MATCH_LINEUP' && boundSnapshotVersion
-                ? `名单 v${boundSnapshotVersion} · `
-                : ''}
-              首发 {starters.size}/{draft.slots.length} · 进攻方向 ↑
-            </span>
-          </div>
-          <div ref={pitch} className={`lineup-pitch ${freeMove ? 'lineup-pitch--free' : ''}`}>
-            <div className="lineup-pitch__boundary" aria-hidden="true">
-              <div className="lineup-pitch__half" />
-              <div className="lineup-pitch__circle" />
-              <div className="lineup-pitch__spot" />
-              <div className="lineup-pitch__box lineup-pitch__box--top" />
-              <div className="lineup-pitch__box lineup-pitch__box--bottom" />
-              <div className="lineup-pitch__goal lineup-pitch__goal--top" />
-              <div className="lineup-pitch__goal lineup-pitch__goal--bottom" />
-            </div>
-            {draft.slots.map((slot) => {
-              const player = slot.playerId ? playerMap.get(slot.playerId) : undefined
-              return (
-                <button
-                  key={slot.id}
-                  data-lineup-slot={slot.id}
-                  data-lineup-key={slot.playerId ?? `empty:${slot.id}`}
-                  className={`lineup-button lineup-slot ${player ? 'lineup-slot--filled' : ''} ${selected && selected === slot.playerId ? 'is-selected' : ''}`}
-                  style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
-                  aria-label={`${slot.label} ${player?.displayName ?? '空位'}`}
-                  aria-pressed={selected !== null && selected === slot.playerId}
-                  onPointerDown={(event) => startDrag(event, slot.playerId, slot.id)}
-                  onPointerMove={moveDrag}
-                  onPointerUp={endDrag}
-                  onPointerCancel={clearDrag}
-                  onLostPointerCapture={() => {
-                    if (drag.current) clearDrag()
-                  }}
-                  onClick={() => chooseSlot(slot.id)}
-                  onKeyDown={(event) => {
-                    if (
-                      !freeMove ||
-                      !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)
-                    )
-                      return
-                    event.preventDefault()
-                    change(
-                      moveSlot(
-                        draft,
-                        slot.id,
-                        slot.x +
-                          (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0),
-                        slot.y + (event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0),
-                      ),
-                    )
-                  }}
-                >
-                  <span
-                    className={`lineup-shirt ${slot.label === 'GK' ? 'lineup-shirt--keeper' : ''}`}
-                  >
-                    {player?.shirtNumber ?? (player ? '—' : '+')}
-                  </span>
-                  <span className="lineup-slot__name">{player?.displayName ?? slot.label}</span>
-                  <span className="lineup-slot__position">{slot.label}</span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="lineup-pitch-footer">
-            <span>号码球衣 · 本队真实成员</span>
-            <button
-              className="lineup-button"
-              onClick={async () => {
-                const result = await Taro.showModal({
-                  title: '清空首发',
-                  content: '球员将回到替补区，已保存的草稿不会被覆盖。',
-                  confirmText: '清空',
-                })
-                if (result.confirm)
+      <fieldset className="lineup-editable" disabled={cloudBusy || Boolean(pendingSave)}>
+        <div className="lineup-toolbar">
+          <label className="lineup-label">
+            阵型
+            <select
+              className="lineup-select"
+              aria-label="选择阵型"
+              value={draft.custom ? 'custom' : draft.formation}
+              onChange={(event) => {
+                if (event.target.value !== 'custom')
                   change(
-                    { ...draft, slots: draft.slots.map((slot) => ({ ...slot, playerId: null })) },
-                    '首发已清空。',
+                    createFormation(event.target.value, draft),
+                    '阵型已切换，已选首发保留；人数减少时多余球员转入替补。',
                   )
               }}
             >
-              清空首发
+              {draft.custom && <option value="custom">自定义站位</option>}
+              {FORMATIONS.filter(
+                (formation) => kind !== 'MATCH_LINEUP' || formation.format === matchFormat,
+              ).map((formation) => (
+                <option key={formation.name} value={formation.name}>
+                  {formation.name} · {formation.format} 人制
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className={freeMove ? 'lineup-button is-active' : 'lineup-button'}
+            aria-pressed={freeMove}
+            onClick={() => {
+              setFreeMove(!freeMove)
+              setNotice(
+                freeMove
+                  ? '拖拽球员可交换首发位置。'
+                  : '自由站位：拖动场上标记，调整战术坐标；方向键也可微调。',
+              )
+            }}
+          >
+            {freeMove ? '自由站位：开启' : '自定义站位'}
+          </button>
+          <button
+            className="lineup-button"
+            onClick={() =>
+              change(fillByPosition(draft, players), '已按球员登记位置填入空位，请核对首发。')
+            }
+          >
+            按位置填入
+          </button>
+          <div className="lineup-toolbar__history">
+            <button
+              className="lineup-button"
+              disabled={!history.length}
+              aria-label="撤销排阵"
+              onClick={() => {
+                const previous = history[history.length - 1]!
+                setFuture([...future, draft])
+                setHistory(history.slice(0, -1))
+                setDraft(previous)
+                setDirty(true)
+              }}
+            >
+              撤销
+            </button>
+            <button
+              className="lineup-button"
+              disabled={!future.length}
+              aria-label="重做排阵"
+              onClick={() => {
+                const next = future[future.length - 1]!
+                setHistory([...history, draft])
+                setFuture(future.slice(0, -1))
+                setDraft(next)
+                setDirty(true)
+              }}
+            >
+              重做
             </button>
           </div>
         </div>
-        <aside className="lineup-bench">
-          <div className="lineup-bench__heading">
-            <div>
-              <span className="lineup-eyebrow">ON THE BENCH</span>
-              <h3>替补</h3>
+        <div className="lineup-layout">
+          <div className="lineup-pitch-panel">
+            <div className="lineup-pitch-caption">
+              <span>{draft.custom ? draft.name || '自定义战术' : draft.formation}</span>
+              <span>
+                {kind === 'MATCH_LINEUP' && boundSnapshotVersion
+                  ? `名单 v${boundSnapshotVersion} · `
+                  : ''}
+                首发 {starters.size}/{draft.slots.length} · 进攻方向 ↑
+              </span>
             </div>
-            <strong>{substitutes.length}</strong>
-          </div>
-          <input
-            className="lineup-input"
-            aria-label="搜索本队球员"
-            placeholder="搜索姓名或号码"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <p className="lineup-bench__hint">拖入球场成为首发，拖回这里成为替补。</p>
-          <div className="lineup-bench__list" data-lineup-bench="true">
-            {bench.map((player) => (
-              <div className="lineup-bench-row" key={player.id}>
-                <button
-                  className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
-                  aria-label={`选择${player.displayName}`}
-                  aria-pressed={selected === player.id}
-                  onPointerDown={(event) => startDrag(event, player.id)}
-                  onPointerMove={moveDrag}
-                  onPointerUp={endDrag}
-                  onPointerCancel={clearDrag}
-                  onClick={() => choosePlayer(player)}
-                >
-                  <PlayerPortrait player={player} />
-                  <span className="lineup-player__copy">
-                    <strong>{player.displayName}</strong>
-                    <small>
-                      {positionLabel(player.position)} · {player.shirtNumber ?? '未设'} 号
-                    </small>
-                  </span>
-                  <span className="lineup-player__grip" aria-hidden="true">
-                    ⠿
-                  </span>
-                </button>
-                <button
-                  className="lineup-button lineup-player-action"
-                  aria-label={`将${player.displayName}移至未安排`}
-                  onClick={() =>
-                    change(
-                      {
-                        ...draft,
-                        benchPlayerIds: substitutes
-                          .map((item) => item.id)
-                          .filter((id) => id !== player.id),
-                      },
-                      '已移至未安排。',
-                    )
-                  }
-                >
-                  未安排
-                </button>
+            <p className="lineup-local-note">
+              首发 {starters.size}/{draft.slots.length} 人 · 替补 {substitutes.length} 人 · 未入选{' '}
+              {unassigned.length} 人
+              {kind === 'MATCH_LINEUP' && starters.size < draft.slots.length
+                ? ' · 请补齐首发后保存'
+                : ''}
+            </p>
+            <div ref={pitch} className={`lineup-pitch ${freeMove ? 'lineup-pitch--free' : ''}`}>
+              <div className="lineup-pitch__boundary" aria-hidden="true">
+                <div className="lineup-pitch__half" />
+                <div className="lineup-pitch__circle" />
+                <div className="lineup-pitch__spot" />
+                <div className="lineup-pitch__box lineup-pitch__box--top" />
+                <div className="lineup-pitch__box lineup-pitch__box--bottom" />
+                <div className="lineup-pitch__goal lineup-pitch__goal--top" />
+                <div className="lineup-pitch__goal lineup-pitch__goal--bottom" />
               </div>
-            ))}
-            {!bench.length && (
-              <p className="lineup-empty">
-                {query
-                  ? '没有符合搜索的本队球员'
-                  : players.length
-                    ? unassigned.length
-                      ? '暂未选择替补，可从未安排中添加。'
-                      : '所有球员均已安排首发'
-                    : '本队还没有已关联档案的球员'}
-              </p>
-            )}
-          </div>
-          <div className="lineup-unassigned" data-lineup-unassigned="true">
-            <h3>
-              未安排 <span>{unassigned.length}</span>
-            </h3>
-            {visibleUnassigned.map((player) => (
-              <div className="lineup-bench-row" key={player.id}>
-                <button
-                  className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
-                  aria-label={`选择未安排的${player.displayName}`}
-                  aria-pressed={selected === player.id}
-                  onPointerDown={(event) => startDrag(event, player.id)}
-                  onPointerMove={moveDrag}
-                  onPointerUp={endDrag}
-                  onPointerCancel={clearDrag}
-                  onClick={() => choosePlayer(player)}
-                >
-                  <PlayerPortrait player={player} />
-                  <span className="lineup-player__copy">
-                    <strong>{player.displayName}</strong>
-                    <small>{positionLabel(player.position)}</small>
-                  </span>
-                </button>
-                <button
-                  className="lineup-button lineup-player-action"
-                  aria-label={`将${player.displayName}设为替补`}
-                  onClick={() =>
-                    change(
-                      {
-                        ...draft,
-                        benchPlayerIds: [...substitutes.map((item) => item.id), player.id],
-                      },
-                      '已设为替补。',
-                    )
-                  }
-                >
-                  替补
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            className="lineup-button lineup-bench__remove"
-            disabled={!selected || !starters.has(selected)}
-            onClick={() => {
-              if (selected) change(assignPlayer(draft, selected, null), '已移至替补。')
-              setSelected(null)
-            }}
-          >
-            将所选球员移至替补
-          </button>
-        </aside>
-      </div>
-      <div className="lineup-custom">
-        <label className="lineup-label">
-          战术名称
-          <input
-            className="lineup-input"
-            aria-label="战术名称"
-            maxLength={32}
-            placeholder="例如：边路推进"
-            value={draft.name}
-            onChange={(event) => change({ ...draft, name: event.target.value })}
-          />
-        </label>
-        <button className="lineup-button" onClick={saveTemplate}>
-          保存为自定义战术
-        </button>
-        {templates.map((template) => (
-          <span className="lineup-template" key={template.name}>
-            <button
-              className="lineup-button"
-              onClick={() => {
-                const sameSize = draft.slots.length === template.slots.length
-                const base = sameSize ? draft : createFormation(template.formation, draft)
-                change(
-                  {
-                    ...template,
-                    benchPlayerIds: base.benchPlayerIds,
-                    slots: template.slots.map((slot, index) => ({
-                      ...slot,
-                      playerId: base.slots[index]?.playerId ?? null,
-                    })),
-                  },
-                  `已应用「${template.name}」。`,
+              {draft.slots.map((slot) => {
+                const player = slot.playerId ? playerMap.get(slot.playerId) : undefined
+                return (
+                  <button
+                    key={slot.id}
+                    data-lineup-slot={slot.id}
+                    data-lineup-key={slot.playerId ?? `empty:${slot.id}`}
+                    className={`lineup-button lineup-slot ${player ? 'lineup-slot--filled' : ''} ${selected && selected === slot.playerId ? 'is-selected' : ''}`}
+                    style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                    aria-label={`${slot.label} ${player?.displayName ?? '空位'}`}
+                    aria-pressed={selected !== null && selected === slot.playerId}
+                    onPointerDown={(event) => startDrag(event, slot.playerId, slot.id)}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={clearDrag}
+                    onLostPointerCapture={() => {
+                      if (drag.current) clearDrag()
+                    }}
+                    onClick={() => chooseSlot(slot.id)}
+                    onKeyDown={(event) => {
+                      if (
+                        !freeMove ||
+                        !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)
+                      )
+                        return
+                      event.preventDefault()
+                      change(
+                        moveSlot(
+                          draft,
+                          slot.id,
+                          slot.x +
+                            (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0),
+                          slot.y +
+                            (event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0),
+                        ),
+                      )
+                    }}
+                  >
+                    <span
+                      className={`lineup-shirt ${slot.label === 'GK' ? 'lineup-shirt--keeper' : ''}`}
+                    >
+                      {player?.shirtNumber ?? (player ? '—' : '+')}
+                    </span>
+                    <span className="lineup-slot__name">{player?.displayName ?? slot.label}</span>
+                    <span className="lineup-slot__position">{slot.label}</span>
+                  </button>
                 )
-              }}
-            >
-              {template.name}
-            </button>
+              })}
+            </div>
+            <div className="lineup-pitch-footer">
+              <span>号码球衣 · 本队真实成员</span>
+              <button
+                className="lineup-button"
+                onClick={async () => {
+                  const result = await Taro.showModal({
+                    title: '清空首发',
+                    content: '球员将回到替补区，已保存的草稿不会被覆盖。',
+                    confirmText: '清空',
+                  })
+                  if (result.confirm) change(clearStarters(draft), '首发已清空。')
+                }}
+              >
+                清空首发
+              </button>
+            </div>
+          </div>
+          <aside className="lineup-bench">
+            <div className="lineup-bench__heading">
+              <div>
+                <span className="lineup-eyebrow">ON THE BENCH</span>
+                <h3>替补</h3>
+              </div>
+              <strong>{substitutes.length}</strong>
+            </div>
+            <input
+              className="lineup-input"
+              aria-label="搜索本队球员"
+              placeholder="搜索姓名或号码"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <p className="lineup-bench__hint">拖入球场成为首发，拖回这里成为替补。</p>
+            <div className="lineup-bench__list" data-lineup-bench="true">
+              {bench.map((player) => (
+                <div className="lineup-bench-row" key={player.id}>
+                  <button
+                    className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
+                    aria-label={`选择${player.displayName}`}
+                    aria-pressed={selected === player.id}
+                    onPointerDown={(event) => startDrag(event, player.id)}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={clearDrag}
+                    onClick={() => choosePlayer(player)}
+                  >
+                    <PlayerPortrait player={player} />
+                    <span className="lineup-player__copy">
+                      <strong>{player.displayName}</strong>
+                      <small>
+                        {positionLabel(player.position)} · {player.shirtNumber ?? '未设'} 号
+                      </small>
+                    </span>
+                    <span className="lineup-player__grip" aria-hidden="true">
+                      ⠿
+                    </span>
+                  </button>
+                  <button
+                    className="lineup-button lineup-player-action"
+                    aria-label={`将${player.displayName}移至未入选`}
+                    onClick={() =>
+                      change(
+                        {
+                          ...draft,
+                          benchPlayerIds: substitutes
+                            .map((item) => item.id)
+                            .filter((id) => id !== player.id),
+                        },
+                        '已移至未入选。',
+                      )
+                    }
+                  >
+                    未入选
+                  </button>
+                </div>
+              ))}
+              {!bench.length && (
+                <p className="lineup-empty">
+                  {query
+                    ? '没有符合搜索的本队球员'
+                    : players.length
+                      ? unassigned.length
+                        ? '暂未选择替补，可从未入选中添加。'
+                        : '所有球员均已安排首发'
+                      : '本队还没有已关联档案的球员'}
+                </p>
+              )}
+            </div>
+            <div className="lineup-unassigned" data-lineup-unassigned="true">
+              <h3>
+                未入选 <span>{unassigned.length}</span>
+              </h3>
+              {visibleUnassigned.map((player) => (
+                <div className="lineup-bench-row" key={player.id}>
+                  <button
+                    className={`lineup-button lineup-player ${selected === player.id ? 'is-selected' : ''}`}
+                    aria-label={`选择未入选的${player.displayName}`}
+                    aria-pressed={selected === player.id}
+                    onPointerDown={(event) => startDrag(event, player.id)}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={clearDrag}
+                    onClick={() => choosePlayer(player)}
+                  >
+                    <PlayerPortrait player={player} />
+                    <span className="lineup-player__copy">
+                      <strong>{player.displayName}</strong>
+                      <small>{positionLabel(player.position)}</small>
+                    </span>
+                  </button>
+                  <button
+                    className="lineup-button lineup-player-action"
+                    aria-label={`将${player.displayName}设为替补`}
+                    onClick={() =>
+                      change(
+                        {
+                          ...draft,
+                          benchPlayerIds: [...substitutes.map((item) => item.id), player.id],
+                        },
+                        '已设为替补。',
+                      )
+                    }
+                  >
+                    替补
+                  </button>
+                </div>
+              ))}
+            </div>
             <button
-              className="lineup-button"
-              aria-label={`删除战术${template.name}`}
+              className="lineup-button lineup-bench__remove"
+              disabled={!selected || !starters.has(selected)}
               onClick={() => {
-                const next = templates.filter((item) => item.name !== template.name)
-                try {
-                  Taro.setStorageSync(`${storageKey}:templates`, next)
-                  setTemplates(next)
-                } catch {
-                  setNotice('删除战术失败。')
-                }
+                if (selected) change(assignPlayer(draft, selected, null), '已移至替补。')
+                setSelected(null)
               }}
             >
-              ×
+              将所选球员移至替补
             </button>
-          </span>
-        ))}
-      </div>
+          </aside>
+        </div>
+        <div className="lineup-custom">
+          <label className="lineup-label">
+            战术名称
+            <input
+              className="lineup-input"
+              aria-label="战术名称"
+              maxLength={32}
+              placeholder="例如：边路推进"
+              value={draft.name}
+              onChange={(event) => change({ ...draft, name: event.target.value })}
+            />
+          </label>
+          <button className="lineup-button" onClick={saveTemplate}>
+            保存为自定义战术
+          </button>
+          {templates.map((template) => (
+            <span className="lineup-template" key={template.name}>
+              <button
+                className="lineup-button"
+                onClick={() => {
+                  const sameSize = draft.slots.length === template.slots.length
+                  const base = sameSize ? draft : createFormation(template.formation, draft)
+                  change(
+                    {
+                      ...template,
+                      benchPlayerIds: base.benchPlayerIds,
+                      slots: template.slots.map((slot, index) => ({
+                        ...slot,
+                        playerId: base.slots[index]?.playerId ?? null,
+                      })),
+                    },
+                    `已应用「${template.name}」。`,
+                  )
+                }}
+              >
+                {template.name}
+              </button>
+              <button
+                className="lineup-button"
+                aria-label={`删除战术${template.name}`}
+                onClick={() => {
+                  const next = templates.filter((item) => item.name !== template.name)
+                  try {
+                    Taro.setStorageSync(`${storageKey}:templates`, next)
+                    setTemplates(next)
+                  } catch {
+                    setNotice('删除战术失败。')
+                  }
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </fieldset>
       <div className="lineup-status" role="status" aria-live="polite">
         {notice}
       </div>

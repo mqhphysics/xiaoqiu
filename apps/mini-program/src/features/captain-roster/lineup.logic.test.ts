@@ -3,11 +3,14 @@ import test from 'node:test'
 import {
   assignPlayer,
   createFormation,
+  clearStarters,
   draftStorageKey,
   fillByPosition,
   FORMATIONS,
+  groupLineupPlayers,
   moveSlot,
   restoreDraft,
+  selectSavedLineupPlan,
 } from './lineup.logic.ts'
 
 const players = Array.from({ length: 14 }, (_, i) => ({
@@ -93,4 +96,43 @@ test('eight starters, one substitute and one unassigned survive restore without 
   assert.equal(restored.benchPlayerIds!.includes(squad[9]!.id), false)
   const swapped = assignPlayer(restored, squad[8]!.id, restored.slots[0]!.id)
   assert.deepEqual(swapped.benchPlayerIds, [squad[0]!.id])
+})
+
+test('new and legacy eight-a-side plans do not select registered players implicitly', () => {
+  const empty = createFormation('3-3-1')
+  const groups = groupLineupPlayers(empty, players)
+  assert.equal(empty.slots.length, 8)
+  assert.equal(groups.starters.length, 0)
+  assert.equal(groups.substitutes.length, 0)
+  assert.equal(groups.unselected.length, 14)
+  const { benchPlayerIds: _legacyBench, ...legacy } = empty
+  const restored = restoreDraft(legacy, players)!
+  assert.deepEqual(restored.benchPlayerIds, [])
+  assert.equal(groupLineupPlayers(restored, players).unselected.length, 14)
+})
+
+test('clearing an eight-a-side starting lineup moves only selected starters to substitutes', () => {
+  const lineup = fillByPosition(createFormation('3-3-1'), players)
+  lineup.benchPlayerIds = ['player-13']
+  const result = clearStarters(lineup)
+  const groups = groupLineupPlayers(result, players)
+  assert.equal(groups.starters.length, 0)
+  assert.equal(groups.substitutes.length, 9)
+  assert.equal(groups.unselected.length, 5)
+  assert.equal(new Set(result.benchPlayerIds).size, 9)
+  const restored = restoreDraft(result, players)!
+  assert.deepEqual(groupLineupPlayers(restored, players), groups)
+})
+
+test('refresh chooses the selected server plan or the most recently saved relevant plan', () => {
+  const plans = [
+    { id: 'old', tournamentId: 'current', updatedAt: '2026-10-03T10:00:00Z' },
+    { id: 'other', tournamentId: 'other', updatedAt: '2026-10-03T13:00:00Z' },
+    { id: 'new', tournamentId: 'current', updatedAt: '2026-10-03T12:00:00Z' },
+    { id: 'general', tournamentId: null, updatedAt: '2026-10-03T11:00:00Z' },
+  ]
+  assert.equal(selectSavedLineupPlan(plans, 'current', 'old')?.id, 'old')
+  assert.equal(selectSavedLineupPlan(plans, 'current', 'missing')?.id, 'new')
+  assert.equal(selectSavedLineupPlan(plans, 'current', 'other')?.id, 'new')
+  assert.equal(selectSavedLineupPlan([], 'current', 'old'), undefined)
 })
