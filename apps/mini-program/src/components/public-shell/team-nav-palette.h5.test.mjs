@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getTeamNavPalette } from './team-nav-palette.h5.ts'
+import { getTeamNavOrnamentPalette, getTeamNavPalette } from './team-nav-palette.h5.ts'
 
 const team = {
   teamCode: 'DEMO-PHY-1',
@@ -14,6 +14,20 @@ test('demo crest palette follows the visible Manchester United crest rather than
   const palette = getTeamNavPalette(team)
   assert.equal(palette.primary, '#da291c')
   assert.equal(palette.secondary, '#ffe500')
+})
+
+test('ornaments retain the club hues while being lighter than the crest colors', () => {
+  for (const teamCode of ['DEMO-PHY-1', 'DEMO-PHY-2']) {
+    const source = { ...team, teamCode }
+    const crest = getTeamNavPalette(source)
+    const ornament = getTeamNavOrnamentPalette(source)
+    const brightness = (color) =>
+      [1, 3, 5].reduce((total, offset) => total + parseInt(color.slice(offset, offset + 2), 16), 0)
+    assert.notEqual(ornament.primary, crest.primary)
+    assert.notEqual(ornament.secondary, crest.secondary)
+    assert.ok(brightness(ornament.primary) > brightness(crest.primary))
+    assert.ok(brightness(ornament.secondary) > brightness(crest.secondary))
+  }
 })
 
 test('custom crests keep their declared team colors even on a known demo team code', () => {

@@ -62,25 +62,28 @@ export function playTeamFocus(shell: HTMLElement, initialFocus?: TeamFocusState[
   const animations: Animation[] = []
   const wings = button.querySelectorAll<HTMLElement>('.public-team-focus__wing')
   for (const [index, wing] of wings.entries()) {
-    const pair = Number(wing.dataset.focusPair)
     const stroke = wing.querySelector<SVGPathElement>('.public-team-focus__stroke')
     if (!stroke) continue
+    const seed = wing.querySelector<SVGPathElement>('.public-team-focus__trace')
+    const seedFraction = seed ? Math.min(1, seed.getTotalLength() / stroke.getTotalLength()) : 0
+    const opacity = wing.classList.contains('public-team-focus__wing--detail') ? '0.64' : '0.92'
     const options: KeyframeAnimationOptions = {
-      duration: 760,
-      delay: 60 + pair * 80,
+      duration: Number(wing.dataset.focusDuration) || 1050,
+      delay: Number(wing.dataset.focusDelay) || 0,
       easing: focusEasing,
       fill: 'backwards',
     }
     const start: Keyframe = {
-      strokeDashoffset: '1',
-      opacity: '0',
+      strokeDashoffset: String(1 - seedFraction),
+      opacity: seed ? '0.4' : '0',
     }
+    const previous = initialFocus?.[index]
     const frames: Keyframe[] = initialFocus
-      ? [initialFocus[index] ?? start]
+      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : start]
       : [replayFocus[index] ?? { strokeDashoffset: '0', opacity: '1' }, { ...start, offset: 0.12 }]
     frames.push(
-      { strokeDashoffset: '0.25', opacity: 1, offset: 0.65 },
-      { strokeDashoffset: '0', opacity: 1 },
+      { strokeDashoffset: '0.2', opacity, offset: 0.68 },
+      { strokeDashoffset: '0', opacity },
     )
     animations.push(stroke.animate(frames, options))
   }
