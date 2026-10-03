@@ -29,13 +29,18 @@ export default function App({ children }: PropsWithChildren) {
   )
 
   return (
-    <AccountBoundary>
+    <AccountBoundary
+      overlays={
+        <>
+          <PostOverlayHost />
+          <TeamOverlayHost />
+          <PlayerOverlayHost />
+          <MatchOverlayHost />
+          <MessagingOverlayHost />
+        </>
+      }
+    >
       {children}
-      <PostOverlayHost />
-      <TeamOverlayHost />
-      <PlayerOverlayHost />
-      <MatchOverlayHost />
-      <MessagingOverlayHost />
     </AccountBoundary>
   )
 }
