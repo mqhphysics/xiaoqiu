@@ -38,3 +38,9 @@
 - 详情内容按需分包，并与真实 API 请求并行加载；代码或 API 加载失败均进入可重试错误状态。分包后的 H5 构建再次通过。
 
 全新数据库、seed、后端角色/事件流程和浏览器桌面/手机联调由集成负责人统一执行。未执行微信构建或真机测试，未启动/修改日常 API、数据库、Worker，未 push、PR、合并或部署。
+# 真实浏览器复核修复
+
+- 实际 Chrome 验收确认 Taro 浏览器 Back 会替换赛程源按钮 DOM；MatchOverlayHost 现在以同一路径的可访问标签/完整链接恢复新按钮焦点，资源导航取消恢复避免抢焦点。
+- 实际手机验收确认 Taro navigateTo 不触发原生 hashchange；MatchOverlayHost 订阅 __afterTaroRouterChange，在真实路径改变时清除比赛层，使球队/球员页面可见。
+- 焦点身份回归新增 3 项，结合阵容和 history 回归 10/10 通过；H5 TypeScript、改动 ESLint 通过。完整浏览器复核等待集成后的统一 H5 构建。
+- 专用 task 测试数据库已正式 HTTP 确认的虚构比赛 d825b51f-9181-4bda-97ac-ff0d3ded93f5，desktop1440/phone390 真实 GET 与展示逐项一致：每队 8 首发+2 替补、8 事件、50′及72+1′两次成对换人，替补先上后下及65′进球/助攻；无阵型/站位如实显示未提供。该 fixture 的 appearance 由授权测试 setup 明确建立，事件通过真实 submit/confirm，不代表生产赛事事实。
