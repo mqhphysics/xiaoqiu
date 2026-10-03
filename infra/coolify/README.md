@@ -20,6 +20,11 @@
    `admin-web:80`。
 3. 设置 `APP_VERSION` 为提交哈希，设置 `VITE_API_BASE_URL` 为公开 API
    地址，例如 `https://api-staging.example.edu/api`。
+   设置 `CORS_ORIGINS` 为 H5、Admin Web 的精确 Origin（逗号分隔），并配置
+   安全初始化产生的 `DEFAULT_ORGANIZATION_ID`；真实赛事发布后再设置
+   `DEFAULT_TOURNAMENT_ID`。后台组织 ID 是构建参数，变更后重建。
+   API 的 `media_data` 卷挂载 `/app/private-data/media`，保存头像与帖子图片，
+   卷需与数据库同时备份。不要在真实库运行演示 Seed。
 4. 确认 migration 容器以退出码 0 完成，然后检查：
 
 ```bash

@@ -26,10 +26,18 @@ services:
       APP_VERSION: ${APP_VERSION:-staging}
       API_HOST: 0.0.0.0
       API_PORT: 3000
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set the exact H5 and admin origins}
+      DEFAULT_ORGANIZATION_ID: ${DEFAULT_ORGANIZATION_ID:-}
+      DEFAULT_TOURNAMENT_ID: ${DEFAULT_TOURNAMENT_ID:-}
+      POST_MEDIA_DIRECTORY: /app/private-data/media/posts
+      LOCAL_DEMO_SHORT_PASSWORDS: '0'
+      ENABLE_DEMO_IDENTITY_RECOVERY: 'false'
       DATABASE_URL: ${DATABASE_URL:-postgresql://replace-me:replace-me@postgres.invalid:5432/xiaoqiu}
       SENTRY_DSN_API: ${SENTRY_DSN_API:-}
     expose:
       - '3000'
+    volumes:
+      - media_data:/app/private-data/media
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -70,6 +78,7 @@ services:
         PNPM_VERSION: ${PNPM_VERSION:-11.5.2}
         NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27.4-alpine}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api-staging.example.invalid/api}
+        VITE_ORGANIZATION_ID: ${DEFAULT_ORGANIZATION_ID:-}
     restart: unless-stopped
     expose:
       - '80'
@@ -88,3 +97,6 @@ services:
       timeout: 5s
       retries: 6
       start_period: 10s
+
+volumes:
+  media_data:

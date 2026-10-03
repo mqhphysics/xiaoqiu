@@ -18,3 +18,12 @@ coverage
 *.tsbuildinfo
 docs
 tests
+
+# Local registrations, uploaded media, credentials, and backups are never image inputs.
+private-data
+**/private-data
+backups
+**/backups
+**/.env
+**/.env.*
+!**/.env.example

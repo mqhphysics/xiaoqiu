@@ -20,4 +20,8 @@ profile 时会先运行一次 migration job。只有迁移成功后，API 和 Wo
 Migration 镜像包含 API workspace 的 Prisma CLI、`prisma/schema.prisma` 和
 `prisma/migrations/`，执行 `prisma migrate deploy`。迁移不会由每个 API 实例自行执行。
 
-Dockerfile 专用 `.dockerignore` 文件位于本目录，避免修改仓库根配置。
+Dockerfile 专用 `.dockerignore` 文件位于本目录，会覆盖仓库根忽略配置；两者均
+排除本地 `private-data/`、上传媒体、真实 `.env` 和备份，仅保留无秘密 `.env.example`。
+
+正式单服务器配置使用 `infra/release/compose.yaml`，不会占用日常服务端口。
+操作步骤与功能边界见[上线版本后端部署](../../docs/deployment/上线版本后端部署.md)。
