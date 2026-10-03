@@ -1,0 +1,20 @@
+/* postcss-pxtransform disable */
+@use '../../pages/readonly-match-detail/index';
+
+// Existing match styling uses web pixel sizes; preserve them on H5 screens.
+@media (max-width: 720px) {
+  .match-dialog .match-detail-tab {
+    min-height: 44px;
+    line-height: 44px;
+  }
+  .match-dialog .rating-star {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+  }
+  .match-dialog .match-review__actions button {
+    min-height: 44px;
+    font-size: 12px;
+    line-height: 44px;
+  }
+}

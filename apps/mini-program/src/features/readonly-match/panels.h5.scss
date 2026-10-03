@@ -1,3 +1,4 @@
+/* postcss-pxtransform disable */
 .match-panel-heading {
   display: flex;
   align-items: end;
@@ -407,6 +408,9 @@
     h3 {
       font-size: 14px;
     }
+  }
+  .match-player-detail button {
+    min-height: 44px;
   }
   .match-events__list {
     padding: 0 12px;

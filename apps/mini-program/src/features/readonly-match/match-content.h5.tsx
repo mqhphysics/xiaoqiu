@@ -13,7 +13,7 @@ import { readSession } from '../product/session'
 import { MatchReportEntry } from '../match-report/MatchReportEntry'
 import type { MatchExperienceResponse } from '../product/product.types'
 import { LineupsPanel, EventsPanel } from './panels.h5'
-import '../../pages/readonly-match-detail/index.scss'
+import './match-content.h5.scss'
 
 type DetailTab = 'ratings' | 'events' | 'lineups'
 export function MatchContent({
