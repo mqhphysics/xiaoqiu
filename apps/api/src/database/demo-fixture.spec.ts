@@ -13,10 +13,27 @@ import {
 import { calculateStandings } from '../experience/ranking'
 import {
   DEMO_STARTERS_PER_TEAM,
+  competitionRules,
   getDemoMinutesPlayed,
   isDemoMatchStarter,
 } from './seed-demo-competition'
 import { DEMO_MATCH_REVIEWS } from './seed-demo-social'
+import { parseResultsRules } from '../results/parse-rules'
+import { parseRosterPolicy } from '../roster/roster-workflow.rules'
+
+test('both seeded tournaments publish complete eight-a-side roster and result policies', () => {
+  for (const year of ['2025', '2026'] as const) {
+    const document = competitionRules(year)
+    const results = parseResultsRules(`demo-rule-${year}`, document)
+    assert.deepEqual(results.points, { win: 3, draw: 1, loss: 0 })
+    assert.equal(results.knockoutShootout, 'ALLOWED')
+    const roster = parseRosterPolicy(document)
+    assert.ok(roster)
+    assert.equal(roster.playersOnPitch, 8)
+    assert.equal(roster.maxPlayers, 14)
+    assert.equal(roster.eligiblePlayerIds.length, year === '2026' ? 224 : 112)
+  }
+})
 
 test('2026 tournament registers all 16 teams with 14 players each', () => {
   assert.equal(DEMO_TOURNAMENT_TEAMS.length, 16)

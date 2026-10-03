@@ -469,7 +469,7 @@ export async function seedDemoMatches(
   }
 }
 
-function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
+export function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
   return {
     summary:
       year === '2026'
@@ -477,6 +477,28 @@ function competitionRules(year: '2025' | '2026'): Prisma.InputJsonValue {
         : '8 支球队采用单败淘汰赛，平局通过点球大战决出胜者。',
     points: { win: 3, draw: 1, loss: 0 },
     tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
+    // Demo policy is explicit so seeded matches support the real report workflow.
+    // Production organizers must publish their own adopted rules.
+    roster: {
+      playersOnPitch: DEMO_STARTERS_PER_TEAM,
+      minPlayers: DEMO_STARTERS_PER_TEAM,
+      maxPlayers: 14,
+      submissionDeadline: `${year}-12-20T00:00:00+08:00`,
+      eligiblePlayerIds: DEMO_PLAYERS.filter(
+        (player) => year === '2026' || player.teamIndex < 8,
+      ).map((player) => player.id),
+    },
+    results: {
+      points: { win: 3, draw: 1, loss: 0 },
+      tieBreakers: ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
+      headToHead: {
+        criteria: ['POINTS', 'GOAL_DIFFERENCE', 'GOALS_FOR'],
+        reapplyToRemainingTeams: true,
+      },
+      groupShootout: 'REJECT',
+      knockoutShootout: 'ALLOWED',
+      forfeit: { winnerGoals: 3, loserGoals: 0, loserPoints: 0, both: null },
+    },
   }
 }
 

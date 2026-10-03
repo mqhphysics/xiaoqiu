@@ -185,6 +185,29 @@ test(
         .expect(200)
       assert.equal(dashboard.body.roster.length, 14)
 
+      const reporter = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('X-Organization-Id', DEMO_ORGANIZATION_ID)
+        .send({ username: 'reporter', password: DEMO_PASSWORD })
+        .expect(200)
+      const reportMatch = await prisma.match.findFirstOrThrow({
+        where: {
+          tournamentId,
+          status: 'SCHEDULED',
+          homeTeamId: { not: null },
+          awayTeamId: { not: null },
+        },
+      })
+      const workspace = await request(app.getHttpServer())
+        .get(`/api/matches/${reportMatch.id}/report`)
+        .set('authorization', `Bearer ${reporter.body.accessToken}`)
+        .expect(200)
+      assert.deepEqual(workspace.body.blockingReasons, [])
+      assert.equal(workspace.body.permissions.canEdit, true)
+      assert.equal(workspace.body.permissions.canSubmit, true)
+      assert.equal(workspace.body.homeTeam.players.length, 14)
+      assert.equal(workspace.body.awayTeam.players.length, 14)
+
       // Restoring an old demo must append a rule version rather than changing frozen content.
       await prisma.teamRegistration.updateMany({
         where: {
