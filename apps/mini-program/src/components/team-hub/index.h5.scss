@@ -256,6 +256,13 @@
     width: 100%;
     border-left: 3px solid #649c6c;
   }
+  .th-follow-chip--primary strong {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
   .th-follow-chip strong {
     transition: color 160ms ease;
   }

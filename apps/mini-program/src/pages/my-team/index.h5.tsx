@@ -20,7 +20,7 @@ import type {
   TeamPreferencesResponse,
   PlayerDetailResponse,
 } from '../../features/product/product.types'
-import ExistingMyTeamPage from './index.tsx'
+import ExistingMyTeamPage from './my-team.shared'
 import '../../components/team-hub/index.h5.scss'
 
 export default function H5MyTeamPage() {
