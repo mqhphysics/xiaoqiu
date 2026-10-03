@@ -122,7 +122,7 @@ test(
         },
       })
       const homePlayers = await Promise.all(
-        [1, 2].map((number) =>
+        [1, 2, 3].map((number) =>
           prisma.playerProfile.create({
             data: {
               organizationId: organization.id,
@@ -648,6 +648,172 @@ test(
           .post(`/api/matches/${target.id}/report`)
           .set('authorization', bearer(userId))
           .send(command)
+
+      await t.test(
+        '完整事件流：成对换人、编辑撤销、非法输入、提交退回和官方更正均保留版本',
+        async () => {
+          const target = await createExtraMatch('EVENT-FLOW')
+          await prisma.roleAssignment.create({
+            data: {
+              organizationId: organization.id,
+              userId: reporter2.id,
+              role: 'MATCH_REPORTER',
+              scopeType: 'MATCH',
+              scopeId: target.id,
+            },
+          })
+          const swap = (
+            clientEventId: string,
+            minute: string,
+            playerId: string,
+            relatedPlayerId: string,
+          ) => ({
+            clientEventId,
+            kind: 'SUBSTITUTION' as const,
+            side: 'HOME' as const,
+            minute,
+            addedMinute: '',
+            playerId,
+            relatedPlayerId,
+          })
+          const complete: ReportFieldsDto = {
+            ...report,
+            homeScore: '3',
+            events: [
+              report.events[0]!,
+              { ...report.events[1]!, minute: '65' },
+              report.events[2]!,
+              { ...report.events[2]!, clientEventId: 'own-goal', kind: 'OWN_GOAL', minute: '80' },
+              {
+                ...report.events[0]!,
+                clientEventId: 'yellow',
+                kind: 'YELLOW_CARD',
+                minute: '35',
+                relatedPlayerId: '',
+              },
+              { ...report.events[2]!, clientEventId: 'red', kind: 'RED_CARD', minute: '85' },
+              swap('swap-on', '50', homePlayers[0]!.id, homePlayers[1]!.id),
+              swap('swap-off', '70', homePlayers[1]!.id, homePlayers[2]!.id),
+            ],
+          }
+          const command = content(0, complete)
+          await postExtra(target, reporter2.id, command).expect(200)
+          await postExtra(target, reporter2.id, command).expect(200)
+          assert.equal(await prisma.matchReportRevision.count({ where: { matchId: target.id } }), 1)
+          await postExtra(target, student.id, content(1, complete)).expect(403)
+          await postExtra(target, reporter.id, content(1, complete)).expect(403)
+          const rejected = [
+            {
+              ...complete,
+              events: [
+                ...complete.events,
+                { ...complete.events[0]!, clientEventId: 'duplicate-fact' },
+              ],
+            },
+            { ...complete, events: [{ ...complete.events[0]!, minute: '121' }] },
+            { ...complete, events: [{ ...complete.events[0]!, addedMinute: '31' }] },
+            { ...complete, events: [{ ...complete.events[0]!, playerId: awayPlayer.id }] },
+            {
+              ...complete,
+              events: [swap('same-player', '50', homePlayers[0]!.id, homePlayers[0]!.id)],
+            },
+            { ...complete, events: [swap('missing-player', '50', homePlayers[0]!.id, '')] },
+            {
+              ...complete,
+              events: [
+                swap('one-off', '50', homePlayers[0]!.id, homePlayers[1]!.id),
+                swap('twice-off', '60', homePlayers[0]!.id, homePlayers[2]!.id),
+              ],
+            },
+          ]
+          for (const invalid of rejected)
+            await postExtra(target, reporter2.id, content(1, invalid)).expect(400)
+          assert.equal(
+            (await prisma.match.findUniqueOrThrow({ where: { id: target.id } })).reportVersion,
+            1,
+          )
+          const edited = {
+            ...complete,
+            events: complete.events.map((event) =>
+              event.clientEventId === 'swap-off'
+                ? { ...event, minute: '72', addedMinute: '1' }
+                : event,
+            ),
+          }
+          await postExtra(target, reporter2.id, content(1, edited)).expect(200)
+          await postExtra(target, reporter2.id, content(2, edited, 'SUBMIT')).expect(200)
+          await postExtra(target, reporter2.id, content(3, complete)).expect(409)
+          await postExtra(target, reporter2.id, review(3, 'CONFIRM')).expect(403)
+          await postExtra(
+            target,
+            admin.id,
+            review(3, 'RETURN', 'FICTIONAL_TEST 撤销多录黄牌'),
+          ).expect(200)
+          const withdrawn = {
+            ...edited,
+            events: edited.events.filter((event) => event.clientEventId !== 'yellow'),
+          }
+          await postExtra(target, reporter2.id, content(4, withdrawn, 'SUBMIT')).expect(200)
+          const confirmation = review(5, 'CONFIRM')
+          await postExtra(target, admin.id, confirmation).expect(200)
+          await postExtra(target, admin.id, confirmation).expect(200)
+          let events = await prisma.matchEvent.findMany({ where: { matchId: target.id } })
+          assert.equal(events.length, 7)
+          assert.equal(events.filter((event) => event.type === 'SUBSTITUTION').length, 2)
+          const leave = events.find(
+            (event) => event.type === 'SUBSTITUTION' && event.playerId === homePlayers[1]!.id,
+          )!
+          assert.equal(leave.relatedPlayerId, homePlayers[2]!.id)
+          assert.equal(leave.minute, 72)
+          assert.equal(leave.stoppageMinute, 1)
+          assert.equal(
+            events.some((event) => event.type === 'YELLOW_CARD'),
+            false,
+          )
+          const corrected = {
+            ...withdrawn,
+            homeScore: '2',
+            events: withdrawn.events.filter((event) => event.clientEventId !== 'client-home-one'),
+          }
+          await postExtra(target, reporter2.id, content(6, corrected, 'CORRECT')).expect(403)
+          await postExtra(target, admin.id, content(6, corrected, 'CORRECT')).expect(200)
+          assert.equal(
+            (await prisma.match.findUniqueOrThrow({ where: { id: target.id } })).homeScore,
+            3,
+          )
+          assert.equal(await prisma.matchEvent.count({ where: { matchId: target.id } }), 7)
+          await postExtra(target, reporter2.id, content(7, corrected, 'SUBMIT')).expect(200)
+          await postExtra(target, admin.id, review(8, 'CONFIRM')).expect(200)
+          events = await prisma.matchEvent.findMany({ where: { matchId: target.id } })
+          assert.equal(events.length, 6)
+          assert.equal(
+            events.some((event) => event.type === 'GOAL' && event.playerId === homePlayers[0]!.id),
+            false,
+          )
+          const actual = await prisma.match.findUniqueOrThrow({ where: { id: target.id } })
+          assert.equal(actual.homeScore, 2)
+          assert.equal(actual.confirmedReportVersion, 9)
+          const revisions = await prisma.matchReportRevision.findMany({
+            where: { matchId: target.id },
+            orderBy: { version: 'asc' },
+          })
+          assert.equal(revisions.length, 9)
+          assert.equal((revisions[0]!.fields as unknown as ReportFieldsDto).events.length, 8)
+          assert.equal(
+            (revisions[2]!.fields as unknown as ReportFieldsDto).events.find(
+              (event) => event.clientEventId === 'swap-off',
+            )!.minute,
+            '72',
+          )
+          assert.equal(await prisma.auditLog.count({ where: { targetId: target.id } }), 9)
+          assert.equal(
+            await prisma.outboxJob.count({
+              where: { aggregateId: target.id, eventType: 'MatchReportConfirmed' },
+            }),
+            2,
+          )
+        },
+      )
 
       await t.test(
         '比赛中止确认投影 CANCELLED 和空比分，保留 appearance 历史但不保留正式事件',

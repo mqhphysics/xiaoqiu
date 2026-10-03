@@ -98,6 +98,71 @@ test('本地事件标识不能重复；补时不可超上限', () => {
     validateReportFields(fields({ events: [{ ...event, addedMinute: '31' }] }), context, true),
   )
 })
+test('换不同客户端标识不能重复同一事实，数字前导零和空补时也不能绕过', () => {
+  const event = fields().events[0]!
+  assert.throws(
+    () =>
+      validateReportFields(
+        fields({
+          homeScore: '2',
+          events: [event, { ...event, clientEventId: 'another', minute: '030', addedMinute: '00' }],
+        }),
+        context,
+        false,
+      ),
+    /相同事件重复/,
+  )
+})
+test('换人保留配对，替补先上后下和重新入场合法，不猜报名名单首发', () => {
+  const expanded = { ...context, homePlayerIds: new Set(['home-1', 'home-2', 'home-3']) }
+  const swap = (id: string, minute: string, playerId: string, relatedPlayerId: string) => ({
+    ...fields().events[0]!,
+    clientEventId: id,
+    kind: 'SUBSTITUTION' as const,
+    minute,
+    playerId,
+    relatedPlayerId,
+  })
+  const events = [
+    swap('first', '50', 'home-1', 'home-2'),
+    swap('second', '70', 'home-2', 'home-3'),
+    swap('third', '90', 'home-3', 'home-1'),
+  ]
+  assert.doesNotThrow(() =>
+    validateReportFields(fields({ homeScore: '0', events: [...events].reverse() }), expanded, true),
+  )
+  assert.throws(
+    () =>
+      validateReportFields(
+        fields({
+          homeScore: '0',
+          events: [events[0]!, swap('wrong-off', '65', 'home-1', 'home-3')],
+        }),
+        expanded,
+        false,
+      ),
+    /已换下/,
+  )
+  assert.throws(
+    () =>
+      validateReportFields(
+        fields({
+          homeScore: '0',
+          events: [events[0]!, swap('wrong-on', '65', 'home-3', 'home-2')],
+        }),
+        expanded,
+        false,
+      ),
+    /已换上/,
+  )
+  assert.doesNotThrow(() =>
+    validateReportFields(
+      fields({ homeScore: '0', events: [events[0]!, { ...events[1]!, minute: '50' }] }),
+      expanded,
+      true,
+    ),
+  )
+})
 test('点球和普通进球分开，淘汰赛平局需有效决胜结果', () => {
   const knockout = { ...context, isKnockout: true }
   const draw = fields({ homeScore: '0', awayScore: '0', events: [] })

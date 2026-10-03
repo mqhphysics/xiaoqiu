@@ -58,6 +58,11 @@ export function MatchReportWorkspace({
   const [correction, setCorrection] = useState(false)
   const [reviewReason, setReviewReason] = useState('')
   const [step, setStep] = useState(0)
+  const [eventSide, setEventSide] = useState<Side>('HOME')
+  const [removedEvent, setRemovedEvent] = useState<{ event: ReportEvent; index: number } | null>(
+    null,
+  )
+  const [eventConfirmation, setEventConfirmation] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [notice, setNotice] = useState('')
@@ -73,6 +78,7 @@ export function MatchReportWorkspace({
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [nextHistoryVersion, setNextHistoryVersion] = useState<number | null>(null)
   const inFlight = useRef(false)
+  const eventModalOpen = useRef(false)
   const generation = useRef(0)
   const alive = useRef(true)
   const loadedOnce = useRef(false)
@@ -88,10 +94,11 @@ export function MatchReportWorkspace({
     !!workspace?.blockingReasons?.length
   const locked =
     busy ||
+    eventConfirmation ||
     !!pending ||
     conflict ||
     missingContext ||
-    (!workspace?.permissions.canEdit && !correction)
+    (!workspace?.permissions.canEdit && !(correction && workspace?.permissions.canCorrect))
   const counts = goalCounts(fields)
 
   useEffect(() => {
@@ -116,6 +123,7 @@ export function MatchReportWorkspace({
       const draft = readDraft(key)
       const decision = draftDecision(draft, data.latest?.version ?? 0)
       setWorkspace(data)
+      setRemovedEvent(null)
       loadedOnce.current = true
       setBusy(inFlight.current)
       setCorrection(Boolean(data.permissions.canCorrect && draft && decision !== 'NONE'))
@@ -210,7 +218,7 @@ export function MatchReportWorkspace({
         {
           id: createClientActionId('event'),
           kind,
-          side: 'HOME',
+          side: eventSide,
           minute: '',
           addedMinute: '',
           playerId: '',
@@ -226,17 +234,51 @@ export function MatchReportWorkspace({
     })
   }
   async function removeEvent(event: ReportEvent) {
-    const result = await Taro.showModal({
-      title: `删除这条${EVENT_LABELS[event.kind]}？`,
-      content: '只移除本次录入中的事件。之前已保存的版本仍可查看。',
-      confirmText: '删除事件',
-    })
-    if (result.confirm)
+    if (locked || eventModalOpen.current) return
+    const requestGeneration = generation.current
+    eventModalOpen.current = true
+    setEventConfirmation(true)
+    try {
+      const result = await Taro.showModal({
+        title: `撤销这条${EVENT_LABELS[event.kind]}？`,
+        content:
+          '仅从本次草稿移除；保存后新增版本，历史不变。正式事件需管理员更正并重新确认后才撤销。',
+        confirmText: '撤销事件',
+      })
+      if (
+        !result.confirm ||
+        !alive.current ||
+        requestGeneration !== generation.current ||
+        readSession()?.accessToken !== actorToken
+      )
+        return
+      setRemovedEvent({
+        event: { ...event },
+        index: fields.events.findIndex((item) => item.id === event.id),
+      })
       edit({ ...fields, events: fields.events.filter((item) => item.id !== event.id) })
+      setNotice('事件已从本次草稿撤销，尚未保存。可恢复刚撤销的事件。')
+    } finally {
+      eventModalOpen.current = false
+      if (alive.current) setEventConfirmation(false)
+    }
+  }
+  function restoreEvent() {
+    if (
+      locked ||
+      !removedEvent ||
+      fields.events.some((event) => event.id === removedEvent.event.id)
+    )
+      return
+    const events = [...fields.events]
+    events.splice(Math.min(removedEvent.index, events.length), 0, { ...removedEvent.event })
+    edit({ ...fields, events })
+    setRemovedEvent(null)
+    setNotice('已恢复事件，仍使用原事件标识，尚未保存。')
   }
 
   async function cancel() {
-    if (busy) return
+    if (busy || eventModalOpen.current) return
     if (pending) {
       setError('这次保存可能已经成功，请先重试确认。确认结果前无法把它当作未保存改动取消。')
       return
@@ -362,6 +404,7 @@ export function MatchReportWorkspace({
       )
         throw new Error('保存结果无法确认，请重试核对')
       setWorkspace(data)
+      setRemovedEvent(null)
       setFields(cloneFields(data.latest.fields))
       setBaseVersion(data.latest.version)
       setReason('')
@@ -399,11 +442,20 @@ export function MatchReportWorkspace({
             setError('已检测到版本冲突，但最新版本读取失败。请点击「重读最新版本」。你的草稿仍在。')
           }
         } else if (status === 401 || status === 403) {
+          setCorrection(false)
           setWorkspace((current) =>
             current
               ? {
                   ...current,
-                  permissions: { ...current.permissions, canEdit: false, canSubmit: false },
+                  permissions: {
+                    ...current.permissions,
+                    canEdit: false,
+                    canSubmit: false,
+                    canCorrect: false,
+                    canConfirm: false,
+                    canReturn: false,
+                    canViewHistory: false,
+                  },
                 }
               : null,
           )
@@ -446,6 +498,7 @@ export function MatchReportWorkspace({
       const nextReason = keepDraft ? reason : ''
       setWorkspace(data)
       setFields(nextFields)
+      setRemovedEvent(null)
       setReason(nextReason)
       setBaseVersion(data.latest?.version ?? 0)
       setConflict(false)
@@ -500,6 +553,7 @@ export function MatchReportWorkspace({
       confirmText: '带入录入',
     })
     if (result.confirm) {
+      setRemovedEvent(null)
       edit(cloneFields(revision.fields))
       editReason(`参照 v${revision.version} 核对修正`)
       persist(revision.fields, `参照 v${revision.version} 核对修正`, null)
@@ -532,7 +586,7 @@ export function MatchReportWorkspace({
         </div>
         <Button
           className="mr-button mr-button--secondary"
-          disabled={busy || !!pending}
+          disabled={busy || !!pending || eventConfirmation}
           onClick={() => void cancel()}
         >
           取消录入
@@ -892,7 +946,7 @@ export function MatchReportWorkspace({
             <div className="mr-panel">
               <span className="mr-panel-title">补充比赛发生的事</span>
               <span className="mr-muted">
-                先选择事件，再选球队、分钟和球员。球员来自本场锁定名单；换人需同时选择换下和换上球员。
+                先选择球队，再添加事件、选择球员和填写分钟。候选来自本场锁定名单；换人需同时选择换下和换上球员。
               </span>
               <div className="mr-completeness">
                 <span>比分 {scoreText(fields)}</span>
@@ -907,6 +961,21 @@ export function MatchReportWorkspace({
                     : '进球明细与比分一致'}
                 </span>
               </div>
+              <span className="mr-label">1 · 为哪支球队录入？</span>
+              <div className="mr-event-teams" aria-label="新增事件的球队">
+                {(['HOME', 'AWAY'] as Side[]).map((side) => (
+                  <Button
+                    key={side}
+                    className={`mr-option ${eventSide === side ? 'is-selected' : ''}`}
+                    disabled={locked}
+                    aria-pressed={eventSide === side}
+                    onClick={() => setEventSide(side)}
+                  >
+                    {side === 'HOME' ? workspace.homeTeam.name : workspace.awayTeam.name}
+                  </Button>
+                ))}
+              </div>
+              <span className="mr-label">2 · 添加事件</span>
               <div className="mr-event-tools">
                 {EVENT_KINDS.map((kind) => (
                   <Button
@@ -919,6 +988,18 @@ export function MatchReportWorkspace({
                   </Button>
                 ))}
               </div>
+              {removedEvent && (
+                <div className="mr-banner" role="status">
+                  <span>已撤销 {EVENT_LABELS[removedEvent.event.kind]}，保存前可恢复。</span>
+                  <Button
+                    className="mr-link"
+                    disabled={locked || fields.events.length >= 500}
+                    onClick={restoreEvent}
+                  >
+                    恢复刚撤销的事件
+                  </Button>
+                </div>
+              )}
               {fields.events.length === 0 && (
                 <div className="mr-empty">
                   <span>还没有比赛事件</span>
@@ -1132,6 +1213,7 @@ function EventEditor({
       `${player.shirtNumber === null ? '' : player.shirtNumber + ' 号 · '}${player.displayName}`,
   )
   const id = `mr-event-${event.id}`
+  const relatedOptions = options.filter((player) => player.id !== event.playerId)
   return (
     <div className="mr-event" id={id}>
       <div className="mr-section-heading">
@@ -1139,7 +1221,7 @@ function EventEditor({
           {index + 1} · {EVENT_LABELS[event.kind]}
         </span>
         <Button className="mr-link mr-link--danger" disabled={disabled} onClick={onRemove}>
-          删除事件
+          撤销事件
         </Button>
       </div>
       <div className="mr-event-teams">
@@ -1149,13 +1231,90 @@ function EventEditor({
             key={side}
             disabled={disabled}
             aria-pressed={event.side === side}
-            onClick={() => onChange({ side, playerId: '', relatedPlayerId: '' })}
+            onClick={() => {
+              if (side !== event.side) onChange({ side, playerId: '', relatedPlayerId: '' })
+            }}
           >
             {side === 'HOME' ? workspace.homeTeam.name : workspace.awayTeam.name}
           </Button>
         ))}
       </div>
       <div className="mr-event-fields">
+        <div>
+          <label htmlFor={`${id}-kind`} className="mr-label">
+            事件类型 *
+          </label>
+          <select
+            id={`${id}-kind`}
+            className="mr-picker"
+            value={event.kind}
+            disabled={disabled}
+            onChange={(input) =>
+              onChange({ kind: input.currentTarget.value as EventKind, relatedPlayerId: '' })
+            }
+          >
+            {EVENT_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {EVENT_LABELS[kind]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-player`} className="mr-label">
+            {event.kind === 'SUBSTITUTION'
+              ? '换下球员 *'
+              : event.kind === 'OWN_GOAL'
+                ? '乌龙球球员 *'
+                : '事件球员 *'}
+          </label>
+          <select
+            id={`${id}-player`}
+            className="mr-picker"
+            aria-label={`第${index + 1}条事件球员`}
+            value={event.playerId}
+            disabled={disabled || !team.rosterSnapshotId}
+            onChange={(input) =>
+              onChange({
+                playerId: input.currentTarget.value,
+                ...(input.currentTarget.value === event.relatedPlayerId
+                  ? { relatedPlayerId: '' }
+                  : {}),
+              })
+            }
+          >
+            {options.map((player, position) => (
+              <option value={player.id} key={player.id}>
+                {range[position]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {(event.kind === 'GOAL' || event.kind === 'SUBSTITUTION') && (
+          <div>
+            <label htmlFor={`${id}-related`} className="mr-label">
+              {event.kind === 'GOAL' ? '助攻球员（选填）' : '换上球员 *'}
+            </label>
+            <select
+              id={`${id}-related`}
+              className="mr-picker"
+              aria-label={`第${index + 1}条事件关联球员`}
+              value={event.relatedPlayerId}
+              disabled={disabled || !team.rosterSnapshotId}
+              onChange={(input) => onChange({ relatedPlayerId: input.currentTarget.value })}
+            >
+              {relatedOptions.map((player) => (
+                <option value={player.id} key={player.id}>
+                  {player.id === ''
+                    ? event.kind === 'GOAL'
+                      ? '无助攻 / 未记录助攻'
+                      : '请选择换上球员'
+                    : `${player.shirtNumber === null ? '' : player.shirtNumber + ' 号 · '}${player.displayName}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor={`${id}-minute`} className="mr-label">
             比赛分钟 *
@@ -1166,7 +1325,10 @@ function EventEditor({
               aria-label={`第${index + 1}条事件分钟`}
               className="mr-input"
               type="number"
-              maxLength={3}
+              inputMode="numeric"
+              min={0}
+              max={120}
+              step={1}
               placeholder="例如 45"
               value={event.minute}
               disabled={disabled}
@@ -1178,7 +1340,10 @@ function EventEditor({
               aria-label={`第${index + 1}条事件补时`}
               className="mr-input"
               type="number"
-              maxLength={2}
+              inputMode="numeric"
+              min={0}
+              max={30}
+              step={1}
               placeholder="补时"
               value={event.addedMinute}
               disabled={disabled}
@@ -1186,54 +1351,17 @@ function EventEditor({
             />
           </div>
         </div>
-        <div>
-          <span className="mr-label">
-            {event.kind === 'SUBSTITUTION'
-              ? '换下球员 *'
-              : event.kind === 'OWN_GOAL'
-                ? '乌龙球球员 *'
-                : '事件球员 *'}
-          </span>
-          <select
-            className="mr-picker"
-            aria-label={`第${index + 1}条事件球员`}
-            value={event.playerId}
-            disabled={disabled || !team.rosterSnapshotId}
-            onChange={(input) => onChange({ playerId: input.currentTarget.value })}
-          >
-            {options.map((player, position) => (
-              <option value={player.id} key={player.id}>
-                {range[position]}
-              </option>
-            ))}
-          </select>
-        </div>
-        {(event.kind === 'GOAL' || event.kind === 'SUBSTITUTION') && (
-          <div>
-            <span className="mr-label">
-              {event.kind === 'GOAL' ? '助攻球员（选填）' : '换上球员 *'}
-            </span>
-            <select
-              className="mr-picker"
-              aria-label={`第${index + 1}条事件关联球员`}
-              value={event.relatedPlayerId}
-              disabled={disabled || !team.rosterSnapshotId}
-              onChange={(input) => onChange({ relatedPlayerId: input.currentTarget.value })}
-            >
-              {options.map((player, position) => (
-                <option value={player.id} key={player.id}>
-                  {range[position]}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
       {!team.rosterSnapshotId && (
         <span className="mr-warning-text">该队名单尚未锁定，请联系赛事管理员。</span>
       )}
       {event.kind === 'OWN_GOAL' && (
         <span className="mr-muted">选择实际发生乌龙球的球员与球队，这球计入对方比分。</span>
+      )}
+      {event.kind === 'SUBSTITUTION' && (
+        <span className="mr-muted">
+          同一条事件保存换下与换上，双方共用分钟。之后再次换人请添加新事件，允许替补先上后下。
+        </span>
       )}
     </div>
   )

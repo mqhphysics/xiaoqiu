@@ -66,6 +66,7 @@ export function validateReportFields(
   )
     throw new ReportRuleError('淘汰赛平局需补充点球大战结果')
   const ids = new Set<string>(),
+    facts = new Set<string>(),
     counts = { HOME: 0, AWAY: 0 }
   for (const event of fields.events) {
     if (
@@ -95,12 +96,25 @@ export function validateReportFields(
       throw new ReportRuleError('换人必须同时填写换下与换上球员')
     if (event.relatedPlayerId && event.kind !== 'GOAL' && event.kind !== 'SUBSTITUTION')
       throw new ReportRuleError('该事件不需要关联球员')
+    // A new client ID must not turn a repeated form entry into a second match fact.
+    const fact = JSON.stringify([
+      event.kind,
+      event.side,
+      Number(event.minute),
+      Number(event.addedMinute || '0'),
+      event.playerId,
+      event.relatedPlayerId,
+    ])
+    if (facts.has(fact))
+      throw new ReportRuleError('同一球队、球员、分钟的相同事件重复，请撤销多录的一条')
+    facts.add(fact)
     if (event.kind === 'GOAL' || event.kind === 'OWN_GOAL') {
       const side =
         event.kind === 'OWN_GOAL' ? (event.side === 'HOME' ? 'AWAY' : 'HOME') : event.side
       counts[side] += 1
     }
   }
+  validateSubstitutionSequence(fields.events)
   if (
     fields.outcome === 'FINISHED' &&
     (counts.HOME > Number(fields.homeScore) ||
@@ -111,6 +125,54 @@ export function validateReportFields(
     throw new ReportRuleError(
       complete ? '进球明细与普通比分不一致，请核对后提交' : '进球明细超过比分，不能保存',
     )
+}
+
+function validateSubstitutionSequence(events: ReportFieldsDto['events']): void {
+  // A roster is not a starting XI. Infer only positions established by reported swaps.
+  // Group equal match clocks so same-minute double swaps do not depend on client ID order.
+  const swaps = events
+    .filter((event) => event.kind === 'SUBSTITUTION')
+    .sort(
+      (a, b) =>
+        Number(a.minute) - Number(b.minute) || Number(a.addedMinute) - Number(b.addedMinute),
+    )
+  const known = new Map<string, 'ON' | 'OFF'>()
+  for (let index = 0; index < swaps.length; ) {
+    const first = swaps[index]!
+    const movements = new Map<string, { on: number; off: number }>()
+    while (index < swaps.length) {
+      const event = swaps[index]!
+      if (
+        Number(event.minute) !== Number(first.minute) ||
+        Number(event.addedMinute) !== Number(first.addedMinute)
+      )
+        break
+      for (const [playerId, direction] of [
+        [event.playerId, 'off'],
+        [event.relatedPlayerId, 'on'],
+      ] as const) {
+        const key = `${event.side}:${playerId}`
+        const movement = movements.get(key) ?? { on: 0, off: 0 }
+        movement[direction] += 1
+        movements.set(key, movement)
+      }
+      index += 1
+    }
+    for (const [key, movement] of movements) {
+      if (movement.on > 1 || movement.off > 1)
+        throw new ReportRuleError('同一球员不能在同一分钟重复换上或换下')
+      // Both at the same clock is a valid short appearance or re-entry; chronology is unknown.
+      if (movement.on && movement.off) continue
+      const next = movement.on ? 'ON' : 'OFF'
+      if (known.get(key) === next)
+        throw new ReportRuleError(
+          next === 'ON'
+            ? '该球员已换上，请核对是否漏录换下事件'
+            : '该球员已换下，请核对是否漏录换上事件',
+        )
+      known.set(key, next)
+    }
+  }
 }
 
 export function reportFieldsEqual(left: ReportFieldsDto, right: ReportFieldsDto): boolean {

@@ -156,6 +156,62 @@ test('事件标识去重；分钟与补时分别校验', () => {
   assert.ok(issues.some((issue) => issue.message.includes('0–120')))
   assert.ok(issues.some((issue) => issue.message.includes('0–30')))
 })
+test('相同事件不能通过更换本地标识和数字格式重复录入', () => {
+  assert.ok(
+    validateReport(
+      fields({
+        homeScore: '2',
+        events: [goal(), goal({ id: 'new-id', minute: '045', addedMinute: '02' })],
+      }),
+      workspace(),
+      false,
+      '',
+    ).some((issue) => issue.message.includes('另一条事件相同')),
+  )
+})
+test('换人校验接受替补先上后下，拒绝漏录的重复上下场，不依赖事件数组顺序', () => {
+  const data = workspace()
+  data.homeTeam.players.push({ id: 'h3', displayName: '测试第三人', shirtNumber: '11' })
+  const first = goal({
+    id: 'swap-first',
+    kind: 'SUBSTITUTION',
+    minute: '50',
+    addedMinute: '',
+    playerId: 'h1',
+    relatedPlayerId: 'h2',
+  })
+  const second = goal({
+    id: 'swap-second',
+    kind: 'SUBSTITUTION',
+    minute: '70',
+    addedMinute: '',
+    playerId: 'h2',
+    relatedPlayerId: 'h3',
+  })
+  assert.deepEqual(
+    validateReport(fields({ homeScore: '0', events: [second, first] }), data, true, ''),
+    [],
+  )
+  assert.ok(
+    validateReport(
+      fields({ homeScore: '0', events: [first, { ...second, playerId: 'h1' }] }),
+      data,
+      false,
+      '',
+    ).some((issue) => issue.message.includes('已换下')),
+  )
+  assert.ok(
+    validateReport(
+      fields({
+        homeScore: '0',
+        events: [first, { ...second, playerId: 'h3', relatedPlayerId: 'h2' }],
+      }),
+      data,
+      false,
+      '',
+    ).some((issue) => issue.message.includes('已换上')),
+  )
+})
 test('比分 2:1 改 1:1 可对比，修改已有报告须填原因', () => {
   const before = fields({ homeScore: '2', awayScore: '1', events: [] })
   const after = fields({ homeScore: '1', awayScore: '1', events: [] })

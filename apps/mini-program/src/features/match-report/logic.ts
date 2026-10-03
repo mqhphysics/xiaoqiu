@@ -120,7 +120,8 @@ export interface ValidationIssue {
   field: string
   message: string
 }
-const integer = (value: string, max: number) => /^\d{1,3}$/.test(value) && Number(value) <= max
+const integer = (value: string, max: number) =>
+  /^\d{1,3}$/.test(value) && value.length <= String(max).length && Number(value) <= max
 
 export function validateReport(
   fields: ReportFields,
@@ -166,6 +167,7 @@ export function validateReport(
   if (fields.notes.length > 800) add('notes', '比赛说明最多 800 字')
   if (fields.events.length > 500) add('events', '比赛事件最多 500 条')
   const ids = new Set<string>()
+  const facts = new Set<string>()
   fields.events.forEach((event, index) => {
     const key = `event-${event.id}`
     const prefix = `第 ${index + 1} 条事件：`
@@ -192,7 +194,20 @@ export function validateReport(
     if (event.kind === 'SUBSTITUTION' && !event.relatedPlayerId) add(key, prefix + '请选择换上球员')
     if (event.kind !== 'GOAL' && event.kind !== 'SUBSTITUTION' && event.relatedPlayerId)
       add(key, prefix + '此事件不需要关联球员')
+    if (event.playerId && integer(event.minute, 120)) {
+      const fact = JSON.stringify([
+        event.kind,
+        event.side,
+        Number(event.minute),
+        Number(event.addedMinute || '0'),
+        event.playerId,
+        event.relatedPlayerId,
+      ])
+      if (facts.has(fact)) add(key, prefix + '与另一条事件相同，请撤销多录的一条')
+      facts.add(fact)
+    }
   })
+  issues.push(...validateSubstitutionSequence(fields.events))
   if (fields.outcome === 'FINISHED') {
     const goals = goalCounts(fields)
     for (const side of ['HOME', 'AWAY'] as const) {
@@ -206,6 +221,67 @@ export function validateReport(
           `${side === 'HOME' ? '主队' : '客队'}比分为 ${score}，进球明细为 ${goals[side]}；${submit ? '请核对一致后提交审核' : '请先核对比分或删除多录的进球'}`,
         )
       }
+    }
+  }
+  return issues
+}
+
+function validateSubstitutionSequence(events: ReportEvent[]): ValidationIssue[] {
+  const swaps = events
+    .filter(
+      (event) =>
+        event.kind === 'SUBSTITUTION' &&
+        event.playerId &&
+        event.relatedPlayerId &&
+        integer(event.minute, 120),
+    )
+    .sort(
+      (a, b) =>
+        Number(a.minute) - Number(b.minute) || Number(a.addedMinute) - Number(b.addedMinute),
+    )
+  const known = new Map<string, 'ON' | 'OFF'>()
+  const issues: ValidationIssue[] = []
+  for (let index = 0; index < swaps.length; ) {
+    const first = swaps[index]!
+    const movements = new Map<string, { on: number; off: number; eventId: string }>()
+    while (index < swaps.length) {
+      const event = swaps[index]!
+      if (
+        Number(event.minute) !== Number(first.minute) ||
+        Number(event.addedMinute) !== Number(first.addedMinute)
+      )
+        break
+      for (const [playerId, direction] of [
+        [event.playerId, 'off'],
+        [event.relatedPlayerId, 'on'],
+      ] as const) {
+        const key = `${event.side}:${playerId}`
+        const movement = movements.get(key) ?? { on: 0, off: 0, eventId: event.id }
+        movement[direction] += 1
+        movement.eventId = event.id
+        movements.set(key, movement)
+      }
+      index += 1
+    }
+    for (const [key, movement] of movements) {
+      if (movement.on > 1 || movement.off > 1) {
+        issues.push({
+          field: `event-${movement.eventId}`,
+          message: '同一球员不能在同一分钟重复换上或换下',
+        })
+        continue
+      }
+      if (movement.on && movement.off) continue
+      const next = movement.on ? 'ON' : 'OFF'
+      if (known.get(key) === next)
+        issues.push({
+          field: `event-${movement.eventId}`,
+          message:
+            next === 'ON'
+              ? '该球员已换上，请核对是否漏录换下事件'
+              : '该球员已换下，请核对是否漏录换上事件',
+        })
+      known.set(key, next)
     }
   }
   return issues
