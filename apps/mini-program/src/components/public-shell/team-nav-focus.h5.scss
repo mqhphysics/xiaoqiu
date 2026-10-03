@@ -16,50 +16,34 @@
       transform: translateX(-50%);
     }
 
-    .public-team-focus__art,
-    .public-team-focus__seed {
-      position: absolute;
-      top: 48px;
-      left: 0;
+    .public-team-focus__drawing {
       display: block;
       width: 100%;
-      aspect-ratio: 804 / 154;
-      background-color: #c5aa6d;
-      mask-image: url('../../assets/nav-ornament/monroe-scroll-reference.svg');
-      mask-size: 100% 100%;
-      mask-repeat: no-repeat;
-      mask-mode: alpha;
+      height: 84px;
+      overflow: visible;
+      stroke: #c5aa6d;
+      stroke-linejoin: round;
     }
 
-    .public-team-focus__seed {
-      opacity: 0.32;
-      clip-path: inset(55% 33% 0 33%);
+    .public-team-focus__trace {
+      opacity: 0.28;
+      stroke-linecap: round;
+      transition: opacity 220ms ease;
     }
 
-    .public-team-focus__art {
+    .public-team-focus__stroke {
       opacity: 0;
-    }
-
-    .public-team-focus__art--left {
-      clip-path: inset(55% 50% 0 33%);
-    }
-
-    .public-team-focus__art--right {
-      clip-path: inset(55% 33% 0 50%);
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
     }
 
     .public-team-nav.public-team-nav--active {
-      .public-team-focus__seed {
-        opacity: 0;
+      .public-team-focus__trace {
+        opacity: 0.08;
       }
-      .public-team-focus__art {
+      .public-team-focus__stroke {
         opacity: 1;
-      }
-      .public-team-focus__art--left {
-        clip-path: inset(0 50% 0 0);
-      }
-      .public-team-focus__art--right {
-        clip-path: inset(0 0 0 50%);
+        stroke-dashoffset: 0;
       }
       > .team-crest,
       .public-team-nav__crest {
@@ -103,7 +87,7 @@
 
 @media (min-width: 721px) and (hover: hover) and (pointer: fine) {
   .public-app--h5 .public-team-nav:hover:not(.public-team-nav--active) {
-    .public-team-focus__seed {
+    .public-team-focus__trace {
       opacity: 0.42;
     }
   }
@@ -111,7 +95,7 @@
 
 @media (min-width: 721px) and (prefers-reduced-motion: reduce) {
   .public-app--h5 {
-    .public-team-focus__seed,
+    .public-team-focus__trace,
     .public-team-focus__sample-crest {
       transition: none;
     }

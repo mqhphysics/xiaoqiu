@@ -1,5 +1,7 @@
 # 15 原图卷草：本地验收素材
 
+> 当前导航已切换为参考结构重建的SVG线绘，运行时不再使用本目录的位图遮罩。该文件保留为历史原图验收素材；当前线稿见`components/public-shell/team-nav-leaf-lines.h5.ts`，逐条绘制检查见NAV-07。
+
 来源：[Shuler Studio / Monroe Scroll for Print](https://www.shulerstudio.com/products/monroe-scroll-print)。用户明确要求在本地网站直接采用此前选中的15原图，并以单色金色展示。
 
 `monroe-scroll-reference.svg`嵌入取得的1000×1000 PNG原字节；仅用SVG视窗去掉透明留白，视窗为`98 423 804 154`。原图形状、羽纹、卷边和透明度均保留，没有重新描画、改变位图或替换纹理。

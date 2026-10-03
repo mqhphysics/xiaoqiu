@@ -3,7 +3,7 @@ import type { NavigationSection } from './navigation-transition.types'
 interface TeamFocusState extends Keyframe {
   transform: string
   opacity: string
-  clipPath?: string
+  strokeDashoffset?: string
 }
 
 interface NavigationOrigin {
@@ -24,14 +24,14 @@ const easing = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const focusEasing = 'cubic-bezier(0.22, 0.61, 0.36, 1)'
 let origin: NavigationOrigin | null = null
 const focusAnimations = new WeakMap<HTMLElement, Animation[]>()
-const focusSelector = '.public-team-focus__art, .public-team-focus__seed'
+const focusSelector = '.public-team-focus__stroke'
 
 function readTeamFocus(element: Element): TeamFocusState {
   const style = getComputedStyle(element)
   return {
     transform: style.transform,
     opacity: style.opacity,
-    clipPath: style.clipPath,
+    strokeDashoffset: style.strokeDashoffset,
   }
 }
 
@@ -65,37 +65,27 @@ export function playTeamFocus(
     return
 
   const animations: Animation[] = []
-  for (const [index, side] of ['left', 'right'].entries()) {
-    const art = button.querySelector<HTMLElement>(`.public-team-focus__art--${side}`)
-    if (!art) continue
-    const seed: Keyframe = {
-      opacity: 0.32,
-      clipPath: side === 'left' ? 'inset(55% 50% 0 33%)' : 'inset(55% 33% 0 50%)',
-    }
-    const complete: Keyframe = {
-      opacity: 1,
-      clipPath: side === 'left' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
-    }
-    const previous = initialFocus?.[side]
+  for (const line of button.querySelectorAll<SVGGElement>('.public-team-focus__line')) {
+    const stroke = line.querySelector<SVGPathElement>('.public-team-focus__stroke')
+    if (!stroke) continue
+    const seed = line.querySelector<SVGPathElement>('.public-team-focus__trace')
+    const seedFraction = seed ? Math.min(1, seed.getTotalLength() / stroke.getTotalLength()) : 0
+    const start: Keyframe = { strokeDashoffset: String(1 - seedFraction), opacity: seed ? 0.28 : 0 }
+    const finish: Keyframe = { strokeDashoffset: '0', opacity: 1 }
+    const key = stroke.getAttribute('data-focus-key') ?? ''
+    const previous = initialFocus?.[key]
     const frames: Keyframe[] = initialFocus
-      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : seed]
-      : [replayFocus[side] ?? complete, { ...seed, offset: 0.12 }]
-    frames.push(complete)
+      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : start]
+      : [replayFocus[key] ?? finish, { ...start, offset: 0.1 }]
+    frames.push({ strokeDashoffset: '0.25', opacity: 1, offset: 0.65 }, finish)
     animations.push(
-      art.animate(frames, {
-        duration: 1300,
-        delay: index * 60,
+      stroke.animate(frames, {
+        duration: Number(line.dataset.focusDuration) || 600,
+        delay: Number(line.dataset.focusDelay) || 0,
         easing: focusEasing,
         fill: 'backwards',
       }),
     )
-  }
-  const seed = button.querySelector<HTMLElement>('.public-team-focus__seed')
-  if (seed) {
-    const frames: Keyframe[] = initialFocus
-      ? [initialFocus.seed ?? { opacity: 0.32 }, { opacity: 0 }]
-      : [replayFocus.seed ?? { opacity: 0 }, { opacity: 0.32, offset: 0.12 }, { opacity: 0 }]
-    animations.push(seed.animate(frames, { duration: 500, easing: focusEasing }))
   }
   focusAnimations.set(shell, animations)
 }

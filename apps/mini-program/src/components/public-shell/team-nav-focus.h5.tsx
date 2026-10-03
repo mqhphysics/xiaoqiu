@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 
 import type { TeamSummary } from '../../features/product/product.types'
 import { playTeamFocus } from './navigation-transition.h5'
+import { goldLeafLines } from './team-nav-leaf-lines.h5'
 import {
   readTeamNavPreview,
   teamNavPreviewCrests,
@@ -40,15 +41,45 @@ export function TeamNavFocus(_props: { team?: TeamSummary | null }) {
         data-nav-design="15"
         className={`public-team-focus ${preview.enabled ? 'public-team-focus--preview' : ''}`}
       >
-        <span className="public-team-focus__seed" data-focus-key="seed" />
-        <span
-          className="public-team-focus__art public-team-focus__art--left"
-          data-focus-key="left"
-        />
-        <span
-          className="public-team-focus__art public-team-focus__art--right"
-          data-focus-key="right"
-        />
+        <svg
+          className="public-team-focus__drawing"
+          viewBox="0 0 200 84"
+          preserveAspectRatio="none"
+          fill="none"
+          focusable="false"
+        >
+          {[-1, 1].map((side) => (
+            <g key={side} transform={side === 1 ? 'translate(200 0) scale(-1 1)' : undefined}>
+              {goldLeafLines.map((line) => (
+                <g
+                  key={line.key}
+                  className="public-team-focus__line"
+                  data-focus-delay={line.delay}
+                  data-focus-duration={line.duration}
+                  data-focus-region={line.region}
+                >
+                  {line.seedPath ? (
+                    <path
+                      className="public-team-focus__trace"
+                      d={line.seedPath}
+                      strokeWidth={line.width}
+                    />
+                  ) : null}
+                  <path
+                    className="public-team-focus__stroke"
+                    data-focus-key={`${line.key}-${side}`}
+                    d={line.path}
+                    strokeWidth={line.width}
+                    strokeLinecap={
+                      line.region === 'stem' || line.key.startsWith('bud-') ? 'round' : 'butt'
+                    }
+                    pathLength="1"
+                  />
+                </g>
+              ))}
+            </g>
+          ))}
+        </svg>
         {preview.enabled ? (
           <img
             className="public-team-focus__sample-crest"
