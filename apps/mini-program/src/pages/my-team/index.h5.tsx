@@ -1,5 +1,5 @@
 import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { TeamCrest, UserAvatar } from '../../components/product-ui'
@@ -131,7 +131,6 @@ function DesktopMyTeamPage() {
                     type="button"
                     className="th-icon-button th-switch"
                     aria-label="切换主队"
-                    title="切换主队"
                     onClick={() => openPicker('primary')}
                   >
                     <TeamIcon name="switch" />
@@ -139,32 +138,13 @@ function DesktopMyTeamPage() {
                   </button>
                 </div>
                 {preferences?.primaryTeam ? (
-                  <div
-                    className={`th-follow-chip th-follow-chip--primary ${selectedTeam === preferences.primaryTeam.id ? 'is-selected' : ''}`}
-                  >
-                    <button
-                      data-team-control
-                      data-team-action
-                      type="button"
-                      className="th-chip-identity"
-                      aria-label={`查看${preferences.primaryTeam.name}球队详情`}
-                      onClick={() => void openTeam(preferences.primaryTeam!.id, tournamentId)}
-                    >
-                      <TeamCrest team={preferences.primaryTeam} interactive={false} />
-                      <strong>{preferences.primaryTeam.name}</strong>
-                    </button>
-                    <button
-                      data-team-control
-                      type="button"
-                      className="th-chip-check"
-                      aria-label={`查看${preferences.primaryTeam.name}动态与赛程`}
-                      title="查看主队动态与赛程"
-                      aria-pressed={selectedTeam === preferences.primaryTeam.id}
-                      onClick={() => setSelectedTeam(preferences.primaryTeam!.id)}
-                    >
-                      {selectedTeam === preferences.primaryTeam.id ? '✓' : '›'}
-                    </button>
-                  </div>
+                  <FollowTeamChip
+                    team={preferences.primaryTeam}
+                    selected={selectedTeam === preferences.primaryTeam.id}
+                    primary
+                    tournamentId={tournamentId}
+                    onSelect={() => setSelectedTeam(preferences.primaryTeam!.id)}
+                  />
                 ) : (
                   <button
                     data-team-control
@@ -191,36 +171,16 @@ function DesktopMyTeamPage() {
                     <TeamIcon name="plus" />
                   </button>
                 </div>
-                <div className="th-follow-strip__scroll">
+                <HorizontalFollowStrip>
                   {preferences?.followedTeams.length ? (
                     preferences.followedTeams.map((team) => (
-                      <div
+                      <FollowTeamChip
                         key={team.id}
-                        className={`th-follow-chip ${selectedTeam === team.id ? 'is-selected' : ''}`}
-                      >
-                        <button
-                          data-team-control
-                          data-team-action
-                          type="button"
-                          className="th-chip-identity"
-                          aria-label={`查看${team.name}球队详情`}
-                          onClick={() => void openTeam(team.id, tournamentId)}
-                        >
-                          <TeamCrest team={team} interactive={false} />
-                          <strong>{team.name}</strong>
-                        </button>
-                        <button
-                          data-team-control
-                          type="button"
-                          className="th-chip-check"
-                          aria-label={`查看${team.name}动态与赛程`}
-                          title={`查看${team.name}动态与赛程`}
-                          aria-pressed={selectedTeam === team.id}
-                          onClick={() => setSelectedTeam(team.id)}
-                        >
-                          {selectedTeam === team.id ? '✓' : '›'}
-                        </button>
-                      </div>
+                        team={team}
+                        selected={selectedTeam === team.id}
+                        tournamentId={tournamentId}
+                        onSelect={() => setSelectedTeam(team.id)}
+                      />
                     ))
                   ) : (
                     <button
@@ -232,7 +192,7 @@ function DesktopMyTeamPage() {
                       关注更多校园球队
                     </button>
                   )}
-                </div>
+                </HorizontalFollowStrip>
               </section>
               <section className="th-follow-strip__players">
                 <div className="th-follow-strip__label">
@@ -248,7 +208,7 @@ function DesktopMyTeamPage() {
                     <TeamIcon name="plus" />
                   </button>
                 </div>
-                <div className="th-follow-strip__scroll">
+                <HorizontalFollowStrip>
                   {players.items.length ? (
                     players.items.map((player) => (
                       <button
@@ -279,7 +239,7 @@ function DesktopMyTeamPage() {
                       {playerError ? '关注加载失败，点击重试' : '关注球员，追踪绿茵表现'}
                     </button>
                   )}
-                </div>
+                </HorizontalFollowStrip>
               </section>
             </div>
             {selectedTeam ? (
@@ -339,6 +299,70 @@ function DesktopMyTeamPage() {
         ) : null}
       </div>
     </PublicShell>
+  )
+}
+
+function FollowTeamChip({
+  team,
+  selected,
+  primary = false,
+  tournamentId,
+  onSelect,
+}: {
+  team: NonNullable<TeamPreferencesResponse['primaryTeam']>
+  selected: boolean
+  primary?: boolean
+  tournamentId: string
+  onSelect: () => void
+}) {
+  return (
+    <div
+      className={`th-follow-chip ${primary ? 'th-follow-chip--primary' : ''} ${selected ? 'is-selected' : ''}`}
+    >
+      <button
+        data-team-control
+        type="button"
+        className="th-chip-select"
+        aria-label={`查看${team.name}动态与赛程`}
+        aria-pressed={selected}
+        onClick={onSelect}
+      />
+      <button
+        data-team-control
+        data-team-action
+        type="button"
+        className="th-chip-identity"
+        aria-label={`查看${team.name}球队详情`}
+        onClick={() => void openTeam(team.id, tournamentId)}
+      >
+        <TeamCrest team={team} interactive={false} />
+        <strong>{team.name}</strong>
+      </button>
+    </div>
+  )
+}
+
+function HorizontalFollowStrip({ children }: PropsWithChildren) {
+  const strip = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = strip.current
+    if (!element) return
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || element.scrollWidth <= element.clientWidth + 1) return
+      const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+      if (!delta) return
+      event.preventDefault()
+      event.stopPropagation()
+      element.scrollLeft += delta * units
+    }
+    element.addEventListener('wheel', wheel, { passive: false })
+    return () => element.removeEventListener('wheel', wheel)
+  }, [])
+  return (
+    <div className="th-follow-strip__scroll" ref={strip}>
+      {children}
+    </div>
   )
 }
 

@@ -21,6 +21,8 @@ import { openMessaging } from '../messaging-drawer'
 import { EmojiPicker, EmojiText, insertAtCursor } from '../post-social/emoji-picker'
 import { PostGallery } from '../post-social/gallery'
 import { PostIcon } from '../post-social/icons'
+import { PostTags } from '../post-tags'
+import { OPEN_TEAM_EVENT } from '../../features/product/team-navigation.h5'
 import '../post-social/index.h5.scss'
 
 export function PostOverlayHost() {
@@ -32,10 +34,12 @@ export function PostOverlayHost() {
     }
     window.addEventListener(OPEN_POST_EVENT, open)
     const close = () => setPostId(null)
+    window.addEventListener(OPEN_TEAM_EVENT, close)
     window.addEventListener('hashchange', close)
     window.addEventListener('popstate', close)
     return () => {
       window.removeEventListener(OPEN_POST_EVENT, open)
+      window.removeEventListener(OPEN_TEAM_EVENT, close)
       window.removeEventListener('hashchange', close)
       window.removeEventListener('popstate', close)
     }
@@ -343,6 +347,7 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                   <p>
                     <EmojiText>{post.body}</EmojiText>
                   </p>
+                  <PostTags tags={post.tags} tournamentId={post.tournamentId} />
                   <div className="post-detail-modal__meta">
                     <time>{formatRelativeTime(post.publishedAt)}</time>
                     {post.type === 'OFFICIAL' && <span>官方发布</span>}

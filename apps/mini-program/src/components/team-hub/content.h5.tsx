@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 import { useId, useRef, useState } from 'react'
 import { TeamCrest, UserAvatar, MatchStatus } from '../product-ui'
 import { DesktopPostComposer } from '../post-composer'
+import { PostTags } from '../post-tags'
 import { EmojiText } from '../post-social/emoji-picker'
 import {
   formatDate,
@@ -442,9 +443,17 @@ export function TeamContent({
       </div>
       <DesktopPostComposer
         open={composer}
-        teamId={data.team.id}
+        initialTags={[{ kind: 'TEAM', targetId: data.team.id, label: data.team.name }]}
+        tournamentId={tournamentId}
         onClose={() => setComposer(false)}
-        onPublished={onPostPublished}
+        onPublished={(post) => {
+          if (
+            post.team?.id === data.team.id ||
+            post.tags?.some((tag) => tag.kind === 'TEAM' && tag.targetId === data.team.id)
+          )
+            onPostPublished(post)
+          else void Taro.showToast({ title: '动态已发布', icon: 'success' })
+        }}
       />
     </>
   )
@@ -553,7 +562,13 @@ function TeamSchedule({
   )
 }
 
-function TeamPost({ post: original, tournamentId }: { post: PostSummary; tournamentId: string }) {
+export function TeamPost({
+  post: original,
+  tournamentId,
+}: {
+  post: PostSummary
+  tournamentId: string
+}) {
   const post = usePostInteraction(original)
   const busy = useRef(false)
   const [error, setError] = useState('')
@@ -612,6 +627,7 @@ function TeamPost({ post: original, tournamentId }: { post: PostSummary; tournam
           {post.title ? <strong>{post.title}</strong> : null}
           <EmojiText>{post.body}</EmojiText>
         </button>
+        <PostTags tags={post.tags} tournamentId={post.tournamentId ?? tournamentId} />
         {images.length ? (
           <div
             className={`th-post__images ${images.length === 1 ? 'th-post__images--single' : ''}`}

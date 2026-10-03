@@ -18,6 +18,8 @@ import type {
   PostComment,
   PostDetail,
   PostSummary,
+  PostTag,
+  PostTagSuggestion,
   RegisterInput,
   SearchCategory,
   SearchResponse,
@@ -71,6 +73,11 @@ export const productRepository = {
     request<MatchExperienceResponse>(`/public/matches/${encodeURIComponent(matchId)}/experience`),
 
   getPost: (postId: string) => request<PostDetail>(`/public/posts/${encodeURIComponent(postId)}`),
+
+  getPostTagSuggestions: (query = '', tournamentId?: string) =>
+    request<{ items: PostTagSuggestion[] }>(
+      `/public/post-tags?query=${encodeURIComponent(query)}${tournamentId ? `&tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+    ),
 
   login: async (identifier: string, password: string) => {
     const session = await request<AuthSession>('/auth/login', {
@@ -154,6 +161,8 @@ export const productRepository = {
     teamId?: string,
     imageDataUrl?: string,
     imageDataUrls?: string[],
+    tags?: PostTag[],
+    tournamentId?: string,
   ) =>
     request<PostSummary>('/community/posts', {
       method: 'POST',
@@ -164,6 +173,8 @@ export const productRepository = {
         ...(teamId ? { teamId } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
         ...(imageDataUrls?.length ? { imageDataUrls } : {}),
+        ...(tags ? { tags } : {}),
+        ...(tournamentId ? { tournamentId } : {}),
       },
     }),
 

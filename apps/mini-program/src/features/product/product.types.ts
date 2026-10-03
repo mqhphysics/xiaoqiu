@@ -53,6 +53,16 @@ export interface PostAuthor {
   messageable: boolean
 }
 
+export interface PostTag {
+  kind: 'TOPIC' | 'TEAM' | 'PLAYER'
+  label: string
+  targetId?: string
+}
+
+export interface PostTagSuggestion extends PostTag {
+  description?: string
+}
+
 export interface PostSummary {
   id: string
   type: 'OFFICIAL' | 'COMMUNITY'
@@ -60,6 +70,8 @@ export interface PostSummary {
   body: string
   imageUrl: string | null
   imageUrls?: string[]
+  tags?: PostTag[]
+  tournamentId?: string | null
   publishedAt: string
   author: PostAuthor
   team: TeamSummary | null
@@ -281,6 +293,7 @@ export interface PlayerDetailResponse {
   tournamentName: string | null
   stats: PlayerStats
   recentMatches: Array<MatchSummary & { starter: boolean; minutesPlayed: number }>
+  posts?: PostSummary[]
 }
 
 export interface MatchExperienceResponse extends MatchSummary {

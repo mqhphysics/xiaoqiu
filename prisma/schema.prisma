@@ -221,6 +221,14 @@ enum PostStatus {
   @@map("post_status")
 }
 
+enum PostTagKind {
+  TOPIC
+  TEAM
+  PLAYER
+
+  @@map("post_tag_kind")
+}
+
 enum TeamMembershipStatus {
   ACTIVE
   REMOVED
@@ -308,6 +316,7 @@ model Organization {
   posts               Post[]
   postLikes           PostLike[]
   postComments        PostComment[]
+  postTags            PostTag[]
   playerFollows       UserPlayerFollow[]
   teamMemberships     TeamMembership[]
   teamApplications    TeamJoinApplication[]
@@ -689,6 +698,7 @@ model Team {
   matchEvents      MatchEvent[]
   appearances      MatchAppearance[]
   posts            Post[]
+  postTags         PostTag[]
   memberships      TeamMembership[]
   joinApplications TeamJoinApplication[]
 
@@ -736,6 +746,7 @@ model PlayerProfile {
   assistedEvents    MatchEvent[]          @relation("MatchEventRelatedPlayer")
   appearances       MatchAppearance[]
   followers         UserPlayerFollow[]
+  postTags          PostTag[]
   teamMemberships   TeamMembership[]
   joinApplications  TeamJoinApplication[]
 
@@ -1051,12 +1062,37 @@ model Post {
   team           Team?         @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "posts_team_organization_fkey")
   likes          PostLike[]
   comments       PostComment[]
+  tags           PostTag[]
 
   @@unique([authorUserId, clientPostId], map: "posts_author_user_id_client_post_id_key")
+  @@unique([id, organizationId], map: "posts_id_organization_id_key")
   @@index([organizationId, status, publishedAt], map: "posts_org_status_published_at_idx")
   @@index([tournamentId, status, publishedAt], map: "posts_tournament_status_published_at_idx")
   @@index([teamId, status, publishedAt], map: "posts_team_status_published_at_idx")
   @@map("posts")
+}
+
+model PostTag {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  postId         String         @map("post_id") @db.Uuid
+  kind           PostTagKind
+  key            String         @db.VarChar(128)
+  label          String         @db.VarChar(160)
+  position       Int
+  teamId         String?        @map("team_id") @db.Uuid
+  playerId       String?        @map("player_id") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  post           Post           @relation(fields: [postId, organizationId], references: [id, organizationId], onDelete: Cascade, map: "post_tags_post_organization_fkey")
+  team           Team?          @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "post_tags_team_organization_fkey")
+  player         PlayerProfile? @relation(fields: [playerId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "post_tags_player_organization_fkey")
+
+  @@unique([postId, key], map: "post_tags_post_id_key_key")
+  @@index([organizationId, teamId, postId], map: "post_tags_org_team_post_idx")
+  @@index([organizationId, playerId, postId], map: "post_tags_org_player_post_idx")
+  @@index([organizationId, key], map: "post_tags_org_key_idx")
+  @@map("post_tags")
 }
 
 model PostLike {

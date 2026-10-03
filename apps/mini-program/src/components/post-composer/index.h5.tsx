@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+import type { PostTag } from '../../features/product/product.types'
+import { PostTagPicker } from '../post-tags/picker.h5'
 import { createPortal } from 'react-dom'
 import { createClientActionId, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
@@ -14,29 +16,39 @@ import {
 import type { PostComposerProps } from './index'
 import '../post-social/index.h5.scss'
 
-export function DesktopPostComposer({ open, onClose, onPublished, teamId }: PostComposerProps) {
+export function DesktopPostComposer({
+  open,
+  onClose,
+  onPublished,
+  teamId,
+  tournamentId,
+  initialTags,
+}: PostComposerProps) {
   const [body, setBody] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
+  const [tags, setTags] = useState<PostTag[]>(() => initialTags ?? [])
+  const [tagResolving, setTagResolving] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const pending = useRef<{ signature: string; id: string } | null>(null)
   const busy = useRef(false)
   const enabled = open && window.matchMedia('(min-width: 721px)').matches
   const close = () => {
-    if (!busy.current && !processing) onClose()
+    if (!busy.current && !processing && !tagResolving) onClose()
   }
   useOverlayFocus(enabled, '.post-composer', close)
   const session = readSession()
-  const canPublish = Boolean(body.trim() || images.length) && !processing && !publishing
+  const canPublish =
+    Boolean(body.trim() || images.length) && !processing && !publishing && !tagResolving
   const publish = async () => {
     if (!canPublish || busy.current) return
     busy.current = true
     setPublishing(true)
     setError('')
-    const signature = JSON.stringify([body.trim(), images, teamId])
+    const signature = JSON.stringify([body.trim(), images, teamId, tags, tournamentId])
     if (pending.current?.signature !== signature)
       pending.current = { signature, id: createClientActionId('post') }
     try {
@@ -47,9 +59,12 @@ export function DesktopPostComposer({ open, onClose, onPublished, teamId }: Post
         teamId,
         undefined,
         images,
+        tags,
+        tournamentId,
       )
       setBody('')
       setImages([])
+      setTags(initialTags ?? [])
       pending.current = null
       onPublished(post)
       onClose()
@@ -86,7 +101,7 @@ export function DesktopPostComposer({ open, onClose, onPublished, teamId }: Post
             type="button"
             className="post-tool"
             aria-label="关闭发布窗口"
-            disabled={publishing || processing}
+            disabled={publishing || processing || tagResolving}
             onClick={close}
           >
             <PostIcon name="close" />
@@ -215,6 +230,13 @@ export function DesktopPostComposer({ open, onClose, onPublished, teamId }: Post
           </div>
           <span className="post-composer__counter">{body.length}/500</span>
         </div>
+        <PostTagPicker
+          tags={tags}
+          onChange={setTags}
+          disabled={publishing || processing}
+          tournamentId={tournamentId}
+          onPendingChange={setTagResolving}
+        />
         <footer className="post-composer__footer">
           <span>让每一个绿茵时刻被看见</span>
           <button

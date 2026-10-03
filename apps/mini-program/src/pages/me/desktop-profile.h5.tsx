@@ -7,6 +7,7 @@ import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { TeamCrest, TeamName, UserAvatar } from '../../components/product-ui'
+import { PostTags } from '../../components/post-tags'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
 import { ReportModal } from '../../components/report-modal'
@@ -1484,6 +1485,7 @@ function ProfilePost({
           {post.title && <strong>{post.title}</strong>}
           <span>{post.body}</span>
         </button>
+        <PostTags tags={post.tags} tournamentId={post.tournamentId} />
         {images.length > 0 && (
           <div
             className={`profile-post__photos profile-post__photos--${Math.min(3, images.length)}`}

@@ -17,6 +17,7 @@ import { productRepository, resolveMediaUrl } from '../../features/product/produ
 import { openPost, updatePostInteraction, usePostInteraction } from '../../features/product/post-navigation'
 import { readSession } from '../../features/product/session'
 import { openDesktopTeam, openTeamCrest } from '../../features/product/team-navigation'
+import { PostTags } from '../post-tags'
 
 import './index.scss'
 
@@ -219,6 +220,7 @@ export function PostCard({
       {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
+      <PostTags tags={post.tags} tournamentId={post.tournamentId} />
       <View className="post-card__actions">
         <Button
           aria-label={`${post.likedByMe ? '取消点赞' : '点赞'}，当前 ${post.likeCount} 赞`}

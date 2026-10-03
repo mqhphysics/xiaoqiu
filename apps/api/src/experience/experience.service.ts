@@ -16,6 +16,13 @@ import {
   type Prisma,
 } from '../generated/prisma/client'
 import { ResultsService } from '../results/results.service'
+import {
+  mapPostTags,
+  normalizePostTags,
+  postTagFingerprint,
+  resolvePostTags,
+  type ResolvedPostTag,
+} from './post-tags'
 import { parseResultsRules } from '../results/parse-rules'
 import { SocialService } from '../social/social.service'
 import { calculateOfficialTeamRecord } from './official-team-record'
@@ -478,7 +485,7 @@ export class ExperienceService {
         where: {
           organizationId,
           tournamentId: selectedTournamentId,
-          teamId: team.id,
+          OR: [{ teamId: team.id }, { tags: { some: { organizationId, teamId: team.id } } }],
           status: PostStatus.PUBLISHED,
         },
         include: postSummaryInclude(viewerUserId),
@@ -566,9 +573,17 @@ export class ExperienceService {
     }
   }
 
-  async getPlayer(organizationId: string, playerId: string, tournamentId?: string) {
+  async getPlayer(
+    organizationId: string,
+    playerId: string,
+    tournamentId?: string,
+    authorization?: string,
+  ) {
+    const session = await this.authService.getSession(authorization)
+    const viewerUserId = session?.organizationId === organizationId ? session.userId : undefined
     return this.prisma.$transaction(
-      (prisma) => this.getPlayerSnapshot(organizationId, playerId, tournamentId, prisma),
+      (prisma) =>
+        this.getPlayerSnapshot(organizationId, playerId, tournamentId, prisma, viewerUserId),
       { isolationLevel: 'RepeatableRead' },
     )
   }
@@ -578,6 +593,7 @@ export class ExperienceService {
     playerId: string,
     tournamentId: string | undefined,
     prisma: Prisma.TransactionClient,
+    viewerUserId?: string,
   ) {
     const selectedTournament = await this.getFeaturedTournament(
       organizationId,
@@ -616,7 +632,7 @@ export class ExperienceService {
     })
     if (!player) throw notFound('球员不存在')
 
-    const [events, appearances] = await Promise.all([
+    const [events, appearances, posts] = await Promise.all([
       prisma.matchEvent.findMany({
         where: {
           organizationId,
@@ -633,6 +649,17 @@ export class ExperienceService {
         },
         include: { player: true, team: true, match: { include: matchSummaryInclude } },
         orderBy: { match: { scheduledStartAt: 'desc' } },
+      }),
+      prisma.post.findMany({
+        where: {
+          organizationId,
+          tournamentId: selectedTournamentId,
+          status: PostStatus.PUBLISHED,
+          tags: { some: { organizationId, playerId } },
+        },
+        include: postSummaryInclude(viewerUserId),
+        orderBy: { publishedAt: 'desc' },
+        take: 20,
       }),
     ])
     const stats = buildPlayerStats(events, appearances).find((item) => item.id === playerId)
@@ -667,6 +694,7 @@ export class ExperienceService {
       stats: stats ?? emptyPlayerStats(player.id, player.displayName),
       resultsMode: resultContext.mode,
       appearanceRecording: resultContext.mode === 'DEMO' ? 'DEMO' : 'EXISTING_MATCH_RECORDS',
+      posts: posts.map((post) => mapPost(post, viewerUserId)),
       recentMatches: appearances.slice(0, 5).map((appearance) => ({
         ...mapResultMatch(appearance.match, resultContext.official),
         starter: appearance.starter,
@@ -823,6 +851,112 @@ export class ExperienceService {
     return this.getMatchExperience(session.organizationId, matchId, authorization)
   }
 
+  async suggestPostTags(organizationId: string, query = '', tournamentId?: string) {
+    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
+    const normalized = query.normalize('NFKC').replace(/^#+/, '').trim()
+    const snapshotScope = {
+      organizationId,
+      tournamentId: tournament.id,
+      lockedAt: { not: null },
+      teamRegistration: {
+        organizationId,
+        tournamentId: tournament.id,
+        status: 'APPROVED' as const,
+      },
+    }
+    const [topics, teams, players] = await Promise.all([
+      this.prisma.postTag.findMany({
+        where: {
+          organizationId,
+          kind: 'TOPIC',
+          post: { organizationId, tournamentId: tournament.id, status: PostStatus.PUBLISHED },
+          ...(normalized ? { label: { contains: normalized, mode: 'insensitive' as const } } : {}),
+        },
+        distinct: ['key'],
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+      }),
+      this.prisma.team.findMany({
+        where: {
+          organizationId,
+          registrations: {
+            some: { organizationId, tournamentId: tournament.id, status: 'APPROVED' },
+          },
+          ...(normalized
+            ? {
+                OR: [
+                  { name: { contains: normalized, mode: 'insensitive' as const } },
+                  { shortName: { contains: normalized, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+        },
+        select: { id: true, name: true, collegeName: true, teamCode: true },
+        orderBy: { name: 'asc' },
+        take: 10,
+      }),
+      this.prisma.playerProfile.findMany({
+        where: {
+          organizationId,
+          snapshotEntries: { some: { organizationId, rosterSnapshot: snapshotScope } },
+          ...(normalized
+            ? {
+                OR: [
+                  { displayName: { contains: normalized, mode: 'insensitive' as const } },
+                  { jerseyName: { contains: normalized, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          displayName: true,
+          snapshotEntries: {
+            where: { organizationId, rosterSnapshot: snapshotScope },
+            select: {
+              shirtNumber: true,
+              rosterSnapshot: { select: { team: { select: { name: true } } } },
+            },
+            orderBy: { rosterSnapshot: { snapshotVersion: 'desc' } },
+            take: 1,
+          },
+        },
+        orderBy: { displayName: 'asc' },
+        take: 10,
+      }),
+    ])
+    const fixedTopics = ['比赛日', '训练日常', '赛后记录', '校园足球']
+      .filter((label) => !normalized || label.includes(normalized))
+      .map((label) => ({ kind: 'TOPIC' as const, label }))
+    const commonTopics = [
+      ...topics.map((tag) => ({ kind: 'TOPIC' as const, label: tag.label })),
+      ...fixedTopics,
+    ]
+    const seen = new Set<string>()
+    return {
+      items: [
+        ...commonTopics.filter((tag) => {
+          const key = tag.label.normalize('NFKC').toLocaleLowerCase('zh-CN')
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        }),
+        ...teams.map((team) => ({
+          kind: 'TEAM' as const,
+          label: team.name,
+          targetId: team.id,
+          description: [team.collegeName, team.teamCode].filter(Boolean).join(' · '),
+        })),
+        ...players.map((player) => ({
+          kind: 'PLAYER' as const,
+          label: player.displayName,
+          targetId: player.id,
+          description: `${player.snapshotEntries[0]?.rosterSnapshot.team.name ?? '校园球员'}${player.snapshotEntries[0]?.shirtNumber ? ` · #${player.snapshotEntries[0].shirtNumber}` : ''}`,
+        })),
+      ],
+    }
+  }
+
   async listPosts(organizationId: string, authorization?: string, tournamentId?: string) {
     const session = await this.authService.getSession(authorization)
     const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
@@ -924,7 +1058,8 @@ export class ExperienceService {
 
   async createPost(authorization: string | undefined, input: CreatePostDto, requestId = 'unknown') {
     const session = await this.authService.requireSession(authorization)
-    const tournament = await this.getFeaturedTournament(session.organizationId)
+    const tournament = await this.getFeaturedTournament(session.organizationId, input.tournamentId)
+    normalizePostTags(input.tags)
     if (input.teamId) {
       const [team, relationship] = await Promise.all([
         this.prisma.team.findFirst({
@@ -982,6 +1117,7 @@ export class ExperienceService {
     const imageUrl = storedImage?.imageUrl ?? null
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const tags = await resolvePostTags(tx, session.organizationId, tournament.id, input.tags)
         const inserted = await tx.post.createMany({
           data: [
             {
@@ -1019,7 +1155,21 @@ export class ExperienceService {
         ) {
           throw conflict('同一提交编号已用于其他动态内容，请重新发布')
         }
+        if (
+          inserted.count === 0 &&
+          postTagFingerprint(post.tags ?? []) !== postTagFingerprint(tags)
+        ) {
+          throw conflict('同一提交编号已用于其他动态标签，请重新发布')
+        }
         if (inserted.count === 1) {
+          if (tags.length)
+            await tx.postTag.createMany({
+              data: tags.map((tag) => ({
+                ...tag,
+                organizationId: session.organizationId,
+                postId: post.id,
+              })),
+            })
           await tx.auditLog.create({
             data: {
               organizationId: session.organizationId,
@@ -1038,6 +1188,7 @@ export class ExperienceService {
                 teamId,
                 hasImage: Boolean(imageUrl),
                 imageCount: imageDataUrls.length,
+                tags: mapPostTags(tags),
               },
               reason: '用户发布校园足球动态',
               requestId,
@@ -1045,7 +1196,7 @@ export class ExperienceService {
             },
           })
         }
-        return mapPost(post, session.userId)
+        return mapPost(inserted.count === 1 ? { ...post, tags } : post, session.userId)
       })
     } catch (error) {
       if (imageUrl) await this.mediaService.cleanupPostImageIfUnreferenced(imageUrl)
@@ -1248,6 +1399,7 @@ function postSummaryInclude(userId?: string) {
   return {
     author: true,
     team: true,
+    tags: { orderBy: { position: 'asc' } },
     _count: { select: { likes: true, comments: { where: { hiddenAt: null } } } },
     likes: userId
       ? { where: { userId }, select: { id: true } }
@@ -1348,6 +1500,8 @@ function mapResultMatch(
 function mapPost(
   post: {
     id: string
+    tournamentId?: string | null
+    tags?: Array<Pick<ResolvedPostTag, 'kind' | 'label' | 'teamId' | 'playerId'>>
     type: PostType
     title: string | null
     body: string
@@ -1367,6 +1521,8 @@ function mapPost(
 ) {
   return {
     id: post.id,
+    tournamentId: post.tournamentId ?? null,
+    tags: mapPostTags(post.tags ?? []),
     type: post.type,
     title: post.title,
     body: post.body,

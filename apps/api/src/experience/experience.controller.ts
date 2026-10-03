@@ -28,6 +28,7 @@ import {
   CreateCommentDto,
   CreateMatchReviewDto,
   CreatePostDto,
+  PostTagQueryDto,
   SearchQueryDto,
   UpdateTeamPreferencesDto,
 } from './experience.dto'
@@ -69,6 +70,18 @@ export class ExperienceController {
     return this.experienceService.listSeasons(getOrganizationId(request))
   }
 
+  @Get('public/post-tags')
+  @PublicOrganizationHeader()
+  @ApiOperation({ summary: '读取常用话题以及公开球队、球员标签建议' })
+  @ApiQuery({ type: PostTagQueryDto })
+  postTags(@Req() request: RequestWithId, @Query() query: PostTagQueryDto) {
+    return this.experienceService.suggestPostTags(
+      getOrganizationId(request),
+      query.query,
+      query.tournamentId,
+    )
+  }
+
   @Get('public/tournaments/:tournamentId/competition-data')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取积分榜、淘汰赛和球员榜单' })
@@ -100,8 +113,14 @@ export class ExperienceController {
     @Req() request: RequestWithId,
     @Param('playerId') playerId: string,
     @Query('tournamentId') tournamentId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
   ) {
-    return this.experienceService.getPlayer(getOrganizationId(request), playerId, tournamentId)
+    return this.experienceService.getPlayer(
+      getOrganizationId(request),
+      playerId,
+      tournamentId,
+      authorization,
+    )
   }
 
   @Get('public/matches/:matchId/experience')

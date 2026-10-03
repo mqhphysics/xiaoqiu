@@ -207,10 +207,24 @@
     display: flex;
     gap: 10px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
+    scrollbar-color: #afc5b4 transparent;
     padding-bottom: 2px;
   }
+  .th-follow-strip__scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+  .th-follow-strip__scroll::-webkit-scrollbar-thumb {
+    background: #afc5b4;
+    border-radius: 8px;
+  }
+  .th-follow-strip__teams .th-follow-chip {
+    min-width: 150px;
+    text-align: left;
+  }
   .th-follow-chip {
+    position: relative;
     display: flex;
     flex: 0 0 auto;
     align-items: center;
@@ -242,33 +256,30 @@
     width: 100%;
     border-left: 3px solid #649c6c;
   }
-  .th-chip-check {
-    margin-left: auto;
-    display: grid;
-    place-items: center;
-    width: 17px;
-    height: 17px;
-    color: white;
-    background: #1c5138;
-    border-radius: 50%;
-    font-size: 11px;
-    padding: 0;
-    border: 0;
-    flex: 0 0 auto;
+  .th-follow-chip strong {
+    transition: color 160ms ease;
   }
-  .th-chip-identity {
+  .th-follow-chip:hover strong {
+    color: #537c60;
+  }
+  .th-follow-chip .th-chip-select {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    border-radius: inherit;
+    padding: 0;
+    background: transparent;
+  }
+  .th-follow-chip .th-chip-identity {
+    position: relative;
+    z-index: 1;
     display: flex;
-    flex: 1;
     align-items: center;
     gap: 10px;
     padding: 0;
     border: 0;
     background: transparent;
     color: inherit;
-    transition: color 160ms ease;
-  }
-  .th-chip-identity:hover {
-    color: #537c60;
   }
   .th-follow-chip--player small {
     display: block;

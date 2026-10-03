@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
+import { PlayerPostFeed } from '../../components/player-posts'
 import { MatchCard, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
 import { footLabel, positionLabel } from '../../features/product/product.format'
 import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
@@ -181,6 +182,7 @@ function PlayerContent({
           </View>
         )}
       </View>
+      <PlayerPostFeed playerId={player.id} playerName={player.displayName} tournamentId={tournamentId} posts={player.posts ?? []} />
     </View>
   )
 }
