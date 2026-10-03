@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { PostIcon } from '../post-social/icons'
 
 import { UserAvatar } from '../product-ui'
+import { PersonTrigger } from '../person-trigger'
 import { createClientActionId, productRepository } from '../../features/product/product.repository'
 import type {
   ConversationListResponse,
@@ -413,10 +414,17 @@ export function MessagingOverlayHost() {
                       disabled={sending}
                       onClick={() => selectUser(user)}
                     >
-                      <UserAvatar avatarUrl={user.avatarUrl} name={user.displayName} size="small" />
+                      <UserAvatar
+                        avatarUrl={user.avatarUrl}
+                        name={user.displayName}
+                        userId={user.id}
+                        size="small"
+                      />
                       <div className="dm-contact__copy">
                         <div>
-                          <strong>{user.displayName}</strong>
+                          <PersonTrigger userId={user.id} name={user.displayName}>
+                            <strong>{user.displayName}</strong>
+                          </PersonTrigger>
                           <time>
                             {conversation?.lastMessageAt
                               ? messageTime(conversation.lastMessageAt, true)
@@ -457,11 +465,14 @@ export function MessagingOverlayHost() {
                   <header className="dm-thread__head">
                     <UserAvatar
                       name={selected.displayName}
+                      userId={selected.id}
                       avatarUrl={selected.avatarUrl}
                       size="small"
                     />
                     <div>
-                      <strong>{selected.displayName}</strong>
+                      <PersonTrigger userId={selected.id} name={selected.displayName}>
+                        <strong>{selected.displayName}</strong>
+                      </PersonTrigger>
                       <span>校内私信</span>
                     </div>
                   </header>
@@ -505,6 +516,7 @@ export function MessagingOverlayHost() {
                           <div className={`dm-message ${message.isMine ? 'is-mine' : ''}`}>
                             <UserAvatar
                               name={message.isMine ? '我' : selected.displayName}
+                              userId={message.isMine ? viewerId ?? undefined : selected.id}
                               avatarUrl={message.isMine ? null : selected.avatarUrl}
                               size="small"
                             />

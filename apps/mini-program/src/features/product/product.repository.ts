@@ -14,6 +14,7 @@ import type {
   MessageUser,
   MatchExperienceResponse,
   PlayerDetailResponse,
+  PublicPersonResponse,
   PlayerFollowsResponse,
   PostComment,
   PostDetail,
@@ -63,6 +64,10 @@ export const productRepository = {
     request<PlayerDetailResponse>(
       `/public/players/${encodeURIComponent(playerId)}${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
     ),
+
+  getPerson: (userId: string, tournamentId?: string) => request<PublicPersonResponse>(
+    `/public/people/${encodeURIComponent(userId)}${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
+  ),
 
   getMatch: (matchId: string) =>
     request<MatchExperienceResponse>(`/public/matches/${encodeURIComponent(matchId)}/experience`),

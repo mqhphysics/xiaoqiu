@@ -7,6 +7,9 @@ import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { openPlayer } from '../../features/product/player-navigation'
 import { TeamCrest, UserAvatar } from '../../components/product-ui'
+import { PersonTrigger } from '../../components/person-trigger'
+import { VerificationBadge } from '../../components/verification-badge'
+import { identityBadgeKinds, identityLabels } from '../../features/product/identity-badges'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
 import { ReportModal } from '../../components/report-modal'
@@ -363,12 +366,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               </span>
             </button>
             <div className="profile-person__copy">
-              <h1>{user.displayName}</h1>
+              <h1>
+                <PersonTrigger userId={user.id} name={user.displayName}>
+                  {user.displayName}
+                </PersonTrigger>
+              </h1>
               <p>{user.bio || '写一句简介，让球友更了解你。'}</p>
               <div className="profile-person__meta">
                 <span>
                   <ProfileIcon name="shield" />
-                  {verificationLabel(user.verificationLevel)}
+                  {identityBadgeKinds(user.verificationLevel, user.roles)
+                    .map((kind) => identityLabels[kind])
+                    .join('、') || verificationLabel(user.verificationLevel)}
                 </span>
                 <span>
                   <ProfileIcon name="user" />
@@ -1463,11 +1472,23 @@ function ProfilePost({
   return (
     <article className="profile-post">
       <div className="profile-post__avatar">
-        <UserAvatar name={post.author.displayName} avatarUrl={post.author.avatarUrl} size="small" />
+        <UserAvatar
+          name={post.author.displayName}
+          avatarUrl={post.author.avatarUrl}
+          userId={post.author.id}
+          size="small"
+        />
       </div>
       <div className="profile-post__content">
         <header>
-          <strong>{post.author.displayName}</strong>
+          <PersonTrigger userId={post.author.id} name={post.author.displayName}>
+            <strong>{post.author.displayName}</strong>
+          </PersonTrigger>
+          <VerificationBadge
+            level={post.author.verificationLevel}
+            roles={post.author.roles}
+            official={post.author.official}
+          />
           <time>
             {formatDate(post.publishedAt)} {formatTime(post.publishedAt)}
           </time>

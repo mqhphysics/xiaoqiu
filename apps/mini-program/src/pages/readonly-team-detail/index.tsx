@@ -3,6 +3,7 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { PersonTrigger } from '../../components/person-trigger'
 import { DataState } from '../../components/public-ui'
 import {
   MatchCard,
@@ -344,7 +345,7 @@ function TeamContent({
                         color={player.profileColor}
                         size="small"
                       />
-                      <Text>{player.displayName}</Text>
+                      <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                     </View>
                     <Text>
                       {positionLabel(player.position)} · {player.academicYear}

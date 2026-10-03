@@ -3,6 +3,8 @@ import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell, updatePrimaryTeamCache } from '../../components/public-shell'
+import { PersonTrigger } from '../../components/person-trigger'
+import { openPlayer } from '../../features/product/player-navigation'
 import { DataState } from '../../components/public-ui'
 import {
   MatchCard,
@@ -844,10 +846,12 @@ function PlayerFollowBar({
                 avatarUrl={player.avatarUrl}
                 color={player.profileColor}
                 name={player.displayName}
+                playerId={player.id}
+                tournamentId={tournamentId}
                 size="small"
               />
               <View>
-                <Text>{player.displayName}</Text>
+                <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                 <Text>{player.team?.shortName ?? positionLabel(player.position)}</Text>
               </View>
               <Button
@@ -878,10 +882,12 @@ function PlayerFollowBar({
                   avatarUrl={player.avatarUrl}
                   color={player.profileColor}
                   name={player.displayName}
+                  playerId={player.id}
+                  tournamentId={tournamentId}
                   size="small"
                 />
                 <View>
-                  <Text>{player.displayName}</Text>
+                  <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                   <Text>{player.team?.name ?? positionLabel(player.position)}</Text>
                 </View>
                 <Button
@@ -965,11 +971,12 @@ function CaptainWorkspace({
                 <UserAvatar
                   avatarUrl={application.player?.avatarUrl ?? application.applicant.avatarUrl}
                   name={application.player?.displayName ?? application.applicant.displayName}
+                  userId={application.applicant.id}
                   size="small"
                 />
                 <View>
                   <Text>
-                    {application.player?.displayName ?? application.applicant.displayName}
+                    <PersonTrigger userId={application.applicant.id} name={application.player?.displayName ?? application.applicant.displayName}>{application.player?.displayName ?? application.applicant.displayName}</PersonTrigger>
                   </Text>
                   <Text>
                     {positionLabel(application.requestedPosition)} ·{' '}
@@ -1001,10 +1008,10 @@ function CaptainWorkspace({
           <Text className="captain-card-title">成员与位置</Text>
           {data.members.map((member) => (
             <View className="captain-member" key={member.id}>
-              <UserAvatar avatarUrl={member.avatarUrl} name={member.displayName} size="small" />
+              <UserAvatar avatarUrl={member.avatarUrl} name={member.displayName} userId={member.userId ?? undefined} playerId={member.playerId ?? undefined} size="small" />
               <View>
                 <Text>
-                  {member.displayName}
+                  <PersonTrigger userId={member.userId ?? undefined} playerId={member.playerId ?? undefined} name={member.displayName}>{member.displayName}</PersonTrigger>
                   {member.isCaptain ? ' · 队长' : ''}
                 </Text>
                 <Text>{positionLabel(member.position)}</Text>
@@ -1206,9 +1213,11 @@ function GroupedRoster({
                   avatarUrl={player.avatarUrl}
                   name={player.displayName}
                   color={player.profileColor}
+                  playerId={player.id}
+                  tournamentId={tournamentId}
                 />
                 <View className="squad-player__copy">
-                  <Text>{player.displayName}</Text>
+                  <PersonTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}><Text>{player.displayName}</Text></PersonTrigger>
                   <Text>
                     {positionLabel(player.position)} · {player.academicYear}
                   </Text>
@@ -1287,11 +1296,5 @@ async function goToTeam(teamId: string, tournamentId: string) {
 }
 
 async function goToPlayer(playerId: string, tournamentId: string) {
-  await Taro.navigateTo({
-    url:
-      '/pages/player-detail/index?playerId=' +
-      encodeURIComponent(playerId) +
-      '&tournamentId=' +
-      encodeURIComponent(tournamentId),
-  })
+  await openPlayer(playerId, tournamentId)
 }

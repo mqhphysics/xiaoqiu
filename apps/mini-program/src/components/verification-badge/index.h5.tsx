@@ -1,47 +1,69 @@
 import { useId } from 'react'
 import { VerificationBadge as ExistingBadge, type VerificationBadgeProps } from './index.tsx'
-import playerIcon from '../../assets/profile-icons/shield-check.svg'
-import staffIcon from '../../assets/profile-icons/calendar.svg'
+import playerIcon from './football.svg'
+import staffIcon from '../../assets/profile-icons/pencil.svg'
+import captainIcon from '../../assets/profile-icons/trophy.svg'
+import operatorIcon from '../../assets/profile-icons/users.svg'
+import adminIcon from '../../assets/profile-icons/shield-check.svg'
+import officialIcon from '../../assets/profile-icons/bell.svg'
 import studentIcon from '../../assets/profile-icons/user-circle.svg'
 import checkIcon from '../../assets/profile-icons/check.svg'
+import {
+  identityBadgeKinds,
+  identityLabels,
+  type IdentityBadgeKind,
+} from '../../features/product/identity-badges'
 import './index.h5.scss'
 
-const identities: Record<string, { kind: string; label: string; icon: string; checked: boolean }> =
-  {
-    PLAYER_CONFIRMED: { kind: 'player', label: '认证球员', icon: playerIcon, checked: false },
-    STAFF_VERIFIED: { kind: 'staff', label: '认证赛事工作人员', icon: staffIcon, checked: true },
-    STUDENT_VERIFIED: { kind: 'student', label: '认证学生', icon: studentIcon, checked: true },
-    UNVERIFIED: { kind: 'profile', label: '普通用户', icon: studentIcon, checked: false },
-    // A public player profile alone is not evidence of account verification.
-    PLAYER_PROFILE: { kind: 'profile', label: '球员档案', icon: studentIcon, checked: false },
-  }
+const icons: Record<IdentityBadgeKind, string> = {
+  player: playerIcon,
+  student: studentIcon,
+  profile: studentIcon,
+  reporter: staffIcon,
+  captain: captainIcon,
+  operator: operatorIcon,
+  admin: adminIcon,
+  official: officialIcon,
+  referee: officialIcon,
+  reviewer: adminIcon,
+}
 
-export function VerificationBadge({ level, className, focusable = true }: VerificationBadgeProps) {
+export function VerificationBadge({
+  level,
+  roles,
+  official,
+  className,
+  focusable = true,
+}: VerificationBadgeProps) {
   const tooltipId = useId()
-  const identity = identities[level ?? '']
+  const identities = identityBadgeKinds(level, roles, official)
   return (
     <>
       <ExistingBadge level={level} className={`verification-badge__native ${className ?? ''}`} />
-      {identity && (
+      {identities.map((kind) => (
         <span
-          className={`verification-badge verification-badge--${identity.kind}`}
+          key={kind}
+          className={`verification-badge verification-badge--${kind}`}
           role="img"
-          aria-label={identity.label}
-          aria-describedby={tooltipId}
+          aria-label={identityLabels[kind]}
+          aria-describedby={`${tooltipId}-${kind}`}
           tabIndex={focusable ? 0 : undefined}
-          onClick={(event) => event.stopPropagation()}
+          onClickCapture={(event) => {
+            event.stopPropagation()
+            event.nativeEvent.stopImmediatePropagation()
+          }}
         >
           <span className="verification-badge__symbol" aria-hidden="true">
-            <img className="verification-badge__icon" src={identity.icon} alt="" />
-            {identity.checked && (
+            <img className="verification-badge__icon" src={icons[kind]} alt="" />
+            {kind !== 'profile' && (
               <img className="verification-badge__check" src={checkIcon} alt="" />
             )}
           </span>
-          <span className="verification-badge__tooltip" id={tooltipId} role="tooltip">
-            {identity.label}
+          <span className="verification-badge__tooltip" id={`${tooltipId}-${kind}`} role="tooltip">
+            {identityLabels[kind]}
           </span>
         </span>
-      )}
+      ))}
     </>
   )
 }

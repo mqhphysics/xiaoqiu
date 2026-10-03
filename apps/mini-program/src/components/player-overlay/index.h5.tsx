@@ -29,6 +29,14 @@ import { useOverlayFocus } from '../overlay-focus'
 import { openMessaging } from '../messaging-drawer/index.h5'
 import { PostIcon } from '../post-social/icons'
 import { VerificationBadge } from '../verification-badge/index.h5'
+import {
+  OPEN_PERSON_EVENT,
+  HOVER_PERSON_EVENT,
+  type PersonRequest,
+  type PersonHoverRequest,
+} from '../../features/product/person-navigation.h5'
+import { PersonDialog, PersonHoverCard } from '../person-overlay/index.h5'
+import { OPEN_POST_EVENT } from '../../features/product/post-navigation.h5'
 import cover from '../../assets/home-visual/home-campus-action.webp'
 import './index.h5.scss'
 
@@ -40,11 +48,31 @@ export interface PlayerPresentation {
   posts?: PostSummary[]
   goalkeeperStats?: { saves: number | null; clearances: number | null }
   verificationLevel?: string | null
+  roles?: string[] | undefined
+  official?: boolean | undefined
 }
 function playerVerification(playerId: string, presentation: PlayerPresentation) {
   if (presentation.verificationLevel) return presentation.verificationLevel
   const user = readSession()?.user
   return user?.linkedPlayer?.id === playerId ? user.verificationLevel : 'PLAYER_PROFILE'
+}
+function playerPresentation(
+  player: PlayerDetailResponse,
+  presentation: PlayerPresentation,
+): PlayerPresentation {
+  const account = player.person
+  return {
+    ...presentation,
+    ...(player.posts ? { posts: player.posts } : {}),
+    ...(account
+      ? {
+          verificationLevel: account.verificationLevel,
+          roles: account.roles,
+          official: account.official,
+          messageUser: account.messageable ? account : null,
+        }
+      : {}),
+  }
 }
 type PlayerState =
   | { phase: 'loading' }
@@ -105,8 +133,8 @@ function usePlayer(request: PlayerRequest) {
 }
 
 export function PlayerOverlayHost() {
-  const [request, setRequest] = useState<PlayerRequest | null>(null)
-  const [hover, setHover] = useState<PlayerHoverRequest | null>(null)
+  const [request, setRequest] = useState<PlayerRequest | PersonRequest | null>(null)
+  const [hover, setHover] = useState<PlayerHoverRequest | PersonHoverRequest | null>(null)
   const timers = useRef<{ enter?: number; leave?: number }>({})
   const clearTimers = useCallback(() => {
     window.clearTimeout(timers.current.enter)
@@ -146,6 +174,45 @@ export function PlayerOverlayHost() {
         if (anchor.isConnected) setHover({ ...next, anchor })
       }, 320)
     }
+    const readPerson = (detail: unknown): PersonRequest | null => {
+      if (
+        !detail ||
+        typeof detail !== 'object' ||
+        !('userId' in detail) ||
+        typeof detail.userId !== 'string' ||
+        !detail.userId ||
+        detail.userId.length > 150
+      )
+        return null
+      const tournamentId =
+        'tournamentId' in detail && typeof detail.tournamentId === 'string'
+          ? detail.tournamentId
+          : ''
+      return { userId: detail.userId, tournamentId }
+    }
+    const openPerson = (event: Event) => {
+      const next = readPerson((event as CustomEvent<unknown>).detail)
+      if (!next || !window.matchMedia('(min-width: 721px)').matches) return
+      closeHover()
+      setRequest(next)
+    }
+    const enterPerson = (event: Event) => {
+      const detail: unknown = (event as CustomEvent<unknown>).detail
+      const next = readPerson(detail)
+      if (
+        !next ||
+        !detail ||
+        typeof detail !== 'object' ||
+        !('anchor' in detail) ||
+        !(detail.anchor instanceof HTMLElement)
+      )
+        return
+      const anchor = detail.anchor
+      clearTimers()
+      timers.current.enter = window.setTimeout(() => {
+        if (anchor.isConnected) setHover({ ...next, anchor })
+      }, 320)
+    }
     const close = () => {
       closeHover()
       setRequest(null)
@@ -155,6 +222,9 @@ export function PlayerOverlayHost() {
       if (!window.matchMedia('(min-width: 721px)').matches) setRequest(null)
     }
     window.addEventListener(OPEN_PLAYER_EVENT, open)
+    window.addEventListener(OPEN_PERSON_EVENT, openPerson)
+    window.addEventListener(HOVER_PERSON_EVENT, enterPerson)
+    window.addEventListener(OPEN_POST_EVENT, close)
     window.addEventListener(HOVER_PLAYER_EVENT, enter)
     window.addEventListener(LEAVE_PLAYER_EVENT, leaveHover)
     window.addEventListener('hashchange', close)
@@ -164,6 +234,9 @@ export function PlayerOverlayHost() {
     return () => {
       clearTimers()
       window.removeEventListener(OPEN_PLAYER_EVENT, open)
+      window.removeEventListener(OPEN_PERSON_EVENT, openPerson)
+      window.removeEventListener(HOVER_PERSON_EVENT, enterPerson)
+      window.removeEventListener(OPEN_POST_EVENT, close)
       window.removeEventListener(HOVER_PLAYER_EVENT, enter)
       window.removeEventListener(LEAVE_PLAYER_EVENT, leaveHover)
       window.removeEventListener('hashchange', close)
@@ -174,22 +247,39 @@ export function PlayerOverlayHost() {
   }, [clearTimers, closeHover, leaveHover])
   return (
     <>
-      {request && (
-        <PlayerDialog
-          key={JSON.stringify(request)}
-          request={request}
-          onClose={() => setRequest(null)}
-        />
-      )}
-      {hover && !request && (
-        <PlayerHoverCard
-          key={JSON.stringify([hover.playerId, hover.tournamentId])}
-          request={hover}
-          onEnter={keepHover}
-          onLeave={leaveHover}
-          onClose={closeHover}
-        />
-      )}
+      {request &&
+        ('userId' in request ? (
+          <PersonDialog
+            key={JSON.stringify(request)}
+            request={request}
+            onClose={() => setRequest(null)}
+          />
+        ) : (
+          <PlayerDialog
+            key={JSON.stringify(request)}
+            request={request}
+            onClose={() => setRequest(null)}
+          />
+        ))}
+      {hover &&
+        !request &&
+        ('userId' in hover ? (
+          <PersonHoverCard
+            key={JSON.stringify([hover.userId, hover.tournamentId])}
+            request={hover}
+            onEnter={keepHover}
+            onLeave={leaveHover}
+            onClose={closeHover}
+          />
+        ) : (
+          <PlayerHoverCard
+            key={JSON.stringify([hover.playerId, hover.tournamentId])}
+            request={hover}
+            onEnter={keepHover}
+            onLeave={leaveHover}
+            onClose={closeHover}
+          />
+        ))}
     </>
   )
 }
@@ -264,6 +354,7 @@ export function PlayerProfile({
   tournamentId: string
   presentation?: PlayerPresentation
 }) {
+  presentation = playerPresentation(player, presentation)
   const portrait = resolveMediaUrl(player.portraitUrl ?? player.avatarUrl)
   return (
     <>
@@ -283,6 +374,11 @@ export function PlayerProfile({
         <div className="player-profile-hero__identity">
           <div className="player-profile-hero__name">
             <h1>{player.displayName}</h1>
+            <VerificationBadge
+              level={presentation.verificationLevel}
+              roles={presentation.roles}
+              official={presentation.official}
+            />
             {player.isDemo && <span className="player-demo-label">演示档案</span>}
           </div>
           <div className="player-profile-hero__facts">
@@ -668,7 +764,7 @@ function StatGroup({ title, items }: { title: string; items: Array<[number | nul
     </section>
   )
 }
-function CompactStats({
+export function CompactStats({
   player,
   goalkeeperStats,
 }: {
@@ -775,7 +871,7 @@ function PlayerAbilities({ player }: { player: PlayerDetailResponse }) {
     </>
   )
 }
-function PlayerActions({
+export function PlayerActions({
   player,
   messageUser,
 }: {
@@ -783,6 +879,7 @@ function PlayerActions({
   messageUser?: MessageUser | null | undefined
 }) {
   const session = readSession()
+  const own = session?.user.linkedPlayer?.id === player.id
   const [followed, setFollowed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [known, setKnown] = useState(!session)
@@ -865,6 +962,7 @@ function PlayerActions({
         <button
           type="button"
           className="player-button player-button--secondary"
+          disabled={own}
           title={messageUser ? undefined : '选择校内账号开始私聊'}
           onClick={() => {
             if (!session) {
@@ -875,7 +973,7 @@ function PlayerActions({
           }}
         >
           <PostIcon name="comment" />
-          发消息
+          {own ? '本人' : '发消息'}
         </button>
       </div>
       {error && (
@@ -900,6 +998,7 @@ export function PlayerHoverCard({
   presentation?: PlayerPresentation
 }) {
   const { state, retry } = usePlayer(request)
+  if (state.phase === 'ready') presentation = playerPresentation(state.player, presentation)
   const rect = request.anchor.getBoundingClientRect()
   const width = Math.min(358, window.innerWidth - 32)
   const left = Math.max(16, Math.min(rect.left - 20, window.innerWidth - width - 16))
@@ -950,6 +1049,8 @@ export function PlayerHoverCard({
           color={state.player.profileColor}
           meta={`${state.player.team?.name ?? '暂无球队'} · ${positionLabel(state.player.position)}${state.player.shirtNumber ? ` · ${state.player.shirtNumber}号` : ''}`}
           verificationLevel={playerVerification(state.player.id, presentation)}
+          roles={presentation.roles}
+          official={presentation.official}
           onOpen={() => void openPlayer(request.playerId, request.tournamentId)}
           stats={
             <CompactStats player={state.player} goalkeeperStats={presentation.goalkeeperStats} />
@@ -971,6 +1072,8 @@ export function PersonHoverPreview({
   color,
   meta,
   verificationLevel,
+  roles,
+  official,
   onOpen,
   stats,
   actions,
@@ -980,6 +1083,8 @@ export function PersonHoverPreview({
   color?: string | null | undefined
   meta?: string | undefined
   verificationLevel?: string | null | undefined
+  roles?: readonly string[] | undefined
+  official?: boolean | undefined
   onOpen: () => void
   stats?: ReactNode
   actions: ReactNode
@@ -1005,7 +1110,7 @@ export function PersonHoverPreview({
             <button type="button" className="player-hover-card__name" onClick={onOpen}>
               {name}
             </button>
-            <VerificationBadge level={verificationLevel} />
+            <VerificationBadge level={verificationLevel} roles={roles} official={official} />
           </div>
           {meta && <span className="player-hover-card__meta">{meta}</span>}
         </div>

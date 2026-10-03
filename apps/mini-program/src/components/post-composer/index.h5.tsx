@@ -96,6 +96,7 @@ export function DesktopPostComposer({ open, onClose, onPublished }: PostComposer
           <UserAvatar
             avatarUrl={session?.user.avatarUrl ?? null}
             name={session?.user.displayName ?? '我'}
+            userId={session?.user.id}
             size="small"
           />
           <div>

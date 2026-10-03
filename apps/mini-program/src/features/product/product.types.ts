@@ -51,10 +51,27 @@ export interface PostAuthor {
   verificationLevel: string
   avatarUrl: string | null
   messageable: boolean
+  roles?: string[]
+  official?: boolean
+}
+
+export interface PublicPersonIdentity extends PostAuthor {
+  roles: string[]
+  official: boolean
+}
+
+export interface PublicPersonResponse extends PublicPersonIdentity {
+  bio: string | null
+  organizationName: string | null
+  player: PlayerDetailResponse | null
+  posts: PostSummary[]
+  tournamentId: string
+  tournamentName: string
 }
 
 export interface PostSummary {
   id: string
+  tournamentId?: string
   type: 'OFFICIAL' | 'COMMUNITY'
   title: string | null
   body: string
@@ -255,6 +272,8 @@ export interface TeamDashboardResponse {
 
 export interface PlayerDetailResponse {
   id: string
+  person?: PublicPersonIdentity | null
+  posts?: PostSummary[]
   displayName: string
   jerseyName: string | null
   shirtNumber: string | null

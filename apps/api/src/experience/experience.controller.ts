@@ -100,8 +100,31 @@ export class ExperienceController {
     @Req() request: RequestWithId,
     @Param('playerId') playerId: string,
     @Query('tournamentId') tournamentId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
   ) {
-    return this.experienceService.getPlayer(getOrganizationId(request), playerId, tournamentId)
+    return this.experienceService.getPlayer(
+      getOrganizationId(request),
+      playerId,
+      tournamentId,
+      authorization,
+    )
+  }
+
+  @Get('public/people/:userId')
+  @PublicOrganizationHeader()
+  @ApiOperation({ summary: '读取人物公开资料、有效身份、关联球员和已公开动态' })
+  person(
+    @Req() request: RequestWithId,
+    @Param('userId') userId: string,
+    @Query('tournamentId') tournamentId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.experienceService.getPerson(
+      getOrganizationId(request),
+      userId,
+      tournamentId,
+      authorization,
+    )
   }
 
   @Get('public/matches/:matchId/experience')

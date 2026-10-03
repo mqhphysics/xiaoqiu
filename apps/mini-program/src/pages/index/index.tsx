@@ -11,6 +11,7 @@ import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
 import { openPlayer } from '../../features/product/player-navigation'
+import { PersonTrigger } from '../../components/person-trigger'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
@@ -90,7 +91,12 @@ export default function IndexPage() {
   const [pendingPost, setPendingPost] = useState<{ id: string; signature: string } | null>(null)
   const searchRequestId = useRef(0)
 
-  useOverlayFocus(composerOpen && !(Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches), '.composer-dialog', () => setComposerOpen(false))
+  useOverlayFocus(
+    composerOpen &&
+      !(Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches),
+    '.composer-dialog',
+    () => setComposerOpen(false),
+  )
 
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
@@ -344,14 +350,27 @@ export default function IndexPage() {
           onSearchTextChange={handleSearchTextChange}
         />
       ) : null}
-      <DesktopPostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onPublished={post => setState(current => current.phase === 'ready' ? { phase: 'ready', data: { ...current.data, posts: [post, ...current.data.posts] } } : current)} />
+      <DesktopPostComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onPublished={(post) =>
+          setState((current) =>
+            current.phase === 'ready'
+              ? { phase: 'ready', data: { ...current.data, posts: [post, ...current.data.posts] } }
+              : current,
+          )
+        }
+      />
     </PublicShell>
   )
 }
 
 function CampusBackdrop({ search }: { search: boolean }) {
   return (
-    <View aria-hidden="true" className={`campus-backdrop ${search ? 'campus-backdrop--search' : ''}`}>
+    <View
+      aria-hidden="true"
+      className={`campus-backdrop ${search ? 'campus-backdrop--search' : ''}`}
+    >
       <View className="home-page__lineart" />
       <View className="match-ornament match-ornament--floodlight" />
       <View className="match-ornament match-ornament--goal" />
@@ -557,72 +576,75 @@ function HomeContent({
         </View>
       </View>
 
-      {composerOpen && !(Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) && (
-        <View className="composer-scrim" onClick={onCloseComposer}>
-          <View
-            aria-labelledby="composer-dialog-title"
-            aria-modal="true"
-            className="composer-dialog"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <View className="composer-dialog__head">
-              <View>
-                <Text className="composer-dialog__eyebrow">CREATE POST</Text>
-                <Text className="composer-dialog__title" id="composer-dialog-title">
-                  发布绿茵动态
-                </Text>
-              </View>
-              <IconButton
-                icon="close"
-                aria-label="关闭发布窗口"
-                className="composer-dialog__close"
-                onClick={onCloseComposer}
-              >
-                ×
-              </IconButton>
-            </View>
-            <View className="composer-dialog__identity">
-              <UserAvatar
-                avatarUrl={data.viewer?.avatarUrl ?? null}
-                name={data.viewer?.displayName ?? '我'}
-                size="small"
-              />
-              <Text>{data.viewer?.displayName ?? '发布动态'}</Text>
-            </View>
-            <Textarea
-              focus
-              className="composer-dialog__input"
-              maxlength={500}
-              placeholder="记录此刻的校园足球，emoji 也可以正常使用 ⚽"
-              value={postBody}
-              onInput={(event) => onPostBodyChange(event.detail.value)}
-            />
-            <PostImagePicker
-              value={postImageDataUrl}
-              disabled={publishing}
-              onChange={onPostImageChange}
-              onProcessingChange={onPostImageProcessingChange}
-            />
-            <View className="composer-dialog__footer">
-              <Text>{postBody.length}/500</Text>
-              <View className="composer-dialog__actions">
-                <Button className="composer-dialog__cancel" onClick={onCloseComposer}>
-                  取消
-                </Button>
-                <Button
-                  className="composer-dialog__submit"
-                  disabled={postBody.trim().length < 2 || publishing || postImageProcessing}
-                  loading={publishing}
-                  onClick={onPublish}
+      {composerOpen &&
+        !(
+          Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches
+        ) && (
+          <View className="composer-scrim" onClick={onCloseComposer}>
+            <View
+              aria-labelledby="composer-dialog-title"
+              aria-modal="true"
+              className="composer-dialog"
+              role="dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <View className="composer-dialog__head">
+                <View>
+                  <Text className="composer-dialog__eyebrow">CREATE POST</Text>
+                  <Text className="composer-dialog__title" id="composer-dialog-title">
+                    发布绿茵动态
+                  </Text>
+                </View>
+                <IconButton
+                  icon="close"
+                  aria-label="关闭发布窗口"
+                  className="composer-dialog__close"
+                  onClick={onCloseComposer}
                 >
-                  发布动态
-                </Button>
+                  ×
+                </IconButton>
+              </View>
+              <View className="composer-dialog__identity">
+                <UserAvatar
+                  avatarUrl={data.viewer?.avatarUrl ?? null}
+                  name={data.viewer?.displayName ?? '我'}
+                  size="small"
+                />
+                <Text>{data.viewer?.displayName ?? '发布动态'}</Text>
+              </View>
+              <Textarea
+                focus
+                className="composer-dialog__input"
+                maxlength={500}
+                placeholder="记录此刻的校园足球，emoji 也可以正常使用 ⚽"
+                value={postBody}
+                onInput={(event) => onPostBodyChange(event.detail.value)}
+              />
+              <PostImagePicker
+                value={postImageDataUrl}
+                disabled={publishing}
+                onChange={onPostImageChange}
+                onProcessingChange={onPostImageProcessingChange}
+              />
+              <View className="composer-dialog__footer">
+                <Text>{postBody.length}/500</Text>
+                <View className="composer-dialog__actions">
+                  <Button className="composer-dialog__cancel" onClick={onCloseComposer}>
+                    取消
+                  </Button>
+                  <Button
+                    className="composer-dialog__submit"
+                    disabled={postBody.trim().length < 2 || publishing || postImageProcessing}
+                    loading={publishing}
+                    onClick={onPublish}
+                  >
+                    发布动态
+                  </Button>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      )}
+        )}
     </View>
   )
 }
@@ -653,7 +675,12 @@ function SearchExperience({
   return (
     <View className="search-experience">
       <View className="search-experience__head">
-        <IconButton icon="back" aria-label="退出搜索" className="search-experience__back" onClick={onBack}>
+        <IconButton
+          icon="back"
+          aria-label="退出搜索"
+          className="search-experience__back"
+          onClick={onBack}
+        >
           <Text className="search-experience__mobile-back">←</Text>
         </IconButton>
         <Text className="search-experience__title">全站搜索</Text>
@@ -801,7 +828,13 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
             size="small"
           />
           <View className="search-result-row__copy">
-            <Text>{player.displayName}</Text>
+            <PersonTrigger
+              playerId={player.id}
+              tournamentId={tournamentId}
+              name={player.displayName}
+            >
+              <Text>{player.displayName}</Text>
+            </PersonTrigger>
             <Text>{player.team?.name ?? '暂无球队'} · 球员</Text>
           </View>
         </View>
@@ -837,7 +870,16 @@ function SearchResults({ result, tournamentId }: { result: SearchResponse; tourn
           <Text className="search-result-row__tag">文</Text>
           <View className="search-result-row__copy">
             <Text>{post.title ?? post.body.slice(0, 24)}</Text>
-            <Text>{post.author.displayName} · 动态</Text>
+            <Text>
+              <PersonTrigger
+                userId={post.author.id}
+                tournamentId={tournamentId}
+                name={post.author.displayName}
+              >
+                {post.author.displayName}
+              </PersonTrigger>{' '}
+              · 动态
+            </Text>
           </View>
         </View>
       ))}
