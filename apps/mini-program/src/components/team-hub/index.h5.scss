@@ -262,25 +262,6 @@
   .th-follow-chip:hover strong {
     color: #537c60;
   }
-  .th-follow-chip .th-chip-select {
-    position: absolute;
-    inset: 0;
-    border: 0;
-    border-radius: inherit;
-    padding: 0;
-    background: transparent;
-  }
-  .th-follow-chip .th-chip-identity {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-  }
   .th-follow-chip--player small {
     display: block;
     color: #78858c;
@@ -1033,7 +1014,7 @@
     backdrop-filter: blur(4px);
   }
   .th-scrim--detail {
-    z-index: 1400;
+    z-index: 1950;
   }
   .th-detail-modal {
     display: flex;
@@ -1202,6 +1183,140 @@
   }
   .team-crest--interactive {
     cursor: pointer;
+  }
+}
+@media (min-width: 721px) {
+  .team-trigger {
+    display: inline-flex;
+    min-width: 0;
+    vertical-align: middle;
+    cursor: pointer;
+  }
+  .team-trigger:focus-visible {
+    outline: 2px solid #719a7c;
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  .th-roster > .player-trigger {
+    display: block;
+    border-radius: 5px;
+  }
+  .th-roster .th-player {
+    width: 100%;
+  }
+  .player-profile-inline {
+    font:
+      14px/1.5 -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Microsoft YaHei',
+      sans-serif;
+    color: #24372d;
+    background: #f4f7f5;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .player-profile-inline [type] {
+    cursor: pointer;
+    font: inherit;
+    border: 0;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .player-profile-inline [type]:focus-visible {
+    outline: 2px solid #719a7c;
+    outline-offset: 3px;
+  }
+  .team-hover-card {
+    position: fixed;
+    z-index: 2300;
+    width: min(336px, calc(100vw - 32px));
+    padding: 18px;
+    color: #263d2f;
+    background: #fff;
+    border: 1px solid #e4ece4;
+    border-radius: 12px;
+    box-shadow: 0 15px 48px rgba(22, 47, 29, 0.15);
+    font:
+      13px/1.5 -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Microsoft YaHei',
+      sans-serif;
+  }
+  .team-hover-card__identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .team-hover-card__identity .team-crest {
+    width: 54px;
+    height: 64px;
+  }
+  .team-hover-card__identity > div {
+    min-width: 0;
+  }
+  .team-hover-card__identity strong {
+    display: block;
+    font-size: 19px;
+  }
+  .team-hover-card__identity span {
+    display: block;
+    color: #7d8b83;
+    font-size: 12px;
+  }
+  .team-hover-card__identity small {
+    display: block;
+    color: #91a090;
+    margin-top: 5px;
+  }
+  .team-hover-card__stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin-top: 17px;
+    padding: 12px 0;
+    border-top: 1px solid #edf1eb;
+    border-bottom: 1px solid #edf1eb;
+    text-align: center;
+  }
+  .team-hover-card__stats > div + div {
+    border-left: 1px solid #edf1eb;
+  }
+  .team-hover-card__stats strong {
+    display: block;
+    font-size: 19px;
+    color: #235236;
+  }
+  .team-hover-card__stats span {
+    color: #91a090;
+    font-size: 11px;
+  }
+  .team-hover-card p {
+    margin: 10px 0;
+    color: #94a08f;
+    font-size: 11px;
+  }
+  .team-hover-card [type] {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border: 0;
+    color: #4b7758;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+  }
+  .team-hover-card [type]:focus-visible {
+    outline: 2px solid #719a7c;
+    outline-offset: 2px;
+  }
+  .team-hover-card__state {
+    display: grid;
+    gap: 10px;
+    min-height: 86px;
+    align-content: center;
+    color: #899889;
   }
 }
 @media (min-width: 721px) and (max-width: 1150px) {

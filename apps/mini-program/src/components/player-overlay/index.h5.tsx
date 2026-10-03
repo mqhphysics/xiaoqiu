@@ -1,5 +1,7 @@
 import Taro from '@tarojs/taro'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { openTeam } from '../../features/product/team-navigation'
+import { OPEN_TEAM_EVENT, HOVER_TEAM_EVENT } from '../../features/product/team-navigation.h5'
 import { createPortal } from 'react-dom'
 import {
   HOVER_PLAYER_EVENT,
@@ -28,6 +30,7 @@ import { UserAvatar, TeamCrest, PostCard } from '../product-ui'
 import { useOverlayFocus } from '../overlay-focus'
 import { openMessaging } from '../messaging-drawer/index.h5'
 import { PostIcon } from '../post-social/icons'
+import { DesktopPostComposer } from '../post-composer'
 import { VerificationBadge } from '../verification-badge/index.h5'
 import {
   OPEN_PERSON_EVENT,
@@ -222,6 +225,8 @@ export function PlayerOverlayHost() {
       if (!window.matchMedia('(min-width: 721px)').matches) setRequest(null)
     }
     window.addEventListener(OPEN_PLAYER_EVENT, open)
+    window.addEventListener(OPEN_TEAM_EVENT, close)
+    window.addEventListener(HOVER_TEAM_EVENT, closeHover)
     window.addEventListener(OPEN_PERSON_EVENT, openPerson)
     window.addEventListener(HOVER_PERSON_EVENT, enterPerson)
     window.addEventListener(OPEN_POST_EVENT, close)
@@ -234,6 +239,8 @@ export function PlayerOverlayHost() {
     return () => {
       clearTimers()
       window.removeEventListener(OPEN_PLAYER_EVENT, open)
+      window.removeEventListener(OPEN_TEAM_EVENT, close)
+      window.removeEventListener(HOVER_TEAM_EVENT, closeHover)
       window.removeEventListener(OPEN_PERSON_EVENT, openPerson)
       window.removeEventListener(HOVER_PERSON_EVENT, enterPerson)
       window.removeEventListener(OPEN_POST_EVENT, close)
@@ -394,11 +401,7 @@ export function PlayerProfile({
               <button
                 type="button"
                 className="player-profile-hero__team"
-                onClick={() =>
-                  void Taro.navigateTo({
-                    url: `/pages/readonly-team-detail/index?teamId=${encodeURIComponent(player.team!.id)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-                  })
-                }
+                onClick={() => void openTeam(player.team!.id, tournamentId)}
               >
                 <TeamCrest team={player.team} size="small" />
                 <div>
@@ -436,11 +439,14 @@ export function PlayerProfileSections({
   presentation?: PlayerPresentation
 }) {
   const [tab, setTab] = useState<'activity' | 'profile'>('activity')
+  const sectionId = useId()
   const [status, setStatus] = useState<'ALL' | 'FINISHED' | 'UPCOMING'>('ALL')
   const [ownPosts, setOwnPosts] = useState<PostSummary[]>([])
   const [postError, setPostError] = useState('')
   const [postsReload, setPostsReload] = useState(0)
   const [postsLoading, setPostsLoading] = useState(false)
+  const [composer, setComposer] = useState(false)
+  const [publishedPosts, setPublishedPosts] = useState<PostSummary[]>([])
   const session = readSession()
   const ownUserId = session?.user.linkedPlayer?.id === player.id ? session.user.id : null
   useEffect(() => {
@@ -465,7 +471,11 @@ export function PlayerProfileSections({
       active = false
     }
   }, [ownUserId, presentation.posts, tournamentId, postsReload])
-  const posts = presentation.posts ?? ownPosts
+  const posts = [
+    ...new Map(
+      [...publishedPosts, ...(presentation.posts ?? ownPosts)].map((post) => [post.id, post]),
+    ).values(),
+  ]
   const matches = player.recentMatches.filter(
     (match) =>
       status === 'ALL' ||
@@ -500,9 +510,9 @@ export function PlayerProfileSections({
         <button
           type="button"
           role="tab"
-          id="player-activity-tab"
+          id={`${sectionId}-activity-tab`}
           data-player-tab="activity"
-          aria-controls="player-activity-panel"
+          aria-controls={`${sectionId}-activity-panel`}
           aria-selected={tab === 'activity'}
           tabIndex={tab === 'activity' ? 0 : -1}
           onClick={() => changeTab('activity')}
@@ -513,9 +523,9 @@ export function PlayerProfileSections({
         <button
           type="button"
           role="tab"
-          id="player-profile-tab"
+          id={`${sectionId}-profile-tab`}
           data-player-tab="profile"
-          aria-controls="player-profile-panel"
+          aria-controls={`${sectionId}-profile-panel`}
           aria-selected={tab === 'profile'}
           tabIndex={tab === 'profile' ? 0 : -1}
           onClick={() => changeTab('profile')}
@@ -527,11 +537,24 @@ export function PlayerProfileSections({
       {tab === 'activity' ? (
         <div
           className="player-profile-grid"
-          id="player-activity-panel"
+          id={`${sectionId}-activity-panel`}
           role="tabpanel"
-          aria-labelledby="player-activity-tab"
+          aria-labelledby={`${sectionId}-activity-tab`}
         >
           <PlayerPanel title="球员动态" note={posts.length ? `${posts.length} 条动态` : undefined}>
+            <button
+              type="button"
+              className="player-button player-button--secondary"
+              onClick={() => {
+                if (!readSession()) {
+                  void Taro.showToast({ title: '登录后可以发布动态', icon: 'none' })
+                  return
+                }
+                setComposer(true)
+              }}
+            >
+              发布动态
+            </button>
             {postsLoading ? (
               <div className="player-section-empty" role="status">
                 正在读取球员动态
@@ -618,9 +641,9 @@ export function PlayerProfileSections({
       ) : (
         <div
           className="player-profile-grid"
-          id="player-profile-panel"
+          id={`${sectionId}-profile-panel`}
           role="tabpanel"
-          aria-labelledby="player-profile-tab"
+          aria-labelledby={`${sectionId}-profile-tab`}
         >
           <PlayerPanel title="比赛记录" note={player.tournamentName ?? '当前赛事'}>
             <div className="player-match-filters" aria-label="比赛状态筛选">
@@ -727,6 +750,20 @@ export function PlayerProfileSections({
           </div>
         </div>
       )}
+      <DesktopPostComposer
+        open={composer}
+        tournamentId={tournamentId}
+        initialTags={[{ kind: 'PLAYER', targetId: player.id, label: player.displayName }]}
+        onClose={() => setComposer(false)}
+        onPublished={(post) => {
+          if (
+            post.tags?.some((tag) => tag.kind === 'PLAYER' && tag.targetId === player.id) ||
+            post.author.id === player.person?.id
+          )
+            setPublishedPosts((current) => [post, ...current])
+          else void Taro.showToast({ title: '动态已发布', icon: 'success' })
+        }}
+      />
     </div>
   )
 }

@@ -24,6 +24,7 @@ import { PostTags } from '../post-tags'
 import { PlayerTrigger } from '../player-trigger'
 import { VerificationBadge } from '../verification-badge'
 import { PersonTrigger } from '../person-trigger'
+import { TeamTrigger } from '../team-trigger'
 
 import './index.scss'
 
@@ -41,20 +42,17 @@ export function TeamCrest({
     ? demoCrestUrl(team.teamCode)
     : (team?.crestUrl ?? (team ? demoCrestUrl(team.teamCode) : null))
   const source = resolveMediaUrl(crestPath)
-  if (source) {
-    return (
-      <Image
-        aria-label={`${team?.name ?? '球队'}队徽`}
-        className={`team-crest team-crest--${size} ${interactive ? 'team-crest--interactive' : ''}`}
-        mode="aspectFit"
-        src={source}
-        onClick={(event) => {
-          if (interactive && team && openTeamCrest(event, team.id)) event.stopPropagation()
-        }}
-      />
-    )
-  }
-  return (
+  const crest = source ? (
+    <Image
+      aria-label={`${team?.name ?? '球队'}队徽`}
+      className={`team-crest team-crest--${size} ${interactive ? 'team-crest--interactive' : ''}`}
+      mode="aspectFit"
+      src={source}
+      onClick={(event) => {
+        if (interactive && team && openTeamCrest(event, team.id)) event.stopPropagation()
+      }}
+    />
+  ) : (
     <Text
       aria-label={team ? `${team.name}队徽待上传` : '球队待定'}
       className={`team-crest team-crest--${size} team-crest--fallback`}
@@ -65,6 +63,13 @@ export function TeamCrest({
     >
       {label}
     </Text>
+  )
+  return interactive && team ? (
+    <TeamTrigger teamId={team.id} name={team.name}>
+      {crest}
+    </TeamTrigger>
+  ) : (
+    crest
   )
 }
 
@@ -79,15 +84,19 @@ export function TeamName({
   className?: string
   fallback?: string
 }) {
-  return (
-    <Text
-      className={`${className} ${team ? 'team-name-link' : ''}`}
-      onClick={(event) => {
-        if (team && openDesktopTeam(team.id, tournamentId)) event.stopPropagation()
-      }}
-    >
-      {team?.name ?? fallback}
-    </Text>
+  return team ? (
+    <TeamTrigger teamId={team.id} name={team.name} tournamentId={tournamentId}>
+      <Text
+        className={`${className} ${team ? 'team-name-link' : ''}`}
+        onClick={(event) => {
+          if (team && openDesktopTeam(team.id, tournamentId)) event.stopPropagation()
+        }}
+      >
+        {team?.name ?? fallback}
+      </Text>
+    </TeamTrigger>
+  ) : (
+    <Text className={className}>{fallback}</Text>
   )
 }
 

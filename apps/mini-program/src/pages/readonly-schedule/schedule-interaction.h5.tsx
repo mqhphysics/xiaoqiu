@@ -129,11 +129,15 @@ export function ScheduleLink({
   replace?: boolean
 }) {
   const { navigate, pending } = useScheduleInteraction()
+  const teamParams = url.startsWith('/pages/readonly-team-detail/index?')
+    ? new URLSearchParams(url.split('?')[1])
+    : null
   return (
     <button
       {...props}
       data-schedule-button=""
       data-schedule-navigation=""
+      data-team-tournament={teamParams?.get('tournamentId') ?? undefined}
       type="button"
       disabled={pending}
       onClick={() => void navigate(url, replace)}

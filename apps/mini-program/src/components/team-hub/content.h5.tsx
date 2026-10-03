@@ -3,6 +3,9 @@ import { useId, useRef, useState } from 'react'
 import { TeamCrest, UserAvatar, MatchStatus } from '../product-ui'
 import { DesktopPostComposer } from '../post-composer'
 import { PostTags } from '../post-tags'
+import { TeamTrigger } from '../team-trigger'
+import { PlayerTrigger } from '../player-trigger'
+import { openPlayer as openPlayerProfile } from '../../features/product/player-navigation'
 import { EmojiText } from '../post-social/emoji-picker'
 import {
   formatDate,
@@ -51,15 +54,17 @@ export function TeamIdentity({
   size?: 'small' | 'medium' | 'large'
 }) {
   return team ? (
-    <button
-      type="button"
-      data-team-action
-      className="th-team-link"
-      onClick={() => void openTeam(team.id, tournamentId)}
-    >
-      <TeamCrest team={team} size={size} interactive={false} />
-      <span>{team.name}</span>
-    </button>
+    <TeamTrigger teamId={team.id} name={team.name} tournamentId={tournamentId}>
+      <button
+        type="button"
+        data-team-action
+        className="th-team-link"
+        onClick={() => void openTeam(team.id, tournamentId)}
+      >
+        <TeamCrest team={team} size={size} interactive={false} />
+        <span>{team.name}</span>
+      </button>
+    </TeamTrigger>
   ) : (
     <span className="th-muted">球队待定</span>
   )
@@ -297,36 +302,44 @@ export function TeamContent({
                     </h3>
                     <div className="th-roster">
                       {players.map((player) => (
-                        <button
+                        <PlayerTrigger
                           key={player.id}
-                          data-team-control
-                          type="button"
-                          className="th-player"
-                          onClick={() => void openPlayer(player.id, tournamentId)}
+                          playerId={player.id}
+                          name={player.displayName}
+                          tournamentId={tournamentId}
                         >
-                          <UserAvatar
-                            name={player.displayName}
-                            avatarUrl={player.avatarUrl}
-                            color={player.profileColor}
-                          />
-                          <strong className="th-player__number">{player.shirtNumber ?? '—'}</strong>
-                          <span className="th-player__name">
-                            <strong>{player.displayName}</strong>
-                            <small>{positionLabel(player.position)}</small>
-                          </span>
-                          <span className="th-player__stats">
-                            <span>
-                              出场<strong>{player.appearances}</strong>
+                          <button
+                            data-team-control
+                            type="button"
+                            className="th-player"
+                            onClick={() => void openPlayer(player.id, tournamentId)}
+                          >
+                            <UserAvatar
+                              name={player.displayName}
+                              avatarUrl={player.avatarUrl}
+                              color={player.profileColor}
+                            />
+                            <strong className="th-player__number">
+                              {player.shirtNumber ?? '—'}
+                            </strong>
+                            <span className="th-player__name">
+                              <strong>{player.displayName}</strong>
+                              <small>{positionLabel(player.position)}</small>
                             </span>
-                            <span>
-                              进球<strong>{player.goals}</strong>
+                            <span className="th-player__stats">
+                              <span>
+                                出场<strong>{player.appearances}</strong>
+                              </span>
+                              <span>
+                                进球<strong>{player.goals}</strong>
+                              </span>
+                              <span>
+                                助攻<strong>{player.assists}</strong>
+                              </span>
                             </span>
-                            <span>
-                              助攻<strong>{player.assists}</strong>
-                            </span>
-                          </span>
-                          <span className="th-chevron">›</span>
-                        </button>
+                            <span className="th-chevron">›</span>
+                          </button>
+                        </PlayerTrigger>
                       ))}
                     </div>
                   </div>
@@ -808,7 +821,5 @@ function TeamProfile({ data }: { data: TeamDashboardResponse }) {
 }
 
 export async function openPlayer(playerId: string, tournamentId: string) {
-  await Taro.navigateTo({
-    url: `/pages/player-detail/index?playerId=${encodeURIComponent(playerId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-  })
+  await openPlayerProfile(playerId, tournamentId)
 }

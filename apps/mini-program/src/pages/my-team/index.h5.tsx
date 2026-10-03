@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { TeamCrest, UserAvatar } from '../../components/product-ui'
-import { TeamContent, Empty, openPlayer } from '../../components/team-hub/content.h5'
+import { TeamContent, Empty } from '../../components/team-hub/content.h5'
+import { PlayerProfile } from '../../components/player-overlay/index.h5'
 import { TeamPicker } from '../../components/team-hub/picker.h5'
 import { PlayerPicker } from '../../components/team-hub/player-picker.h5'
 import { useDesktopTeamView, useTeamData } from '../../components/team-hub/data.h5'
@@ -17,6 +18,7 @@ import type {
   HomeResponse,
   PlayerFollowsResponse,
   TeamPreferencesResponse,
+  PlayerDetailResponse,
 } from '../../features/product/product.types'
 import ExistingMyTeamPage from './index.tsx'
 import '../../components/team-hub/index.h5.scss'
@@ -41,6 +43,7 @@ function DesktopMyTeamPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedTeam, setSelectedTeam] = useState('')
+  const [selectedPlayer, setSelectedPlayer] = useState('')
   const [picker, setPicker] = useState<'primary' | 'follow' | 'player' | null>(null)
   const sequence = useRef(0)
   const currentPrimary = useRef('')
@@ -72,6 +75,7 @@ function DesktopMyTeamPage() {
       setPlayers(follows.value)
       setPlayerError(follows.error)
       setSelectedTeam(prefs?.primaryTeam?.id ?? '')
+      setSelectedPlayer('')
     } catch (issue) {
       if (request === sequence.current)
         setError(issue instanceof Error ? issue.message : '主队空间加载失败')
@@ -88,8 +92,10 @@ function DesktopMyTeamPage() {
   useEffect(() => {
     const changed = (event: Event) => {
       const next = (event as CustomEvent<TeamPreferencesResponse>).detail
-      if (currentPrimary.current !== (next.primaryTeam?.id ?? ''))
+      if (currentPrimary.current !== (next.primaryTeam?.id ?? '')) {
         setSelectedTeam(next.primaryTeam?.id ?? '')
+        setSelectedPlayer('')
+      }
       currentPrimary.current = next.primaryTeam?.id ?? ''
       setPreferences(next)
     }
@@ -140,10 +146,12 @@ function DesktopMyTeamPage() {
                 {preferences?.primaryTeam ? (
                   <FollowTeamChip
                     team={preferences.primaryTeam}
-                    selected={selectedTeam === preferences.primaryTeam.id}
+                    selected={!selectedPlayer && selectedTeam === preferences.primaryTeam.id}
                     primary
-                    tournamentId={tournamentId}
-                    onSelect={() => setSelectedTeam(preferences.primaryTeam!.id)}
+                    onSelect={() => {
+                      setSelectedPlayer('')
+                      setSelectedTeam(preferences.primaryTeam!.id)
+                    }}
                   />
                 ) : (
                   <button
@@ -177,9 +185,11 @@ function DesktopMyTeamPage() {
                       <FollowTeamChip
                         key={team.id}
                         team={team}
-                        selected={selectedTeam === team.id}
-                        tournamentId={tournamentId}
-                        onSelect={() => setSelectedTeam(team.id)}
+                        selected={!selectedPlayer && selectedTeam === team.id}
+                        onSelect={() => {
+                          setSelectedPlayer('')
+                          setSelectedTeam(team.id)
+                        }}
                       />
                     ))
                   ) : (
@@ -214,9 +224,12 @@ function DesktopMyTeamPage() {
                       <button
                         data-team-control
                         type="button"
-                        className="th-follow-chip th-follow-chip--player"
+                        data-team-selector
+                        className={`th-follow-chip th-follow-chip--player ${selectedPlayer === player.id ? 'is-selected' : ''}`}
                         key={player.id}
-                        onClick={() => void openPlayer(player.id, tournamentId)}
+                        aria-label={`在页面中查看${player.displayName}球员资料`}
+                        aria-pressed={selectedPlayer === player.id}
+                        onClick={() => setSelectedPlayer(player.id)}
                       >
                         <UserAvatar
                           name={player.displayName}
@@ -242,7 +255,13 @@ function DesktopMyTeamPage() {
                 </HorizontalFollowStrip>
               </section>
             </div>
-            {selectedTeam ? (
+            {selectedPlayer ? (
+              <SelectedPlayer
+                key={selectedPlayer}
+                playerId={selectedPlayer}
+                tournamentId={tournamentId}
+              />
+            ) : selectedTeam ? (
               <SelectedTeam key={selectedTeam} teamId={selectedTeam} tournamentId={tournamentId} />
             ) : (
               <section className="th-surface th-welcome">
@@ -285,7 +304,10 @@ function DesktopMyTeamPage() {
             onClose={() => setPicker(null)}
             onSaved={(next) => {
               setPreferences(next)
-              if (picker === 'primary') setSelectedTeam(next.primaryTeam?.id ?? '')
+              if (picker === 'primary') {
+                setSelectedPlayer('')
+                setSelectedTeam(next.primaryTeam?.id ?? '')
+              }
             }}
           />
         ) : null}
@@ -306,39 +328,69 @@ function FollowTeamChip({
   team,
   selected,
   primary = false,
-  tournamentId,
   onSelect,
 }: {
   team: NonNullable<TeamPreferencesResponse['primaryTeam']>
   selected: boolean
   primary?: boolean
-  tournamentId: string
   onSelect: () => void
 }) {
   return (
-    <div
+    <button
+      data-team-control
+      data-team-selector
+      type="button"
       className={`th-follow-chip ${primary ? 'th-follow-chip--primary' : ''} ${selected ? 'is-selected' : ''}`}
+      aria-label={`在页面中查看${team.name}球队内容`}
+      aria-pressed={selected}
+      onClick={onSelect}
     >
-      <button
-        data-team-control
-        type="button"
-        className="th-chip-select"
-        aria-label={`查看${team.name}动态与赛程`}
-        aria-pressed={selected}
-        onClick={onSelect}
+      <TeamCrest team={team} interactive={false} />
+      <strong>{team.name}</strong>
+    </button>
+  )
+}
+
+function SelectedPlayer({ playerId, tournamentId }: { playerId: string; tournamentId: string }) {
+  const [state, setState] = useState<
+    | { phase: 'loading' }
+    | { phase: 'failed'; message: string }
+    | { phase: 'ready'; player: PlayerDetailResponse }
+  >({ phase: 'loading' })
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    let active = true
+    setState({ phase: 'loading' })
+    void productRepository
+      .getPlayer(playerId, tournamentId)
+      .then((player) => {
+        if (active) setState({ phase: 'ready', player })
+      })
+      .catch((error) => {
+        if (active)
+          setState({
+            phase: 'failed',
+            message: error instanceof Error ? error.message : '球员资料读取失败',
+          })
+      })
+    return () => {
+      active = false
+    }
+  }, [playerId, tournamentId, retry])
+  if (state.phase === 'loading') return <DataState kind="loading" title="正在读取球员资料" />
+  if (state.phase === 'failed')
+    return (
+      <DataState
+        kind="error"
+        title="球员资料暂不可用"
+        description={state.message}
+        onRetry={() => setRetry((value) => value + 1)}
       />
-      <button
-        data-team-control
-        data-team-action
-        type="button"
-        className="th-chip-identity"
-        aria-label={`查看${team.name}球队详情`}
-        onClick={() => void openTeam(team.id, tournamentId)}
-      >
-        <TeamCrest team={team} interactive={false} />
-        <strong>{team.name}</strong>
-      </button>
-    </div>
+    )
+  return (
+    <section className="player-profile-inline" aria-label="所选球员资料">
+      <PlayerProfile player={state.player} tournamentId={tournamentId} />
+    </section>
   )
 }
 

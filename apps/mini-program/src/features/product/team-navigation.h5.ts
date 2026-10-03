@@ -1,6 +1,8 @@
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 
 export const OPEN_TEAM_EVENT = 'xiaoqiu:open-team'
+export const HOVER_TEAM_EVENT = 'xiaoqiu:hover-team'
+export const LEAVE_TEAM_EVENT = 'xiaoqiu:leave-team'
 export const TEAM_PREFERENCES_EVENT = 'xiaoqiu:team-preferences-changed'
 
 export function openDesktopTeam(teamId: string, tournamentId?: string): boolean {
@@ -26,7 +28,7 @@ export async function openTeam(teamId: string, tournamentId?: string): Promise<v
 
 export function openTeamCrest(event: { target?: unknown }, teamId: string): boolean {
   const target = event.target instanceof Element ? event.target : null
-  if (target?.closest('.public-team-nav, .mobile-team-tab, [data-team-action]')) return false
+  if (target?.closest('.public-team-nav, .mobile-team-tab, [data-team-action], [data-team-selector]')) return false
   // These entries already carry the correct tournament context in their handler.
   if (
     target?.closest(
