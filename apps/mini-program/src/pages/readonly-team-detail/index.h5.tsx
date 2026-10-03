@@ -5,6 +5,7 @@ import { useDesktopTeamView } from '../../components/team-hub/data.h5'
 import { useDetailBack } from '../readonly-schedule/detail-back'
 import ExistingTeamDetail from './team-detail.shared'
 import '../../components/team-hub/index.h5.scss'
+import './index.h5.scss'
 
 export default function H5TeamDetailPage() {
   const desktop = useDesktopTeamView()
