@@ -1064,6 +1064,31 @@ function CaptainWorkspace({
       )
     }
   }
+  const updatePosition = (member: CaptainWorkspaceResponse['members'][number], position: string) => {
+    const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+    const updatedAt = (member as { updatedAt?: string }).updatedAt
+    if (h5 && (!updatedAt || memberReason.trim().length < 2)) {
+      setMemberError('请重新读取成员版本，并填写至少 2 个字的修改原因。')
+      return
+    }
+    const commandKey = createClientActionId('team-member')
+    const reason = memberReason.trim()
+    void run(
+      `position:${member.id}`,
+      () =>
+        h5
+          ? teamManagementRepository.updateMember(
+              teamId,
+              member.id,
+              position,
+              updatedAt!,
+              reason,
+              commandKey,
+            )
+          : productRepository.updateTeamMember(teamId, member.id, position),
+      h5,
+    )
+  }
   return (
     <View className="my-team-section captain-workspace">
       <ProductSection kicker="CAPTAIN" title="球队管理" note="队长权限" />
@@ -1165,43 +1190,40 @@ function CaptainWorkspace({
                 </Text>
                 <Text>{positionLabel(member.position)}</Text>
               </View>
-              <Picker
-                mode="selector"
-                range={positionNames}
-                value={Math.max(
-                  0,
-                  positionKeys.indexOf(member.position as (typeof positionKeys)[number]),
-                )}
-                disabled={Boolean(busy || pendingMember)}
-                onChange={(event) => {
-                  const position = positionKeys[Number(event.detail.value)] ?? 'MIDFIELDER'
-                  const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
-                  const updatedAt = (member as { updatedAt?: string }).updatedAt
-                  if (h5 && (!updatedAt || memberReason.trim().length < 2)) {
-                    setMemberError('请重新读取成员版本，并填写至少 2 个字的修改原因。')
-                    return
+              {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
+                <select
+                  className="captain-member__position"
+                  aria-label={`${member.displayName}的场上位置`}
+                  data-membership-id={member.id}
+                  value={member.position ?? ''}
+                  disabled={Boolean(busy || pendingMember)}
+                  onChange={(event) => updatePosition(member, event.target.value)}
+                >
+                  <option value="" disabled>
+                    未填写位置
+                  </option>
+                  {POSITION_GROUPS.map((position) => (
+                    <option key={position.key} value={position.key}>
+                      {position.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Picker
+                  mode="selector"
+                  range={positionNames}
+                  value={Math.max(
+                    0,
+                    positionKeys.indexOf(member.position as (typeof positionKeys)[number]),
+                  )}
+                  disabled={Boolean(busy || pendingMember)}
+                  onChange={(event) =>
+                    updatePosition(member, positionKeys[Number(event.detail.value)] ?? 'MIDFIELDER')
                   }
-                  const commandKey = createClientActionId('team-member')
-                  const reason = memberReason.trim()
-                  void run(
-                    `position:${member.id}`,
-                    () =>
-                      h5
-                        ? teamManagementRepository.updateMember(
-                            teamId,
-                            member.id,
-                            position,
-                            updatedAt!,
-                            reason,
-                            commandKey,
-                          )
-                        : productRepository.updateTeamMember(teamId, member.id, position),
-                    h5,
-                  )
-                }}
-              >
-                <Button disabled={Boolean(busy || pendingMember)}>设置位置</Button>
-              </Picker>
+                >
+                  <Button disabled={Boolean(busy || pendingMember)}>设置位置</Button>
+                </Picker>
+              )}
               <Button
                 className="captain-member__remove"
                 disabled={member.isCaptain || Boolean(busy || pendingMember)}
