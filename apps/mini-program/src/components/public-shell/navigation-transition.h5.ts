@@ -3,7 +3,6 @@ import type { NavigationSection } from './navigation-transition.types'
 interface TeamFocusState extends Keyframe {
   transform: string
   opacity: string
-  strokeDashoffset?: string
   clipPath?: string
 }
 
@@ -25,18 +24,14 @@ const easing = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const focusEasing = 'cubic-bezier(0.22, 0.61, 0.36, 1)'
 let origin: NavigationOrigin | null = null
 const focusAnimations = new WeakMap<HTMLElement, Animation[]>()
-const focusSelector =
-  '.public-team-focus__stroke, .public-team-focus__body, .public-team-focus__engraving, .public-team-focus__jewel'
+const focusSelector = '.public-team-focus__art, .public-team-focus__seed'
 
 function readTeamFocus(element: Element): TeamFocusState {
   const style = getComputedStyle(element)
   return {
     transform: style.transform,
     opacity: style.opacity,
-    ...(element.matches('.public-team-focus__stroke, .public-team-focus__engraving')
-      ? { strokeDashoffset: style.strokeDashoffset }
-      : {}),
-    ...(element.matches('.public-team-focus__body') ? { clipPath: style.clipPath } : {}),
+    clipPath: style.clipPath,
   }
 }
 
@@ -62,101 +57,48 @@ export function playTeamFocus(
   const replayFocus = initialFocus ? {} : captureTeamFocus(button ?? shell)
   stopTeamFocus(shell)
   if (
+    !button?.classList.contains('public-team-nav--active') ||
     !window.matchMedia('(min-width: 721px)').matches ||
     window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
     document.activeElement?.matches(':focus-visible')
   )
     return
-  if (!button?.classList.contains('public-team-nav--active')) return
+
   const animations: Animation[] = []
-  const wings = button.querySelectorAll<HTMLElement>('.public-team-focus__wing')
-  for (const wing of wings) {
-    const stroke = wing.querySelector<SVGPathElement>('.public-team-focus__stroke')
-    if (!stroke) continue
-    const seed = wing.querySelector<SVGPathElement>('.public-team-focus__trace')
-    const seedFraction = seed ? Math.min(1, seed.getTotalLength() / stroke.getTotalLength()) : 0
-    const opacity = wing.classList.contains('public-team-focus__wing--detail') ? '0.64' : '0.92'
-    const options: KeyframeAnimationOptions = {
-      duration: Number(wing.dataset.focusDuration) || 1050,
-      delay: Number(wing.dataset.focusDelay) || 0,
-      easing: focusEasing,
-      fill: 'backwards',
+  for (const [index, side] of ['left', 'right'].entries()) {
+    const art = button.querySelector<HTMLElement>(`.public-team-focus__art--${side}`)
+    if (!art) continue
+    const seed: Keyframe = {
+      opacity: 0.32,
+      clipPath: side === 'left' ? 'inset(55% 50% 0 33%)' : 'inset(55% 33% 0 50%)',
     }
-    const start: Keyframe = {
-      strokeDashoffset: String(1 - seedFraction),
-      opacity: seed ? '0.4' : '0',
+    const complete: Keyframe = {
+      opacity: 1,
+      clipPath: side === 'left' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
     }
-    const key = stroke.getAttribute('data-focus-key') ?? ''
-    const previous = initialFocus?.[key]
+    const previous = initialFocus?.[side]
     const frames: Keyframe[] = initialFocus
-      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : start]
-      : [replayFocus[key] ?? { strokeDashoffset: '0', opacity: '1' }, { ...start, offset: 0.12 }]
-    frames.push(
-      { strokeDashoffset: '0.2', opacity, offset: 0.68 },
-      { strokeDashoffset: '0', opacity },
-    )
-    animations.push(stroke.animate(frames, options))
-
-    const body = wing.querySelector<SVGPathElement>('.public-team-focus__body')
-    if (body) {
-      const bodyKey = body.getAttribute('data-focus-key') ?? ''
-      const hidden: Keyframe = { opacity: 0, clipPath: 'inset(0 0 100% 0) fill-box' }
-      const visible: Keyframe = { opacity: 0.34, clipPath: 'inset(0 0 0 0) fill-box' }
-      const bodyPrevious = initialFocus?.[bodyKey]
-      const bodyFrames: Keyframe[] = initialFocus
-        ? [bodyPrevious && parseFloat(bodyPrevious.opacity) > 0.01 ? bodyPrevious : hidden]
-        : [replayFocus[bodyKey] ?? visible, { ...hidden, offset: 0.12 }]
-      bodyFrames.push(visible)
-      animations.push(
-        body.animate(bodyFrames, {
-          duration: 600,
-          delay: Number(options.delay) + 200,
-          easing: focusEasing,
-          fill: 'backwards',
-        }),
-      )
-    }
-
-    wing
-      .querySelectorAll<SVGPathElement>('.public-team-focus__engraving')
-      .forEach((grain, index) => {
-        const grainKey = grain.getAttribute('data-focus-key') ?? ''
-        const hidden: Keyframe = { opacity: 0, strokeDashoffset: '1' }
-        const visible: Keyframe = { opacity: 0.58, strokeDashoffset: '0' }
-        const grainPrevious = initialFocus?.[grainKey]
-        const grainFrames: Keyframe[] = initialFocus
-          ? [grainPrevious && parseFloat(grainPrevious.opacity) > 0.01 ? grainPrevious : hidden]
-          : [replayFocus[grainKey] ?? visible, { ...hidden, offset: 0.12 }]
-        grainFrames.push(visible)
-        animations.push(
-          grain.animate(grainFrames, {
-            duration: 500,
-            delay: Number(options.delay) + Number(options.duration) - 680 + index * 12,
-            easing: focusEasing,
-            fill: 'backwards',
-          }),
-        )
-      })
-  }
-  const jewel = button.querySelector<HTMLElement>('.public-team-focus__jewel')
-  if (jewel)
+      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : seed]
+      : [replayFocus[side] ?? complete, { ...seed, offset: 0.12 }]
+    frames.push(complete)
     animations.push(
-      jewel.animate(
-        [
-          initialFocus?.jewel ??
-            replayFocus.jewel ?? {
-              transform: 'scale(0.85)',
-              opacity: '0.3',
-            },
-          { transform: 'scale(1.18)', opacity: 1, offset: 0.55 },
-          { transform: 'none', opacity: 1 },
-        ],
-        { duration: 300, easing: focusEasing, fill: 'backwards' },
-      ),
+      art.animate(frames, {
+        duration: 1300,
+        delay: index * 60,
+        easing: focusEasing,
+        fill: 'backwards',
+      }),
     )
+  }
+  const seed = button.querySelector<HTMLElement>('.public-team-focus__seed')
+  if (seed) {
+    const frames: Keyframe[] = initialFocus
+      ? [initialFocus.seed ?? { opacity: 0.32 }, { opacity: 0 }]
+      : [replayFocus.seed ?? { opacity: 0 }, { opacity: 0.32, offset: 0.12 }, { opacity: 0 }]
+    animations.push(seed.animate(frames, { duration: 500, easing: focusEasing }))
+  }
   focusAnimations.set(shell, animations)
 }
-
 export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSection): void {
   const selection = shell.querySelector<HTMLElement>('.public-nav__selection')
   const line = shell.querySelector<HTMLElement>('.public-nav__line')

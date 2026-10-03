@@ -78,7 +78,7 @@ export function TeamNavPreviewControls({
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <div className="team-nav-preview__title">15 · 卷草细纹</div>
+      <div className="team-nav-preview__title">15 · 原图金色卷草</div>
       <div className="team-nav-preview__choices" aria-label="示例队徽">
         {teamNavPreviewCrestKeys.map((crest) => (
           <button
