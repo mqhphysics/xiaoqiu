@@ -53,6 +53,7 @@ export interface PostAuthor {
   messageable: boolean
   roles?: string[]
   official?: boolean
+  displayedBadgeKind?: string | null
 }
 
 export interface PublicPersonIdentity extends PostAuthor {
@@ -483,6 +484,7 @@ export interface MessageUser {
 }
 
 export interface ConversationListResponse {
+  canSend?: boolean
   items: Array<{
     id: string
     counterpart: MessageUser
@@ -490,6 +492,13 @@ export interface ConversationListResponse {
     latestMessage: { id: string; body: string; isMine: boolean; createdAt: string } | null
     unreadCount: number
   }>
+}
+
+export interface BadgePreferenceResponse {
+  availableKinds: import('./identity-badges').IdentityBadgeKind[]
+  preferredKind: string | null
+  displayedKind: string | null
+  version: number
 }
 
 export interface MessageListResponse {

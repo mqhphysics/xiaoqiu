@@ -1084,7 +1084,7 @@
     background: #fafcf9;
     color: #788d7d;
   }
-  .th-search input {
+  .th-search [aria-label='搜索球队'] {
     flex: 1;
     min-width: 0;
     padding: 0;
@@ -1094,8 +1094,9 @@
     color: #324c3c;
     font-size: 14px;
   }
-  .th-search:focus-within {
-    border-color: #6f9d78;
+  .th-root .th-search [aria-label='搜索球队']:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
   .th-search [data-team-control]:focus-visible {
     outline: 0;

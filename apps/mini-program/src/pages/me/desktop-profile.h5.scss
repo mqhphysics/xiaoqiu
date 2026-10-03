@@ -1040,6 +1040,17 @@
   outline: 2px solid #428c57;
   outline-offset: 3px;
 }
+.profile-post .reaction-heart {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+.profile-dialog [data-profile-input]:focus,
+.profile-dialog [data-profile-textarea]:focus {
+  outline: none;
+  box-shadow: none;
+}
 .profile-search,
 .profile-edit-form [data-profile-input],
 .profile-edit-form [data-profile-textarea] {

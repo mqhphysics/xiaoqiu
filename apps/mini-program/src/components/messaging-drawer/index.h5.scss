@@ -34,11 +34,14 @@
     cursor: default;
     opacity: 0.55;
   }
-  .message-drawer--desktop [type]:focus-visible,
-  .message-drawer--desktop [aria-label='搜索校内用户']:focus-visible,
-  .message-drawer--desktop [aria-label='输入私信']:focus-visible {
+  .message-drawer--desktop [type]:focus-visible {
     outline: 2px solid #2b7550;
     outline-offset: 2px;
+  }
+  .message-drawer--desktop [aria-label='搜索校内用户']:focus,
+  .message-drawer--desktop [aria-label='输入私信']:focus {
+    outline: none;
+    box-shadow: none;
   }
   .message-drawer--desktop img.post-icon {
     width: 18px;

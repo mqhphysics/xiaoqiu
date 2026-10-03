@@ -24,6 +24,7 @@ import { PostTags } from '../post-tags'
 import { PlayerTrigger } from '../player-trigger'
 import { VerificationBadge } from '../verification-badge'
 import { PersonTrigger } from '../person-trigger'
+import { ReactionHeart } from '../reaction-heart'
 import { TeamTrigger } from '../team-trigger'
 
 import './index.scss'
@@ -270,20 +271,25 @@ export function PostCard({
               level={post.author.verificationLevel}
               roles={post.author.roles}
               official={post.author.official}
+              displayedKind={post.author.displayedBadgeKind}
+              userId={post.author.id}
               className="post-card__verified"
             />
           </View>
           <Text className="post-card__time">{formatRelativeTime(post.publishedAt)}</Text>
         </View>
-        {onMessageAuthor && (
-          <Button
-            aria-label={`私聊${post.author.displayName}`}
-            className="post-card__message-author"
-            onClick={stopAndMessage}
-          >
-            私聊
-          </Button>
-        )}
+        {onMessageAuthor &&
+          !(
+            Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches
+          ) && (
+            <Button
+              aria-label={`私聊${post.author.displayName}`}
+              className="post-card__message-author"
+              onClick={stopAndMessage}
+            >
+              私聊
+            </Button>
+          )}
       </View>
       {imageUrl && (
         <Image
@@ -317,7 +323,7 @@ export function PostCard({
           disabled={!onLike}
           onClick={stopAndLike}
         >
-          <Text className="post-card__action-icon">{post.likedByMe ? '♥' : '♡'}</Text>
+          <ReactionHeart active={post.likedByMe} />
           <Text>{post.likeCount}</Text>
         </Button>
         <Text

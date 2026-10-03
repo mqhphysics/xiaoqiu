@@ -1,4 +1,6 @@
 @media (min-width: 721px) {
+  .post-detail-modal__like .reaction-heart {display:block; width:20px; height:20px;}
+  .post-detail-modal__like.is-active .reaction-heart {color:#246d46;}
   .post-scrim {
     position: fixed;
     inset: 0;

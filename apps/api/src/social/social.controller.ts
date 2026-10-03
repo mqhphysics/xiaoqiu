@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger'
 
 import { getRequestId, type RequestWithId } from '../common/request-context'
 import { MessagingService } from './messaging.service'
+import { BadgePreferenceService } from './badge-preference.service'
 import {
   CreateDirectMessageDto,
   CreateReportDto,
@@ -22,6 +23,7 @@ import {
   ReviewReportDto,
   ReviewTeamApplicationDto,
   UpdateTeamMemberDto,
+  UpdateBadgePreferenceDto,
 } from './social.dto'
 import { SocialService } from './social.service'
 
@@ -32,7 +34,25 @@ export class SocialController {
   constructor(
     @Inject(SocialService) private readonly socialService: SocialService,
     @Inject(MessagingService) private readonly messagingService: MessagingService,
+    @Inject(BadgePreferenceService) private readonly badgePreference: BadgePreferenceService,
   ) {}
+
+  @Get('me/profile-badge')
+  @ApiOperation({ summary: '读取自己的展示标志及可选有效身份' })
+  profileBadge(@Headers('authorization') authorization: string | undefined) {
+    return this.badgePreference.get(authorization)
+  }
+
+  @Put('me/profile-badge')
+  @ApiOperation({ summary: '更换自己的展示标志，不改变身份权限' })
+  @ApiBody({ type: UpdateBadgePreferenceDto })
+  updateProfileBadge(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() input: UpdateBadgePreferenceDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.badgePreference.update(authorization, input, getRequestId(request))
+  }
 
   @Get('me/player-follows')
   @ApiOperation({ summary: '读取当前用户关注的球员' })

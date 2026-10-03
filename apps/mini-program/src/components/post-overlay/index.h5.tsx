@@ -17,6 +17,7 @@ import type {
 import { UserAvatar } from '../product-ui'
 import { PersonTrigger } from '../person-trigger'
 import { VerificationBadge } from '../verification-badge'
+import { ReactionHeart } from '../reaction-heart'
 import { useOverlayFocus } from '../overlay-focus'
 import { ReportModal } from '../report-modal'
 import { openMessaging } from '../messaging-drawer'
@@ -232,6 +233,8 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
             level={comment.author.verificationLevel}
             roles={comment.author.roles}
             official={comment.author.official}
+            displayedKind={comment.author.displayedBadgeKind}
+            userId={comment.author.id}
           />
           {post?.author.id === comment.author.id && (
             <span className="post-comment__author-label">作者</span>
@@ -359,6 +362,8 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                       level={post.author.verificationLevel}
                       roles={post.author.roles}
                       official={post.author.official}
+                      displayedKind={post.author.displayedBadgeKind}
+                      userId={post.author.id}
                     />
                   </div>
                   {signedIn && post.author.messageable && (
@@ -447,7 +452,7 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                     disabled={liking}
                     onClick={() => void toggleLike()}
                   >
-                    <PostIcon name="heart" />
+                    <ReactionHeart active={post.likedByMe} />
                     <span>{post.likeCount}</span>
                   </button>
                   <span>

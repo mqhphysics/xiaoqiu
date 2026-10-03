@@ -11,7 +11,10 @@ import { PostTags } from '../../components/post-tags'
 import { openPlayer } from '../../features/product/player-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
 import { VerificationBadge } from '../../components/verification-badge'
-import { identityBadgeKinds, identityLabels } from '../../features/product/identity-badges'
+import { BadgeManager } from '../../components/badge-manager/index.h5'
+import { ReactionHeart } from '../../components/reaction-heart'
+import { displayedBadgeKind, identityLabels } from '../../features/product/identity-badges'
+import { updateBadgeDisplay, useBadgeDisplay } from '../../features/product/badge-display.h5'
 import { DataState } from '../../components/public-ui'
 import { updatePrimaryTeamCache } from '../../components/public-shell'
 import { ReportModal } from '../../components/report-modal'
@@ -57,6 +60,7 @@ type Modal =
   | 'follow'
   | 'collect'
   | 'identity'
+  | 'badge'
   | 'logout'
   | ProfileService
   | null
@@ -126,6 +130,20 @@ function useProfileLibrary(key: string) {
 }
 
 export function DesktopProfile({ home, user, onUserChange, renderService }: DesktopProfileProps) {
+  const displayedKind = useBadgeDisplay(user.id)
+  const badgeKind = displayedBadgeKind(user.verificationLevel, user.roles, false, displayedKind)
+  useEffect(() => {
+    let active = true
+    void productRepository
+      .getBadgePreference()
+      .then((result) => {
+        if (active) updateBadgeDisplay(user.id, result.displayedKind)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [user.id, user.organizationId])
   const [tab, setTab] = useState<Tab>('posts')
   const [modal, setModal] = useState<Modal>(null)
   const [avatar, setAvatar] = useState(false)
@@ -381,9 +399,9 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               <div className="profile-person__meta">
                 <span>
                   <ProfileIcon name="shield" />
-                  {identityBadgeKinds(user.verificationLevel, user.roles)
-                    .map((kind) => identityLabels[kind])
-                    .join('、') || verificationLabel(user.verificationLevel)}
+                  {badgeKind
+                    ? identityLabels[badgeKind]
+                    : verificationLabel(user.verificationLevel)}
                 </span>
                 <span>
                   <ProfileIcon name="user" />
@@ -786,6 +804,11 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               账户与身份
               <ProfileIcon name="right" />
             </button>
+            <button data-profile-button="" onClick={() => openModal('badge')}>
+              <ProfileIcon name="shield" />
+              展示标志管理
+              <ProfileIcon name="right" />
+            </button>
             <button data-profile-button="" onClick={() => setFeedback(true)}>
               <ProfileIcon name="comment" />
               问题反馈
@@ -1025,6 +1048,15 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               <ProfileIcon name="arrow" />
             </button>
           )}
+        </ProfileDialog>
+      )}
+      {modal === 'badge' && (
+        <ProfileDialog
+          title="展示标志管理"
+          note="仅选择自己已有的身份，所有页面每人显示一个标志。"
+          onClose={closeModal}
+        >
+          <BadgeManager user={user} onClose={closeModal} />
         </ProfileDialog>
       )}
       {modal && modal in SERVICE_TITLES && (
@@ -1506,6 +1538,8 @@ function ProfilePost({
             level={post.author.verificationLevel}
             roles={post.author.roles}
             official={post.author.official}
+            displayedKind={post.author.displayedBadgeKind}
+            userId={post.author.id}
           />
           <time>
             {formatDate(post.publishedAt)} {formatTime(post.publishedAt)}
@@ -1560,7 +1594,7 @@ function ProfilePost({
               disabled={liking}
               onClick={() => void like()}
             >
-              <ProfileIcon name="heart" />
+              <ReactionHeart active={post.likedByMe} />
               {post.likeCount}
             </button>
             <button

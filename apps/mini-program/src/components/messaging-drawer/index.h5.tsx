@@ -49,6 +49,8 @@ export function MessagingOverlayHost() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [canSend, setCanSend] = useState(false)
+  const unavailable = () => void Taro.showToast({ title: '此功能暂未开放，敬请期待', icon: 'none' })
   const [listError, setListError] = useState('')
   const [threadError, setThreadError] = useState('')
   const [threadLoading, setThreadLoading] = useState(false)
@@ -123,6 +125,7 @@ export function MessagingOverlayHost() {
     ])
     if (!queryRef.current.trim()) setDirectory(people.items)
     setConversations(list.items)
+    setCanSend(list.canSend === true)
     setListError('')
     return list.items
   }, [])
@@ -236,7 +239,10 @@ export function MessagingOverlayHost() {
     const timer = setInterval(() => {
       void productRepository
         .getConversations()
-        .then((data) => setConversations(data.items))
+        .then((data) => {
+          setConversations(data.items)
+          setCanSend(data.canSend === true)
+        })
         .catch(() => undefined)
       if (conversationId && selected) void selectConversation(conversationId, selected, true)
     }, 5000)
@@ -268,6 +274,10 @@ export function MessagingOverlayHost() {
   }, [open, query])
 
   const send = async () => {
+    if (!canSend) {
+      unavailable()
+      return
+    }
     if (!selected || !body.trim() || sendBusy.current) return
     sendBusy.current = true
     nearBottomRef.current = true
@@ -516,7 +526,7 @@ export function MessagingOverlayHost() {
                           <div className={`dm-message ${message.isMine ? 'is-mine' : ''}`}>
                             <UserAvatar
                               name={message.isMine ? '我' : selected.displayName}
-                              userId={message.isMine ? viewerId ?? undefined : selected.id}
+                              userId={message.isMine ? (viewerId ?? undefined) : selected.id}
                               avatarUrl={message.isMine ? null : selected.avatarUrl}
                               size="small"
                             />
@@ -563,7 +573,13 @@ export function MessagingOverlayHost() {
                   >
                     <textarea
                       aria-label="输入私信"
-                      placeholder={`发消息给${selected.displayName}…`}
+                      placeholder={
+                        canSend ? `发消息给${selected.displayName}…` : '此功能暂未开放，敬请期待'
+                      }
+                      readOnly={!canSend}
+                      onFocus={() => {
+                        if (!canSend) unavailable()
+                      }}
                       maxLength={2000}
                       disabled={sending || threadLoading || Boolean(threadError)}
                       value={body}
@@ -580,10 +596,18 @@ export function MessagingOverlayHost() {
                       }}
                     />
                     <div>
-                      <span>Enter 发送 · Shift + Enter 换行</span>
+                      <span>
+                        {canSend ? 'Enter 发送 · Shift + Enter 换行' : '当前仅平台管理员可发送私信'}
+                      </span>
                       <button
                         type="submit"
-                        disabled={!body.trim() || sending || threadLoading || Boolean(threadError)}
+                        disabled={
+                          !canSend ||
+                          !body.trim() ||
+                          sending ||
+                          threadLoading ||
+                          Boolean(threadError)
+                        }
                       >
                         <PostIcon name="send" />
                         {sending ? '发送中' : '发送'}

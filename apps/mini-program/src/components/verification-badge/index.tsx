@@ -7,6 +7,8 @@ export interface VerificationBadgeProps {
   focusable?: boolean | undefined
   roles?: readonly (string | { role: string })[] | undefined
   official?: boolean | undefined
+  displayedKind?: string | null | undefined
+  userId?: string | undefined
 }
 
 // Keep the existing compact H5 / WeChat text treatment.

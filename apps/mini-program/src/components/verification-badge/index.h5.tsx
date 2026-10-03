@@ -9,10 +9,11 @@ import officialIcon from '../../assets/profile-icons/bell.svg'
 import studentIcon from '../../assets/profile-icons/user-circle.svg'
 import checkIcon from '../../assets/profile-icons/check.svg'
 import {
-  identityBadgeKinds,
+  displayedBadgeKind,
   identityLabels,
   type IdentityBadgeKind,
 } from '../../features/product/identity-badges'
+import { useBadgeDisplay } from '../../features/product/badge-display.h5'
 import './index.h5.scss'
 
 const icons: Record<IdentityBadgeKind, string> = {
@@ -34,9 +35,18 @@ export function VerificationBadge({
   official,
   className,
   focusable = true,
+  displayedKind,
+  userId,
 }: VerificationBadgeProps) {
   const tooltipId = useId()
-  const identities = identityBadgeKinds(level, roles, official)
+  const localChoice = useBadgeDisplay(userId)
+  const single = displayedBadgeKind(
+    level,
+    roles,
+    official,
+    localChoice === undefined ? displayedKind : localChoice,
+  )
+  const identities = single ? [single] : []
   return (
     <>
       <ExistingBadge level={level} className={`verification-badge__native ${className ?? ''}`} />

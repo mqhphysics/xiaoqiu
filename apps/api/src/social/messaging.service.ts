@@ -69,6 +69,7 @@ export class MessagingService {
       unreadCounts.map((item) => [item.conversationId, item._count._all]),
     )
     return {
+      canSend: canSendDirectMessages(session),
       items: conversations.map((conversation) => {
         const counterpart =
           conversation.userOneId === session.userId ? conversation.userTwo : conversation.userOne
@@ -152,6 +153,11 @@ export class MessagingService {
   ) {
     const session = await this.authService.requireSession(authorization)
     const body = input.body.trim()
+    if (!canSendDirectMessages(session))
+      throw new ApiHttpException(HttpStatus.FORBIDDEN, {
+        code: ERROR_CODES.FORBIDDEN,
+        message: '此功能暂未开放，敬请期待',
+      })
     const result = await this.prisma.$transaction(async (tx) => {
       if (recipientUserId === session.userId) throw badRequest('不能给自己发送私信')
       const recipient = await tx.organizationMembership.findFirst({
@@ -253,6 +259,12 @@ export class MessagingService {
     if (!conversation) throw notFound('私信会话不存在')
     return conversation
   }
+}
+
+export function canSendDirectMessages(session: AuthenticatedSession): boolean {
+  return session.user.roles.some(
+    (role) => role.role === 'PLATFORM_ADMIN' && role.scopeType === 'PLATFORM',
+  )
 }
 
 function mapUser(
