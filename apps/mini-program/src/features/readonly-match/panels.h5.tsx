@@ -16,6 +16,12 @@ import {
   type PlayerMatchEvents,
 } from './lineup.logic'
 import './panels.h5.scss'
+import {
+  GoalMedia,
+  MediaLibraryButton,
+  MediaUploadButton,
+  useMatchGoalMedia,
+} from '../managed-media/index.h5'
 
 export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
   const [teamId, setTeamId] = useState(match.lineups[0]?.team.id ?? '')
@@ -272,6 +278,10 @@ function EventBadges({
 }
 
 export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
+  const media = useMatchGoalMedia(match.id)
+  const goalMedia = new Map<string, (typeof media.items)[number]>()
+  for (const item of media.items)
+    if (!goalMedia.has(item.targetId)) goalMedia.set(item.targetId, item)
   return (
     <section className="match-tab-content match-events" aria-label="比赛事件">
       <div className="match-panel-heading">
@@ -280,6 +290,7 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
           <h2>比赛事件</h2>
         </div>
         <span>{match.events.length} 条</span>
+        <MediaLibraryButton />
       </div>
       {match.events.length ? (
         <ol className="match-events__list">
@@ -310,6 +321,18 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
                   )}
                 </span>
                 {event.relatedPlayer && <small>{event.team.name}</small>}
+                {event.type === 'GOAL' || event.type === 'OWN_GOAL' ? (
+                  <>
+                    {goalMedia.has(event.id) ? (
+                      <GoalMedia asset={goalMedia.get(event.id)!} />
+                    ) : null}
+                    <MediaUploadButton
+                      purpose="GOAL_GIF"
+                      targetId={event.id}
+                      label="投稿进球 GIF"
+                    />
+                  </>
+                ) : null}
               </div>
             </li>
           ))}
@@ -317,6 +340,7 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
       ) : (
         <p className="match-lineups__empty">暂无已公布比赛事件</p>
       )}
+      {media.error ? <p role="status">{media.error}</p> : null}
     </section>
   )
 }

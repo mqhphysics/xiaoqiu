@@ -286,7 +286,7 @@ enum ReportStatus {
 model Organization {
   identityRecords      IdentityRecord[]
   identityApplications IdentityApplication[]
-
+  managedMediaAssets  ManagedMediaAsset[]
   id                  String                   @id @default(uuid()) @db.Uuid
   slug                String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
   name                String                   @db.VarChar(120)
@@ -344,7 +344,9 @@ model User {
   linkedIdentityRecords        IdentityRecord[]      @relation("IdentityRecordUser")
   identityApplications         IdentityApplication[] @relation("IdentityApplicant")
   reviewedIdentityApplications IdentityApplication[] @relation("IdentityReviewer")
-
+  uploadedMediaAssets  ManagedMediaAsset[]      @relation("ManagedMediaUploader")
+  reviewedMediaAssets  ManagedMediaAsset[]      @relation("ManagedMediaReviewer")
+  mediaChanges         ManagedMediaAsset[]      @relation("ManagedMediaVisibilityActor")
   id                   String                   @id @default(uuid()) @db.Uuid
   loginNameNormalized  String?                  @map("login_name_normalized") @db.VarChar(120)
   displayName          String                   @map("display_name") @db.VarChar(120)
@@ -1559,4 +1561,44 @@ model IdentityApplication {
 
   @@index([organizationId, userId, status], map: "identity_applications_org_user_status_idx")
   @@map("identity_applications")
+}
+
+// Polymorphic target IDs deliberately survive match-event correction/replacement.
+model ManagedMediaAsset {
+  id                        String       @id @default(uuid()) @db.Uuid
+  organizationId            String       @map("organization_id") @db.Uuid
+  uploaderUserId            String       @map("uploader_user_id") @db.Uuid
+  clientSubmissionId        String       @map("client_submission_id") @db.VarChar(120)
+  purpose                   String       @db.VarChar(32)
+  targetId                  String       @map("target_id") @db.Uuid
+  targetLabel               String       @map("target_label") @db.VarChar(320)
+  matchId                   String?      @map("match_id") @db.Uuid
+  eventSignature            String?      @map("event_signature") @db.Char(64)
+  checksum                  String       @db.Char(64)
+  mimeType                  String       @map("mime_type") @db.VarChar(32)
+  bytes                     Int
+  width                     Int
+  height                    Int
+  frames                    Int
+  durationMs                Int          @map("duration_ms")
+  status                    String       @db.VarChar(16)
+  visibility                String       @default("ACTIVE") @db.VarChar(16)
+  reviewReason              String?      @map("review_reason") @db.VarChar(1000)
+  reviewedByUserId          String?      @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt                DateTime?    @map("reviewed_at") @db.Timestamptz(3)
+  visibilityChangedByUserId String?      @map("visibility_changed_by_user_id") @db.Uuid
+  version                   Int          @default(0)
+  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, map: "managed_media_assets_org_fkey")
+  uploader                  User         @relation("ManagedMediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict, map: "managed_media_assets_uploader_fkey")
+  reviewer                  User?        @relation("ManagedMediaReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict, map: "managed_media_assets_reviewer_fkey")
+  visibilityActor           User?        @relation("ManagedMediaVisibilityActor", fields: [visibilityChangedByUserId], references: [id], onDelete: Restrict, map: "managed_media_assets_visibility_actor_fkey")
+
+  @@unique([organizationId, uploaderUserId, clientSubmissionId], map: "managed_media_assets_submission_key")
+  @@index([organizationId, purpose, targetId, status, visibility, createdAt(sort: Desc)], map: "managed_media_assets_target_idx")
+  @@index([organizationId, status, createdAt(sort: Desc)], map: "managed_media_assets_queue_idx")
+  @@index([organizationId, uploaderUserId, createdAt(sort: Desc)], map: "managed_media_assets_uploader_idx")
+  @@index([organizationId, matchId, targetId, createdAt(sort: Desc)], map: "managed_media_assets_match_idx")
+  @@map("managed_media_assets")
 }

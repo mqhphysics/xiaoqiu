@@ -42,6 +42,7 @@ import {
 import { PersonDialog, PersonHoverCard } from '../person-overlay/index.h5'
 import { OPEN_POST_EVENT } from '../../features/product/post-navigation.h5'
 import cover from '../../assets/home-visual/home-campus-action.webp'
+import { MediaUploadButton, usePersonalBackground } from '../../features/managed-media/index.h5'
 import './index.h5.scss'
 
 // Presentation inputs are separate from the public API contract. Team pages can supply
@@ -367,13 +368,35 @@ export function PlayerProfile({
   presentation?: PlayerPresentation
 }) {
   presentation = playerPresentation(player, presentation)
-  const portrait = resolveMediaUrl(player.portraitUrl ?? player.avatarUrl)
+  const personalBackground = usePersonalBackground(player.person?.id)
+  const [portraitUrl, setPortraitUrl] = useState(player.portraitUrl)
+  useEffect(() => {
+    let active = true
+    setPortraitUrl(player.portraitUrl)
+    const refresh = () =>
+      void productRepository
+        .getPlayer(player.id, tournamentId)
+        .then((fresh) => {
+          if (active) setPortraitUrl(fresh.portraitUrl)
+        })
+        .catch(() => {})
+    window.addEventListener('xiaoqiu:media-changed', refresh)
+    return () => {
+      active = false
+      window.removeEventListener('xiaoqiu:media-changed', refresh)
+    }
+  }, [player.id, player.portraitUrl, tournamentId])
+  const portrait = resolveMediaUrl(portraitUrl)
+  const user = readSession()?.user
+  const canUploadPortrait =
+    user?.linkedPlayer?.id === player.id ||
+    user?.roles.some((role) => role.role === 'PLATFORM_ADMIN' && role.scopeType === 'PLATFORM')
   return (
     <>
       <header className="player-profile-hero">
         <img
           className="player-profile-hero__cover"
-          src={resolveMediaUrl(presentation.coverUrl) ?? cover}
+          src={personalBackground ?? resolveMediaUrl(presentation.coverUrl) ?? cover}
           alt=""
         />
         <div className="player-profile-hero__portrait">
@@ -423,6 +446,13 @@ export function PlayerProfile({
         <div className="player-profile-hero__aside">
           <CompactStats player={player} goalkeeperStats={presentation.goalkeeperStats} />
           <PlayerActions player={player} messageUser={presentation.messageUser} />
+          {canUploadPortrait ? (
+            <MediaUploadButton
+              purpose="PLAYER_PORTRAIT"
+              targetId={player.id}
+              label="上传球员照片"
+            />
+          ) : null}
         </div>
       </header>
       <PlayerProfileSections

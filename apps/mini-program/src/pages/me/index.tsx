@@ -24,6 +24,7 @@ import type {
 
 import './index.scss'
 import { DesktopProfile, useDesktopProfile } from './desktop-profile'
+import { MediaAccountEntry } from '../../features/managed-media'
 
 type PageState =
   | { phase: 'loading' }
@@ -219,6 +220,7 @@ function ProfilePanel({
           </View>
         </View>
         <View className="profile-header__actions">
+          <MediaAccountEntry />
           <Button className="profile-header__edit" onClick={() => setEditing((value) => !value)}>
             {editing ? '收起编辑' : '编辑资料'}
           </Button>

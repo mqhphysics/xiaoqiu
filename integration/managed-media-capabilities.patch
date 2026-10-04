@@ -1,0 +1,45 @@
+diff --git a/apps/api/src/product-config/account-capabilities.service.ts b/apps/api/src/product-config/account-capabilities.service.ts
+index 3c6d6e6..762ed31 100644
+--- a/apps/api/src/product-config/account-capabilities.service.ts
++++ b/apps/api/src/product-config/account-capabilities.service.ts
+@@ -13,6 +13,7 @@ import { resolveOrganizationSelector } from '../auth/auth-context.guard'
+ import { ApiHttpException } from '../common/api-http.exception'
+ import type { RequestWithId } from '../common/request-context'
+ import { PrismaService } from '../database/prisma.service'
++import { mediaPermissions } from '../managed-media/media-policy'
+ import { canSendDirectMessages } from '../social/messaging.service'
+ import { ProductConfigService, UNAVAILABLE_FEATURE_REASON } from './product-config.service'
+
+@@ -49,6 +50,7 @@ export class AccountCapabilitiesService {
+       select: { role: true, scopeType: true, scopeId: true },
+     })
+     const actor = { ...session, user: { ...session.user, roles } }
++    const media = mediaPermissions(actor)
+     const config = this.configuration.getConfiguration()
+     const organization: CapabilityScope[] = [{ type: 'ORGANIZATION', id: session.organizationId }]
+     const administrator = this.policy.isOrganizationAdministrator(actor)
+@@ -146,9 +148,9 @@ export class AccountCapabilitiesService {
+         ),
+         'identityApplications.submit': pending,
+         'identityApplications.review': pending,
+-        'goalMedia.submit': pending,
+-        'goalMedia.review': pending,
+-        'goalMedia.publish': pending,
++        'goalMedia.submit': capability('goalMedia', media.canSubmit ? organization : []),
++        'goalMedia.review': capability('goalMedia', media.canReview ? organization : []),
++        'goalMedia.publish': capability('goalMedia', media.canDirectPublish ? organization : []),
+       },
+     }
+   }
+diff --git a/apps/api/src/product-config/product-config.service.ts b/apps/api/src/product-config/product-config.service.ts
+index 5855eea..36b88b5 100644
+--- a/apps/api/src/product-config/product-config.service.ts
++++ b/apps/api/src/product-config/product-config.service.ts
+@@ -29,6 +29,7 @@ const implementedModules = new Set<ProductModuleId>([
+   'matchReporting',
+   'administration',
+   'directMessages',
++  'goalMedia',
+ ])
+
+ export function buildProductConfiguration(

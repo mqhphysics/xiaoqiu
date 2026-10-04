@@ -3,6 +3,7 @@ import { openTeam as openTeamDetail } from '../../features/product/team-navigati
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AvatarCropper } from '../../components/avatar-cropper'
+import { MediaAccountEntry, usePersonalBackground } from '../../features/managed-media/index.h5'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
@@ -130,6 +131,7 @@ function useProfileLibrary(key: string) {
 }
 
 export function DesktopProfile({ home, user, onUserChange, renderService }: DesktopProfileProps) {
+  const personalBackground = usePersonalBackground(user.id)
   const displayedKind = useBadgeDisplay(user.id)
   const badgeKind = displayedBadgeKind(user.verificationLevel, user.roles, false, displayedKind)
   useEffect(() => {
@@ -376,6 +378,14 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
       </div>
       <div className="profile-top">
         <section className="profile-person profile-surface" aria-label="个人资料">
+          {personalBackground ? (
+            <img
+              className="profile-personal-background"
+              src={personalBackground}
+              alt="个人背景"
+              loading="lazy"
+            />
+          ) : null}
           <div className="profile-person__main">
             <button
               data-profile-button=""
@@ -418,6 +428,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 <ProfileIcon name="pencil" />
                 编辑资料
               </button>
+              <MediaAccountEntry />
             </div>
           </div>
           <div className="profile-person__stats">
