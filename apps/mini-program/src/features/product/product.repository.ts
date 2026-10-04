@@ -46,6 +46,8 @@ export class ProductApiError extends Error {
 }
 
 export const productRepository = {
+  getPublishedTournaments: () => request<{ items: Array<{ id: string }> }>('/public/tournaments'),
+
   getHome: (tournamentId?: string) =>
     request<HomeResponse>(
       `/public/home${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,

@@ -4,6 +4,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { selectPublicTournament } from '../common/public-tournament'
+import { isDemoFixtureOrganization } from '../common/demo-fixture-organization'
 import { PrismaService } from '../database/prisma.service'
 import { MediaService, postImageUrls } from '../media/media.service'
 import {
@@ -1512,7 +1513,7 @@ export class ExperienceService {
     prisma: Prisma.TransactionClient,
   ) {
     const legacyDemo =
-      organizationId === '00000000-0000-4000-8000-000000000001' &&
+      isDemoFixtureOrganization(organizationId) &&
       /^DEMO-GREEN-CUP-(2025|2026)$/.test(tournament.tournamentCode) &&
       (await prisma.match.count({
         where: { organizationId, tournamentId: tournament.id, reportVersion: { gt: 0 } },
