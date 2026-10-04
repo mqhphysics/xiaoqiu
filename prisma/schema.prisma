@@ -286,49 +286,49 @@ enum ReportStatus {
 model Organization {
   identityRecords      IdentityRecord[]
   identityApplications IdentityApplication[]
-  managedMediaAssets  ManagedMediaAsset[]
-  id                  String                   @id @default(uuid()) @db.Uuid
-  slug                String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
-  name                String                   @db.VarChar(120)
-  status              OrganizationStatus       @default(ACTIVE)
-  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  memberships         OrganizationMembership[]
-  userSessions        UserSession[]
-  roleAssignments     RoleAssignment[]
-  auditLogs           AuditLog[]
-  idempotencyRecords  IdempotencyRecord[]
-  outboxJobs          OutboxJob[]
-  seasons             Season[]
-  tournaments         Tournament[]
-  teams               Team[]
-  playerProfiles      PlayerProfile[]
-  venues              Venue[]
-  schedulePlans       SchedulePlan[]
-  scheduleRevisions   ScheduleRevision[]
-  matches             Match[]
-  teamRegistrations   TeamRegistration[]
-  rosterSubmissions   RosterSubmission[]
-  rosterEntries       RosterEntry[]
-  rosterSnapshots     RosterSnapshot[]
-  snapshotEntries     RosterSnapshotEntry[]
-  importBatches       ImportBatch[]
-  teamPreferences     UserTeamPreference[]
-  badgePreferences    UserBadgePreference[]
-  matchEvents         MatchEvent[]
-  matchAppearances    MatchAppearance[]
-  matchReviews        MatchReview[]
-  posts               Post[]
-  postLikes           PostLike[]
-  postComments        PostComment[]
-  postTags            PostTag[]
-  playerFollows       UserPlayerFollow[]
-  teamMemberships     TeamMembership[]
-  teamApplications    TeamJoinApplication[]
-  notifications       UserNotification[]
-  reports             ContentReport[]
-  directConversations DirectConversation[]
-  directMessages      DirectMessage[]
+  managedMediaAssets   ManagedMediaAsset[]
+  id                   String                   @id @default(uuid()) @db.Uuid
+  slug                 String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
+  name                 String                   @db.VarChar(120)
+  status               OrganizationStatus       @default(ACTIVE)
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships          OrganizationMembership[]
+  userSessions         UserSession[]
+  roleAssignments      RoleAssignment[]
+  auditLogs            AuditLog[]
+  idempotencyRecords   IdempotencyRecord[]
+  outboxJobs           OutboxJob[]
+  seasons              Season[]
+  tournaments          Tournament[]
+  teams                Team[]
+  playerProfiles       PlayerProfile[]
+  venues               Venue[]
+  schedulePlans        SchedulePlan[]
+  scheduleRevisions    ScheduleRevision[]
+  matches              Match[]
+  teamRegistrations    TeamRegistration[]
+  rosterSubmissions    RosterSubmission[]
+  rosterEntries        RosterEntry[]
+  rosterSnapshots      RosterSnapshot[]
+  snapshotEntries      RosterSnapshotEntry[]
+  importBatches        ImportBatch[]
+  teamPreferences      UserTeamPreference[]
+  badgePreferences     UserBadgePreference[]
+  matchEvents          MatchEvent[]
+  matchAppearances     MatchAppearance[]
+  matchReviews         MatchReview[]
+  posts                Post[]
+  postLikes            PostLike[]
+  postComments         PostComment[]
+  postTags             PostTag[]
+  playerFollows        UserPlayerFollow[]
+  teamMemberships      TeamMembership[]
+  teamApplications     TeamJoinApplication[]
+  notifications        UserNotification[]
+  reports              ContentReport[]
+  directConversations  DirectConversation[]
+  directMessages       DirectMessage[]
 
   matchReportRevisions   MatchReportRevision[]
   lineupPlans            TeamLineupPlan[]
@@ -340,54 +340,54 @@ model Organization {
 }
 
 model User {
-  createdIdentityRecords       IdentityRecord[]      @relation("IdentityRecordCreator")
-  linkedIdentityRecords        IdentityRecord[]      @relation("IdentityRecordUser")
-  identityApplications         IdentityApplication[] @relation("IdentityApplicant")
-  reviewedIdentityApplications IdentityApplication[] @relation("IdentityReviewer")
-  uploadedMediaAssets  ManagedMediaAsset[]      @relation("ManagedMediaUploader")
-  reviewedMediaAssets  ManagedMediaAsset[]      @relation("ManagedMediaReviewer")
-  mediaChanges         ManagedMediaAsset[]      @relation("ManagedMediaVisibilityActor")
-  id                   String                   @id @default(uuid()) @db.Uuid
-  loginNameNormalized  String?                  @map("login_name_normalized") @db.VarChar(120)
-  displayName          String                   @map("display_name") @db.VarChar(120)
-  realName             String?                  @map("real_name") @db.VarChar(120)
-  realNameNormalized   String?                  @map("real_name_normalized") @db.VarChar(120)
-  studentId            String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
-  email                String?                  @db.VarChar(254)
-  emailNormalized      String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
-  avatarUrl            String?                  @map("avatar_url") @db.VarChar(512)
-  bio                  String?                  @db.VarChar(280)
-  verificationLevel    VerificationLevel        @default(UNVERIFIED) @map("verification_level")
-  playerProfileId      String?                  @unique(map: "app_users_player_profile_id_key") @map("player_profile_id") @db.Uuid
-  status               UserStatus               @default(ACTIVE)
-  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  memberships          OrganizationMembership[]
-  wechatIdentities     WechatIdentity[]
-  sessions             UserSession[]
-  roleAssignments      RoleAssignment[]         @relation("RoleAssignmentUser")
-  grantedAssignments   RoleAssignment[]         @relation("RoleAssignmentGrantor")
-  auditLogs            AuditLog[]
-  idempotencyRecords   IdempotencyRecord[]
-  passwordCredential   PasswordCredential?
-  playerProfile        PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
-  teamPreferences      UserTeamPreference[]
-  badgePreferences     UserBadgePreference[]
-  posts                Post[]                   @relation("PostAuthor")
-  postLikes            PostLike[]
-  postComments         PostComment[]
-  matchReviews         MatchReview[]
-  playerFollows        UserPlayerFollow[]
-  teamMemberships      TeamMembership[]
-  teamApplications     TeamJoinApplication[]    @relation("TeamApplicationApplicant")
-  reviewedApplications TeamJoinApplication[]    @relation("TeamApplicationReviewer")
-  notifications        UserNotification[]       @relation("NotificationRecipient")
-  notificationActions  UserNotification[]       @relation("NotificationActor")
-  reports              ContentReport[]          @relation("ReportReporter")
-  handledReports       ContentReport[]          @relation("ReportHandler")
-  conversationsAsOne   DirectConversation[]     @relation("ConversationUserOne")
-  conversationsAsTwo   DirectConversation[]     @relation("ConversationUserTwo")
-  directMessages       DirectMessage[]          @relation("DirectMessageSender")
+  createdIdentityRecords       IdentityRecord[]         @relation("IdentityRecordCreator")
+  linkedIdentityRecords        IdentityRecord[]         @relation("IdentityRecordUser")
+  identityApplications         IdentityApplication[]    @relation("IdentityApplicant")
+  reviewedIdentityApplications IdentityApplication[]    @relation("IdentityReviewer")
+  uploadedMediaAssets          ManagedMediaAsset[]      @relation("ManagedMediaUploader")
+  reviewedMediaAssets          ManagedMediaAsset[]      @relation("ManagedMediaReviewer")
+  mediaChanges                 ManagedMediaAsset[]      @relation("ManagedMediaVisibilityActor")
+  id                           String                   @id @default(uuid()) @db.Uuid
+  loginNameNormalized          String?                  @map("login_name_normalized") @db.VarChar(120)
+  displayName                  String                   @map("display_name") @db.VarChar(120)
+  realName                     String?                  @map("real_name") @db.VarChar(120)
+  realNameNormalized           String?                  @map("real_name_normalized") @db.VarChar(120)
+  studentId                    String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
+  email                        String?                  @db.VarChar(254)
+  emailNormalized              String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
+  avatarUrl                    String?                  @map("avatar_url") @db.VarChar(512)
+  bio                          String?                  @db.VarChar(280)
+  verificationLevel            VerificationLevel        @default(UNVERIFIED) @map("verification_level")
+  playerProfileId              String?                  @unique(map: "app_users_player_profile_id_key") @map("player_profile_id") @db.Uuid
+  status                       UserStatus               @default(ACTIVE)
+  createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships                  OrganizationMembership[]
+  wechatIdentities             WechatIdentity[]
+  sessions                     UserSession[]
+  roleAssignments              RoleAssignment[]         @relation("RoleAssignmentUser")
+  grantedAssignments           RoleAssignment[]         @relation("RoleAssignmentGrantor")
+  auditLogs                    AuditLog[]
+  idempotencyRecords           IdempotencyRecord[]
+  passwordCredential           PasswordCredential?
+  playerProfile                PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
+  teamPreferences              UserTeamPreference[]
+  badgePreferences             UserBadgePreference[]
+  posts                        Post[]                   @relation("PostAuthor")
+  postLikes                    PostLike[]
+  postComments                 PostComment[]
+  matchReviews                 MatchReview[]
+  playerFollows                UserPlayerFollow[]
+  teamMemberships              TeamMembership[]
+  teamApplications             TeamJoinApplication[]    @relation("TeamApplicationApplicant")
+  reviewedApplications         TeamJoinApplication[]    @relation("TeamApplicationReviewer")
+  notifications                UserNotification[]       @relation("NotificationRecipient")
+  notificationActions          UserNotification[]       @relation("NotificationActor")
+  reports                      ContentReport[]          @relation("ReportReporter")
+  handledReports               ContentReport[]          @relation("ReportHandler")
+  conversationsAsOne           DirectConversation[]     @relation("ConversationUserOne")
+  conversationsAsTwo           DirectConversation[]     @relation("ConversationUserTwo")
+  directMessages               DirectMessage[]          @relation("DirectMessageSender")
 
   matchReportRevisions   MatchReportRevision[]   @relation("MatchReportAuthor")
   lineupRevisions        TeamLineupRevision[]    @relation("LineupRevisionAuthor")

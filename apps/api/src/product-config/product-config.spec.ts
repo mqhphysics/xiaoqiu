@@ -7,7 +7,7 @@ import { ApiHttpException } from '../common/api-http.exception'
 import type { ExecutionContext } from '@nestjs/common'
 import type { ProductConfigService } from './product-config.service'
 
-test('anonymous configuration is fixed eight-a-side and cannot enable guest or unimplemented media', () => {
+test('anonymous configuration is fixed eight-a-side, exposes implemented modules and keeps guest closed', () => {
   const config = buildProductConfiguration({
     XIAOQIU_FEATURE_GUEST: 'true',
     XIAOQIU_FEATURE_IDENTITY_APPLICATIONS: 'true',
@@ -20,7 +20,7 @@ test('anonymous configuration is fixed eight-a-side and cannot enable guest or u
   assert.equal(config.serverGuestAccess, false)
   assert.deepEqual(config.guest, { visible: true, enabled: false, reason: '功能暂未开放' })
   assert.equal(config.modules.identityApplications.enabled, true)
-  assert.equal(config.modules.goalMedia.enabled, false)
+  assert.equal(config.modules.goalMedia.enabled, true)
   assert.equal(JSON.stringify(config).includes('private-'), false)
 })
 

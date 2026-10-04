@@ -2,23 +2,62 @@ import Taro from '@tarojs/taro'
 import type {
   AccountCapabilities,
   ProductActionId,
+  ProductModuleId,
 } from '../../../../../packages/contracts/src/product-config'
 import { productConfigRepository } from '../product-config/product-config.repository'
 import { runFeatureAction } from '../product-config/product-config.logic'
 import { productRepository } from '../product/product.repository'
+import { readSession } from '../product/session'
 import { readonlyScheduleRepository } from '../readonly-schedule/readonly-schedule.repository'
 import { openIdentity } from './identity.repository.h5'
 import { canReportMatch, managedTeamIds } from './entry-scope'
 
 const notify = (title: string) => Taro.showToast({ title, icon: 'none' })
+const actionModules: Partial<Record<ProductActionId, ProductModuleId>> = {
+  'identityApplications.submit': 'identityApplications',
+  'teams.manage': 'teamManagement',
+  'matchReports.write': 'matchReporting',
+  'administration.manage': 'administration',
+}
 
 async function accountAction(
   action: ProductActionId,
-  perform: (caps: AccountCapabilities) => Promise<void>,
+  perform: (
+    caps: AccountCapabilities,
+    refresh: () => Promise<AccountCapabilities>,
+  ) => Promise<void>,
 ) {
   try {
+    const module = actionModules[action]
+    const session = readSession()
+    if (!session) throw new Error('请先登录账号')
+    const current = () => {
+      const value = readSession()
+      if (
+        value?.accessToken !== session.accessToken ||
+        value.user.id !== session.user.id ||
+        value.user.organizationId !== session.user.organizationId
+      )
+        throw new Error('账号已变更，请重新打开此入口')
+    }
+    const refresh = async () => {
+      current()
+      const caps = await productConfigRepository.getCapabilities()
+      current()
+      if (!module || caps.modules[module]?.enabled !== true) throw new Error('功能暂未开放')
+      if (caps.organizationId !== session.user.organizationId || !caps.actions[action]?.enabled)
+        throw new Error(caps.actions[action]?.reason || '当前账号没有此范围的操作权限')
+      return caps
+    }
     const caps = await productConfigRepository.getCapabilities()
-    await runFeatureAction(caps.actions[action], () => perform(caps), notify)
+    current()
+    await runFeatureAction(
+      module && caps.modules[module]?.enabled === true
+        ? caps.actions[action]
+        : { enabled: false, reason: '功能暂未开放' },
+      () => perform(caps, refresh),
+      notify,
+    )
   } catch (issue) {
     if (
       issue &&
@@ -54,19 +93,30 @@ export const identityEntryActions = {
       openIdentity()
     }),
   teamManagement: () =>
-    accountAction('teams.manage', async (caps) => {
-      const teams = await Promise.all(
-        managedTeamIds(caps.actions['teams.manage']).map((id) =>
-          productRepository.getCaptainWorkspace(id),
-        ),
-      )
+    accountAction('teams.manage', async (caps, refresh) => {
+      const ids = managedTeamIds(caps.actions['teams.manage'])
+      if (
+        !ids.length &&
+        caps.actions['teams.manage'].scopes.some(
+          (scope) => scope.type === 'ORGANIZATION' && scope.id === caps.organizationId,
+        )
+      ) {
+        // Organization maintenance uses the real admin portal; it never invents
+        // a captain/coach TEAM grant or calls a private team workspace.
+        await identityEntryActions.administrationEntry()
+        return
+      }
+      const teams = await Promise.all(ids.map((id) => productRepository.getCaptainWorkspace(id)))
       const selected = await choose(teams, (workspace) => workspace.team.name)
+      const latest = await refresh()
+      if (!managedTeamIds(latest.actions['teams.manage']).includes(selected.team.id))
+        throw new Error('当前账号已失去该球队的管理权限')
       await Taro.navigateTo({
         url: `/pages/my-team/index?teamId=${encodeURIComponent(selected.team.id)}`,
       })
     }),
   informationEntry: () =>
-    accountAction('matchReports.write', async (caps) => {
+    accountAction('matchReports.write', async (caps, refresh) => {
       const tournaments = await readonlyScheduleRepository.listTournaments()
       if (tournaments.source !== 'api') throw new Error('信息录入需要连接真实 API')
       const schedules = await Promise.all(
@@ -84,6 +134,9 @@ export const identityEntryActions = {
         (match) =>
           `${match.homeTeamName} vs ${match.awayTeamName} · ${match.scheduledStartAt.slice(0, 10)}`,
       )
+      const latest = await refresh()
+      if (!canReportMatch(latest.actions['matchReports.write'], latest.organizationId, selected))
+        throw new Error('当前账号已失去该比赛的录入权限')
       await Taro.navigateTo({
         url: `/pages/quick-report/index?matchId=${encodeURIComponent(selected.id)}`,
       })

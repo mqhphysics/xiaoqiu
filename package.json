@@ -15,6 +15,7 @@
     "dev:h5": "pnpm --filter @xiaoqiu/mini-program dev:h5",
     "dev:admin": "pnpm --filter @xiaoqiu/admin-web dev",
     "build": "pnpm -r --if-present build",
+    "build:sites": "node scripts/build-sites-bundle.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",
     "test": "pnpm -r --if-present test",

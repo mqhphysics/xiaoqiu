@@ -4,6 +4,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { isUUID } from 'class-validator'
 import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
+import { isDemoFixtureOrganization } from '../common/demo-fixture-organization'
 import { PrismaService } from '../database/prisma.service'
 import type { Prisma, MatchEvent } from '../generated/prisma/client'
 import { ResultsService } from '../results/results.service'
@@ -382,7 +383,7 @@ export class ManagedMediaService {
     })
     if (!match) throw notFound()
     const legacyDemo =
-      organizationId === '00000000-0000-4000-8000-000000000001' &&
+      isDemoFixtureOrganization(organizationId) &&
       /^DEMO-GREEN-CUP-(2025|2026)$/.test(match.tournament.tournamentCode) &&
       (await tx.match.count({
         where: { organizationId, tournamentId: match.tournamentId, reportVersion: { gt: 0 } },

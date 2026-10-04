@@ -13,6 +13,7 @@ import { resolveOrganizationSelector } from '../auth/auth-context.guard'
 import { ApiHttpException } from '../common/api-http.exception'
 import type { RequestWithId } from '../common/request-context'
 import { PrismaService } from '../database/prisma.service'
+import { mediaPermissions } from '../managed-media/media-policy'
 import { canSendDirectMessages } from '../social/messaging.service'
 import { ProductConfigService, UNAVAILABLE_FEATURE_REASON } from './product-config.service'
 
@@ -49,6 +50,7 @@ export class AccountCapabilitiesService {
       select: { role: true, scopeType: true, scopeId: true },
     })
     const actor = { ...session, user: { ...session.user, roles } }
+    const media = mediaPermissions(actor)
     const config = this.configuration.getConfiguration()
     const organization: CapabilityScope[] = [{ type: 'ORGANIZATION', id: session.organizationId }]
     const administrator = this.policy.isOrganizationAdministrator(actor)
@@ -118,11 +120,6 @@ export class AccountCapabilitiesService {
         scopes: enabled ? unique : [],
       }
     }
-    const pending: ScopedCapability = {
-      enabled: false,
-      reason: UNAVAILABLE_FEATURE_REASON,
-      scopes: [],
-    }
     return {
       schemaVersion: 1,
       revision: config.revision,
@@ -153,9 +150,9 @@ export class AccountCapabilitiesService {
           'identityApplications',
           administrator ? organization : [],
         ),
-        'goalMedia.submit': pending,
-        'goalMedia.review': pending,
-        'goalMedia.publish': pending,
+        'goalMedia.submit': capability('goalMedia', media.canSubmit ? organization : []),
+        'goalMedia.review': capability('goalMedia', media.canReview ? organization : []),
+        'goalMedia.publish': capability('goalMedia', media.canDirectPublish ? organization : []),
       },
     }
   }

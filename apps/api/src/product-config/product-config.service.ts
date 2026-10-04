@@ -30,6 +30,7 @@ const implementedModules = new Set<ProductModuleId>([
   'administration',
   'directMessages',
   'identityApplications',
+  'goalMedia',
 ])
 
 export function buildProductConfiguration(

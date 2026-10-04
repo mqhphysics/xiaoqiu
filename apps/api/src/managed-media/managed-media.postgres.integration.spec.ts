@@ -5,7 +5,7 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import test from 'node:test'
-import { Controller, Get, Headers, Inject, type INestApplication } from '@nestjs/common'
+import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import sharp from 'sharp'
@@ -16,53 +16,29 @@ import { PrismaClient } from '../generated/prisma/client'
 import { MediaStorage } from './media-storage'
 import { dataUrl, gifFixture } from './media-test-fixtures'
 import { AuthService } from '../auth/auth.service'
-import { goalMediaEnabled, mediaPermissions } from './media-policy'
-
-// The baseline predates ProductConfigModule. This fixture exercises its agreed response
-// shape without importing/merging another worker's branch or registering production routes.
-@Controller()
-class MediaCapabilityFixtureController {
-  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
-  @Get('me/capabilities')
-  async get(@Headers('authorization') authorization?: string) {
-    const session = await this.auth.requireSession(authorization)
-    const permissions = mediaPermissions(session)
-    const enabled = goalMediaEnabled()
-    const action = (allowed: boolean) => ({
-      enabled: enabled && allowed,
-      reason: !enabled ? '功能暂未开放' : allowed ? null : '当前账号没有此范围的操作权限',
-      scopes: enabled && allowed ? [{ type: 'ORGANIZATION', id: session.organizationId }] : [],
-    })
-    return {
-      schemaVersion: 1,
-      organizationId: session.organizationId,
-      modules: { goalMedia: { enabled } },
-      actions: {
-        'goalMedia.submit': action(permissions.canSubmit),
-        'goalMedia.review': action(permissions.canReview),
-        'goalMedia.publish': action(permissions.canDirectPublish),
-      },
-    }
-  }
-}
+import { mediaPermissions } from './media-policy'
 
 test(
   'disposable PostgreSQL/HTTP upload → private review → published GIF; object authorization and withdrawal',
-  { timeout: 90_000, skip: !process.env.MEDIA_TEST_DATABASE_URL },
+  { timeout: 90_000 },
   async () => {
-    const url = process.env.MEDIA_TEST_DATABASE_URL!
+    const url = process.env.TEST_DATABASE_URL
+    assert.ok(url, 'TEST_DATABASE_URL is required; media integration tests never silently skip')
     assert.match(
-      url,
-      /^postgresql:\/\/postgres@127\.0\.0\.1:\d+\/xiaoqiu_media_test$/,
-      'Only a separately created local disposable media test database is permitted',
+      new URL(url).pathname,
+      /(?:_|\/)(?:test|ci)(?:_|$)/,
+      'Only an isolated test database is permitted',
     )
+    assert.notEqual(url, process.env.DATABASE_URL, 'Never test on the application database')
+    const previousDemoOrganization = process.env.DEMO_FIXTURE_ORGANIZATION_ID
     process.env.MEDIA_ASSETS_DIRECTORY = await mkdtemp(resolve(tmpdir(), 'xiaoqiu-worker-a-media-'))
     process.env.XIAOQIU_FEATURE_GOAL_MEDIA = 'true'
     process.env.NODE_ENV = 'test'
     delete process.env.MEDIA_REVIEW_ALLOW_ORGANIZATION_ADMIN
     const prisma = new PrismaClient({ datasources: { db: { url } } })
     let app: INestApplication | undefined
-    const organizationId = '00000000-0000-4000-8000-000000000001'
+    const organizationId: string = randomUUID()
+    process.env.DEMO_FIXTURE_ORGANIZATION_ID = organizationId
     try {
       await prisma.organization.create({
         data: {
@@ -188,7 +164,6 @@ test(
       })
       const module = await Test.createTestingModule({
         imports: [AppModule],
-        controllers: [MediaCapabilityFixtureController],
       })
         .overrideProvider(PrismaService)
         .useValue(prisma)
@@ -197,6 +172,37 @@ test(
       configureApp(app)
       await app.init()
       const http = app.getHttpServer()
+      // Exercise the production capability controller and the same freshly loaded roles
+      // as upload/moderation, rather than a controller that emulates its response.
+      for (const [identity, review, publish] of [
+        [student, false, false],
+        [reporter, false, false],
+        [orgAdmin, false, false],
+        [futureAdmin, false, false],
+        [platform, true, true],
+      ] as const) {
+        const caps = await request(http)
+          .get('/api/me/capabilities')
+          .set('Authorization', identity.auth)
+          .expect(200)
+        assert.equal(caps.body.organizationId, organizationId)
+        assert.equal(caps.body.modules.goalMedia.enabled, true)
+        assert.equal(caps.body.actions['goalMedia.submit'].enabled, true)
+        assert.equal(caps.body.actions['goalMedia.review'].enabled, review)
+        assert.equal(caps.body.actions['goalMedia.publish'].enabled, publish)
+      }
+      process.env.MEDIA_REVIEW_ALLOW_ORGANIZATION_ADMIN = 'true'
+      const organizationReview = await request(http)
+        .get('/api/me/capabilities')
+        .set('Authorization', orgAdmin.auth)
+        .expect(200)
+      assert.equal(organizationReview.body.actions['goalMedia.review'].enabled, true)
+      assert.equal(organizationReview.body.actions['goalMedia.publish'].enabled, false)
+      await request(http)
+        .get('/api/admin/media-assets')
+        .set('Authorization', orgAdmin.auth)
+        .expect(200)
+      delete process.env.MEDIA_REVIEW_ALLOW_ORGANIZATION_ADMIN
       const gif = dataUrl(await gifFixture(), 'gif')
       const png = dataUrl(
         await sharp({ create: { width: 128, height: 128, channels: 3, background: '#338866' } })
@@ -596,6 +602,8 @@ test(
       await prisma.$disconnect()
       delete process.env.MEDIA_ASSETS_DIRECTORY
       delete process.env.XIAOQIU_FEATURE_GOAL_MEDIA
+      if (previousDemoOrganization === undefined) delete process.env.DEMO_FIXTURE_ORGANIZATION_ID
+      else process.env.DEMO_FIXTURE_ORGANIZATION_ID = previousDemoOrganization
     }
   },
 )

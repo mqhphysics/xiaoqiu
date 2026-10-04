@@ -79,7 +79,12 @@ export async function mediaRequest<T>(path: string, data?: unknown, method = 'GE
     },
     ...(data ? { body: JSON.stringify(data) } : {}),
   })
-  if (readSession()?.accessToken !== session.accessToken)
+  const current = readSession()
+  if (
+    current?.accessToken !== session.accessToken ||
+    current.user.id !== session.user.id ||
+    current.user.organizationId !== session.user.organizationId
+  )
     throw new Error('账号已切换，请重新打开媒体管理')
   const value = await response.json()
   if (!response.ok) throw new Error(value.message ?? value.error?.message ?? '媒体操作失败，请重试')
@@ -94,7 +99,13 @@ export async function privateMediaBlob(path: string, signal: AbortSignal) {
     headers: { Authorization: `Bearer ${session.accessToken}` },
   })
   if (!response.ok) throw new Error('图片不存在或不可见')
-  if (readSession()?.accessToken !== session.accessToken) throw new Error('账号已切换')
+  const current = readSession()
+  if (
+    current?.accessToken !== session.accessToken ||
+    current.user.id !== session.user.id ||
+    current.user.organizationId !== session.user.organizationId
+  )
+    throw new Error('账号已切换')
   return response.blob()
 }
 
