@@ -134,6 +134,11 @@ test(
       assert.deepEqual(me.body.roles, [])
       assert.equal(me.body.linkedPlayer, null)
       assert.equal(me.body.verificationLevel, 'UNVERIFIED')
+      const capabilities = await get('me/capabilities', coach.token).expect(200)
+      assert.deepEqual(capabilities.body.managedTeamIds, [])
+      assert.equal(capabilities.body.actions['lineups.manage'].enabled, false)
+      assert.equal(capabilities.body.actions['identityApplications.submit'].enabled, true)
+      assert.equal(capabilities.body.actions['identityApplications.review'].enabled, false)
       await get('admin/identity/applications', coach.token).expect(403)
       await post('admin/identity/records', coach.token, {
         kind: 'TEAM_COACH',
@@ -186,6 +191,12 @@ test(
           ),
         )
         assert.equal(await prisma.teamMembership.count({ where: { userId: coach.user.id } }), 0)
+        const capabilities = await get('me/capabilities', coach.token).expect(200)
+        assert.deepEqual(capabilities.body.managedTeamIds, [team.id])
+        assert.deepEqual(capabilities.body.actions['lineups.manage'].scopes, [
+          { type: 'TEAM', id: team.id },
+        ])
+        assert.equal(capabilities.body.actions['identityApplications.review'].enabled, false)
         await post(`admin/identity/applications/${applicationId}/review`, admin.token, {
           decision: 'REJECTED',
           expectedVersion: 1,
@@ -291,6 +302,8 @@ test(
         .then((r) => assert.deepEqual(r.body.roles, []))
       await get(`captain/teams/${otherTeam.id}`, sameName.token).expect(403)
       await get(`captain/teams/${otherTeam.id}/lineup-plans`, sameName.token).expect(403)
+      const futureCapabilities = await get('me/capabilities', sameName.token).expect(200)
+      assert.deepEqual(futureCapabilities.body.managedTeamIds, [])
       await prisma.roleAssignment.update({
         where: { id: future.id },
         data: { revokedAt: new Date() },
@@ -409,6 +422,9 @@ test(
             where: { organizationId: org.id, action: { startsWith: 'IDENTITY_' } },
           })) >= 9,
         )
+        const capabilities = await get('me/capabilities', coach.token).expect(200)
+        assert.deepEqual(capabilities.body.managedTeamIds, [])
+        assert.equal(capabilities.body.actions['lineups.manage'].enabled, false)
         const revokeAudit = await prisma.auditLog.findFirstOrThrow({
           where: {
             organizationId: org.id,

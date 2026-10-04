@@ -18,6 +18,13 @@ export function modulesForRoute(route: string): ProductModuleId[] {
     .replace(/^\/+|\/+$/g, '')
     .toLowerCase()
   if (path === 'public/home') return ['home']
+  if (/^me\/identity(?:\/applications)?$/.test(path)) return ['identityApplications']
+  if (
+    /^admin\/identity\/(?:applications(?:\/:[^/]+\/review)?|records(?:\/:[^/]+\/revoke)?)$/.test(
+      path,
+    )
+  )
+    return ['administration', 'identityApplications']
   if (path === 'public/seasons' || /^public\/tournaments(?:\/:[^/]+)?$/.test(path))
     return ['schedule']
   if (

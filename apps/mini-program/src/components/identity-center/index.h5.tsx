@@ -6,12 +6,15 @@ import {
   identityActionId,
   identityLabels,
   identityRepository,
-  openIdentity,
   type IdentityKind,
   type IdentitySnapshot,
 } from '../../features/identity/identity.repository.h5'
 import type { AuthUser } from '../../features/product/product.types'
 import { productRepository } from '../../features/product/product.repository'
+import { roleLabel } from '../../features/product/product.format'
+import { identityEntryActions } from '../../features/identity/entry-actions.h5'
+import { productConfigRepository } from '../../features/product-config/product-config.repository'
+import { useProductConfiguration } from '../../features/product-config/use-product-config.h5'
 import {
   readSession,
   saveSession,
@@ -42,6 +45,7 @@ export function IdentityEntry({
       'TEAM_COACH',
       'TEAM_CAPTAIN',
       'MATCH_REPORTER',
+      'TOURNAMENT_ADMIN',
       'ORGANIZATION_ADMIN',
       'PLATFORM_ADMIN',
     ].includes(r.role),
@@ -62,28 +66,11 @@ export function IdentityEntry({
   )
   const canReport =
     isAdmin ||
-    roles.some((r) => r.role === 'MATCH_REPORTER' && ['MATCH', 'TOURNAMENT'].includes(r.scopeType))
-  const unavailable = () => void Taro.showToast({ title: '功能暂未开放', icon: 'none' })
-  const manage = async () => {
-    try {
-      const snapshot = await identityRepository.get()
-      const teams = snapshot.teams.filter((team) => teamIds.includes(team.id))
-      if (!teams.length) throw new Error('当前账号没有有效的球队管理范围，请刷新认证状态')
-      const team =
-        teams.length === 1
-          ? teams[0]!
-          : teams[
-              (await Taro.showActionSheet({ itemList: teams.map((team) => team.name) })).tapIndex
-            ]!
-      await productRepository.getCaptainWorkspace(team.id)
-      await Taro.navigateTo({ url: `/pages/my-team/index?teamId=${encodeURIComponent(team.id)}` })
-    } catch (issue) {
-      void Taro.showToast({
-        title: issue instanceof Error ? issue.message : '球队管理读取失败',
-        icon: 'none',
-      })
-    }
-  }
+    roles.some(
+      (r) =>
+        (r.role === 'MATCH_REPORTER' && ['MATCH', 'TOURNAMENT'].includes(r.scopeType)) ||
+        (r.role === 'TOURNAMENT_ADMIN' && r.scopeType === 'TOURNAMENT'),
+    )
   return (
     <section className="identity-entry" aria-label="身份与认证">
       <div>
@@ -92,21 +79,25 @@ export function IdentityEntry({
           {[
             user.linkedPlayer ? '球员' : '学生',
             ...new Set(
-              roles.map(
-                (r) =>
-                  identityLabels[r.role as IdentityKind] ??
-                  (r.role === 'PLATFORM_ADMIN' ? '总管理员' : '组织管理员'),
-              ),
+              roles.map((r) => identityLabels[r.role as IdentityKind] ?? roleLabel(r.role)),
             ),
           ].join(' · ')}
         </span>
       </div>
       <div className="identity-entry-actions">
-        <button data-identity-button type="button" onClick={openIdentity}>
+        <button
+          data-identity-button
+          type="button"
+          onClick={() => void identityEntryActions.identity()}
+        >
           身份认证 <span aria-hidden="true">→</span>
         </button>
         {teamIds.length > 0 && (
-          <button data-identity-button type="button" onClick={() => void manage()}>
+          <button
+            data-identity-button
+            type="button"
+            onClick={() => void identityEntryActions.teamManagement()}
+          >
             球队管理
           </button>
         )}
@@ -114,7 +105,9 @@ export function IdentityEntry({
           <button
             data-identity-button
             type="button"
-            onClick={actions?.informationEntry ?? unavailable}
+            onClick={
+              actions?.informationEntry ?? (() => void identityEntryActions.informationEntry())
+            }
           >
             信息录入
           </button>
@@ -123,7 +116,10 @@ export function IdentityEntry({
           <button
             data-identity-button
             type="button"
-            onClick={actions?.administrationEntry ?? unavailable}
+            onClick={
+              actions?.administrationEntry ??
+              (() => void identityEntryActions.administrationEntry())
+            }
           >
             管理中心
           </button>
@@ -134,6 +130,8 @@ export function IdentityEntry({
 }
 
 export function IdentityCenterHost() {
+  const { configuration } = useProductConfiguration()
+  const identityEnabled = configuration?.modules.identityApplications.enabled === true
   const [token, setToken] = useState(() => readSession()?.accessToken ?? null)
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<IdentitySnapshot | null>(null)
@@ -157,6 +155,11 @@ export function IdentityCenterHost() {
     setLoading(true)
     setError('')
     try {
+      const capabilities = await productConfigRepository.getCapabilities()
+      if (!capabilities.actions['identityApplications.submit'].enabled)
+        throw new Error(
+          capabilities.actions['identityApplications.submit'].reason ?? '功能暂未开放',
+        )
       const [snapshot, user] = await Promise.all([
         identityRepository.get(),
         productRepository.getMe(),
@@ -184,7 +187,7 @@ export function IdentityCenterHost() {
     setCandidateId('')
     setTeamId('')
     pending.current = null
-    if (!token) return
+    if (!token || !identityEnabled) return
     let active = true
     void load().then((snapshot) => {
       if (!active || !snapshot || !snapshot.candidates.length) return
@@ -204,7 +207,7 @@ export function IdentityCenterHost() {
       active = false
       sequence.current++
     }
-  }, [token, load])
+  }, [token, load, identityEnabled])
   useEffect(() => {
     const show = () => {
       setOpen(true)

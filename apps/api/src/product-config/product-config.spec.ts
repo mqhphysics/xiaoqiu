@@ -7,7 +7,7 @@ import { ApiHttpException } from '../common/api-http.exception'
 import type { ExecutionContext } from '@nestjs/common'
 import type { ProductConfigService } from './product-config.service'
 
-test('anonymous configuration is fixed eight-a-side and cannot enable guest or unimplemented modules', () => {
+test('anonymous configuration is fixed eight-a-side and cannot enable guest or unimplemented media', () => {
   const config = buildProductConfiguration({
     XIAOQIU_FEATURE_GUEST: 'true',
     XIAOQIU_FEATURE_IDENTITY_APPLICATIONS: 'true',
@@ -19,7 +19,7 @@ test('anonymous configuration is fixed eight-a-side and cannot enable guest or u
   assert.equal(config.accountRequired, true)
   assert.equal(config.serverGuestAccess, false)
   assert.deepEqual(config.guest, { visible: true, enabled: false, reason: '功能暂未开放' })
-  assert.equal(config.modules.identityApplications.enabled, false)
+  assert.equal(config.modules.identityApplications.enabled, true)
   assert.equal(config.modules.goalMedia.enabled, false)
   assert.equal(JSON.stringify(config).includes('private-'), false)
 })
@@ -60,6 +60,10 @@ test('registered route mapping covers actual module endpoints and leaves authent
     ['messages/direct/:recipientUserId', ['directMessages']],
     ['admin/center/posts/:id', ['administration', 'community']],
     ['admin/tournaments/:tournamentId/team-registrations/:registrationId', ['administration']],
+    ['me/identity', ['identityApplications']],
+    ['me/identity/applications', ['identityApplications']],
+    ['admin/identity/records/:id/revoke', ['administration', 'identityApplications']],
+    ['admin/identity/applications/:id/review', ['administration', 'identityApplications']],
   ]
   for (const [path, expected] of routes) assert.deepEqual(modulesForRoute(path), expected, path)
   for (const path of [

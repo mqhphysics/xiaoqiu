@@ -29,6 +29,7 @@ const implementedModules = new Set<ProductModuleId>([
   'matchReporting',
   'administration',
   'directMessages',
+  'identityApplications',
 ])
 
 export function buildProductConfiguration(

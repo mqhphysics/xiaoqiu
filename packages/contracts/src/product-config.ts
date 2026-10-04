@@ -64,6 +64,8 @@ export interface AccountCapabilities {
   schemaVersion: 1
   revision: string
   organizationId: string
+  /** Verified team captain/coach scopes; older v1 clients may omit this additive field. */
+  managedTeamIds?: string[]
   modules: Record<ProductModuleId, FeatureAvailability>
   actions: Record<ProductActionId, ScopedCapability>
 }

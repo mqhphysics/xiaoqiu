@@ -167,3 +167,34 @@ test('capability snapshots do not retain a revoked team role from an earlier req
   assert.equal(refreshed.actions['teams.manage'].enabled, false)
   assert.equal(current.sessionCalls(), 2)
 })
+
+test('coach capabilities only describe the real managed team; organization administration does not grant a lineup scope', async () => {
+  const coach = await fixture([
+    { role: 'TEAM_COACH', scopeType: 'TEAM', scopeId: teamId },
+    { role: 'TEAM_COACH', scopeType: 'TEAM', scopeId: foreignTeamId },
+  ]).service.get('valid-test-session', headers())
+  assert.deepEqual(coach.managedTeamIds, [teamId])
+  assert.deepEqual(coach.actions['lineups.manage'].scopes, [{ type: 'TEAM', id: teamId }])
+  assert.equal(coach.actions['identityApplications.review'].enabled, false)
+  const administrator = await fixture([
+    { role: 'ORGANIZATION_ADMIN', scopeType: 'ORGANIZATION', scopeId: organizationId },
+  ]).service.get('valid-test-session', headers())
+  assert.deepEqual(administrator.managedTeamIds, [])
+  assert.equal(administrator.actions['lineups.manage'].enabled, false)
+  assert.equal(administrator.actions['teams.manage'].enabled, true)
+  assert.deepEqual(administrator.actions['identityApplications.review'].scopes, [
+    { type: 'ORGANIZATION', id: organizationId },
+  ])
+})
+
+test('identity submission is available to authenticated members, review requires real administrator scope and the module switch', async () => {
+  const member = await fixture().service.get('valid-test-session', headers())
+  assert.equal(member.actions['identityApplications.submit'].enabled, true)
+  assert.equal(member.actions['identityApplications.review'].enabled, false)
+  const closed = await fixture(
+    [{ role: 'ORGANIZATION_ADMIN', scopeType: 'ORGANIZATION', scopeId: organizationId }],
+    { XIAOQIU_FEATURE_IDENTITY_APPLICATIONS: 'false' },
+  ).service.get('valid-test-session', headers())
+  for (const action of ['identityApplications.submit', 'identityApplications.review'] as const)
+    assert.deepEqual(closed.actions[action], { enabled: false, reason: '功能暂未开放', scopes: [] })
+})

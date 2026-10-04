@@ -79,13 +79,13 @@ export class AccountCapabilitiesService {
         select: { id: true, tournamentId: true },
       }),
     ])
-    const teamScopes: CapabilityScope[] = administrator ? organization : []
+    const teamScopes: CapabilityScope[] = []
     const tournamentScopes: CapabilityScope[] = administrator ? organization : []
     const reportScopes: CapabilityScope[] = administrator ? organization : []
+    for (const team of teams)
+      if (await allowed(() => this.policy.requireTeamCaptain(actor, team.id)))
+        teamScopes.push({ type: 'TEAM', id: team.id })
     if (!administrator) {
-      for (const team of teams)
-        if (await allowed(() => this.policy.requireTeamCaptain(actor, team.id)))
-          teamScopes.push({ type: 'TEAM', id: team.id })
       for (const tournament of tournaments)
         if (await allowed(() => this.policy.requireTournamentAdministrator(actor, tournament.id)))
           tournamentScopes.push({ type: 'TOURNAMENT', id: tournament.id })
@@ -127,6 +127,7 @@ export class AccountCapabilitiesService {
       schemaVersion: 1,
       revision: config.revision,
       organizationId: session.organizationId,
+      managedTeamIds: teamScopes.map((scope) => scope.id),
       modules: config.modules,
       actions: {
         'home.read': capability('home', organization),
@@ -134,7 +135,10 @@ export class AccountCapabilitiesService {
         'data.read': capability('data', organization),
         'teams.read': capability('teams', organization),
         'community.write': capability('community', organization),
-        'teams.manage': capability('teamManagement', teamScopes),
+        'teams.manage': capability(
+          'teamManagement',
+          administrator ? [...organization, ...teamScopes] : teamScopes,
+        ),
         'lineups.manage': capability('teamManagement', teamScopes),
         'matchReports.write': capability('matchReporting', reportScopes),
         'tournaments.manage': capability('administration', tournamentScopes),
@@ -144,8 +148,11 @@ export class AccountCapabilitiesService {
           'directMessages',
           canSendDirectMessages(actor) ? organization : [],
         ),
-        'identityApplications.submit': pending,
-        'identityApplications.review': pending,
+        'identityApplications.submit': capability('identityApplications', organization),
+        'identityApplications.review': capability(
+          'identityApplications',
+          administrator ? organization : [],
+        ),
         'goalMedia.submit': pending,
         'goalMedia.review': pending,
         'goalMedia.publish': pending,
