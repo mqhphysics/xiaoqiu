@@ -89,14 +89,22 @@ export async function loginAdmin(
   return { accessToken: payload.accessToken, expiresAt: payload.expiresAt }
 }
 
-export async function currentAdminUser(api: string, accessToken: string, signal?: AbortSignal) {
+export async function currentAdminUser(
+  api: string,
+  accessToken: string,
+  signal?: AbortSignal,
+  expectedOrganizationId?: string | null,
+) {
   const { response, payload } = await readAdminResponse(`${api}/auth/me`, {
     cache: 'no-store',
     headers: { authorization: `Bearer ${accessToken}` },
     ...(signal ? { signal } : {}),
   })
   if (!response.ok) throw errorResponse(payload, response.status)
-  return parseAdminUser(payload)
+  const user = parseAdminUser(payload)
+  if (expectedOrganizationId && user.organizationId !== expectedOrganizationId.toLowerCase())
+    throw new AdminApiError('当前账号不属于此网站的组织，请使用本组织管理员账号。', 403)
+  return user
 }
 
 export async function revokeAdminSession(api: string, accessToken: string): Promise<void> {

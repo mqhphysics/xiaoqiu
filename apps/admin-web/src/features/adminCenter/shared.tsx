@@ -166,7 +166,12 @@ export function DataState({
 }
 export function Icon({ name, className = '' }: { name: string; className?: string }) {
   return (
-    <img className={`mc-icon ${className}`} src={`/icons/${name}.svg`} alt="" aria-hidden="true" />
+    <img
+      className={`mc-icon ${className}`}
+      src={`${import.meta.env.BASE_URL}icons/${name}.svg`}
+      alt=""
+      aria-hidden="true"
+    />
   )
 }
 export function Badge({ value }: { value: unknown }) {

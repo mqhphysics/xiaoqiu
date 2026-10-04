@@ -1,9 +1,24 @@
+import { isUuid } from './types.ts'
+
 export function configuredAdminApi(): string | null {
-  const value = import.meta.env.DEV ? '/api' : import.meta.env.VITE_API_BASE_URL?.trim()
+  const value = import.meta.env?.DEV ? '/api' : import.meta.env?.VITE_API_BASE_URL?.trim()
   if (!value) return null
   const base = value.replace(/\/+$/, '')
   if (!/^https?:\/\//i.test(base) && !/^\/(?!\/)/.test(base)) return null
   return base.endsWith('/api') ? base : `${base}/api`
+}
+
+export function configuredAdminOrganizationId(): string | null {
+  const value = import.meta.env?.VITE_ORGANIZATION_ID?.trim()
+  return value && isUuid(value) ? value.toLowerCase() : null
+}
+
+export function h5SessionBridgeEnabled(): boolean {
+  return import.meta.env?.PROD === true && import.meta.env?.VITE_H5_SESSION_BRIDGE === '1'
+}
+
+export function publicWebsiteHref(): string {
+  return h5SessionBridgeEnabled() ? '/' : 'http://127.0.0.1:3000/'
 }
 
 export function requireAdminApi(): string {

@@ -1192,9 +1192,15 @@ textarea:focus-visible {
     font-size: 11px;
   }
   .mc-nav-label,
-  .mc-sidebar-bottom,
   .mc-current-indicator {
     display: none;
+  }
+  .mc-sidebar-bottom {
+    margin-top: 12px;
+    padding-top: 0;
+  }
+  .mc-account {
+    padding-top: 12px;
   }
   .mc-topbar {
     height: auto;

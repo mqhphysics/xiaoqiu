@@ -10,7 +10,8 @@ import {
   revokeAdminSession,
   readAdminResponse,
 } from './request'
-import { adminSession, validCredential } from './session'
+import { adminSession, H5_SESSION_KEY, validCredential } from './session'
+import { configuredAdminOrganizationId, publicWebsiteHref } from './config'
 import { adminKind, isUuid } from './types'
 import type { AdminCredential } from './types'
 import './admin-auth.css'
@@ -37,6 +38,7 @@ export function AdminAccess({ api }: { api: string }) {
   const validation = useRef<AbortController | null>(null)
 
   const verify = useCallback(async () => {
+    adminSession.syncH5Session()
     const credential = adminSession.getSnapshot().credential
     if (!credential) return
     const token = credential.accessToken
@@ -49,19 +51,25 @@ export function AdminAccess({ api }: { api: string }) {
     validation.current = controller
     setValidationError('')
     try {
-      const user = await currentAdminUser(api, credential.accessToken, controller.signal)
+      const user = await currentAdminUser(
+        api,
+        credential.accessToken,
+        controller.signal,
+        configuredAdminOrganizationId(),
+      )
       if (controller.signal.aborted) return
       if (!adminKind(user)) {
         // A successful ordinary login is still not a management session.
-        await revokeAdminSession(api, credential.accessToken).catch(() => undefined)
         if (!controller.signal.aborted)
           adminSession.clear(
             credential.accessToken,
             '当前账号没有后台管理权限，请使用获授权的管理员账号。',
+            false,
           )
         return
       }
-      adminSession.verify(credential.accessToken, user)
+      if (!adminSession.verify(credential.accessToken, user))
+        adminSession.clear(token, '当前账号没有可用的后台管理权限。', false)
     } catch (error: unknown) {
       if (
         controller.signal.aborted ||
@@ -69,13 +77,15 @@ export function AdminAccess({ api }: { api: string }) {
       )
         return
       if (error instanceof AdminApiError && (error.status === 401 || error.status === 403))
-        adminSession.clear(credential.accessToken)
-      else
+        adminSession.clear(credential.accessToken, error.message, error.status === 401)
+      else {
+        adminSession.beginVerification(credential.accessToken)
         setValidationError(
           error instanceof AdminApiError
             ? error.message
             : '无法验证当前登录，请确认管理服务可用后重试。',
         )
+      }
     }
   }, [api])
 
@@ -89,12 +99,21 @@ export function AdminAccess({ api }: { api: string }) {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void verify()
     }
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.storageArea === window.localStorage &&
+        (event.key === H5_SESSION_KEY || event.key === null)
+      )
+        void verify()
+    }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('storage', onStorage)
     return () => {
       validation.current?.abort()
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('storage', onStorage)
     }
   }, [verify, accessToken])
 
@@ -344,7 +363,7 @@ function AdminLogin({ api, message }: { api: string; message: string }) {
             {mode === 'loading' ? '正在准备…' : busy ? '正在进入…' : '进入管理中心'}
           </button>
         )}
-        <a className="admin-public-link" href="http://127.0.0.1:3000/">
+        <a className="admin-public-link" href={publicWebsiteHref()}>
           打开晓球网站 ↗
         </a>
       </section>
@@ -458,7 +477,7 @@ function AccountLogin({ api, message }: { api: string; message: string }) {
             {busy ? '正在登录…' : '进入管理中心'}
           </button>
         </form>
-        <a className="admin-public-link" href="http://127.0.0.1:3000/">
+        <a className="admin-public-link" href={publicWebsiteHref()}>
           返回晓球网站 ↗
         </a>
       </section>

@@ -12,6 +12,7 @@ import { Directory } from './Directory'
 import { Content } from './Content'
 import { Records } from './Records'
 import { IdentityManagement } from './IdentityManagement'
+import { publicWebsiteHref } from '../adminAuth/config'
 import { Badge, DataState, Icon, PendingCapability, time, useAdminData } from './shared'
 import './admin-center.css'
 
@@ -124,7 +125,7 @@ export function AdminCenter({
       </a>
       <aside className="mc-sidebar">
         <a className="mc-brand" href="#overview" onClick={() => navigate('overview')}>
-          <img src="/favicon.svg" alt="" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
           <span>
             <strong>晓球</strong>
             <small>管理中心</small>
@@ -147,7 +148,7 @@ export function AdminCenter({
           ))}
         </nav>
         <div className="mc-sidebar-bottom">
-          <a href="http://127.0.0.1:3000/" target="_blank" rel="noreferrer">
+          <a href={publicWebsiteHref()} target="_blank" rel="noreferrer">
             打开晓球网站 <span>↗</span>
           </a>
           <div className="mc-account">
