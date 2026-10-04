@@ -32,6 +32,7 @@ import {
   resolveMediaUrl,
 } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { loadHomeWithEmptyState, type HomeLoadState } from '../../features/product/home-loading'
 import type {
   HomeResponse,
   MatchSummary,
@@ -42,10 +43,7 @@ import type {
 
 import './index.scss'
 
-type PageState =
-  | { phase: 'loading' }
-  | { phase: 'failed'; message: string }
-  | { phase: 'ready'; data: HomeResponse }
+type PageState = HomeLoadState<HomeResponse>
 
 const searchCategories: Array<{ key: SearchCategory; label: string }> = [
   { key: 'ALL', label: '全部' },
@@ -104,7 +102,14 @@ export default function IndexPage() {
   const load = useCallback(async () => {
     setState({ phase: 'loading' })
     try {
-      setState({ phase: 'ready', data: await productRepository.getHome() })
+      setState(
+        Taro.getEnv() === Taro.ENV_TYPE.WEB
+          ? await loadHomeWithEmptyState(
+              () => productRepository.getHome(),
+              () => productRepository.getPublishedTournaments(),
+            )
+          : { phase: 'ready', data: await productRepository.getHome() },
+      )
     } catch (error) {
       setState({
         phase: 'failed',
@@ -317,6 +322,14 @@ export default function IndexPage() {
           kind="error"
           title="暂时无法连接赛事数据"
           description={state.message}
+          onRetry={() => void load()}
+        />
+      )}
+      {!searchMode && state.phase === 'empty' && (
+        <DataState
+          kind="empty"
+          title="暂无已发布赛事"
+          description="当前组织还没有已发布赛事。赛事管理员发布后，赛程和赛事数据会出现在这里。"
           onRetry={() => void load()}
         />
       )}

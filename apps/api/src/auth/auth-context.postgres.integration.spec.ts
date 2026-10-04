@@ -4,6 +4,7 @@ import test from 'node:test'
 
 import { Controller, Get, Headers, Inject, Param, type INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { ERROR_CODES } from '@xiaoqiu/contracts'
 import request from 'supertest'
 
 import { AppModule } from '../app.module'
@@ -119,7 +120,7 @@ test(
       const other = await prisma.organization.create({
         data: { slug: `context-other-${suffix}`, name: 'FICTIONAL_TEST 其他组织' },
       })
-      const createUser = async (label: string) =>
+      const createUser = async (label: string, memberOrganizationId = organization.id) =>
         prisma.user.create({
           data: {
             loginNameNormalized: `context-${suffix}-${label}`,
@@ -128,7 +129,7 @@ test(
             studentId: `FAKE-${suffix}-${label}`,
             email: `${label}-${suffix}@example.invalid`,
             emailNormalized: `${label}-${suffix}@example.invalid`,
-            memberships: { create: { organizationId: organization.id, status: 'ACTIVE' } },
+            memberships: { create: { organizationId: memberOrganizationId, status: 'ACTIVE' } },
             passwordCredential: {
               create: {
                 passwordHash: digest.hash,
@@ -319,10 +320,10 @@ test(
       configureApp(app)
       await app.init()
       const server = app.getHttpServer()
-      const login = async (account: typeof student) => {
+      const login = async (account: typeof student, memberOrganizationId = organization.id) => {
         const response = await request(server)
           .post('/api/auth/login')
-          .set('x-organization-id', organization.id)
+          .set('x-organization-id', memberOrganizationId)
           .send({ username: account.loginNameNormalized, password })
           .expect(200)
         return `Bearer ${response.body.accessToken as string}`
@@ -335,6 +336,51 @@ test(
       const captainToken = await login(captain)
       const reporterToken = await login(reporter)
       const tournamentReporterToken = await login(tournamentReporter)
+
+      await t.test(
+        'a fresh active organization has an authenticated 404 home and a 200 empty published list',
+        async () => {
+          const emptyOrganization = await prisma.organization.create({
+            data: { slug: `context-empty-${suffix}`, name: 'FICTIONAL_TEST 空联调组织' },
+          })
+          const emptyUser = await createUser('empty', emptyOrganization.id)
+          const token = await login(emptyUser, emptyOrganization.id)
+          process.env.NODE_ENV = 'production'
+          try {
+            await request(server)
+              .get('/api/public/home')
+              .set('x-organization-id', emptyOrganization.id)
+              .expect(401)
+            const home = await request(server)
+              .get('/api/public/home')
+              .set('authorization', token)
+              .expect(404)
+            assert.equal(home.body.code, ERROR_CODES.NOT_FOUND)
+            assert.equal(home.body.message, '当前组织没有可读取的已发布赛事')
+            const tournaments = await request(server)
+              .get('/api/public/tournaments')
+              .set('authorization', token)
+              .expect(200)
+            assert.deepEqual(tournaments.body, { items: [] })
+            const seasons = await request(server)
+              .get('/api/public/seasons')
+              .set('authorization', token)
+              .expect(200)
+            assert.deepEqual(seasons.body, [])
+            assert.equal(
+              await prisma.season.count({ where: { organizationId: emptyOrganization.id } }),
+              0,
+            )
+            assert.equal(
+              await prisma.tournament.count({ where: { organizationId: emptyOrganization.id } }),
+              0,
+            )
+            await request(server).post('/api/auth/logout').set('authorization', token).expect(204)
+          } finally {
+            process.env.NODE_ENV = 'test'
+          }
+        },
+      )
 
       await t.test(
         'account-only public reads reject guests, forged headers and revoked sessions',
