@@ -24,8 +24,8 @@ export interface GuestEntryPolicy extends FeatureAvailability {
 export interface ProductConfiguration {
   schemaVersion: 1
   revision: string
-  accountRequired: true
-  serverGuestAccess: false
+  accountRequired: boolean
+  serverGuestAccess: boolean
   guest: GuestEntryPolicy
   sport: { format: 'EIGHT_A_SIDE'; playersPerSide: 8 }
   modules: Record<ProductModuleId, FeatureAvailability>

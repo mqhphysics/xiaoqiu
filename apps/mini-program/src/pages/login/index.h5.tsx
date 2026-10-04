@@ -6,12 +6,10 @@ import brandMark from '../../assets/home-visual/brand-mark.png'
 import { AuthRecoveryDialog } from '../../components/auth-recovery/index.h5'
 import { AuthScene } from '../../components/auth-scene/index.h5'
 import { productRepository } from '../../features/product/product.repository'
-import { enterGuestMode, readSession } from '../../features/product/session'
+import { readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
-import {
-  CLOSED_GUEST_POLICY,
-  runFeatureAction,
-} from '../../features/product-config/product-config.logic'
+import { CLOSED_GUEST_POLICY } from '../../features/product-config/product-config.logic'
+import { dispatchGuestEntry } from '../../features/product-config/guest-entry.logic'
 import { useProductConfiguration } from '../../features/product-config/use-product-config.h5'
 import ExistingLoginPage from './login.shared'
 
@@ -33,6 +31,13 @@ const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS ==
 export default function H5LoginPage() {
   const { configuration } = useProductConfiguration()
   const guestPolicy = configuration?.guest ?? CLOSED_GUEST_POLICY
+  const onGuestEntry = async () => {
+    await dispatchGuestEntry(
+      guestPolicy,
+      (options) => Taro.reLaunch(options),
+      (title) => Taro.showToast({ title, icon: 'none', duration: 2200 }),
+    )
+  }
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   useEffect(() => {
     const query = window.matchMedia('(min-width: 1024px)')
@@ -41,13 +46,19 @@ export default function H5LoginPage() {
     return () => query.removeEventListener('change', update)
   }, [])
   return desktop ? (
-    <ArtLoginPage guestPolicy={guestPolicy} />
+    <ArtLoginPage guestPolicy={guestPolicy} onGuestEntry={onGuestEntry} />
   ) : (
-    <ExistingLoginPage allowGuest={false} guestPolicy={guestPolicy} />
+    <ExistingLoginPage allowGuest={false} guestPolicy={guestPolicy} onGuestEntry={onGuestEntry} />
   )
 }
 
-function ArtLoginPage({ guestPolicy }: { guestPolicy: typeof CLOSED_GUEST_POLICY }) {
+function ArtLoginPage({
+  guestPolicy,
+  onGuestEntry,
+}: {
+  guestPolicy: typeof CLOSED_GUEST_POLICY
+  onGuestEntry: () => Promise<void>
+}) {
   const [screen, setScreen] = useState<'login' | 'register'>('login')
   const [method, setMethod] = useState<'password' | 'email'>('password')
   const [identifier, setIdentifier] = useState('')
@@ -365,16 +376,7 @@ function ArtLoginPage({ guestPolicy }: { guestPolicy: typeof CLOSED_GUEST_POLICY
             <button
               type="button"
               className="art-login__control art-login__guest"
-              onClick={() =>
-                void runFeatureAction(
-                  guestPolicy,
-                  async () => {
-                    enterGuestMode()
-                    await Taro.reLaunch({ url: '/pages/index/index' })
-                  },
-                  (title) => Taro.showToast({ title, icon: 'none', duration: 2200 }),
-                )
-              }
+              onClick={() => void onGuestEntry()}
             >
               以游客身份浏览
             </button>

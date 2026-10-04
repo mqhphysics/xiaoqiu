@@ -37,14 +37,16 @@ export function parseProductConfiguration(value: unknown): ProductConfiguration 
     root.schemaVersion !== 1 ||
     typeof root.revision !== 'string' ||
     !root.revision ||
-    root.accountRequired !== true ||
-    root.serverGuestAccess !== false ||
+    typeof root.accountRequired !== 'boolean' ||
+    typeof root.serverGuestAccess !== 'boolean' ||
     sport.format !== 'EIGHT_A_SIDE' ||
     sport.playersPerSide !== 8
   ) {
     throw new Error('产品配置版本不兼容，请联系管理员')
   }
   const input = record(root.modules)
+  const guestEnabled =
+    guest.enabled === true && root.serverGuestAccess === true && root.accountRequired === false
   const modules = Object.fromEntries(
     moduleIds.map((id) => {
       const availability = record(input[id])
@@ -55,10 +57,13 @@ export function parseProductConfiguration(value: unknown): ProductConfiguration 
   return {
     schemaVersion: 1,
     revision: root.revision,
-    accountRequired: true,
-    serverGuestAccess: false,
-    // This release deliberately has no anonymous business access, even if a server flag is wrong.
-    guest: { visible: guest.visible !== false, enabled: false, reason: safeReason(guest.reason) },
+    accountRequired: root.accountRequired,
+    serverGuestAccess: root.serverGuestAccess,
+    guest: {
+      visible: guest.visible !== false,
+      enabled: guestEnabled,
+      reason: guestEnabled ? null : safeReason(guest.reason),
+    },
     sport: { format: 'EIGHT_A_SIDE', playersPerSide: 8 },
     modules,
   }

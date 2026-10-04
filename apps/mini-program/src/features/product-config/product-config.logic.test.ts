@@ -32,9 +32,28 @@ test('unknown modules, missing flags and a misleading guest flag never open rest
     {},
     { ...configuration, schemaVersion: 2 },
     { ...configuration, sport: { format: 'ELEVEN_A_SIDE', playersPerSide: 11 } },
-    { ...configuration, serverGuestAccess: true },
+    { ...configuration, accountRequired: 'false' },
+    { ...configuration, serverGuestAccess: 'true' },
   ])
     assert.throws(() => parseProductConfiguration(input))
+})
+
+test('guest entry is enabled only when all three backend decisions consistently allow it', () => {
+  for (const accountRequired of [true, false]) {
+    for (const serverGuestAccess of [true, false]) {
+      for (const enabled of [true, false]) {
+        const result = parseProductConfiguration({
+          ...configuration,
+          accountRequired,
+          serverGuestAccess,
+          guest: { visible: true, enabled },
+        })
+        assert.equal(result.guest.enabled, enabled && serverGuestAccess && !accountRequired)
+        assert.equal(result.accountRequired, accountRequired)
+        assert.equal(result.serverGuestAccess, serverGuestAccess)
+      }
+    }
+  }
 })
 
 test('closed buttons remain clickable, explain availability and never execute the business action', async () => {

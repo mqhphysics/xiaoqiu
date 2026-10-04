@@ -25,9 +25,11 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
 export default function LoginPage({
   allowGuest = true,
   guestPolicy,
+  onGuestEntry,
 }: {
   allowGuest?: boolean
   guestPolicy?: GuestEntryPolicy
+  onGuestEntry?: () => Promise<void>
 }) {
   const [screenMode, setScreenMode] = useState<ScreenMode>('login')
   const [loginMode, setLoginMode] = useState<LoginMode>('password')
@@ -117,12 +119,14 @@ export default function LoginPage({
   }
 
   const enterAsGuest = async () => {
-    if (guestPolicy && !guestPolicy.enabled) {
-      await Taro.showToast({
-        title: guestPolicy.reason || '功能暂未开放',
-        icon: 'none',
-        duration: 2200,
-      })
+    if (guestPolicy) {
+      if (guestPolicy.enabled && onGuestEntry) await onGuestEntry()
+      else
+        await Taro.showToast({
+          title: guestPolicy.reason || '功能暂未开放',
+          icon: 'none',
+          duration: 2200,
+        })
       return
     }
     enterGuestMode()

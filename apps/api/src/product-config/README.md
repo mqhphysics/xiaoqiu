@@ -2,7 +2,9 @@
 
 `GET /api/product/config` 可匿名访问，只返回产品开关，不包含组织、账号或赛事数据。`GET /api/me/capabilities` 必须由 `AuthService.requireSession` 当次验证会话；组织选择不一致返回 403。名称含 `public/` 的球队、赛事等业务接口继续要求登录。
 
-公共契约源为 `packages/contracts/src/product-config.ts`，集成负责人将它从 contracts/index 导出，并在 AppModule 接入 ProductConfigModule。当前固定 `EIGHT_A_SIDE / playersPerSide=8`；`accountRequired=true / serverGuestAccess=false / guest.enabled=false` 不受环境变量覆盖。游客按钮保留原名称并可点击，未开放点击提示“功能暂未开放”，不写游客存储、不导航。未来开放匿名业务需要真实服务端授权及会话边界实现，不能只改一个显示开关。
+公共契约源为 `packages/contracts/src/product-config.ts`，集成负责人将它从 contracts/index 导出，并在 AppModule 接入 ProductConfigModule。当前固定 `EIGHT_A_SIDE / playersPerSide=8`；当前服务返回 `accountRequired=true / serverGuestAccess=false / guest.enabled=false`，不受环境变量覆盖。契约中 accountRequired/serverGuestAccess 使用 boolean 保留后续真实游客能力的兼容性。客户端仅当 `guest.enabled===true && serverGuestAccess===true && accountRequired===false` 时启用进入动作，不一致或未知类型继续关闭。游客按钮保留原名称并可点击，未开放点击提示“功能暂未开放”，不写游客存储、不导航。
+
+桌面及移动 H5 的同一按钮经 `dispatchGuestEntry` 调用真实 `Taro.reLaunch({url:'/pages/index/index'})`，enabled 分支不调用会 throw 的旧 session.h5.enterGuestMode，也不伪造账号/游客会话。未来后端真实游客功能上线可继续返回此 v1 契约而无需更换按钮。整站接线仍需集成负责人处理：AccountBoundary 当前无 token 返回登录，且 accessible 只允许账号入口或已验证会话；productRepository 当前 H5 无 session 会直接抛 401。二者应复用同一已校验的三开关一致结果，在未来真实服务端支持后允许明确匿名只读路由与读取请求，写操作继续要求会话、角色及对象权限。不要用 localStorage 的 guest 标志做权限依据。本子任务不修改这两处，也不实现匿名业务权限放行；当前服务器 anonymous business 401 保持不变。
 
 模块环境变量只接受 `1`、`true` 开启及 `0`、`false` 关闭，大小写和首尾空格归一；未指定保留现有功能，其他非空值按关闭处理：
 
@@ -28,6 +30,6 @@
 
 前端 `productConfigRepository` 匿名配置请求不发送 token/组织；配置 hook 首次及窗口 focus 刷新，获取失败/未知 schema/缺失键关闭入口。`runFeatureAction` 为未开放按钮提供统一提示，已开放执行原业务动作；`capabilityAllows` 只判断同类型同 ID 的明确 scope。组织级管理能力返回 ORGANIZATION scope，调用方应按当前组织上下文判断；最终服务端仍核对对象。登录页已使用配置，其余公共导航与角色入口由集成负责人接此 repository/helper，避免与其他任务的壳层和“我的”页面冲突。
 
-微信共享登录页仅新增可选 guestPolicy；未传属性时保留原 allowGuest 行为。本轮只构建与验证 H5，微信构建/真机不在此子任务验收范围。
+微信共享登录页新增可选 guestPolicy/onGuestEntry；有 guestPolicy 时仅其 enabled 且有真实 callback 才委托进入，无 callback 继续提示未开放。未传 guestPolicy 时保留原 allowGuest 行为。本轮只构建与验证 H5，微信构建/真机不在此子任务验收范围。
 
-本分支验证（2026-10-04，Node 22.14.0）：API 配置/能力/HTTP 定向测试 11/11，H5 全量测试 85/85，contracts/API/H5 TypeScript、变更范围 ESLint 与 H5 构建通过。H5 构建保留既有资产/入口体积警告。API 单元和 HTTP 测试使用明确测试 fixture/mock，不连接公网或真实组织数据库；HTTP 测试只临时监听随机 loopback 端口并在 after 关闭，没有保留预览服务。生产模块接线、A/B 真实数据库权限、整轮数据库回归及浏览器截图由集成负责人验收；没有在当前公网数据库执行迁移或更改现有服务。
+本分支验证（2026-10-04，Node 22.14.0）：API 配置/能力/HTTP 定向测试 11/11，游客契约增量后 H5 全量测试 88/88，contracts/API/H5 TypeScript、变更范围 ESLint 与 H5 构建通过。新增测试覆盖三开关八种组合、未来一致开启后的真实首页路由 dispatch、不一致/当前关闭时不导航、错误类型继续拒绝。H5 构建保留既有资产/入口体积警告。API 单元和 HTTP 测试使用明确测试 fixture/mock，不连接公网或真实组织数据库；HTTP 测试只临时监听随机 loopback 端口并在 after 关闭，没有保留预览服务。生产模块接线、A/B 真实数据库权限、整轮数据库回归及浏览器截图由集成负责人验收；没有在当前公网数据库执行迁移或更改现有服务。
