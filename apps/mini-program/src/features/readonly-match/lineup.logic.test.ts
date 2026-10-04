@@ -4,8 +4,10 @@ import {
   collectPlayerEvents,
   hasPublishedPositions,
   lineupGroups,
+  lineupHasAppearances,
   minuteLabel,
   playerEventDetails,
+  playerAppearanceLabel,
   type MatchEvent,
   type MatchLineup,
 } from './lineup.logic.ts'
@@ -65,6 +67,34 @@ test('substitute can enter, score, assist and later leave; both paired transitio
     '换下 81′',
   ])
   assert.deepEqual(events.get('second')?.on, ['81′'])
+})
+
+test('unconfirmed data never supplies starters and confirmed plans do not invent appearances', () => {
+  const player = {
+    id: 'confirmed-player',
+    displayName: 'DEMO_FIXTURE 队员',
+    shirtNumber: '8',
+    position: null,
+    starter: true,
+    minutesPlayed: null,
+  }
+  const unconfirmed: MatchLineup = { team, lineupSource: 'UNAVAILABLE', players: [player] }
+  assert.deepEqual(lineupGroups(unconfirmed), { starters: [], substitutes: [] })
+  const confirmed: MatchLineup = {
+    ...unconfirmed,
+    lineupSource: 'CONFIRMED_MATCH_LINEUP',
+    appearanceRecorded: false,
+  }
+  assert.equal(lineupGroups(confirmed).starters.length, 1)
+  assert.equal(lineupHasAppearances(confirmed), false)
+  assert.equal(playerAppearanceLabel(player, false), '实际出场未录入')
+  assert.equal(playerAppearanceLabel({ ...player, minutesPlayed: 0 }, false), '实际出场未录入')
+  assert.equal(playerAppearanceLabel({ ...player, minutesPlayed: 60 }, true), '60 分钟')
+  assert.equal(playerAppearanceLabel(player, true), '出场分钟未提供')
+  assert.equal(
+    playerAppearanceLabel({ ...player, starter: false, minutesPlayed: 0 }, true),
+    '未出场',
+  )
 })
 
 test('own goals, penalties and opposite-team events cannot create false assists or goals', () => {

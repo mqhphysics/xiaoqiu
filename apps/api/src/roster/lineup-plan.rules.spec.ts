@@ -44,9 +44,23 @@ test('duplicate positions, duplicate starters/bench and mismatched context are r
   duplicate.payload.slots[1]!.slotId = duplicate.payload.slots[0]!.slotId
   assert.throws(() => validateLineupPlan(duplicate), /编号/)
   const wrongFormat = fixture()
-  wrongFormat.payload.format = 7
-  assert.throws(() => validateLineupPlan(wrongFormat), /数量/)
+  Object.assign(wrongFormat.payload, { format: 7 })
+  assert.throws(() => validateLineupPlan(wrongFormat), /八人制/)
   const wrongKind = fixture()
   wrongKind.matchId = randomUUID()
   assert.throws(() => validateLineupPlan(wrongKind), /普通战术/)
+})
+
+test('non-eight formats are rejected even when their slot counts match', () => {
+  for (const format of [5, 7, 11]) {
+    const input = fixture()
+    Object.assign(input.payload, {
+      format,
+      slots: Array.from({ length: format }, (_, index) => ({
+        ...input.payload.slots[index % 8]!,
+        slotId: `slot-${index}`,
+      })),
+    })
+    assert.throws(() => validateLineupPlan(input), /八人制/)
+  }
 })

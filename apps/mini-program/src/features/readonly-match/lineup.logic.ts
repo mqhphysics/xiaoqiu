@@ -3,13 +3,25 @@ import type { MatchExperienceResponse } from '../product/product.types.ts'
 export type MatchEvent = MatchExperienceResponse['events'][number]
 export type MatchLineup = Omit<
   MatchExperienceResponse['lineups'][number],
-  'players' | 'formation' | 'lineupSource'
+  | 'players'
+  | 'formation'
+  | 'lineupSource'
+  | 'appearanceRecorded'
+  | 'confirmedVersion'
+  | 'confirmedAt'
 > & {
   formation?: string | null
   lineupSource?: string
+  appearanceRecorded?: boolean
+  confirmedVersion?: number | null
+  confirmedAt?: string | null
   players: Array<
-    Omit<MatchExperienceResponse['lineups'][number]['players'][number], 'pitchPosition'> & {
+    Omit<
+      MatchExperienceResponse['lineups'][number]['players'][number],
+      'pitchPosition' | 'minutesPlayed'
+    > & {
       pitchPosition?: { x: number; y: number } | null
+      minutesPlayed: number | null
     }
   >
 }
@@ -109,11 +121,28 @@ export function playerEventDetails(events: PlayerMatchEvents | undefined): strin
 }
 
 export function lineupGroups(lineup: MatchLineup) {
+  if (lineup.lineupSource === 'UNAVAILABLE') return { starters: [], substitutes: [] }
   // Only the explicit appearance/lineup flag defines a starter; a roster is not a lineup.
   return {
     starters: lineup.players.filter((player) => player.starter),
     substitutes: lineup.players.filter((player) => !player.starter),
   }
+}
+
+export function lineupHasAppearances(lineup: MatchLineup): boolean {
+  return lineup.appearanceRecorded ?? lineup.lineupSource !== 'CONFIRMED_MATCH_LINEUP'
+}
+
+export function playerAppearanceLabel(
+  player: MatchLineup['players'][number],
+  recorded: boolean,
+  events?: PlayerMatchEvents,
+): string {
+  if (!recorded) return '实际出场未录入'
+  if (player.minutesPlayed !== null && player.minutesPlayed > 0)
+    return `${player.minutesPlayed} 分钟`
+  if (player.minutesPlayed === null || player.starter || events?.on.length) return '出场分钟未提供'
+  return '未出场'
 }
 
 export function hasPublishedPositions(players: MatchLineup['players']): boolean {

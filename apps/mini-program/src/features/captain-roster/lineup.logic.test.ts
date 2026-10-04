@@ -20,19 +20,20 @@ const players = Array.from({ length: 14 }, (_, i) => ({
   avatarUrl: null,
   position: i === 0 ? 'GOALKEEPER' : i < 5 ? 'DEFENDER' : i < 10 ? 'MIDFIELDER' : 'FORWARD',
 }))
-test('formation switch keeps selected starters and goalkeeper, smaller teams return extras to bench', () => {
+test('every offered formation has eight positions and switching keeps starters and goalkeeper', () => {
   const initial = fillByPosition(createFormation(), players)
-  for (const formation of FORMATIONS.filter((item) => item.format === 11)) {
+  assert.equal(initial.slots.length, 8)
+  assert.ok(FORMATIONS.every((formation) => formation.format === 8))
+  for (const formation of FORMATIONS) {
     const changed = createFormation(formation.name, initial)
     assert.deepEqual(
       changed.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])).sort(),
       initial.slots.flatMap((slot) => (slot.playerId ? [slot.playerId] : [])).sort(),
     )
     assert.equal(changed.slots.find((slot) => slot.label === 'GK')!.playerId, 'player-0')
+    assert.equal(changed.slots.length, 8)
   }
-  const smaller = createFormation('1-2-1', initial)
-  assert.equal(smaller.slots.filter((slot) => slot.playerId).length, 5)
-  assert.equal(smaller.slots.find((slot) => slot.label === 'GK')!.playerId, 'player-0')
+  assert.equal(createFormation('4-3-3', initial).slots.length, 8)
 })
 test('occupied drops swap identities; bench replacement demotes the displaced player; removing never creates duplicates', () => {
   const initial = fillByPosition(createFormation(), players)
@@ -50,7 +51,7 @@ test('occupied drops swap identities; bench replacement demotes the displaced pl
   const removed = assignPlayer(replaced, 'player-13', null)
   assert.equal(removed.slots[1]!.playerId, null)
   assert.equal(assignPlayer(initial, first.playerId!, 'missing'), initial)
-  assert.equal(new Set(swapped.slots.map((slot) => slot.playerId)).size, 11)
+  assert.equal(new Set(swapped.slots.map((slot) => slot.playerId)).size, 8)
 })
 test('draft restore removes departed players and duplicates, clamps coordinates and rejects malformed storage', () => {
   const initial = fillByPosition(createFormation(), players)
@@ -84,6 +85,17 @@ test('custom positioning remains in the pitch and rejects nonfinite gesture coor
   assert.equal(moved.slots[0]!.x, 8)
   assert.equal(moved.slots[0]!.y, 91)
   assert.equal(moveSlot(draft, draft.slots[0]!.id, NaN, 10), draft)
+})
+
+test('legacy non-eight drafts are not silently promoted to a new starting lineup', () => {
+  const draft = createFormation()
+  for (const size of [5, 7, 11]) {
+    const slots = Array.from({ length: size }, (_, index) => ({
+      ...draft.slots[index % 8]!,
+      id: `legacy-${index}`,
+    }))
+    assert.equal(restoreDraft({ ...draft, slots }, players), null)
+  }
 })
 test('eight starters, one substitute and one unassigned survive restore without silently adding bench players', () => {
   const squad = players.slice(0, 10)
@@ -135,4 +147,13 @@ test('refresh chooses the selected server plan or the most recently saved releva
   assert.equal(selectSavedLineupPlan(plans, 'current', 'missing')?.id, 'new')
   assert.equal(selectSavedLineupPlan(plans, 'current', 'other')?.id, 'new')
   assert.equal(selectSavedLineupPlan([], 'current', 'old'), undefined)
+})
+
+test('refresh opens the team default when no explicit saved plan was selected', () => {
+  const plans = [
+    { id: 'recent-match', tournamentId: 'current', updatedAt: '2026-10-04T12:00:00Z' },
+    { id: 'team-default', tournamentId: null, updatedAt: '2026-10-03T12:00:00Z', isDefault: true },
+  ]
+  assert.equal(selectSavedLineupPlan(plans, 'current', '')?.id, 'team-default')
+  assert.equal(selectSavedLineupPlan(plans, 'current', 'recent-match')?.id, 'recent-match')
 })

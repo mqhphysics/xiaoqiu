@@ -57,7 +57,6 @@ export default function LineupBoard({
   const [ownerInvalid, setOwnerInvalid] = useState(false)
   const [kind, setKind] = useState<'TACTIC' | 'MATCH_LINEUP'>('TACTIC')
   const [tacticScope, setTacticScope] = useState<'TEAM' | 'TOURNAMENT'>('TEAM')
-  const [matchFormat, setMatchFormat] = useState<5 | 7 | 8 | 11>(8)
   const [matchId, setMatchId] = useState('')
   const [boundPlayers, setBoundPlayers] = useState<LineupPlayer[] | null>(null)
   const [boundSnapshotId, setBoundSnapshotId] = useState<string | null>(null)
@@ -102,6 +101,12 @@ export default function LineupBoard({
   const [cloudPlan, setCloudPlan] = useState<LineupPlanView | null>(null)
   const [cloudError, setCloudError] = useState('')
   const [cloudBusy, setCloudBusy] = useState(false)
+  const [pendingPublication, setPendingPublication] = useState<{
+    planId: string
+    action: 'DEFAULT' | 'CONFIRM'
+    expectedVersion: number
+    key: string
+  } | null>(null)
   const [cloudLoading, setCloudLoading] = useState(true)
   const [planHistory, setPlanHistory] = useState<LineupPlanHistory | null>(null)
   const [pendingSave, setPendingSave] = useState<{ input: SaveLineupPlan; key: string } | null>(
@@ -175,6 +180,13 @@ export default function LineupBoard({
       const result = await lineupPlanRepository.list(teamId)
       if (alive.current) {
         setPlans(result.items)
+        setCloudPlan((current) =>
+          current
+            ? (result.items.find(
+                (plan) => plan.id === current.id && plan.version === current.version,
+              ) ?? current)
+            : current,
+        )
         setCloudError('')
         if (!initialPlanLoaded.current) {
           initialPlanLoaded.current = true
@@ -184,7 +196,13 @@ export default function LineupBoard({
           } catch {
             /* Read from the server list below. */
           }
-          const saved = selectSavedLineupPlan(result.items, tournamentId, selectedPlanId)
+          const saved = selectSavedLineupPlan(
+            result.items.filter(
+              (plan) => plan.payload.format === 8 && plan.payload.slots.length === 8,
+            ),
+            tournamentId,
+            selectedPlanId,
+          )
           if (saved && !dirtyRef.current) await openPlan(saved.id, saved)
         }
       }
@@ -226,7 +244,7 @@ export default function LineupBoard({
   }, [draft])
 
   const change = (next: LineupDraft, message?: string) => {
-    if (cloudBusy || pendingSave) {
+    if (cloudBusy || pendingSave || pendingPublication) {
       setNotice('上一次云端保存尚未确认，请先重试原请求。')
       return
     }
@@ -444,7 +462,7 @@ export default function LineupBoard({
   }
 
   const openPlan = async (id: string, latestPlan?: LineupPlanView) => {
-    if (cloudBusy || pendingSave) return
+    if (cloudBusy || pendingSave || pendingPublication) return
     if (dirty) {
       const answer = await Taro.showModal({
         title: '切换云端计划',
@@ -477,7 +495,6 @@ export default function LineupBoard({
     }
     setKind(plan.kind)
     setTacticScope(plan.tournamentId ? 'TOURNAMENT' : 'TEAM')
-    if (plan.kind === 'MATCH_LINEUP') setMatchFormat(plan.payload.format)
     setBoundPlayers(plan.kind === 'MATCH_LINEUP' ? plan.snapshotPlayers : null)
     setBoundSnapshotId(plan.rosterSnapshotId)
     setBoundSnapshotVersion(plan.rosterSnapshotVersion)
@@ -497,7 +514,7 @@ export default function LineupBoard({
     }
   }
   const chooseKind = async (nextKind: 'TACTIC' | 'MATCH_LINEUP') => {
-    if (cloudBusy || pendingSave || cloudPlan) return
+    if (cloudBusy || pendingSave || pendingPublication || cloudPlan) return
     setCloudBusy(true)
     try {
       let next =
@@ -506,10 +523,9 @@ export default function LineupBoard({
       if (nextKind === 'MATCH_LINEUP') {
         const workflow = await rosterRepository.read(tournamentId, teamId)
         const format = workflow.policy?.playersOnPitch
-        if (!format) throw new Error('赛事尚未配置首发人数，请联系赛事管理员。')
+        if (format !== 8) throw new Error('本赛事须配置八人制首发人数，请联系赛事管理员。')
         if (!workflow.lockedSnapshot) throw new Error('本队尚无赛事锁定名单，不能编排单场阵容。')
         setBoundPlayers(workflow.lockedSnapshot.players)
-        setMatchFormat(format)
         setBoundSnapshotId(workflow.lockedSnapshot.id)
         setBoundSnapshotVersion(workflow.lockedSnapshot.version)
         next = restoreDraft(next, workflow.lockedSnapshot.players) ?? createFormation('3-3-1')
@@ -529,8 +545,8 @@ export default function LineupBoard({
       setCloudError('')
       setNotice(
         nextKind === 'MATCH_LINEUP'
-          ? '已按赛事人数设置阵型，单场阵容只能选择锁定名单中的球员。'
-          : '普通战术可安排本队现役成员。',
+          ? '八人制单场计划仅使用锁定名单；保存后还需明确确认本场首发。'
+          : '球队阵容计划可安排本队现役成员；设为默认后仍不会代替单场首发。',
       )
     } catch (error) {
       if (alive.current) setCloudError(error instanceof Error ? error.message : '赛事规程读取失败')
@@ -539,7 +555,11 @@ export default function LineupBoard({
     }
   }
   const saveCloud = async (retry = false) => {
-    if (sending.current) return
+    if (sending.current || pendingPublication) return
+    if (!hasSameOwner()) {
+      setOwnerInvalid(true)
+      return
+    }
     let request = retry ? pendingSave : null
     if (!request) {
       if (!draft.name.trim()) {
@@ -575,7 +595,7 @@ export default function LineupBoard({
             rosterSnapshotId: kind === 'MATCH_LINEUP' ? boundSnapshotId : null,
             payload: {
               formation: draft.formation,
-              format: draft.slots.length as 5 | 7 | 8 | 11,
+              format: 8,
               slots: draft.slots.map((slot) => ({
                 slotId: slot.id,
                 label: slot.label,
@@ -607,7 +627,14 @@ export default function LineupBoard({
       setPendingSave(null)
       setDirty(false)
       setPlanHistory(null)
-      setNotice(`已保存到云端「${result.name}」v${result.version}；本队获授权队长可重新读取。`)
+      setNotice(
+        `已保存「${result.name}」v${result.version}。` +
+          (result.kind === 'MATCH_LINEUP'
+            ? result.confirmedVersion
+              ? `本场仍使用已确认 v${result.confirmedVersion}，新修改需再次确认。`
+              : '本场首发尚未确认，保存计划不会自动公布。'
+            : '队长与教练可管理球队阵容，默认阵容不代替单场首发。'),
+      )
       try {
         Taro.setStorageSync(`${storageKey}:cloud-plan`, result.id)
         Taro.setStorageSync(storageKey, draft)
@@ -620,6 +647,136 @@ export default function LineupBoard({
       if (!(error instanceof RosterApiError) || error.status >= 500 || error.status === 0)
         setPendingSave(request)
       else setPendingSave(null)
+    } finally {
+      sending.current = false
+      if (alive.current) setCloudBusy(false)
+    }
+  }
+
+  const refreshLockedRoster = async () => {
+    if (sending.current || pendingSave || pendingPublication || kind !== 'MATCH_LINEUP') return
+    if (!hasSameOwner()) {
+      setOwnerInvalid(true)
+      return
+    }
+    sending.current = true
+    setCloudBusy(true)
+    setCloudError('')
+    try {
+      const workflow = await rosterRepository.read(tournamentId, teamId)
+      if (!alive.current) return
+      if (workflow.policy?.playersOnPitch !== 8)
+        throw new Error('本赛事须配置八人制首发人数，请联系赛事管理员。')
+      if (!workflow.lockedSnapshot) throw new Error('本队尚无赛事锁定名单，不能确认单场首发。')
+      const snapshot = workflow.lockedSnapshot
+      if (snapshot.id === boundSnapshotId) {
+        setNotice('当前计划已绑定最新锁定名单。')
+        return
+      }
+      setBoundPlayers(snapshot.players)
+      setBoundSnapshotId(snapshot.id)
+      setBoundSnapshotVersion(snapshot.version)
+      setDraft(restoreDraft(draft, snapshot.players) ?? createFormation())
+      setHistory([])
+      setFuture([])
+      setDirty(true)
+      setNotice(
+        `已绑定锁定名单 v${snapshot.version}；离队球员已移出计划。请补齐八人、保存并重新确认。此前确认的首发保持原版本。`,
+      )
+    } catch (error) {
+      if (alive.current) setCloudError(error instanceof Error ? error.message : '锁定名单读取失败')
+    } finally {
+      sending.current = false
+      if (alive.current) setCloudBusy(false)
+    }
+  }
+
+  const publishPlan = async (action: 'DEFAULT' | 'CONFIRM', retry = false) => {
+    if (sending.current || pendingSave || (pendingPublication && !retry)) return
+    if (!hasSameOwner()) {
+      setOwnerInvalid(true)
+      return
+    }
+    let command = retry ? pendingPublication : null
+    if (!command) {
+      if (!cloudPlan || dirty) {
+        setCloudError('请先保存当前修改，再操作保存的阵容版本。')
+        return
+      }
+      if (action === 'CONFIRM') {
+        sending.current = true
+        setCloudBusy(true)
+        try {
+          const answer = await Taro.showModal({
+            title: '确认本场八人首发',
+            content: `确认「${cloudPlan.name}」v${cloudPlan.version} 为本场首发？这会替换本队本场此前已确认的阵容。球队默认阵容不会参与此操作。`,
+            confirmText: '确认首发',
+          })
+          if (!answer.confirm) return
+          if (!hasSameOwner()) {
+            setOwnerInvalid(true)
+            return
+          }
+        } catch {
+          setCloudError('确认窗口未能打开，请重试。')
+          return
+        } finally {
+          sending.current = false
+          if (alive.current) setCloudBusy(false)
+        }
+      }
+      command = {
+        planId: cloudPlan.id,
+        action,
+        expectedVersion: cloudPlan.version,
+        key: createClientActionId('lineup-publication'),
+      }
+    }
+    sending.current = true
+    setCloudBusy(true)
+    setCloudError('')
+    try {
+      const result = await lineupPlanRepository.publish(
+        teamId,
+        command.planId,
+        command.action,
+        command.expectedVersion,
+        command.key,
+      )
+      if (!alive.current) return
+      setCloudPlan(result)
+      setPlans((items) => [
+        result,
+        ...items
+          .filter((item) => item.id !== result.id)
+          .map((item) =>
+            command.action === 'DEFAULT'
+              ? { ...item, isDefault: false }
+              : item.matchId === result.matchId
+                ? {
+                    ...item,
+                    confirmedVersion: null,
+                    confirmedAt: null,
+                    confirmedByUserId: null,
+                    hasUnconfirmedChanges: false,
+                  }
+                : item,
+          ),
+      ])
+      setPendingPublication(null)
+      setNotice(
+        command.action === 'DEFAULT'
+          ? `「${result.name}」已设为球队默认阵容；每场比赛仍需单独确认首发。`
+          : `已确认本场首发 v${result.confirmedVersion}；之后保存的修改需再次确认才会公布。`,
+      )
+    } catch (error) {
+      if (!alive.current) return
+      setCloudError(error instanceof Error ? error.message : '阵容操作失败')
+      setPendingPublication(
+        !(error instanceof RosterApiError) || error.status >= 500 || error.status === 0
+          ? command
+          : null,
+      )
     } finally {
       sending.current = false
       if (alive.current) setCloudBusy(false)
@@ -639,12 +796,12 @@ export default function LineupBoard({
       </section>
     )
   return (
-    <section className="lineup-workbench" aria-label="队长战术排阵">
+    <section className="lineup-workbench" aria-label="队长与教练八人制排阵">
       <div className="lineup-heading">
         <div>
           <span className="lineup-eyebrow">TACTICS ROOM</span>
           <h2>把你的阵容，排上球场</h2>
-          <p>{teamName} · 战术规划与报名名单分别保存</p>
+          <p>{teamName} · 固定八人制 · 球队默认阵容与单场确认首发分别管理</p>
         </div>
         <div className="lineup-save-actions">
           <button className="lineup-button" onClick={saveDraft}>
@@ -652,7 +809,7 @@ export default function LineupBoard({
           </button>
           <button
             className="lineup-button lineup-primary"
-            disabled={cloudBusy || cloudLoading || Boolean(pendingSave)}
+            disabled={cloudBusy || cloudLoading || Boolean(pendingSave || pendingPublication)}
             onClick={() => void saveCloud()}
           >
             {cloudBusy ? '处理中…' : '保存到云端'}
@@ -660,6 +817,35 @@ export default function LineupBoard({
         </div>
       </div>
       <div className="lineup-cloud">
+        <p className="lineup-publication-status" role="status">
+          {kind === 'TACTIC'
+            ? cloudPlan?.isDefault
+              ? '球队默认阵容 · 每场比赛仍需单独确认首发'
+              : '球队阵容计划 · 尚未设为球队默认阵容'
+            : cloudPlan?.confirmedVersion
+              ? `本场已确认 v${cloudPlan.confirmedVersion}${cloudPlan.hasUnconfirmedChanges || dirty ? ' · 有未确认修改' : ''}`
+              : '本场首发尚未确认 · 保存计划不会自动公布'}
+        </p>
+        {cloudPlan && (
+          <button
+            className="lineup-button lineup-primary"
+            disabled={
+              cloudBusy ||
+              dirty ||
+              Boolean(pendingSave || pendingPublication) ||
+              (kind === 'TACTIC' && (cloudPlan.tournamentId !== null || cloudPlan.isDefault)) ||
+              (kind === 'MATCH_LINEUP' &&
+                !matches.some(
+                  (match) =>
+                    match.id === cloudPlan.matchId &&
+                    ['DRAFT', 'SCHEDULED', 'POSTPONED'].includes(match.status),
+                ))
+            }
+            onClick={() => void publishPlan(kind === 'TACTIC' ? 'DEFAULT' : 'CONFIRM')}
+          >
+            {kind === 'TACTIC' ? '设为球队默认阵容' : '确认本场首发'}
+          </button>
+        )}
         {cloudPlan && (
           <span className="lineup-cloud__hint">
             {cloudPlan.tournamentId === null
@@ -673,11 +859,11 @@ export default function LineupBoard({
             className="lineup-select"
             aria-label="计划用途"
             value={kind}
-            disabled={cloudBusy || Boolean(pendingSave) || Boolean(cloudPlan)}
+            disabled={cloudBusy || Boolean(pendingSave || pendingPublication) || Boolean(cloudPlan)}
             onChange={(event) => void chooseKind(event.target.value as 'TACTIC' | 'MATCH_LINEUP')}
           >
-            <option value="TACTIC">球队战术</option>
-            <option value="MATCH_LINEUP">单场阵容</option>
+            <option value="TACTIC">球队阵容计划</option>
+            <option value="MATCH_LINEUP">单场首发计划（需确认）</option>
           </select>
         </label>
         {kind === 'TACTIC' ? (
@@ -687,7 +873,9 @@ export default function LineupBoard({
               className="lineup-select"
               aria-label="战术归属"
               value={tacticScope}
-              disabled={cloudBusy || Boolean(pendingSave) || Boolean(cloudPlan)}
+              disabled={
+                cloudBusy || Boolean(pendingSave || pendingPublication) || Boolean(cloudPlan)
+              }
               onChange={(event) => {
                 setTacticScope(event.target.value as 'TEAM' | 'TOURNAMENT')
                 setDirty(true)
@@ -705,7 +893,9 @@ export default function LineupBoard({
               className="lineup-select"
               aria-label="选择本队比赛"
               value={matchId}
-              disabled={cloudBusy || Boolean(pendingSave) || Boolean(cloudPlan)}
+              disabled={
+                cloudBusy || Boolean(pendingSave || pendingPublication) || Boolean(cloudPlan)
+              }
               onChange={(event) => {
                 setMatchId(event.target.value)
                 const match = matches.find((item) => item.id === event.target.value)
@@ -723,21 +913,37 @@ export default function LineupBoard({
             </select>
           </label>
         )}
+        {kind === 'MATCH_LINEUP' && (
+          <button
+            className="lineup-button"
+            disabled={cloudBusy || Boolean(pendingSave || pendingPublication)}
+            onClick={() => void refreshLockedRoster()}
+          >
+            绑定最新锁定名单
+          </button>
+        )}
         <label className="lineup-label">
           云端计划
           <select
             className="lineup-select"
             aria-label="云端计划"
             value={cloudPlan?.id ?? ''}
-            disabled={cloudBusy || Boolean(pendingSave)}
+            disabled={cloudBusy || Boolean(pendingSave || pendingPublication)}
             onChange={(event) => void openPlan(event.target.value)}
           >
             <option value="">新建计划</option>
             {plans
-              .filter((plan) => !plan.tournamentId || plan.tournamentId === tournamentId)
+              .filter(
+                (plan) =>
+                  plan.payload.format === 8 &&
+                  plan.payload.slots.length === 8 &&
+                  (!plan.tournamentId || plan.tournamentId === tournamentId),
+              )
               .map((plan) => (
                 <option value={plan.id} key={plan.id}>
                   {plan.name} · v{plan.version}
+                  {plan.isDefault ? ' · 球队默认' : ''}
+                  {plan.confirmedVersion ? ` · 本场已确认 v${plan.confirmedVersion}` : ''}
                 </option>
               ))}
           </select>
@@ -745,7 +951,7 @@ export default function LineupBoard({
         {cloudLoading && <span className="lineup-cloud__hint">正在读取云端计划…</span>}
         <button
           className="lineup-button"
-          disabled={cloudBusy || Boolean(pendingSave)}
+          disabled={cloudBusy || Boolean(pendingSave || pendingPublication)}
           onClick={() => void loadPlans()}
         >
           刷新云端列表
@@ -753,7 +959,7 @@ export default function LineupBoard({
         {cloudPlan && (
           <button
             className="lineup-button"
-            disabled={cloudBusy || Boolean(pendingSave)}
+            disabled={cloudBusy || Boolean(pendingSave || pendingPublication)}
             onClick={async () => {
               try {
                 const result = await lineupPlanRepository.list(teamId)
@@ -798,6 +1004,15 @@ export default function LineupBoard({
               用原保存请求重试
             </button>
           )}
+          {pendingPublication && (
+            <button
+              className="lineup-button"
+              disabled={cloudBusy}
+              onClick={() => void publishPlan(pendingPublication.action, true)}
+            >
+              用原阵容操作请求重试
+            </button>
+          )}
         </div>
       )}
       {planHistory && (
@@ -814,7 +1029,10 @@ export default function LineupBoard({
           )}
         </div>
       )}
-      <fieldset className="lineup-editable" disabled={cloudBusy || Boolean(pendingSave)}>
+      <fieldset
+        className="lineup-editable"
+        disabled={cloudBusy || Boolean(pendingSave || pendingPublication)}
+      >
         <div className="lineup-toolbar">
           <label className="lineup-label">
             阵型
@@ -831,9 +1049,7 @@ export default function LineupBoard({
               }}
             >
               {draft.custom && <option value="custom">自定义站位</option>}
-              {FORMATIONS.filter(
-                (formation) => kind !== 'MATCH_LINEUP' || formation.format === matchFormat,
-              ).map((formation) => (
+              {FORMATIONS.map((formation) => (
                 <option key={formation.name} value={formation.name}>
                   {formation.name} · {formation.format} 人制
                 </option>
@@ -901,11 +1117,11 @@ export default function LineupBoard({
                 {kind === 'MATCH_LINEUP' && boundSnapshotVersion
                   ? `名单 v${boundSnapshotVersion} · `
                   : ''}
-                首发 {starters.size}/{draft.slots.length} · 进攻方向 ↑
+                拟首发 {starters.size}/8 · 进攻方向 ↑
               </span>
             </div>
             <p className="lineup-local-note">
-              首发 {starters.size}/{draft.slots.length} 人 · 替补 {substitutes.length} 人 · 未入选{' '}
+              拟首发 {starters.size}/8 人 · 替补 {substitutes.length} 人 · 未入选{' '}
               {unassigned.length} 人
               {kind === 'MATCH_LINEUP' && starters.size < draft.slots.length
                 ? ' · 请补齐首发后保存'

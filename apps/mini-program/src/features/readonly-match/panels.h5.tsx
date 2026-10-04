@@ -7,9 +7,11 @@ import {
   collectPlayerEvents,
   hasPublishedPositions,
   lineupGroups,
+  lineupHasAppearances,
   minuteLabel,
   orderedEvents,
   playerEventDetails,
+  playerAppearanceLabel,
   type MatchLineup,
   type PlayerMatchEvents,
 } from './lineup.logic'
@@ -27,7 +29,7 @@ export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
           <small>STARTING LINEUPS</small>
           <h2>双方阵容</h2>
         </div>
-        <span>首发与比赛事件</span>
+        <span>八人制 · 首发与比赛事件</span>
       </div>
       <div className="match-lineups__switch" aria-label="选择球队">
         {match.lineups.map((lineup) => (
@@ -57,7 +59,7 @@ export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
         </div>
       )}
       <p className="match-lineups__footnote">
-        点击球员查看完整事件分钟。首发由正式出场记录确定，站位和阵型以公布资料为准。
+        点击号码查看球员与真实事件。球队默认阵容不代替本场首发；已确认赛前首发与正式出场记录分别标示。
       </p>
     </section>
   )
@@ -78,6 +80,7 @@ function LineupCard({
     [match.events, lineup.team.id],
   )
   const { starters, substitutes } = lineupGroups(lineup)
+  const appearances = lineupHasAppearances(lineup)
   const positioned = hasPublishedPositions(starters)
   const activePlayer = lineup.players.find((player) => player.id === playerId)
   return (
@@ -88,8 +91,18 @@ function LineupCard({
           <h3>{lineup.team.name}</h3>
           <span>阵型：{lineup.formation || '未提供'}</span>
         </div>
-        <span className="match-lineup-card__count">首发 {starters.length}</span>
+        <span className="match-lineup-card__count">
+          {starters.length
+            ? `${appearances ? '实际首发' : '已确认首发'} ${starters.length}`
+            : '首发未提供'}
+        </span>
       </header>
+      {!appearances && starters.length > 0 && (
+        <p className="match-lineup-card__note match-lineup-card__confirmation">
+          已确认赛前首发{lineup.confirmedVersion ? ` v${lineup.confirmedVersion}` : ''}
+          （实际出场未录入）
+        </p>
+      )}
       {starters.length ? (
         <>
           <div
@@ -102,7 +115,8 @@ function LineupCard({
               <i />
             </div>
             <span className="match-pitch__caption">
-              首发阵容{positioned ? '' : ' · 站位未提供'}
+              {appearances ? '实际首发' : '已确认赛前首发'}
+              {positioned ? '' : ' · 站位未提供'}
             </span>
             <div className="match-pitch__players">
               {starters.map((player) => (
@@ -136,15 +150,17 @@ function LineupCard({
           )}
         </>
       ) : (
-        <p className="match-lineups__empty">首发阵容尚未公布</p>
+        <p className="match-lineups__empty">本场首发尚未确认</p>
       )}
       {activePlayer && (
         <div className="match-player-detail" aria-live="polite">
           <strong>
-            {activePlayer.displayName} · {activePlayer.starter ? '首发' : '替补'}
+            {activePlayer.shirtNumber ?? '—'}号 · {activePlayer.displayName} ·{' '}
+            {activePlayer.starter ? '首发' : '替补'}
           </strong>
           <span>
-            {positionLabel(activePlayer.position)} · 出场 {activePlayer.minutesPlayed} 分钟
+            {positionLabel(activePlayer.position)} ·{' '}
+            {playerAppearanceLabel(activePlayer, appearances, events.get(activePlayer.id))}
           </span>
           <span>
             {playerEventDetails(events.get(activePlayer.id)).join(' · ') || '暂无已公布比赛事件'}
@@ -165,6 +181,7 @@ function LineupCard({
         events={events}
         onSelect={setPlayerId}
         selectedId={playerId}
+        appearances={appearances}
       />
       <PlayerList
         title="替补名单"
@@ -172,6 +189,7 @@ function LineupCard({
         events={events}
         onSelect={setPlayerId}
         selectedId={playerId}
+        appearances={appearances}
       />
     </article>
   )
@@ -183,12 +201,14 @@ function PlayerList({
   events,
   onSelect,
   selectedId,
+  appearances,
 }: {
   title: string
   players: MatchLineup['players']
   events: Map<string, PlayerMatchEvents>
   onSelect: (id: string | null) => void
   selectedId: string | null
+  appearances: boolean
 }) {
   return (
     <section className="match-lineup-list">
@@ -212,11 +232,7 @@ function PlayerList({
                 <strong>{player.displayName}</strong>
                 <small>
                   {positionLabel(player.position)} ·{' '}
-                  {player.minutesPlayed > 0
-                    ? `${player.minutesPlayed} 分钟`
-                    : player.starter || playerEvents?.on.length
-                      ? '出场分钟未提供'
-                      : '未出场'}
+                  {playerAppearanceLabel(player, appearances, playerEvents)}
                 </small>
               </span>
               <EventBadges events={playerEvents} />

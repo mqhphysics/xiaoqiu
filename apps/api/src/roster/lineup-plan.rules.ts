@@ -3,6 +3,8 @@ import { rosterError } from './roster-workflow.rules'
 
 export function validateLineupPlan(input: SaveLineupPlanDto): string[] {
   if (!input.name.trim()) throw rosterError(400, '请填写战术名称')
+  if (input.payload.format !== 8 || input.payload.slots.length !== 8)
+    throw rosterError(400, '晓球阵容固定为八人制，必须提供 8 个场上位置')
   if (input.payload.slots.length !== input.payload.format)
     throw rosterError(400, '场上位置数量必须与人数制一致')
   const slots = input.payload.slots

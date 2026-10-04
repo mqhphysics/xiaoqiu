@@ -166,8 +166,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 33px;
+  width: 40px;
+  height: 44px;
   color: #23432f;
   background: #f0e7c8;
   clip-path: polygon(
@@ -184,12 +184,12 @@
     15% 43%,
     0 19%
   );
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 900;
 }
 .match-pitch-player__name {
   max-width: 100%;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   overflow-wrap: anywhere;
 }
@@ -247,6 +247,12 @@
   color: #718076;
   font-size: 11px;
   line-height: 1.7;
+}
+.match-lineup-card__confirmation {
+  padding: 10px 12px;
+  color: #6e531f;
+  background: #f6efd9;
+  border-left: 3px solid #bd9d4d;
 }
 .match-lineups__footnote {
   margin: 14px 0 0;

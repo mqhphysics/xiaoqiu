@@ -48,13 +48,13 @@ export class LineupPayloadDto {
   @IsString()
   @Length(1, 32)
   formation!: string
-  @ApiProperty({ enum: [5, 7, 8, 11] })
-  @IsIn([5, 7, 8, 11])
-  format!: 5 | 7 | 8 | 11
+  @ApiProperty({ enum: [8] })
+  @IsIn([8])
+  format!: 8
   @ApiProperty({ type: () => [LineupSlotDto] })
   @IsArray()
-  @ArrayMinSize(5)
-  @ArrayMaxSize(11)
+  @ArrayMinSize(8)
+  @ArrayMaxSize(8)
   @ValidateNested({ each: true })
   @Type(() => LineupSlotDto)
   slots!: LineupSlotDto[]
@@ -100,4 +100,12 @@ export class SaveLineupPlanDto {
   @ValidateNested()
   @Type(() => LineupPayloadDto)
   payload!: LineupPayloadDto
+}
+
+export class LineupPlanCommandDto {
+  @ApiProperty({ type: Number, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(2147483646)
+  expectedVersion!: number
 }

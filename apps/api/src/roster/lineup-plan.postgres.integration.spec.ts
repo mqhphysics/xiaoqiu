@@ -15,7 +15,10 @@ import { RosterModule } from './roster.module'
 test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked match eligibility', async () => {
   const databaseUrl = process.env.TEST_DATABASE_URL
   assert.ok(databaseUrl, 'TEST_DATABASE_URL required: real PostgreSQL acceptance cannot skip')
-  assert.match(new URL(databaseUrl).pathname, /^\/roster_v2_test(?:_[a-z0-9]+)?$/)
+  assert.match(
+    new URL(databaseUrl).pathname,
+    /^\/(?:roster_v2_test(?:_[a-z0-9]+)?|xiaoqiu_eight_lineup_test_20261004)$/,
+  )
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
   const suffix = randomUUID().slice(0, 8)
   const org = await prisma.organization.create({
@@ -180,6 +183,17 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
         .set('Authorization', authorization)
         .set('Idempotency-Key', key)
         .send(input)
+    const publish = (
+      planId: string,
+      action: 'default' | 'confirm',
+      expectedVersion: number,
+      key = randomUUID(),
+    ) =>
+      request(server)
+        .post(`${path}/${planId}/${action}`)
+        .set('Authorization', authorization)
+        .set('Idempotency-Key', key)
+        .send({ expectedVersion })
     await request(server).get(path).expect(401)
     await request(server)
       .get(`/api/captain/teams/${other.id}/lineup-plans`)
@@ -204,6 +218,8 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     assert.deepEqual(saved[0]!.body, saved[1]!.body)
     const plan = saved[0]!.body
     assert.equal(plan.version, 1)
+    assert.equal(plan.isDefault, false)
+    assert.equal(plan.confirmedVersion, null)
     assert.deepEqual(plan.payload.benchPlayerIds, [players[8]!.id])
     assert.equal(await prisma.teamLineupRevision.count({ where: { planId: plan.id } }), 1)
     await post({ ...tactic, name: '不同名称' }, key).expect(409)
@@ -234,6 +250,51 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     )
     const list = await request(server).get(path).set('Authorization', authorization).expect(200)
     assert.equal(list.body.items[0].version, 2)
+    await request(server)
+      .post(`${path}/${plan.id}/default`)
+      .send({ expectedVersion: 2 })
+      .expect(401)
+    await request(server)
+      .post(`/api/captain/teams/${other.id}/lineup-plans/${plan.id}/default`)
+      .set('Authorization', authorization)
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: 2 })
+      .expect(403)
+    const defaultKey = randomUUID()
+    const defaultResponses = await Promise.all([
+      publish(plan.id, 'default', 2, defaultKey),
+      publish(plan.id, 'default', 2, defaultKey),
+    ])
+    assert.deepEqual(
+      defaultResponses.map((response) => response.status),
+      [200, 200],
+    )
+    assert.deepEqual(defaultResponses[0]!.body, defaultResponses[1]!.body)
+    assert.equal(defaultResponses[0]!.body.isDefault, true)
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { organizationId: org.id, action: 'TEAM_DEFAULT_LINEUP_SET' },
+      }),
+      1,
+    )
+    assert.equal(await prisma.teamLineupRevision.count({ where: { planId: plan.id } }), 2)
+    await publish(plan.id, 'default', 1).expect(409)
+    await publish(plan.id, 'confirm', 2).expect(400)
+    const alternateDefault = await post({ ...tactic, name: 'DEMO_FIXTURE 另一套球队阵容' }).expect(
+      200,
+    )
+    await publish(alternateDefault.body.id, 'default', 1).expect(200)
+    assert.equal(
+      await prisma.teamLineupPlan.count({
+        where: { organizationId: org.id, teamId: team.id, isDefault: true },
+      }),
+      1,
+    )
+    assert.equal(
+      (await prisma.teamLineupPlan.findUniqueOrThrow({ where: { id: plan.id } })).isDefault,
+      false,
+    )
+    assert.equal(await prisma.matchAppearance.count({ where: { matchId: match.id } }), 0)
     const lineup = {
       name: 'DEMO_FIXTURE 比赛首发',
       kind: 'MATCH_LINEUP',
@@ -246,6 +307,73 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     const locked = await post(lineup).expect(200)
     assert.equal(locked.body.rosterSnapshotId, snapshot.id)
     assert.equal(locked.body.snapshotPlayers[0].shirtNumber, '1')
+    assert.equal(locked.body.confirmedVersion, null)
+    await publish(locked.body.id, 'default', 1).expect(400)
+    await request(server)
+      .post(`${path}/${locked.body.id}/confirm`)
+      .send({ expectedVersion: 1 })
+      .expect(401)
+    await publish(locked.body.id, 'confirm', 2).expect(409)
+    const confirmKey = randomUUID()
+    const confirmed = await Promise.all([
+      publish(locked.body.id, 'confirm', 1, confirmKey),
+      publish(locked.body.id, 'confirm', 1, confirmKey),
+    ])
+    assert.deepEqual(
+      confirmed.map((response) => response.status),
+      [200, 200],
+    )
+    assert.deepEqual(confirmed[0]!.body, confirmed[1]!.body)
+    assert.equal(confirmed[0]!.body.confirmedVersion, 1)
+    assert.equal(confirmed[0]!.body.confirmedByUserId, user.id)
+    assert.equal(typeof confirmed[0]!.body.confirmedAt, 'string')
+    assert.equal(
+      await prisma.auditLog.count({
+        where: { organizationId: org.id, action: 'MATCH_LINEUP_CONFIRMED' },
+      }),
+      1,
+    )
+    const changedLineup = await post({
+      ...lineup,
+      planId: locked.body.id,
+      expectedVersion: 1,
+      payload: { ...payload, slots: payload.slots.map((slot) => ({ ...slot, x: 60 })) },
+    }).expect(200)
+    assert.equal(changedLineup.body.version, 2)
+    assert.equal(changedLineup.body.confirmedVersion, 1)
+    assert.equal(changedLineup.body.hasUnconfirmedChanges, true)
+    const frozenConfirmation = await prisma.teamLineupPlan.findUniqueOrThrow({
+      where: { id: locked.body.id },
+      include: { confirmedRevision: true },
+    })
+    assert.equal(
+      (frozenConfirmation.confirmedRevision!.payload as { lineup: { slots: Array<{ x: number }> } })
+        .lineup.slots[0]!.x,
+      50,
+    )
+    await publish(locked.body.id, 'confirm', 1).expect(409)
+    const reconfirmed = await publish(locked.body.id, 'confirm', 2).expect(200)
+    assert.equal(reconfirmed.body.confirmedVersion, 2)
+    assert.equal(reconfirmed.body.hasUnconfirmedChanges, false)
+    const alternative = await post({ ...lineup, name: 'DEMO_FIXTURE 本场备用方案' }).expect(200)
+    await publish(alternative.body.id, 'confirm', 1).expect(200)
+    assert.equal(
+      await prisma.teamLineupPlan.count({
+        where: {
+          organizationId: org.id,
+          teamId: team.id,
+          matchId: match.id,
+          confirmedVersion: { not: null },
+        },
+      }),
+      1,
+    )
+    assert.equal(
+      (await prisma.teamLineupPlan.findUniqueOrThrow({ where: { id: locked.body.id } }))
+        .confirmedVersion,
+      null,
+    )
+    assert.equal(await prisma.matchAppearance.count({ where: { matchId: match.id } }), 0)
     await prisma.playerProfile.update({
       where: { id: players[0]!.id },
       data: { displayName: 'DEMO_FIXTURE 后来修改的姓名' },
@@ -295,11 +423,30 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
     assert.equal(frozenPlan.rosterSnapshotVersion, 1)
     assert.equal(frozenPlan.snapshotPlayers[0].displayName, players[0]!.displayName)
     assert.equal(frozenPlan.snapshotPlayers[0].shirtNumber, '1')
+    await publish(alternative.body.id, 'confirm', 1).expect(409)
+    assert.equal(
+      (await prisma.teamLineupPlan.findUniqueOrThrow({ where: { id: alternative.body.id } }))
+        .confirmedVersion,
+      1,
+    )
     await post({
       ...lineup,
       name: '重复球员',
       payload: { ...payload, benchPlayerIds: [players[0]!.id] },
     }).expect(400)
+    for (const format of [5, 7, 11])
+      await post({
+        ...tactic,
+        name: `错误${format}人制`,
+        payload: {
+          ...payload,
+          format,
+          slots: Array.from({ length: format }, (_, index) => ({
+            ...payload.slots[index % 8],
+            slotId: `non-eight-${index}`,
+          })),
+        },
+      }).expect(400)
     await post({
       ...lineup,
       name: '名单外球员',
@@ -318,12 +465,15 @@ test('cloud lineups: real HTTP saves, revisions, CAS, team isolation and locked 
       payload: { ...payload, format: 5, slots: payload.slots.slice(0, 5), benchPlayerIds: [] },
     }).expect(400)
     await prisma.match.update({ where: { id: match.id }, data: { status: 'LIVE' } })
-    await post({ ...lineup, planId: locked.body.id, expectedVersion: 1 }).expect(409)
+    await post({ ...lineup, planId: locked.body.id, expectedVersion: 2 }).expect(409)
+    await publish(alternative.body.id, 'confirm', 1).expect(409)
     await prisma.roleAssignment.updateMany({
       where: { userId: user.id },
       data: { revokedAt: new Date() },
     })
     await post({ ...tactic, planId: plan.id, expectedVersion: 2 }).expect(403)
+    await publish(alternateDefault.body.id, 'default', 1).expect(403)
+    await publish(alternative.body.id, 'confirm', 1).expect(403)
     assert.equal(await prisma.matchAppearance.count({ where: { matchId: match.id } }), 0)
   } finally {
     await app.close()

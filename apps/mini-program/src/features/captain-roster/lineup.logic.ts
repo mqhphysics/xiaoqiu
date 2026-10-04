@@ -22,61 +22,10 @@ export interface LineupDraft {
 }
 export interface Formation {
   name: string
-  format: number
+  format: 8
   rows: Array<{ labels: string[]; y: number }>
 }
 export const FORMATIONS: Formation[] = [
-  {
-    name: '4-3-3',
-    format: 11,
-    rows: [
-      { labels: ['LW', 'ST', 'RW'], y: 18 },
-      { labels: ['LCM', 'CM', 'RCM'], y: 42 },
-      { labels: ['LB', 'LCB', 'RCB', 'RB'], y: 68 },
-      { labels: ['GK'], y: 88 },
-    ],
-  },
-  {
-    name: '4-4-2',
-    format: 11,
-    rows: [
-      { labels: ['LS', 'RS'], y: 18 },
-      { labels: ['LM', 'LCM', 'RCM', 'RM'], y: 43 },
-      { labels: ['LB', 'LCB', 'RCB', 'RB'], y: 68 },
-      { labels: ['GK'], y: 88 },
-    ],
-  },
-  {
-    name: '4-2-3-1',
-    format: 11,
-    rows: [
-      { labels: ['ST'], y: 15 },
-      { labels: ['LAM', 'CAM', 'RAM'], y: 34 },
-      { labels: ['LDM', 'RDM'], y: 53 },
-      { labels: ['LB', 'LCB', 'RCB', 'RB'], y: 72 },
-      { labels: ['GK'], y: 90 },
-    ],
-  },
-  {
-    name: '3-5-2',
-    format: 11,
-    rows: [
-      { labels: ['LS', 'RS'], y: 18 },
-      { labels: ['LWB', 'LCM', 'CM', 'RCM', 'RWB'], y: 44 },
-      { labels: ['LCB', 'CB', 'RCB'], y: 70 },
-      { labels: ['GK'], y: 88 },
-    ],
-  },
-  {
-    name: '2-3-1',
-    format: 7,
-    rows: [
-      { labels: ['ST'], y: 20 },
-      { labels: ['LM', 'CM', 'RM'], y: 44 },
-      { labels: ['LCB', 'RCB'], y: 69 },
-      { labels: ['GK'], y: 88 },
-    ],
-  },
   {
     name: '3-3-1',
     format: 8,
@@ -97,19 +46,9 @@ export const FORMATIONS: Formation[] = [
       { labels: ['GK'], y: 88 },
     ],
   },
-  {
-    name: '1-2-1',
-    format: 5,
-    rows: [
-      { labels: ['ST'], y: 20 },
-      { labels: ['LM', 'RM'], y: 44 },
-      { labels: ['CB'], y: 69 },
-      { labels: ['GK'], y: 88 },
-    ],
-  },
 ]
 
-export function createFormation(name = '4-3-3', previous?: LineupDraft): LineupDraft {
+export function createFormation(name = '3-3-1', previous?: LineupDraft): LineupDraft {
   const formation = FORMATIONS.find((item) => item.name === name) ?? FORMATIONS[0]!
   const remaining =
     previous?.slots.flatMap((slot) =>
@@ -259,7 +198,7 @@ export function restoreDraft(value: unknown, players: LineupPlayer[]): LineupDra
     typeof draft.formation !== 'string' ||
     typeof draft.name !== 'string' ||
     !Array.isArray(draft.slots) ||
-    ![5, 7, 8, 11].includes(draft.slots.length)
+    draft.slots.length !== 8
   )
     return null
   const allowed = new Set(players.map((player) => player.id))
@@ -312,13 +251,14 @@ export function restoreDraft(value: unknown, players: LineupPlayer[]): LineupDra
 }
 
 export function selectSavedLineupPlan<
-  T extends { id: string; tournamentId: string | null; updatedAt: string },
+  T extends { id: string; tournamentId: string | null; updatedAt: string; isDefault?: boolean },
 >(plans: T[], tournamentId: string, preferredId: string): T | undefined {
   const relevant = plans.filter(
     (plan) => plan.tournamentId === null || plan.tournamentId === tournamentId,
   )
   return (
     relevant.find((plan) => plan.id === preferredId) ??
+    relevant.find((plan) => plan.isDefault) ??
     relevant
       .slice()
       .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0]
