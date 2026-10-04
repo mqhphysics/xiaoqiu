@@ -27,6 +27,7 @@ import {
 import { parseResultsRules } from '../results/parse-rules'
 import { SocialService } from '../social/social.service'
 import { calculateOfficialTeamRecord } from './official-team-record'
+import { confirmedMatchLineup } from './confirmed-match-lineup'
 import type {
   CreateCommentDto,
   CreateMatchReviewDto,
@@ -916,6 +917,50 @@ export class ExperienceService {
       resultContext.official?.confirmedResults.some(
         (fact) => fact.id === match.id && fact.status === 'CONFIRMED',
       )
+    const confirmedPlans = await prisma.teamLineupPlan.findMany({
+      where: {
+        organizationId,
+        tournamentId: match.tournamentId,
+        matchId: match.id,
+        kind: 'MATCH_LINEUP',
+        confirmedVersion: { not: null },
+        teamId: {
+          in: [match.homeTeamId, match.awayTeamId].filter((id): id is string => id !== null),
+        },
+      },
+      select: {
+        kind: true,
+        organizationId: true,
+        teamId: true,
+        tournamentId: true,
+        confirmedVersion: true,
+        confirmedAt: true,
+        confirmedRevision: {
+          select: {
+            organizationId: true,
+            version: true,
+            payload: true,
+            rosterSnapshot: {
+              select: {
+                organizationId: true,
+                teamId: true,
+                tournamentId: true,
+                lockedAt: true,
+                entries: {
+                  orderBy: { sortOrder: 'asc' },
+                  select: {
+                    playerProfileId: true,
+                    displayName: true,
+                    shirtNumber: true,
+                    playerProfile: { select: { position: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
     const viewerReview = session
       ? match.reviews.find((review) => review.userId === session.userId)
       : undefined
@@ -942,25 +987,44 @@ export class ExperienceService {
       })),
       lineups: [match.homeTeam, match.awayTeam]
         .filter((team): team is NonNullable<typeof team> => Boolean(team))
-        .map((team) => ({
-          team: mapTeam(team),
-          formation: null,
-          lineupSource:
-            isOfficialFact && match.appearances.some((appearance) => appearance.teamId === team.id)
-              ? 'CONFIRMED_APPEARANCES'
-              : 'UNAVAILABLE',
-          players: (isOfficialFact ? match.appearances : [])
-            .filter((appearance) => appearance.teamId === team.id)
-            .map((appearance) => ({
-              id: appearance.player.id,
-              displayName: appearance.player.displayName,
-              shirtNumber: appearance.shirtNumber,
-              position: appearance.player.position,
-              starter: appearance.starter,
-              minutesPlayed: appearance.minutesPlayed,
-              pitchPosition: null,
-            })),
-        })),
+        .map((team) => {
+          const appearances = (isOfficialFact ? match.appearances : []).filter(
+            (appearance) => appearance.teamId === team.id,
+          )
+          if (appearances.length)
+            return {
+              team: mapTeam(team),
+              formation: null,
+              lineupSource: 'CONFIRMED_APPEARANCES' as const,
+              appearanceRecorded: true,
+              confirmedVersion: null,
+              confirmedAt: null,
+              players: appearances.map((appearance) => ({
+                id: appearance.player.id,
+                displayName: appearance.player.displayName,
+                shirtNumber: appearance.shirtNumber,
+                position: appearance.player.position,
+                starter: appearance.starter,
+                minutesPlayed: appearance.minutesPlayed,
+                pitchPosition: null,
+              })),
+            }
+          const confirmed = confirmedMatchLineup(
+            confirmedPlans.find((plan) => plan.teamId === team.id),
+            { organizationId, tournamentId: match.tournamentId, teamId: team.id },
+          )
+          return {
+            team: mapTeam(team),
+            ...(confirmed ?? {
+              formation: null,
+              lineupSource: 'UNAVAILABLE' as const,
+              appearanceRecorded: false,
+              confirmedVersion: null,
+              confirmedAt: null,
+              players: [],
+            }),
+          }
+        }),
       reviews: {
         averageRating:
           match.reviews.length > 0
