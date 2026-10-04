@@ -77,7 +77,7 @@ export class AccessPolicyService {
     if (
       !session.user.roles.some(
         (role) =>
-          role.role === 'TEAM_CAPTAIN' &&
+          (role.role === 'TEAM_CAPTAIN' || role.role === 'TEAM_COACH') &&
           role.scopeType === 'TEAM' &&
           role.scopeId.toLowerCase() === team.id,
       )

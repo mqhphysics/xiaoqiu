@@ -25,6 +25,7 @@ const compiled = ts.transpileModule(source, {
 const componentModule = { exports: {} }
 const load = (name) => {
   if (name === '@tarojs/taro') return {}
+  if (name === '../identity-center/index.h5') return { IdentityCenterHost: () => null }
   if (name.endsWith('/account-access')) return { isAccountEntryRoute }
   if (name.endsWith('/product.repository'))
     return {

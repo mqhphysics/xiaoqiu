@@ -689,6 +689,12 @@ test('report client key is idempotent, rejects changed content, and stays organi
 })
 
 class TeamReviewPrismaFake {
+  userSession = { findFirst: async () => ({ id: 'active-session' }) }
+  organizationMembership = { findFirst: async () => ({ id: 'active-member' }) }
+  team = { findFirst: async () => ({ id: TEAM_ID }) }
+  roleAssignment = {
+    findMany: async () => [{ role: 'TEAM_CAPTAIN', scopeType: 'TEAM', scopeId: TEAM_ID }],
+  }
   application = {
     id: APPLICATION_ID,
     organizationId: ORGANIZATION_ID,

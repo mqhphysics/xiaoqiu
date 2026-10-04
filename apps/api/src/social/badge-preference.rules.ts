@@ -5,6 +5,7 @@ export const BADGE_KINDS = [
   'reviewer',
   'referee',
   'captain',
+  'coach',
   'player',
   'student',
   'profile',
@@ -23,6 +24,7 @@ export function badgeOptions(
   if (values.has('REVIEWER')) options.push('reviewer')
   if (values.has('OFFICIAL')) options.push('referee')
   if (values.has('TEAM_CAPTAIN')) options.push('captain')
+  if (values.has('TEAM_COACH')) options.push('coach')
   if (level === 'PLAYER_CONFIRMED') options.push('player')
   else if (level === 'STUDENT_VERIFIED') options.push('student')
   return options

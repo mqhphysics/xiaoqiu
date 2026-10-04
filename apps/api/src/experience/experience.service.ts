@@ -1262,7 +1262,7 @@ export class ExperienceService {
           (role.role === 'ORGANIZATION_ADMIN' &&
             role.scopeType === 'ORGANIZATION' &&
             role.scopeId === session.organizationId) ||
-          (role.role === 'TEAM_CAPTAIN' &&
+          ((role.role === 'TEAM_CAPTAIN' || role.role === 'TEAM_COACH') &&
             role.scopeType === 'TEAM' &&
             role.scopeId === input.teamId),
       )

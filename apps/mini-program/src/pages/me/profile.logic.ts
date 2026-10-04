@@ -40,7 +40,11 @@ export function managedTeamIds(user: AuthUser, availableIds: string[]): string[]
   return [
     ...new Set(
       user.roles
-        .filter((role) => role.role === 'TEAM_CAPTAIN' && role.scopeType === 'TEAM')
+        .filter(
+          (role) =>
+            (role.role === 'TEAM_CAPTAIN' || role.role === 'TEAM_COACH') &&
+            role.scopeType === 'TEAM',
+        )
         .map((role) => role.scopeId),
     ),
   ]

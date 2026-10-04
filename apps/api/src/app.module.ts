@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { AuthModule } from './auth/auth.module'
+import { IdentityModule } from './identity/identity.module'
 import { DatabaseModule } from './database/database.module'
 import { ExperienceModule } from './experience/experience.module'
 import { MediaModule } from './media/media.module'
@@ -19,6 +20,7 @@ import { ProductConfigModule } from './product-config/product-config.module'
   imports: [
     DatabaseModule,
     AuthModule,
+    IdentityModule,
     ExperienceModule,
     MediaModule,
     RosterModule,

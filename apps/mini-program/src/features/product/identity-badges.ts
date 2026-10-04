@@ -1,6 +1,7 @@
 export type IdentityBadgeKind =
   | 'operator'
   | 'captain'
+  | 'coach'
   | 'reporter'
   | 'admin'
   | 'official'
@@ -12,6 +13,7 @@ export type IdentityBadgeKind =
 export const identityLabels: Record<IdentityBadgeKind, string> = {
   operator: '网站运营',
   captain: '认证队长',
+  coach: '认证教练',
   reporter: '信息管理员',
   admin: '赛事管理员',
   official: '官方账号',
@@ -35,6 +37,7 @@ export function identityBadgeKinds(
   if (values.has('REVIEWER')) badges.push('reviewer')
   if (values.has('OFFICIAL')) badges.push('referee')
   if (values.has('TEAM_CAPTAIN')) badges.push('captain')
+  if (values.has('TEAM_COACH')) badges.push('coach')
   if (level === 'PLAYER_CONFIRMED') badges.push('player')
   else if (level === 'STUDENT_VERIFIED') badges.push('student')
   else if (level === 'PLAYER_PROFILE') badges.push('profile')

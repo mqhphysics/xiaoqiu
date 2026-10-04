@@ -403,6 +403,7 @@ export class RosterWorkflowService {
       where: {
         userId: actor.userId,
         revokedAt: null,
+        grantedAt: { lte: new Date() },
         OR: [
           { organizationId: actor.organizationId },
           { organizationId: null, role: 'PLATFORM_ADMIN', scopeType: 'PLATFORM' },

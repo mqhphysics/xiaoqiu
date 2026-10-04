@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { IdentityCenterHost } from '../identity-center/index.h5'
 import { useEffect, useRef, useState, type PropsWithChildren, type ReactNode } from 'react'
 
 import { isAccountEntryRoute } from '../../features/product/account-access'
@@ -117,6 +118,7 @@ export function AccountBoundary({
         {children}
       </div>
       {verified ? overlays : null}
+      {verified && !entry ? <IdentityCenterHost /> : null}
       {!accessible ? (
         <main className="account-boundary" aria-busy={!error}>
           <section className="account-boundary__panel" role={error ? 'alert' : 'status'}>

@@ -39,6 +39,7 @@ enum Role {
   ORGANIZATION_ADMIN
   TOURNAMENT_ADMIN
   TEAM_CAPTAIN
+  TEAM_COACH
   MATCH_REPORTER
   OFFICIAL
   REVIEWER
@@ -283,6 +284,9 @@ enum ReportStatus {
 }
 
 model Organization {
+  identityRecords      IdentityRecord[]
+  identityApplications IdentityApplication[]
+
   id                  String                   @id @default(uuid()) @db.Uuid
   slug                String                   @unique(map: "organizations_slug_key") @db.VarChar(64)
   name                String                   @db.VarChar(120)
@@ -336,6 +340,11 @@ model Organization {
 }
 
 model User {
+  createdIdentityRecords       IdentityRecord[]      @relation("IdentityRecordCreator")
+  linkedIdentityRecords        IdentityRecord[]      @relation("IdentityRecordUser")
+  identityApplications         IdentityApplication[] @relation("IdentityApplicant")
+  reviewedIdentityApplications IdentityApplication[] @relation("IdentityReviewer")
+
   id                   String                   @id @default(uuid()) @db.Uuid
   loginNameNormalized  String?                  @map("login_name_normalized") @db.VarChar(120)
   displayName          String                   @map("display_name") @db.VarChar(120)
@@ -453,6 +462,8 @@ model UserSession {
 }
 
 model RoleAssignment {
+  identityRecords IdentityRecord[]
+
   id              String        @id @default(uuid()) @db.Uuid
   organizationId  String?       @map("organization_id") @db.Uuid
   userId          String        @map("user_id") @db.Uuid
@@ -678,6 +689,9 @@ model CompetitionRound {
 }
 
 model Team {
+  identityRecords      IdentityRecord[]
+  identityApplications IdentityApplication[]
+
   id               String                @id @default(uuid()) @db.Uuid
   organizationId   String                @map("organization_id") @db.Uuid
   teamCode         String                @map("team_code") @db.VarChar(64)
@@ -714,6 +728,8 @@ model Team {
 }
 
 model PlayerProfile {
+  identityRecords IdentityRecord[]
+
   id                String                @id @default(uuid()) @db.Uuid
   organizationId    String                @map("organization_id") @db.Uuid
   sourceType        String?               @map("source_type") @db.VarChar(64)
@@ -1489,4 +1505,58 @@ model TournamentProgression {
   @@unique([tournamentId, version], map: "tournament_progressions_tournament_version_key")
   @@index([organizationId, tournamentId, sourceHash], map: "tournament_progressions_org_tournament_hash_idx")
   @@map("tournament_progressions")
+}
+
+// Administrator-entered identity candidates. Matching names never grant authority.
+// Team staff appointments remain independent of player-profile identity.
+model IdentityRecord {
+  id                  String          @id @default(uuid()) @db.Uuid
+  organizationId      String          @map("organization_id") @db.Uuid
+  kind                String          @db.VarChar(32)
+  displayName         String          @map("display_name") @db.VarChar(120)
+  teamId              String?         @map("team_id") @db.Uuid
+  playerProfileId     String?         @map("player_profile_id") @db.Uuid
+  scopeType           String          @map("scope_type") @db.VarChar(32)
+  scopeId             String          @map("scope_id") @db.VarChar(64)
+  status              String          @default("ACTIVE") @db.VarChar(16)
+  linkedUserId        String?         @map("linked_user_id") @db.Uuid
+  grantedAssignmentId String?         @map("granted_assignment_id") @db.Uuid
+  grantedAssignment   RoleAssignment? @relation(fields: [grantedAssignmentId], references: [id], onDelete: Restrict)
+  createdByUserId     String          @map("created_by_user_id") @db.Uuid
+  version             Int             @default(1)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team                Team?           @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  playerProfile       PlayerProfile?  @relation(fields: [playerProfileId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  linkedUser          User?           @relation("IdentityRecordUser", fields: [linkedUserId], references: [id], onDelete: Restrict)
+  createdBy           User            @relation("IdentityRecordCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, displayName, status], map: "identity_records_org_name_status_idx")
+  @@map("identity_records")
+}
+
+model IdentityApplication {
+  id                  String       @id @default(uuid()) @db.Uuid
+  organizationId      String       @map("organization_id") @db.Uuid
+  userId              String       @map("user_id") @db.Uuid
+  kind                String       @db.VarChar(32)
+  teamId              String?      @map("team_id") @db.Uuid
+  candidateId         String?      @map("candidate_id") @db.VarChar(64)
+  message             String       @db.VarChar(1000)
+  status              String       @default("PENDING") @db.VarChar(16)
+  version             Int          @default(1)
+  resolvedCandidateId String?      @map("resolved_candidate_id") @db.VarChar(64)
+  reviewedByUserId    String?      @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt          DateTime?    @map("reviewed_at") @db.Timestamptz(3)
+  decisionNote        String?      @map("decision_note") @db.VarChar(1000)
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team                Team?        @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  user                User         @relation("IdentityApplicant", fields: [userId], references: [id], onDelete: Restrict)
+  reviewedBy          User?        @relation("IdentityReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, userId, status], map: "identity_applications_org_user_status_idx")
+  @@map("identity_applications")
 }

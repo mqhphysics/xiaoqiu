@@ -565,16 +565,18 @@ function mapAuthUser(
       role: string
       scopeType: string
       scopeId: string
+      grantedAt?: Date
     }>
   },
   organizationId: string,
 ): AuthUserDto {
   const roles = user.roleAssignments.filter(
     (assignment) =>
-      (assignment.organizationId === organizationId && assignment.role !== 'PLATFORM_ADMIN') ||
-      (assignment.role === 'PLATFORM_ADMIN' &&
-        assignment.organizationId === null &&
-        assignment.scopeType === 'PLATFORM'),
+      (!assignment.grantedAt || assignment.grantedAt.getTime() <= Date.now()) &&
+      ((assignment.organizationId === organizationId && assignment.role !== 'PLATFORM_ADMIN') ||
+        (assignment.role === 'PLATFORM_ADMIN' &&
+          assignment.organizationId === null &&
+          assignment.scopeType === 'PLATFORM')),
   )
   const linkedPlayer =
     user.playerProfile?.organizationId === organizationId ? user.playerProfile : null

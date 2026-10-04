@@ -11,6 +11,7 @@ import {
 import { Directory } from './Directory'
 import { Content } from './Content'
 import { Records } from './Records'
+import { IdentityManagement } from './IdentityManagement'
 import { Badge, DataState, Icon, PendingCapability, time, useAdminData } from './shared'
 import './admin-center.css'
 
@@ -224,7 +225,10 @@ export function AdminCenter({
             ) : null}
             {section === 'accounts' ? (
               context.canManageOrganization ? (
-                <Directory context={context} kind="users" />
+                <>
+                  <Directory context={context} kind="users" />
+                  <IdentityManagement context={context} />
+                </>
               ) : (
                 <Restricted />
               )

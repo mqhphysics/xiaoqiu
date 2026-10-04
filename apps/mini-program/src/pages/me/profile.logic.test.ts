@@ -62,6 +62,21 @@ test('organization management requires the current organization scope', () => {
     ['team'],
   )
 })
+
+test('coach management is team scoped and does not depend on linked player or displayed badge', () => {
+  const coach = { ...user, roles: [{ role: 'TEAM_COACH', scopeType: 'TEAM', scopeId: 'own-team' }] }
+  assert.deepEqual(managedTeamIds(coach, ['other-team']), ['own-team'])
+  assert.deepEqual(
+    managedTeamIds({ ...coach, roles: [{ ...coach.roles[0]!, scopeType: 'ORGANIZATION' }] }, [
+      'other-team',
+    ]),
+    [],
+  )
+  assert.deepEqual(
+    managedTeamIds({ ...user, verificationLevel: 'PLAYER_CONFIRMED' }, ['other-team']),
+    [],
+  )
+})
 test('calendar reminder exports UTC times, escapes content, and includes a 15 minute alarm', () => {
   const ics = calendarEvent(match, now)
   assert.match(ics, /DTSTART:20261004T110000Z\r\n/)

@@ -779,7 +779,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             <section className="profile-captain profile-surface">
               <span>
                 <ProfileIcon name="shield" />
-                队长工作台
+                球队管理工作台
               </span>
               <h2>把球队的下一场准备好</h2>
               <p>入队申请、成员位置、赛事名单、战术与单场阵容。</p>

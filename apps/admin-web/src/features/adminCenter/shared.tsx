@@ -52,6 +52,7 @@ const LABELS: Record<string, string> = {
   PLATFORM_ADMIN: '平台管理员',
   TOURNAMENT_ADMIN: '赛事管理员',
   TEAM_CAPTAIN: '队长',
+  TEAM_COACH: '教练',
   MATCH_REPORTER: '信息员',
   GK: '门将',
   DF: '后卫',

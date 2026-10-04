@@ -308,9 +308,10 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   data?: unknown
   authenticated?: boolean
+  headers?: Record<string, string>
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const session = readSession()
   if (Taro.getEnv() === Taro.ENV_TYPE.WEB && options.authenticated !== false && !session) {
     clearSession()
@@ -321,6 +322,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method: options.method ?? 'GET',
     data: options.data,
     header: {
+      ...options.headers,
       'content-type': 'application/json',
       'x-organization-id':
         (session?.user.organizationId ?? process.env.TARO_APP_ORGANIZATION_ID?.trim()) ||

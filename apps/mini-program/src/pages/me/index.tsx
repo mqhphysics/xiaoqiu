@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
+import { IdentityEntry } from '../../components/identity-center'
 import { AvatarCropper } from '../../components/avatar-cropper'
 import { openMessaging } from '../../components/messaging-drawer'
 import { ReportModal } from '../../components/report-modal'
@@ -64,6 +65,14 @@ export default function MePage() {
   const tournamentId = state.phase === 'ready' ? state.home.tournament.id : undefined
   return (
     <PublicShell active="me" tournamentId={tournamentId}>
+      {state.phase === 'ready' && (
+        <IdentityEntry
+          user={state.user}
+          onUserChange={(user) =>
+            setState((current) => (current.phase === 'ready' ? { ...current, user } : current))
+          }
+        />
+      )}
       {state.phase === 'loading' && <DataState kind="loading" title="正在读取账户" />}
       {state.phase === 'failed' && (
         <DataState

@@ -25,6 +25,7 @@ const icons: Record<IdentityBadgeKind, string> = {
   profile: studentIcon,
   reporter: staffIcon,
   captain: captainIcon,
+  coach: staffIcon,
   operator: operatorIcon,
   admin: adminIcon,
   official: officialIcon,

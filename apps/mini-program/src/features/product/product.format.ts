@@ -65,12 +65,12 @@ export function positionLabel(position: string | null): string {
     MIDFIELDER: '中场',
     FORWARD: '前锋',
   }
-  return position ? labels[position] ?? position : '位置待定'
+  return position ? (labels[position] ?? position) : '位置待定'
 }
 
 export function footLabel(foot: string | null): string {
   const labels: Record<string, string> = { LEFT: '左脚', RIGHT: '右脚', BOTH: '双脚' }
-  return foot ? labels[foot] ?? foot : '未填写'
+  return foot ? (labels[foot] ?? foot) : '未填写'
 }
 
 export function verificationLabel(level: string): string {
@@ -88,6 +88,8 @@ export function roleLabel(role: string): string {
     STUDENT: '学生',
     PLAYER: '球员',
     TEAM_CAPTAIN: '球队队长',
+    TEAM_COACH: '球队教练',
+    PLATFORM_ADMIN: '总管理员',
     MATCH_REPORTER: '比赛信息员',
     TOURNAMENT_ADMIN: '赛事管理员',
     ORGANIZATION_ADMIN: '组织管理员',

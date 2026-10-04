@@ -198,10 +198,11 @@ export class SocialService {
     const captains = await this.prisma.roleAssignment.findMany({
       where: {
         organizationId: session.organizationId,
-        role: 'TEAM_CAPTAIN',
+        role: { in: ['TEAM_CAPTAIN', 'TEAM_COACH'] },
         scopeType: 'TEAM',
         scopeId: teamId,
         revokedAt: null,
+        grantedAt: { lte: new Date() },
         user: {
           status: 'ACTIVE',
           memberships: { some: { organizationId: session.organizationId, status: 'ACTIVE' } },
@@ -413,6 +414,7 @@ export class SocialService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      await this.freshTeamManager(tx, session, teamId)
       const claimed = await tx.teamJoinApplication.updateMany({
         where: {
           id: application.id,
@@ -1267,7 +1269,7 @@ export class SocialService {
     if (!canManageTeam(fresh, teamId))
       throw new ApiHttpException(HttpStatus.FORBIDDEN, {
         code: ERROR_CODES.FORBIDDEN,
-        message: '仅球队队长或组织管理员可管理该球队',
+        message: '仅本队队长、教练或组织管理员可管理该球队',
       })
     if (!team) throw notFound('本组织中不存在该球队')
     return fresh
@@ -1311,7 +1313,7 @@ export class SocialService {
     if (!canManageTeam(session, teamId)) {
       throw new ApiHttpException(HttpStatus.FORBIDDEN, {
         code: ERROR_CODES.FORBIDDEN,
-        message: '仅球队队长或组织管理员可管理该球队',
+        message: '仅本队队长、教练或组织管理员可管理该球队',
       })
     }
     return session
@@ -1396,7 +1398,9 @@ function canManageTeam(session: AuthenticatedSession, teamId: string): boolean {
       (role.role === 'ORGANIZATION_ADMIN' &&
         role.scopeType === 'ORGANIZATION' &&
         role.scopeId === session.organizationId) ||
-      (role.role === 'TEAM_CAPTAIN' && role.scopeType === 'TEAM' && role.scopeId === teamId),
+      ((role.role === 'TEAM_CAPTAIN' || role.role === 'TEAM_COACH') &&
+        role.scopeType === 'TEAM' &&
+        role.scopeId === teamId),
   )
 }
 
