@@ -484,7 +484,7 @@ function RuleVersionEditor({
             <summary>规则字段说明</summary>
             <p>
               roster：minPlayers、maxPlayers、带时区的 submissionDeadline、稳定球员 ID 数组
-              eligiblePlayerIds，可选 playersOnPitch（5/7/8/11）。
+              eligiblePlayerIds；八人制 playersOnPitch 为 8，省略时服务器保存为 8。
             </p>
             <p>
               results：points（win/draw/loss）、tieBreakers、headToHead、groupShootout、knockoutShootout、forfeit（含

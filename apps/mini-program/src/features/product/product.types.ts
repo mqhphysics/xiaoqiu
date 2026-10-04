@@ -335,14 +335,17 @@ export interface MatchExperienceResponse extends MatchSummary {
   lineups: Array<{
     team: TeamSummary
     formation?: string | null
-    lineupSource?: 'CONFIRMED_APPEARANCES' | 'UNAVAILABLE'
+    lineupSource?: 'CONFIRMED_APPEARANCES' | 'CONFIRMED_MATCH_LINEUP' | 'UNAVAILABLE'
+    appearanceRecorded?: boolean
+    confirmedVersion?: number | null
+    confirmedAt?: string | null
     players: Array<{
       id: string
       displayName: string
       shirtNumber: string | null
       position: string | null
       starter: boolean
-      minutesPlayed: number
+      minutesPlayed: number | null
       pitchPosition?: { x: number; y: number } | null
     }>
   }>

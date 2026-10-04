@@ -109,7 +109,7 @@ const rules = {
     maxPlayers: 11,
     eligiblePlayerIds: [homePlayer, awayPlayer],
     submissionDeadline: '2027-01-01T00:00:00+08:00',
-    playersOnPitch: 11,
+    playersOnPitch: 8,
   },
   results: {
     points: { win: 3, draw: 1, loss: 0 },
@@ -127,6 +127,16 @@ test('完整名单与结果规程可通过结构检查，summary占位被拒绝'
     validateRuleDocument({ ...rules, results: { ...rules.results, fakeSetting: true } }),
     /不支持/,
   )
+})
+test('新规程只允许八人制，省略人数时由服务器固定八人制', () => {
+  for (const playersOnPitch of [5, 7, 11, '8', null])
+    assert.match(
+      validateRuleDocument({ ...rules, roster: { ...rules.roster, playersOnPitch } }),
+      /八人制/,
+    )
+  const { playersOnPitch, ...roster } = rules.roster
+  assert.equal(playersOnPitch, 8)
+  assert.equal(validateRuleDocument({ ...rules, roster }), null)
 })
 test('资格ID、时区、排序条件和晋级位置必须有效且无重复', () => {
   assert.match(

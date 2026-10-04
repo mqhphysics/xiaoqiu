@@ -594,6 +594,45 @@ test('P1 admin endpoints reject missing role and cross-organization resource acc
   assert.equal(response.body.code, ERROR_CODES.NOT_FOUND)
 })
 
+test('new schedule rule versions use eight-a-side without rewriting historical rules', async () => {
+  const tournamentId = randomUUID()
+  fakePrisma.tournaments.push({
+    id: tournamentId,
+    organizationId: ORGANIZATION_ID,
+    status: 'DRAFT',
+  })
+  const path = `/api/admin/tournaments/${tournamentId}/rule-versions`
+  const historicalRules = { roster: { playersOnPitch: 11 } }
+  const historical = await fakePrisma.competitionRuleVersion.create({
+    data: { organizationId: ORGANIZATION_ID, tournamentId, version: 1, rules: historicalRules },
+  })
+  const roster = {
+    minPlayers: 8,
+    maxPlayers: 20,
+    submissionDeadline: '2027-01-01T00:00:00Z',
+    eligiblePlayerIds: [],
+  }
+  for (const playersOnPitch of [5, 7, 11, '8', null])
+    await request(app.getHttpServer())
+      .post(path)
+      .set(ADMIN_HEADERS)
+      .send({
+        version: 2,
+        name: 'Eight-a-side rule',
+        rules: { roster: { ...roster, playersOnPitch } },
+      })
+      .expect(400)
+  assert.equal(fakePrisma.ruleVersions.filter((row) => row.tournamentId === tournamentId).length, 1)
+  const reply = await request(app.getHttpServer())
+    .post(path)
+    .set(ADMIN_HEADERS)
+    .send({ version: 2, name: 'Eight-a-side rule', rules: { roster } })
+    .expect(201)
+  assert.equal(reply.body.rules.roster.playersOnPitch, 8)
+  assert.equal(Object.hasOwn(roster, 'playersOnPitch'), false)
+  assert.deepEqual(historical.rules, historicalRules)
+})
+
 test('OpenAPI includes P1 schedule paths', async () => {
   const response = await request(app.getHttpServer()).get('/api/openapi.json').expect(200)
 

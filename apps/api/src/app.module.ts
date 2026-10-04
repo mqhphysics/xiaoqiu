@@ -12,6 +12,7 @@ import { ResultsModule } from './results/results.module'
 import { ScheduleModule } from './schedule/schedule.module'
 import { SocialModule } from './social/social.module'
 import { AdminCenterModule } from './admin-center/admin-center.module'
+import { ProductConfigModule } from './product-config/product-config.module'
 
 @Module({
   controllers: [AppController],
@@ -26,6 +27,7 @@ import { AdminCenterModule } from './admin-center/admin-center.module'
     ScheduleModule,
     SocialModule,
     AdminCenterModule,
+    ProductConfigModule,
   ],
   providers: [AppService],
 })

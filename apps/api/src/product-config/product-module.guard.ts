@@ -38,7 +38,7 @@ export function modulesForRoute(route: string): ProductModuleId[] {
   )
     return ['community']
   if (
-    /^captain\/teams\/:[^/]+(?:\/(?:profile|applications\/:[^/]+|members\/:[^/]+|lineup-plans(?:\/:[^/]+\/revisions)?))?$/.test(
+    /^captain\/teams\/:[^/]+(?:\/(?:profile|applications\/:[^/]+|members\/:[^/]+|lineup-plans(?:\/:[^/]+\/(?:revisions|default|confirm))?))?$/.test(
       path,
     ) ||
     /^roster\/tournaments\/:[^/]+\/teams\/:[^/]+(?:\/commands)?$/.test(path) ||

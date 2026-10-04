@@ -1423,8 +1423,8 @@ model TeamLineupPlan {
   match             Match?               @relation(fields: [matchId, organizationId], references: [id, organizationId], onDelete: Restrict)
   rosterSnapshot    RosterSnapshot?      @relation(fields: [rosterSnapshotId, organizationId], references: [id, organizationId], onDelete: Restrict)
   revisions         TeamLineupRevision[]
-  confirmedBy       User?                @relation("LineupConfirmationAuthor", fields: [confirmedByUserId], references: [id], onDelete: Restrict)
-  confirmedRevision TeamLineupRevision?  @relation("ConfirmedLineupRevision", fields: [id, confirmedVersion], references: [planId, version], onDelete: Restrict)
+  confirmedBy       User?                @relation("LineupConfirmationAuthor", fields: [confirmedByUserId], references: [id], onDelete: Restrict, map: "team_lineup_plans_confirmation_author_fkey")
+  confirmedRevision TeamLineupRevision?  @relation("ConfirmedLineupRevision", fields: [id, confirmedVersion], references: [planId, version], onDelete: Restrict, map: "team_lineup_plans_confirmed_revision_fkey")
 
   @@unique([organizationId, teamId, name], map: "team_lineup_plans_org_team_name_key")
   @@unique([id, organizationId], map: "team_lineup_plans_id_org_key")

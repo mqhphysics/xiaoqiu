@@ -3,6 +3,7 @@ import type { Prisma } from '../generated/prisma/client'
 import { parseResultsRules } from '../results/parse-rules'
 import { parseProgressionRules } from '../results/progression-rules'
 import { parseRosterPolicy } from '../roster/roster-workflow.rules'
+import { eightASideRuleDocument } from '../schedule/eight-a-side-rules'
 import { centerError } from './admin-center.policy'
 
 /** Structure uses existing rule engines; every referenced object is verified in the write transaction. */
@@ -13,6 +14,7 @@ export async function validateManagementRules(
   ruleVersionId: string,
   document: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
+  document = eightASideRuleDocument(document)
   if (
     Object.keys(document).some(
       (key) => !['results', 'roster', 'progression', 'summary'].includes(key),
@@ -52,8 +54,6 @@ export async function validateManagementRules(
     )
   )
     throw centerError(400, 'rules.roster 包含未支持字段')
-  if (roster.playersOnPitch !== undefined && ![5, 7, 8, 11].includes(roster.playersOnPitch))
-    throw centerError(400, '名单人数制仅支持5/7/8/11')
   if (roster.eligiblePlayerIds.length > 5000 || roster.eligiblePlayerIds.some((id) => !isUUID(id)))
     throw centerError(400, '资格名单必须是最多5000个有效球员UUID')
   const eligibleIds = roster.eligiblePlayerIds.map((id) => id.toLowerCase())

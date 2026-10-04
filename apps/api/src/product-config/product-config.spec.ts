@@ -52,6 +52,8 @@ test('registered route mapping covers actual module endpoints and leaves authent
     ['community/posts/:postId/comments', ['community']],
     ['matches/:matchId/reviews', ['community']],
     ['captain/teams/:teamId/lineup-plans/:planId/revisions', ['teamManagement']],
+    ['captain/teams/:teamId/lineup-plans/:planId/default', ['teamManagement']],
+    ['captain/teams/:teamId/lineup-plans/:planId/confirm', ['teamManagement']],
     ['captain/teams/:teamId/members/:membershipId', ['teamManagement']],
     ['roster/tournaments/:tournamentId/teams/:teamId/commands', ['teamManagement']],
     ['matches/:matchId/report/history', ['matchReporting']],

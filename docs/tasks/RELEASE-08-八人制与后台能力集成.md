@@ -58,3 +58,21 @@ Sites 的 meta CSP 当前仅有临时 API connect-src，应加 `'self'` 允许�
 - A/B 的审核、媒体和身份对象隔离、未授权拒绝、幂等与审计，不从姓名推断权限。
 - 空库全部迁移、业务导入两次不重写、lint/typecheck/test/build、H5 desktop/mobile 的真实 API 操作。
 - 记录未测的物理手机/Safari、长期稳定性、灾备恢复与负载；不把 mock 或 Chrome 手机模拟称为实体端验收。
+
+## 已验证阶段（2026-10-04，全集成尚未完成）
+
+空赛事/模拟事实热修 `bf9c384e1e563b8a0649e37401d250ca4f517d66` 已推独立分支 `codex/h5-empty-organization`，GitHub CI `37173871765` 成功。
+本机专用 API 已同步热修，HTTPS readiness200、真实匿名管理中心401；专用 Worker 与 Quick Tunnel 保留，没有对公网库应用新schema。
+模拟业务导入首次1476行、第二次0行；账号、凭据、会话、角色及已有用户球队均保留。
+实际只读应用服务DTO验证16参赛队/32比赛/17目录队、四组前二晋级8强、已赛58侧各8实际首发、3未开始比赛无实际出场或事件。
+这项服务诊断不是已登录公开浏览器验收。
+
+父 Sites version4 已发布热修，同URL/API origin/org；桌面1440与手机390 Chrome模拟登录资源、真实跨域HTTP、无溢出及CSP检查4/4通过。
+`connect-src 'self'` 与精确API来源已在公开版本生效，旧CSP阻断已消除；匿名管理探测导致的预期401控制台消息不被误报为产品连接故障。
+
+root 新规程写入固定8、省略则保存8，管理H5取消5/7/11新规程；历史已发布内容仍按不可变版本读取，不批量改历史。
+模块关闭还覆盖新增阵容default/confirm端点，不能通过直接HTTP绕过关闭的入口。
+独立空库 `xiaoqiu_eight_integration_test_20261004` 的17项迁移成功；定向API/Nest HTTP/真实PostgreSQL25/25、管理规程逻辑9/9、改动lint、API测试编译、H5/Admin类型检查与Prisma验证通过。
+
+公开confirmed revision映射、未来游客入口/模块按钮接线正在各独立worktree补齐；A/B媒体与身份成果尚待集成。
+最终必须再建空库覆盖全部合并迁移、seed两次、完整质量门、备份恢复演练及受控公开API同步，不能把上面的定向结果称为全集成验收。

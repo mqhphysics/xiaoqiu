@@ -13,6 +13,7 @@ import {
   type Prisma,
 } from '../generated/prisma/client'
 import { PrismaService } from '../database/prisma.service'
+import { eightASideRuleDocument } from './eight-a-side-rules'
 import type {
   CreateCompetitionRuleVersionDto,
   CreateMatchDto,
@@ -147,7 +148,7 @@ export class ScheduleService {
         tournamentId,
         version: dto.version,
         name: dto.name,
-        rules: dto.rules as Prisma.InputJsonValue,
+        rules: eightASideRuleDocument(dto.rules) as Prisma.InputJsonValue,
       },
     })
 

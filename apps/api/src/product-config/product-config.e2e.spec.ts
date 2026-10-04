@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import test, { after, before } from 'node:test'
-import { Controller, Get, HttpStatus, type INestApplication } from '@nestjs/common'
+import { Controller, Get, Post, HttpStatus, type INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 import request from 'supertest'
@@ -15,6 +15,12 @@ import type { Server } from 'node:http'
 
 @Controller()
 class BusinessProbeController {
+  @Post('captain/teams/:teamId/lineup-plans/:planId/default') defaultLineup() {
+    throw new Error('Closed teamManagement route must never reach a write handler')
+  }
+  @Post('captain/teams/:teamId/lineup-plans/:planId/confirm') confirmLineup() {
+    throw new Error('Closed teamManagement route must never reach a write handler')
+  }
   @Get('public/home') home() {
     return { fixture: true }
   }
@@ -49,7 +55,11 @@ before(async () => {
     .useValue({})
     .overrideProvider(ProductConfigService)
     .useValue({
-      getConfiguration: () => buildProductConfiguration({ XIAOQIU_FEATURE_COMMUNITY: 'false' }),
+      getConfiguration: () =>
+        buildProductConfiguration({
+          XIAOQIU_FEATURE_COMMUNITY: 'false',
+          XIAOQIU_FEATURE_TEAM_MANAGEMENT: 'false',
+        }),
     })
     .compile()
   app = module.createNestApplication()
@@ -98,4 +108,15 @@ test('closed module rejects an actual direct HTTP request with its stable reason
   const response = await request(app.getHttpServer()).get('/api/community/posts/').expect(403)
   assert.equal(response.body.message, '功能暂未开放')
   assert.equal(response.body.details.module, 'community')
+})
+
+test('closed team management also blocks direct default and confirmation HTTP writes', async () => {
+  for (const action of ['default', 'confirm']) {
+    const response = await request(app.getHttpServer())
+      .post(`/api/captain/teams/${org}/lineup-plans/${org}/${action}`)
+      .send({ expectedVersion: 1 })
+      .expect(403)
+    assert.equal(response.body.message, '功能暂未开放')
+    assert.equal(response.body.details.module, 'teamManagement')
+  }
 })

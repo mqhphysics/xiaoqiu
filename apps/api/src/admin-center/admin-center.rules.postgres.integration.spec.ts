@@ -273,7 +273,7 @@ test('safe rule publication through real HTTP and PostgreSQL', { timeout: 90000 
       maxPlayers: 20,
       submissionDeadline: '2027-01-01T00:00:00Z',
       eligiblePlayerIds: [player.id],
-      playersOnPitch: 11,
+      playersOnPitch: 8,
     }
     const progression = {
       sourceStageId: stage.id,
@@ -321,10 +321,11 @@ test('safe rule publication through real HTTP and PostgreSQL', { timeout: 90000 
       'complete supported result/roster structures are required and invalid versions rejected',
       async () => {
         await publish({ ...body, rules: { summary: 'Legacy summary only' } }).expect(400)
-        await publish({
-          ...body,
-          rules: { results, roster: { ...roster, playersOnPitch: 9 } },
-        }).expect(400)
+        for (const playersOnPitch of [5, 7, 9, 11, '8', null])
+          await publish({
+            ...body,
+            rules: { results, roster: { ...roster, playersOnPitch } },
+          }).expect(400)
         await publish({
           ...body,
           rules: { results, roster: { ...roster, submissionDeadline: '2027-01-01' } },
@@ -388,6 +389,7 @@ test('safe rule publication through real HTTP and PostgreSQL', { timeout: 90000 
         assert.ok(replies.every((reply) => reply.status === 200))
         assert.deepEqual(replies[0]!.body, replies[1]!.body)
         firstResponse = replies[0]!.body
+        assert.equal(replies[0]!.body.rules.roster.playersOnPitch, 8)
         assert.equal(
           await prisma.competitionRuleVersion.count({ where: { tournamentId: tournament.id } }),
           1,

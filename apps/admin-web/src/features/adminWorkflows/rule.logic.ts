@@ -33,8 +33,8 @@ export function validateRuleDocument(value: unknown): string | null {
     new Set(roster.eligiblePlayerIds).size !== roster.eligiblePlayerIds.length
   )
     return '资格名单需填写不重复的稳定球员 UUID。'
-  if (roster.playersOnPitch !== undefined && ![5, 7, 8, 11].includes(Number(roster.playersOnPitch)))
-    return '比赛人数仅支持 5/7/8/11 人制。'
+  if (roster.playersOnPitch !== undefined && roster.playersOnPitch !== 8)
+    return '新规程仅支持八人制，playersOnPitch 必须为 8。'
   if (!object(value.results)) return '请配置完整的 results 正式赛果规则。'
   const results = value.results
   if (
