@@ -5,12 +5,16 @@ import test from 'node:test'
 import { URL } from 'node:url'
 
 import { isAccountEntryRoute } from '../../features/product/account-access.ts'
+import { guestPageAllowed } from '../../features/product-config/access-boundary.logic.ts'
+import { parseProductConfiguration } from '../../features/product-config/product-config.logic.ts'
 
 const require = createRequire(import.meta.url)
 const React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 const ts = require('typescript')
 let storedSession = null
+let configuration = null
+let failedAccount = false
 
 // Render the actual H5 component before effects run. Taro must be able to find
 // the initial page instance even while account verification hides its UI.
@@ -27,6 +31,23 @@ const load = (name) => {
   if (name === '@tarojs/taro') return {}
   if (name === '../identity-center/index.h5') return { IdentityCenterHost: () => null }
   if (name.endsWith('/account-access')) return { isAccountEntryRoute }
+  if (name.endsWith('/access-boundary.logic')) return { guestPageAllowed }
+  if (name.endsWith('/use-product-config.h5'))
+    return {
+      useProductConfiguration: () => ({
+        configuration,
+        phase: configuration ? 'ready' : 'unknown',
+        error: null,
+      }),
+    }
+  if (name.endsWith('/policy-state.h5'))
+    return {
+      readAccountPresence: () => ({
+        session: storedSession,
+        hasSession: Boolean(storedSession),
+        needsAccount: failedAccount || Boolean(storedSession),
+      }),
+    }
   if (name.endsWith('/product.repository'))
     return {
       productRepository: {
@@ -46,10 +67,12 @@ new Function('require', 'exports', 'module', compiled)(
 )
 const { AccountBoundary } = componentModule.exports
 
-function renderAt(route, session = null) {
+function renderAt(route, session = null, config = null, failure = false) {
   const previousWindow = globalThis.window
   globalThis.window = { location: { hash: route, pathname: '/' } }
   storedSession = session
+  configuration = config
+  failedAccount = failure
   try {
     return renderToStaticMarkup(
       React.createElement(
@@ -62,6 +85,8 @@ function renderAt(route, session = null) {
     )
   } finally {
     storedSession = null
+    configuration = null
+    failedAccount = false
     if (previousWindow === undefined) delete globalThis.window
     else globalThis.window = previousWindow
   }
@@ -74,6 +99,58 @@ test('unverified deep links retain the Taro route child while hiding it and excl
     assert.match(html, /style="display:none" aria-hidden="true"/)
     assert.ok(!html.includes('data-overlay-test'))
   }
+})
+
+test('actual boundary opens only configured future public read pages and keeps private overlays closed', () => {
+  const config = parseProductConfiguration({
+    schemaVersion: 1,
+    revision: 'future',
+    accountRequired: false,
+    serverGuestAccess: true,
+    guest: { enabled: true },
+    sport: { format: 'EIGHT_A_SIDE', playersPerSide: 8 },
+    modules: {
+      home: { enabled: true },
+      schedule: { enabled: true },
+      data: { enabled: true },
+      teams: { enabled: true },
+    },
+  })
+  for (const route of [
+    '#/pages/index/index',
+    '#/pages/readonly-match-detail/index?id=test',
+    '#/pages/readonly-teams/index?tournamentId=test',
+  ]) {
+    const html = renderAt(route, null, config)
+    assert.match(html, /style="display:contents" aria-hidden="false"/)
+    assert.ok(!html.includes('data-overlay-test'))
+  }
+  for (const route of [
+    '#/pages/me/index',
+    '#/pages/my-team/index?review=roster',
+    '#/pages/quick-report/index',
+    '#/pages/unknown/index',
+  ])
+    assert.match(renderAt(route, null, config), /style="display:none" aria-hidden="true"/)
+})
+
+test('actual boundary never downgrades an existing or expired account into future guest access', () => {
+  const config = parseProductConfiguration({
+    schemaVersion: 1,
+    revision: 'future',
+    accountRequired: false,
+    serverGuestAccess: true,
+    guest: { enabled: true },
+    sport: { format: 'EIGHT_A_SIDE', playersPerSide: 8 },
+    modules: { home: { enabled: true } },
+  })
+  assert.match(
+    renderAt('#/pages/index/index', { accessToken: 'fictional-invalid-session' }, config),
+    /style="display:none" aria-hidden="true"/,
+  )
+  const html = renderAt('#/pages/index/index', null, config, true)
+  assert.match(html, /style="display:none" aria-hidden="true"/)
+  assert.match(html, /登录状态已失效/)
 })
 
 test('the login route remains mounted and visible while private portal hosts stay closed', () => {

@@ -4,6 +4,7 @@ import type {
   ProductConfiguration,
 } from '../../../../../packages/contracts/src/product-config'
 import { readSession } from '../product/session'
+import { markAccountInvalid, readAccountPresence } from './policy-state'
 import { parseProductConfiguration } from './product-config.logic'
 
 export const productConfigRepository = {
@@ -18,7 +19,8 @@ export const productConfigRepository = {
     return parseProductConfiguration(response.data)
   },
   async getCapabilities(): Promise<AccountCapabilities> {
-    const session = readSession()
+    const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+    const session = h5 ? readAccountPresence().session : readSession()
     if (!session) throw new Error('请先登录账号')
     const response = await Taro.request<AccountCapabilities>({
       url: `${apiBase()}/me/capabilities`,
@@ -29,10 +31,15 @@ export const productConfigRepository = {
         'x-organization-id': session.user.organizationId,
       },
     })
+    if (h5 && response.statusCode === 401 && readSession()?.accessToken === session.accessToken)
+      markAccountInvalid()
+    const currentSession = readSession()
     if (
       response.statusCode !== 200 ||
       response.data.schemaVersion !== 1 ||
-      response.data.organizationId !== session.user.organizationId
+      response.data.organizationId !== session.user.organizationId ||
+      currentSession?.accessToken !== session.accessToken ||
+      currentSession.user.organizationId !== session.user.organizationId
     )
       throw new Error('暂时无法读取账号能力，请重新验证会话')
     return response.data

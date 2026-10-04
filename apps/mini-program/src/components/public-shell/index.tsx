@@ -11,6 +11,13 @@ import {
 
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { getConfiguration, readAccountPresence } from '../../features/product-config/policy-state'
+import { productConfigRepository } from '../../features/product-config/product-config.repository'
+import {
+  runNavigationEntry,
+  runPrivateEntry,
+} from '../../features/product-config/navigation-entry.logic'
+import { useProductConfiguration } from '../../features/product-config/use-product-config'
 import type { TeamSummary } from '../../features/product/product.types'
 import type { PublicDataSource } from '../../features/readonly-schedule/readonly-schedule.types'
 import { TeamCrest, UserAvatar } from '../product-ui'
@@ -69,6 +76,7 @@ export function PublicShell({
   children,
 }: PublicShellProps) {
   const session = readSession()
+  useProductConfiguration()
   const teamCacheKey = session ? `${session.user.id}:${session.expiresAt}` : null
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -129,8 +137,31 @@ export function PublicShell({
   }, [teamCacheKey])
 
   const closeMenu = () => setMenuOpen(false)
+  const entryAccount = () => {
+    const account = readAccountPresence()
+    return {
+      hasSession: account.hasSession,
+      needsAccount: account.needsAccount,
+      organizationId: account.session?.user.organizationId ?? null,
+    }
+  }
+  const notifyUnavailable = (title: string) =>
+    Taro.showToast({ title, icon: 'none', duration: 2200 })
   const navigateToSection = async (section: PublicSection) => {
-    const targetPath = getSectionPath(section, tournamentId)
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB) {
+      await runNavigationEntry(section, {
+        getConfiguration,
+        account: entryAccount,
+        getCapabilities: productConfigRepository.getCapabilities,
+        navigate: () => performNavigation(section),
+        notify: notifyUnavailable,
+      })
+    } else await performNavigation(section)
+  }
+  const performNavigation = async (section: PublicSection) => {
+    const guest = Taro.getEnv() === Taro.ENV_TYPE.WEB && !readAccountPresence().hasSession
+    const destination = guest && section === 'team' ? 'teams' : section
+    const targetPath = getSectionPath(destination, tournamentId)
     if (navigationLock.current) return
     if (currentPath === normalizePath(targetPath)) {
       if (section === 'team' && isDesktopH5() && shellRef.current) playTeamFocus(shellRef.current)
@@ -148,7 +179,7 @@ export function PublicShell({
     }
     try {
       if (!desktopH5 && !prefersReducedMotion()) await wait(160)
-      await goToSection(section, tournamentId)
+      await goToSection(destination, tournamentId)
     } catch {
       clearNavigationOrigin()
       await Taro.showToast({ title: '页面切换失败，请重试', icon: 'none' })
@@ -172,7 +203,33 @@ export function PublicShell({
       await Taro.reLaunch({ url: '/pages/login/index' })
       return
     }
-    setFeedbackOpen(true)
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB)
+      await runPrivateEntry(null, {
+        getConfiguration,
+        account: entryAccount,
+        getCapabilities: productConfigRepository.getCapabilities,
+        navigate: () => {
+          setFeedbackOpen(true)
+        },
+        notify: notifyUnavailable,
+      })
+    else setFeedbackOpen(true)
+  }
+  const openPrivateMenu = async (kind: 'messages' | 'settings') => {
+    closeMenu()
+    const open = () => {
+      if (kind === 'messages') openMessaging()
+      else setSettingsOpen(true)
+    }
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB)
+      await runPrivateEntry(kind === 'messages' ? 'messages.read' : null, {
+        getConfiguration,
+        account: entryAccount,
+        getCapabilities: productConfigRepository.getCapabilities,
+        navigate: open,
+        notify: notifyUnavailable,
+      })
+    else open()
   }
 
   return (
@@ -281,10 +338,7 @@ export function PublicShell({
                 {session && (
                   <Button
                     className="public-account-menu__item"
-                    onClick={() => {
-                      closeMenu()
-                      openMessaging()
-                    }}
+                    onClick={() => void openPrivateMenu('messages')}
                   >
                     消息与私信
                   </Button>
@@ -294,10 +348,7 @@ export function PublicShell({
                 </Button>
                 <Button
                   className="public-account-menu__item"
-                  onClick={() => {
-                    closeMenu()
-                    setSettingsOpen(true)
-                  }}
+                  onClick={() => void openPrivateMenu('settings')}
                 >
                   设置
                 </Button>

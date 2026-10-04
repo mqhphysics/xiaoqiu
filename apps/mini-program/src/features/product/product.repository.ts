@@ -1,6 +1,16 @@
 import Taro from '@tarojs/taro'
 
 import { clearSession, leaveGuestMode, readSession, saveSession } from './session'
+import {
+  anonymousReadAllowed,
+  explicitAnonymousAuthRequest,
+} from '../product-config/access-boundary.logic'
+import {
+  clearAccountByUser,
+  getConfiguration,
+  markAccountInvalid,
+  readAccountPresence,
+} from '../product-config/policy-state'
 import type {
   AdminIdentity,
   AuthSession,
@@ -154,6 +164,7 @@ export const productRepository = {
     } finally {
       clearSession()
       leaveGuestMode()
+      if (Taro.getEnv() === Taro.ENV_TYPE.WEB) clearAccountByUser()
     }
   },
 
@@ -312,14 +323,31 @@ interface RequestOptions {
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const session = readSession()
-  if (Taro.getEnv() === Taro.ENV_TYPE.WEB && options.authenticated !== false && !session) {
-    clearSession()
-    throw new ProductApiError('请先登录账号后再访问晓球', 401)
+  const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const account = h5 ? readAccountPresence() : null
+  const session = h5 ? account?.session : readSession()
+  const method = options.method ?? 'GET'
+  const anonymousAuth =
+    options.authenticated === false && explicitAnonymousAuthRequest(path, method)
+  if (h5 && !anonymousAuth && (!session || options.authenticated === false)) {
+    let allowed = false
+    if (account && !account.needsAccount && !account.hasSession) {
+      try {
+        allowed = anonymousReadAllowed(
+          path,
+          method,
+          await getConfiguration(),
+          readAccountPresence(),
+        )
+      } catch {
+        /* configuration unavailable closes anonymous entry */
+      }
+    }
+    if (!allowed) throw new ProductApiError('请先登录账号后再访问晓球', 401)
   }
   const response = await Taro.request<T>({
     url: `${getApiBaseUrl()}${path}`,
-    method: options.method ?? 'GET',
+    method,
     data: options.data,
     header: {
       ...options.headers,
@@ -337,7 +365,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    if (response.statusCode === 401 && options.authenticated !== false) clearSession()
+    if (response.statusCode === 401 && options.authenticated !== false) {
+      if (h5 && session && readSession()?.accessToken === session.accessToken) markAccountInvalid()
+      else if (!h5) clearSession()
+    }
     throw new ProductApiError(
       readErrorMessage(response.data, response.statusCode),
       response.statusCode,

@@ -1,5 +1,11 @@
 import Taro from '@tarojs/taro'
 import { clearSession, readSession } from '../product/session'
+import { anonymousReadAllowed } from '../product-config/access-boundary.logic'
+import {
+  getConfiguration,
+  markAccountInvalid,
+  readAccountPresence,
+} from '../product-config/policy-state'
 
 import { readonlyScheduleMockFixture } from './mock-fixture'
 import { sortMatchesByStartAt } from './readonly-schedule.logic'
@@ -413,10 +419,19 @@ function formatDateRangePoint(value: string | undefined): string {
 }
 
 async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
-  const session = readSession()
-  if (Taro.getEnv() === Taro.ENV_TYPE.WEB && !session) {
-    clearSession()
-    throw new PublicApiRequestError(401, '请先登录账号后再访问晓球')
+  const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const account = h5 ? readAccountPresence() : null
+  const session = h5 ? account?.session : readSession()
+  if (h5 && !session) {
+    let allowed = false
+    if (account && !account.needsAccount) {
+      try {
+        allowed = anonymousReadAllowed(path, 'GET', await getConfiguration(), readAccountPresence())
+      } catch {
+        /* fail closed without offline/mock fallback */
+      }
+    }
+    if (!allowed) throw new PublicApiRequestError(401, '请先登录账号后再访问晓球')
   }
   const response = await Taro.request<T>({
     url: `${apiContext.baseUrl}${path}`,
@@ -431,7 +446,10 @@ async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    if (response.statusCode === 401) clearSession()
+    if (response.statusCode === 401) {
+      if (h5 && session && readSession()?.accessToken === session.accessToken) markAccountInvalid()
+      else if (!h5) clearSession()
+    }
     throw new PublicApiRequestError(
       response.statusCode,
       readErrorMessage(response.data, response.statusCode),
