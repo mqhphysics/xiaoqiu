@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { productRepository } from '../../features/product/product.repository'
 import { enterGuestMode, readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
+import type { GuestEntryPolicy } from '../../../../../packages/contracts/src/product-config'
 
 import './index.scss'
 
@@ -21,7 +22,13 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
   confirmPassword: '',
 }
 
-export default function LoginPage({ allowGuest = true }: { allowGuest?: boolean }) {
+export default function LoginPage({
+  allowGuest = true,
+  guestPolicy,
+}: {
+  allowGuest?: boolean
+  guestPolicy?: GuestEntryPolicy
+}) {
   const [screenMode, setScreenMode] = useState<ScreenMode>('login')
   const [loginMode, setLoginMode] = useState<LoginMode>('password')
   const [identifier, setIdentifier] = useState('')
@@ -110,6 +117,14 @@ export default function LoginPage({ allowGuest = true }: { allowGuest?: boolean 
   }
 
   const enterAsGuest = async () => {
+    if (guestPolicy && !guestPolicy.enabled) {
+      await Taro.showToast({
+        title: guestPolicy.reason || '功能暂未开放',
+        icon: 'none',
+        duration: 2200,
+      })
+      return
+    }
     enterGuestMode()
     await Taro.reLaunch({ url: '/pages/index/index' })
   }
@@ -339,12 +354,16 @@ export default function LoginPage({ allowGuest = true }: { allowGuest?: boolean 
             </View>
           )}
 
-          {allowGuest ? (
+          {(guestPolicy ? guestPolicy.visible : allowGuest) ? (
             <View className="guest-entry">
               <Button className="guest-entry__button" onClick={() => void enterAsGuest()}>
                 以游客身份浏览
               </Button>
-              <Text className="guest-entry__hint">无需注册，先看赛程、比分和球队</Text>
+              <Text className="guest-entry__hint">
+                {guestPolicy
+                  ? '登录后查看球队、赛程与比赛数据。'
+                  : '无需注册，先看赛程、比分和球队'}
+              </Text>
             </View>
           ) : (
             <Text className="guest-entry__hint">当前仅向已登录账号开放，请登录或注册后进入。</Text>

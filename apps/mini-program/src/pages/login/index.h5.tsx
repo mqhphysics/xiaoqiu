@@ -6,8 +6,13 @@ import brandMark from '../../assets/home-visual/brand-mark.png'
 import { AuthRecoveryDialog } from '../../components/auth-recovery/index.h5'
 import { AuthScene } from '../../components/auth-scene/index.h5'
 import { productRepository } from '../../features/product/product.repository'
-import { readSession } from '../../features/product/session'
+import { enterGuestMode, readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
+import {
+  CLOSED_GUEST_POLICY,
+  runFeatureAction,
+} from '../../features/product-config/product-config.logic'
+import { useProductConfiguration } from '../../features/product-config/use-product-config.h5'
 import ExistingLoginPage from './login.shared'
 
 import '../../components/auth-cursor/native-cursors.h5.scss'
@@ -26,6 +31,8 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
 const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
 
 export default function H5LoginPage() {
+  const { configuration } = useProductConfiguration()
+  const guestPolicy = configuration?.guest ?? CLOSED_GUEST_POLICY
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   useEffect(() => {
     const query = window.matchMedia('(min-width: 1024px)')
@@ -33,10 +40,14 @@ export default function H5LoginPage() {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
-  return desktop ? <ArtLoginPage /> : <ExistingLoginPage allowGuest={false} />
+  return desktop ? (
+    <ArtLoginPage guestPolicy={guestPolicy} />
+  ) : (
+    <ExistingLoginPage allowGuest={false} guestPolicy={guestPolicy} />
+  )
 }
 
-function ArtLoginPage() {
+function ArtLoginPage({ guestPolicy }: { guestPolicy: typeof CLOSED_GUEST_POLICY }) {
   const [screen, setScreen] = useState<'login' | 'register'>('login')
   const [method, setMethod] = useState<'password' | 'email'>('password')
   const [identifier, setIdentifier] = useState('')
@@ -350,7 +361,25 @@ function ArtLoginPage() {
             </form>
           )}
 
-          <p className="art-login__guest-hint">当前仅向已登录账号开放，请登录或注册后进入。</p>
+          {guestPolicy.visible ? (
+            <button
+              type="button"
+              className="art-login__control art-login__guest"
+              onClick={() =>
+                void runFeatureAction(
+                  guestPolicy,
+                  async () => {
+                    enterGuestMode()
+                    await Taro.reLaunch({ url: '/pages/index/index' })
+                  },
+                  (title) => Taro.showToast({ title, icon: 'none', duration: 2200 }),
+                )
+              }
+            >
+              以游客身份浏览
+            </button>
+          ) : null}
+          <p className="art-login__guest-hint">登录后查看球队、赛程与比赛数据。</p>
         </div>
       </section>
       {recovery && <AuthRecoveryDialog onClose={() => setRecovery(false)} />}
