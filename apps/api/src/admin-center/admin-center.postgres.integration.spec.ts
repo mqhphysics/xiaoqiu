@@ -161,7 +161,7 @@ test(
       )
 
       await t.test(
-        'user pages omit password material and private identities and do not leak other organization',
+        'privileged user pages include identity, omit password material and exclude foreign organization',
         async () => {
           const result = await http
             .get('/api/admin/center/users?pageSize=2')
@@ -175,8 +175,16 @@ test(
             .expect(200)
           assert.ok(all.body.items.every((item: { id: string }) => item.id !== otherUser.id))
           const serialized = JSON.stringify(all.body)
-          for (const privateValue of [digest.hash, digest.salt, target.studentId!, target.email!])
+          for (const privateValue of [digest.hash, digest.salt])
             assert.ok(!serialized.includes(privateValue))
+          assert.equal(
+            all.body.items.find((item: { id: string }) => item.id === target.id).studentId,
+            target.studentId,
+          )
+          assert.equal(
+            all.body.items.find((item: { id: string }) => item.id === target.id).email,
+            target.email,
+          )
           assert.ok(
             all.body.items.find((item: { id: string }) => item.id === target.id).hasPassword,
           )
@@ -353,7 +361,7 @@ test(
             .send({
               expectedUpdatedAt: player.updatedAt.toISOString(),
               reason,
-              patch: { studentId: 'Overwrite' },
+              patch: { sourceKey: 'Overwrite' },
             })
             .expect(400)
           await http
@@ -370,7 +378,10 @@ test(
             .get('/api/admin/center/players')
             .set('authorization', auth)
             .expect(200)
-          assert.ok(!JSON.stringify(players.body).includes(player.studentId!))
+          assert.equal(
+            players.body.items.find((item: { id: string }) => item.id === player.id).studentId,
+            player.studentId,
+          )
         },
       )
 

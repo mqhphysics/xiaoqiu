@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
 import { AuditActorType } from '../generated/prisma/client'
+import { assertMediaReadable } from './media-access-policy'
 
 const MAX_AVATAR_BYTES = 72 * 1024
 const MIN_AVATAR_EDGE = 64
@@ -37,7 +38,9 @@ export interface StoredPostImage {
 export function postImageUrls(imageUrl: string | null): string[] {
   if (!imageUrl) return []
   const album =
-    /^(\/api\/media\/posts\/[a-f0-9-]+\/[a-f0-9-]+\/[a-f0-9]{64})-([2-9])-0\.webp$/.exec(imageUrl)
+    /^((?:https?:\/\/[^/]+)?\/api\/media\/posts\/[a-f0-9-]+\/[a-f0-9-]+\/[a-f0-9]{64})-([2-9])-0\.webp$/.exec(
+      imageUrl,
+    )
   return album
     ? Array.from(
         { length: Number(album[2]) },
@@ -102,8 +105,20 @@ export class MediaService {
     if (album && Number(album[3]) >= Number(album[2])) throw notFound('动态图片不存在')
     const cover = album ? `${album[1]}-${album[2]}-0.webp` : fileName
     const imageUrl = `/api/media/posts/${organizationId}/${authorUserId}/${cover}`
+    if (
+      !(await assertMediaReadable(
+        this.prisma,
+        `/api/media/posts/${organizationId}/${authorUserId}/${fileName}`,
+      ))
+    )
+      throw notFound('动态图片已下架')
     const visiblePost = await this.prisma.post.findFirst({
-      where: { organizationId, authorUserId, imageUrl, status: 'PUBLISHED' },
+      where: {
+        organizationId,
+        authorUserId,
+        OR: [{ imageUrl }, { imageUrl: { endsWith: imageUrl } }],
+        status: 'PUBLISHED',
+      },
       select: { id: true },
     })
     if (!visiblePost) throw notFound('动态图片不存在')
@@ -284,6 +299,8 @@ export class MediaService {
 
   async readAvatar(fileName: string): Promise<{ body: Buffer; mimeType: string }> {
     if (!/^[a-f0-9]{64}\.(?:webp|png|jpg)$/.test(fileName)) throw notFound('头像不存在')
+    if (!(await assertMediaReadable(this.prisma, `/api/media/avatars/${fileName}`)))
+      throw notFound('头像已下架')
     try {
       const body = await readFile(resolve(AVATAR_DIRECTORY, fileName))
       const extension = fileName.slice(fileName.lastIndexOf('.') + 1)
@@ -306,6 +323,8 @@ export class MediaService {
       !fileName.endsWith(`.${extension}`)
     )
       throw notFound('演示图片不存在')
+    if (!(await assertMediaReadable(this.prisma, `/api/media/demo/${kind}/${fileName}`)))
+      throw notFound('图片已下架')
     try {
       return {
         body: await readFile(resolve(DEMO_DIRECTORY, kind, fileName)),

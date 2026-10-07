@@ -156,7 +156,14 @@ if ($PrepareOnly) {
   exit 0
 }
 
-Write-Host '[4/4] Starting API and H5 in the background...'
+Write-Host '[4/4] Preparing same-site management portal and starting API/H5...'
+$env:VITE_API_BASE_URL = 'http://127.0.0.1:3001'
+$env:VITE_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001'
+$env:VITE_LOCAL_SHORT_PASSWORDS = '1'
+$env:VITE_H5_SESSION_BRIDGE = '1'
+Invoke-CheckedCommand 'management portal build' {
+  npm.cmd --prefix apps/admin-web run build -- --base /admin/
+}
 $apiHealthUrl = 'http://127.0.0.1:3001/api/health/ready'
 $h5Url = 'http://127.0.0.1:3000/'
 

@@ -36,6 +36,7 @@ const TEAM_FIELDS: Field[] = [
   { key: 'secondaryColor', title: '辅色', max: 16 },
 ]
 const PLAYER_FIELDS: Field[] = [
+  { key: 'studentId', title: '学号', max: 32 },
   { key: 'displayName', title: '显示姓名', max: 120, required: true },
   { key: 'jerseyName', title: '球衣显示名', max: 120 },
   {

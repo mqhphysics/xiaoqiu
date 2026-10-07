@@ -66,6 +66,7 @@ test('HTTP publishes a large single photo, retries once, reads it back, and pres
     },
   }
   const prisma = {
+    $queryRaw: async () => [],
     $transaction: async (action: (transaction: typeof tx) => Promise<unknown>) => action(tx),
     tournament: { findFirst: async () => ({ id: tournamentId }) },
     post: {
@@ -73,7 +74,17 @@ test('HTTP publishes a large single photo, retries once, reads it back, and pres
         [...posts.values()].filter((post) => post.imageUrl === where.imageUrl).length,
       findFirst: async ({ where }: { where: Record<string, unknown> }) =>
         [...posts.values()].find((post) =>
-          Object.entries(where).every(([key, value]) => post[key] === value),
+          Object.entries(where).every(([key, value]) => {
+            if (key !== 'OR') return post[key] === value
+            return (
+              Array.isArray(value) &&
+              value.some(({ imageUrl }: { imageUrl: string | { endsWith: string } }) =>
+                typeof imageUrl === 'string'
+                  ? post.imageUrl === imageUrl
+                  : typeof post.imageUrl === 'string' && post.imageUrl.endsWith(imageUrl.endsWith),
+              )
+            )
+          }),
         ),
     },
   } as unknown as PrismaService

@@ -13,6 +13,9 @@ import { Content } from './Content'
 import { Records } from './Records'
 import { IdentityManagement } from './IdentityManagement'
 import { publicWebsiteHref } from '../adminAuth/config'
+import { PeopleManagement } from './PeopleManagement'
+import { MediaLibrary } from './MediaLibrary'
+import { PostComposer, PostReview } from './PostManagement'
 import { Badge, DataState, Icon, PendingCapability, time, useAdminData } from './shared'
 import './admin-center.css'
 
@@ -22,11 +25,25 @@ type Section =
   | 'people'
   | 'events'
   | 'content'
+  | 'publish'
+  | 'review'
   | 'media'
   | 'audit'
   | 'system'
 const NAV: { id: Section; title: string; icon: string; description: string }[] = [
   { id: 'overview', title: '工作台', icon: 'trophy', description: '从待办开始，让赛事有序进行。' },
+  {
+    id: 'publish',
+    title: '发布帖子',
+    icon: 'pencil',
+    description: '编写帖子并上传图片，直接发布或提交审核。',
+  },
+  {
+    id: 'review',
+    title: '帖子审核',
+    icon: 'shield-check',
+    description: '查看正文和图片，批准、封禁或恢复内容。',
+  },
   {
     id: 'accounts',
     title: '账号与权限',
@@ -47,13 +64,13 @@ const NAV: { id: Section; title: string; icon: string; description: string }[] =
   },
   {
     id: 'content',
-    title: '内容与反馈',
+    title: '反馈与举报',
     icon: 'bell',
-    description: '发布官方消息，认真处理每一条反馈。',
+    description: '查看用户反馈与举报，记录处理结果并回复。',
   },
   {
     id: 'media',
-    title: '媒体资料',
+    title: '图片管理',
     icon: 'bookmark',
     description: '查看当前使用的公开图片及关联对象。',
   },
@@ -227,7 +244,7 @@ export function AdminCenter({
             {section === 'accounts' ? (
               context.canManageOrganization ? (
                 <>
-                  <Directory context={context} kind="users" />
+                  <PeopleManagement context={context} />
                   <IdentityManagement context={context} />
                 </>
               ) : (
@@ -255,12 +272,17 @@ export function AdminCenter({
             ) : null}
             {section === 'content' ? (
               context.canManageOrganization ? (
-                <Content context={context} tournamentId={selectedTournament?.id ?? ''} />
+                <Content context={context} />
               ) : (
                 <Restricted />
               )
             ) : null}
-            {section === 'media' || section === 'audit' || section === 'system' ? (
+            {section === 'publish' ? (
+              <PostComposer context={context} tournamentId={selectedTournament?.id ?? ''} />
+            ) : null}
+            {section === 'review' ? <PostReview context={context} /> : null}
+            {section === 'media' ? <MediaLibrary context={context} /> : null}
+            {section === 'audit' || section === 'system' ? (
               context.canManageOrganization ? (
                 <Records context={context} kind={section} />
               ) : (

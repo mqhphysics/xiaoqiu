@@ -18,6 +18,9 @@ export function localManagementPlugin(options) {
     if (initializing) return initializing
     initializing = (async () => {
       process.env.DATABASE_URL = options.databaseUrl
+      process.env.ADMIN_PUBLIC_MEDIA_ORIGIN = 'http://127.0.0.1:5173'
+      process.env.ADMIN_LEGACY_REPOSITORY = options.legacyRepository
+      process.env.PUBLIC_API_BASE_URL = options.publicApiBaseUrl
       const { NestFactory } = requireApi('@nestjs/core')
       const [
         { AdminCenterModule },
@@ -67,7 +70,12 @@ export function localManagementPlugin(options) {
       const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
       const desktopRoute =
         pathname === '/__admin-center/status' || pathname === '/__admin-center/session'
-      if (!desktopRoute && !/^\/api\/admin\/center(?:\/|$)/i.test(pathname)) return next()
+      if (
+        !desktopRoute &&
+        !/^\/api\/admin\/center(?:\/|$)/i.test(pathname) &&
+        !/^\/api\/media(?:\/|$)/i.test(pathname)
+      )
+        return next()
       response.setHeader('Cache-Control', 'private, no-store')
       try {
         const origin = `http://${request.headers.host}`

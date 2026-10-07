@@ -81,6 +81,12 @@ const config: UserConfigExport = {
       host: '127.0.0.1',
       port: 3000,
       open: false,
+      static: [
+        {
+          directory: path.resolve(__dirname, '../../admin-web/dist'),
+          publicPath: '/admin/',
+        },
+      ],
     },
     htmlPluginOption: {
       favicon: path.resolve(__dirname, '../src/assets/favicon.svg'),

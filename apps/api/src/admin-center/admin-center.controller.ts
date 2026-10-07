@@ -26,6 +26,7 @@ import {
   AdminCenterReasonDto,
   AdminCenterRuleVersionDto,
   AdminCenterUsersQueryDto,
+  AdminCenterPostsQueryDto,
 } from './admin-center.dto'
 import { AdminCenterService } from './admin-center.service'
 
@@ -42,6 +43,7 @@ import { AdminCenterService } from './admin-center.service'
   AdminCenterReasonDto,
   AdminCenterRuleVersionDto,
   AdminCenterUsersQueryDto,
+  AdminCenterPostsQueryDto,
 )
 @AuthorizeInApplicationService()
 @Controller('admin/center')
@@ -158,7 +160,10 @@ export class AdminCenterController {
   }
 
   @Get('posts')
-  posts(@Headers('authorization') auth: string | undefined, @Query() query: AdminCenterPageDto) {
+  posts(
+    @Headers('authorization') auth: string | undefined,
+    @Query() query: AdminCenterPostsQueryDto,
+  ) {
     return this.center.posts(auth, query)
   }
 

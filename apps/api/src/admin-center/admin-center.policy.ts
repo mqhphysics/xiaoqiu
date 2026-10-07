@@ -56,6 +56,7 @@ const teamStrings: Record<string, number> = {
   secondaryColor: 16,
 }
 const playerStrings: Record<string, number> = {
+  studentId: 32,
   displayName: 120,
   jerseyName: 120,
   academicYear: 32,
@@ -66,7 +67,7 @@ const playerStrings: Record<string, number> = {
 }
 const positions = ['GOALKEEPER', 'DEFENDER', 'MIDFIELDER', 'FORWARD']
 
-/** Accept display fields only; stable IDs, source keys, student IDs and memberships are never editable here. */
+/** Admin-authorized fields only; stable IDs, source keys and memberships are never editable here. */
 export function publicProfilePatch(
   kind: 'Team' | 'PlayerProfile',
   input: Record<string, unknown>,
@@ -114,6 +115,8 @@ export function publicProfilePatch(
       output[key] = value
     }
   }
+  if (kind === 'PlayerProfile' && Object.hasOwn(output, 'studentId'))
+    output.studentIdMasked = maskIdentity(output.studentId as string | null)
   return output
 }
 

@@ -11,11 +11,10 @@ import {
   Pager,
   PendingCapability,
   message,
-  textValue,
   time,
   useAdminData,
 } from './shared'
-import type { PageData, Row } from './shared'
+import type { Row } from './shared'
 
 interface Feedback extends Row {
   reason: string
@@ -27,31 +26,8 @@ interface Feedback extends Row {
   reporter: { id: string; displayName: string }
   handledBy: { displayName: string } | null
 }
-export function Content({
-  context,
-  tournamentId,
-}: {
-  context: OrganizationContext
-  tournamentId: string
-}) {
-  const [tab, setTab] = useState<'posts' | 'feedback'>('feedback')
-  return (
-    <>
-      <div className="mc-tabs" role="group" aria-label="内容管理功能">
-        <button className={tab === 'feedback' ? 'active' : ''} onClick={() => setTab('feedback')}>
-          反馈与举报
-        </button>
-        <button className={tab === 'posts' ? 'active' : ''} onClick={() => setTab('posts')}>
-          官方资讯与动态
-        </button>
-      </div>
-      {tab === 'feedback' ? (
-        <Feedbacks context={context} />
-      ) : (
-        <Posts context={context} tournamentId={tournamentId} />
-      )}
-    </>
-  )
+export function Content({ context }: { context: OrganizationContext }) {
+  return <Feedbacks context={context} />
 }
 function Feedbacks({ context }: { context: OrganizationContext }) {
   const result = useAdminData<{ items: Feedback[] }>(context, '/admin/reports')
@@ -323,137 +299,7 @@ function FeedbackReview({
     </form>
   )
 }
-function Posts({ context, tournamentId }: { context: OrganizationContext; tournamentId: string }) {
-  const [page, setPage] = useState(1)
-  const [query, setQuery] = useState('')
-  const [input, setInput] = useState('')
-  const [selected, setSelected] = useState<Row | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const result = useAdminData<PageData>(
-    context,
-    `/admin/center/posts?${new URLSearchParams({ page: String(page), pageSize: '10', query })}`,
-  )
-  function done() {
-    setEditing(false)
-    setCreating(false)
-    setSelected(null)
-    result.refresh()
-  }
-  return (
-    <>
-      <section className="mc-panel">
-        <div className="mc-panel-heading">
-          <div>
-            <h2>官方资讯与动态</h2>
-            <p>官方资讯发布到当前已发布赛事。隐藏内容保留原记录。</p>
-          </div>
-          <button disabled={!tournamentId} onClick={() => setCreating(true)}>
-            发布官方资讯
-          </button>
-        </div>
-        <form
-          className="mc-toolbar"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setPage(1)
-            setQuery(input.trim())
-          }}
-        >
-          <input
-            aria-label="搜索内容"
-            value={input}
-            placeholder="搜索标题或正文"
-            onChange={(e) => setInput(e.target.value)}
-          />
-          <button type="submit">搜索</button>
-          <button type="button" className="secondary-button" onClick={result.refresh}>
-            刷新
-          </button>
-        </form>
-        <DataState {...result} empty={result.data?.items.length === 0} onRetry={result.refresh} />
-        {result.data?.items.length ? (
-          <>
-            <div className="mc-table-wrap">
-              <table className="mc-table">
-                <thead>
-                  <tr>
-                    <th>内容</th>
-                    <th>类型</th>
-                    <th>发布者</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.data.items.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <strong>{textValue(r.title)}</strong>
-                        <small>{String(r.body).slice(0, 65)}</small>
-                      </td>
-                      <td>
-                        <Badge value={r.type} />
-                      </td>
-                      <td>
-                        {(r.author as { displayName: string } | null)?.displayName || '官方赛事组'}
-                      </td>
-                      <td>
-                        <Badge value={r.status} />
-                      </td>
-                      <td>
-                        <button className="mc-link-button" onClick={() => setSelected(r)}>
-                          查看详情 ↗
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pager data={result.data} page={page} onPage={setPage} />
-          </>
-        ) : null}
-      </section>
-      {selected && !editing ? (
-        <Modal title="内容详情" variant="drawer" onClose={() => setSelected(null)}>
-          <section className="mc-panel mc-detail">
-            <div className="mc-panel-heading">
-              <h2>{textValue(selected.title)}</h2>
-              <button className="secondary-button" onClick={() => setSelected(null)}>
-                收起详情
-              </button>
-            </div>
-            <div className="mc-actions">
-              <Badge value={selected.type} />
-              <Badge value={selected.status} />
-              <span className="mc-muted">{time(selected.publishedAt)}</span>
-            </div>
-            <p className="mc-prose">{textValue(selected.body)}</p>
-            <button onClick={() => setEditing(true)}>编辑与调整可见状态</button>
-          </section>
-        </Modal>
-      ) : null}
-      {creating || (selected && editing) ? (
-        <Modal
-          title={creating ? '发布官方资讯' : '编辑内容'}
-          onClose={() => {
-            setCreating(false)
-            setEditing(false)
-          }}
-        >
-          <PostEditor
-            context={context}
-            tournamentId={tournamentId}
-            row={creating ? null : selected}
-            onDone={done}
-          />
-        </Modal>
-      ) : null}
-    </>
-  )
-}
-function PostEditor({
+export function PostEditor({
   context,
   tournamentId,
   row,
@@ -477,7 +323,11 @@ function PostEditor({
         row
           ? {
               expectedUpdatedAt: row.updatedAt,
-              patch: { title: title.trim(), body: body.trim(), status },
+              patch: {
+                title: title.trim(),
+                body: body.trim(),
+                ...(status !== String(row.status) ? { status } : {}),
+              },
             }
           : { tournamentId, title: title.trim(), body: body.trim() }
       }
@@ -511,9 +361,13 @@ function PostEditor({
           <span id={`${editorId}-status`}>可见状态</span>
           <select
             aria-labelledby={`${editorId}-status`}
+            disabled={row.status === 'DRAFT'}
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
+            {row.status === 'DRAFT' ? (
+              <option value="DRAFT">待审核（请用审核动作批准）</option>
+            ) : null}
             <option value="PUBLISHED">已发布</option>
             <option value="HIDDEN">已隐藏</option>
           </select>
