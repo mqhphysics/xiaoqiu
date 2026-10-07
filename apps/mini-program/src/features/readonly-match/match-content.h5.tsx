@@ -115,15 +115,10 @@ export function MatchContent({
 
       {showReportEntry && <MatchReportEntry matchId={match.id} />}
 
-      {(match.summary || match.statusReason) && (
+      {match.statusReason && (
         <View className="match-summary surface">
-          <Text className="match-summary__label">
-            {match.statusReason ? '比赛说明' : '比赛战报'}
-          </Text>
-          <Text className="match-summary__body">{match.statusReason ?? match.summary}</Text>
-          {match.attendance !== null && (
-            <Text className="match-summary__attendance">现场观众 {match.attendance} 人</Text>
-          )}
+          <Text className="match-summary__label">比赛说明</Text>
+          <Text className="match-summary__body">{match.statusReason}</Text>
         </View>
       )}
 

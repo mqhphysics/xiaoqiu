@@ -466,7 +466,8 @@
     position: relative;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-height: 340px;
+    aspect-ratio: 105 / 68;
+    min-height: 0;
     overflow: hidden;
     border: 5px solid #214e36;
     border-radius: 7px;
@@ -475,56 +476,12 @@
   .match-horizontal-pitch__lines {
     position: absolute;
     inset: 14px;
-    border: 1px solid #c9dec877;
+    width: calc(100% - 28px);
+    height: calc(100% - 28px);
+    color: #c9dec899;
+    stroke: currentColor;
+    stroke-width: 0.15;
     pointer-events: none;
-    &::before {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: 0;
-      bottom: 0;
-      border-left: 1px solid #c9dec877;
-    }
-    i,
-    b {
-      position: absolute;
-      border: 1px solid #c9dec877;
-    }
-    i:nth-child(1),
-    i:nth-child(3) {
-      top: 22%;
-      width: 14%;
-      height: 56%;
-    }
-    i:nth-child(1) {
-      left: 0;
-      border-left: 0;
-    }
-    i:nth-child(3) {
-      right: 0;
-      border-right: 0;
-    }
-    i:nth-child(2) {
-      left: 50%;
-      top: 50%;
-      width: 98px;
-      height: 98px;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-    }
-    b {
-      top: 36%;
-      width: 5%;
-      height: 28%;
-    }
-    b:nth-of-type(1) {
-      left: 0;
-      border-left: 0;
-    }
-    b:nth-of-type(2) {
-      right: 0;
-      border-right: 0;
-    }
   }
   .match-pitch-half {
     position: relative;
@@ -536,7 +493,8 @@
   }
   .match-pitch-half--positioned {
     display: block;
-    min-height: 340px;
+    min-height: 0;
+    height: 100%;
     padding: 0;
     .match-horizontal-player {
       position: absolute;
@@ -580,6 +538,24 @@
   [data-side='1'] .match-horizontal-player__number {
     background: #913e35;
     color: #fff9df;
+  }
+  .match-horizontal-player--goalkeeper .match-horizontal-player__number {
+    color: #213c31;
+    background: #e7bd55;
+    border-color: #fff5c6;
+  }
+  .match-horizontal-player__keeper {
+    position: absolute;
+    top: 25px;
+    left: calc(50% - 29px);
+    padding: 1px 3px;
+    color: #fff;
+    background: #234b36;
+    border: 1px solid #f5dc93;
+    border-radius: 3px;
+    font-size: 8px;
+    line-height: 12px;
+    font-weight: 800;
   }
   .match-horizontal-player__name {
     font-size: 12px;

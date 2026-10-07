@@ -17,6 +17,7 @@ import {
 } from './lineup.logic'
 import './panels.h5.scss'
 import { MatchIcon, type MatchIconKind } from './match-icons.h5'
+import { createLineupDisplay } from './lineup-display.h5'
 import { PlayerTrigger } from '../../components/player-trigger/index.h5'
 import {
   GoalMedia,
@@ -102,51 +103,66 @@ function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
           <div key={lineup.team.id}>
             <TeamCrest team={lineup.team} size="small" />
             <strong>{lineup.team.name}</strong>
-            <span>{lineup.formation ? `阵型 ${lineup.formation}` : '站位未提供'}</span>
+            <span>
+              {createLineupDisplay(lineupGroups(lineup).starters).source === 'DEFAULT'
+                ? '按位置默认排布'
+                : lineup.formation
+                  ? `阵型 ${lineup.formation}`
+                  : '已公布站位'}
+            </span>
           </div>
         ))}
       </div>
       <div className="match-horizontal-pitch" aria-label="双方首发横向球场">
-        <div className="match-horizontal-pitch__lines" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <b />
-          <b />
-        </div>
+        <svg
+          className="match-horizontal-pitch__lines"
+          viewBox="0 0 105 68"
+          aria-hidden="true"
+          fill="none"
+        >
+          <rect x=".5" y=".5" width="104" height="67" />
+          <path d="M52.5 .5v67M.5 13.84H16.5v40.32H.5M104.5 13.84H88.5v40.32h16M.5 24.84h5v18.32h-5M104.5 24.84h-5v18.32h5" />
+          <circle cx="52.5" cy="34" r="9.15" />
+          <circle cx="52.5" cy="34" r=".6" fill="currentColor" />
+          <circle cx="11" cy="34" r=".5" fill="currentColor" />
+          <circle cx="94" cy="34" r=".5" fill="currentColor" />
+          <path d="M16.5 26.68a9.15 9.15 0 0 1 0 14.64M88.5 26.68a9.15 9.15 0 0 0 0 14.64M.5 1.5a1 1 0 0 0 1-1M103.5 .5a1 1 0 0 0 1 1M.5 66.5a1 1 0 0 1 1 1M103.5 67.5a1 1 0 0 1 1-1" />
+        </svg>
         {lineups.map((lineup, side) => {
           const { starters } = lineupGroups(lineup)
-          const positioned = hasPublishedPositions(starters)
+          const display = createLineupDisplay(starters)
           return (
             <div
               key={lineup.team.id}
-              className={`match-pitch-half ${positioned ? 'match-pitch-half--positioned' : ''}`}
+              className="match-pitch-half match-pitch-half--positioned"
               data-side={side}
-              aria-label={`${lineup.team.name}${positioned ? '首发站位' : '首发名单，站位未提供'}`}
+              data-position-source={display.source}
+              aria-label={`${lineup.team.name}${display.source === 'PUBLISHED' ? '已公布首发站位' : '按球员位置默认排布'}`}
             >
               {starters.length ? (
-                starters.map((player) => (
+                display.players.map(({ player, point }) => (
                   <div
                     key={player.id}
-                    className="match-horizontal-player"
-                    style={
-                      positioned && player.pitchPosition
-                        ? {
-                            left: `${side === 0 ? 8 + player.pitchPosition.y * 0.84 : 92 - player.pitchPosition.y * 0.84}%`,
-                            top: `${10 + player.pitchPosition.x * 0.8}%`,
-                          }
-                        : undefined
-                    }
+                    className={`match-horizontal-player ${player.position === 'GOALKEEPER' ? 'match-horizontal-player--goalkeeper' : ''}`}
+                    style={{
+                      left: `${side === 0 ? 8 + point.y * 0.84 : 92 - point.y * 0.84}%`,
+                      top: `${10 + point.x * 0.8}%`,
+                    }}
                   >
                     <button
                       type="button"
                       className="match-horizontal-player__number"
                       aria-pressed={selected === player.id}
-                      aria-label={`${player.displayName}，${player.shirtNumber ?? '无'}号，查看本场事件`}
+                      aria-label={`${player.displayName}，${player.shirtNumber ?? '无'}号，${positionLabel(player.position)}，查看本场事件`}
                       onClick={() => setSelected(selected === player.id ? null : player.id)}
                     >
                       {player.shirtNumber ?? '—'}
                     </button>
+                    {player.position === 'GOALKEEPER' && (
+                      <span className="match-horizontal-player__keeper" title="门将">
+                        GK
+                      </span>
+                    )}
                     <PlayerTrigger
                       playerId={player.id}
                       tournamentId={match.tournamentId}
@@ -166,7 +182,7 @@ function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
       </div>
       <p className="match-horizontal-lineups__note">
         {lineups.some((lineup) => !hasPublishedPositions(lineupGroups(lineup).starters))
-          ? '未提供站位的球队按首发名单排列。'
+          ? '默认站位按球员档案位置排列，不代表本场实际战术站位。'
           : ''}
         {lineups.some((lineup) => !lineupHasAppearances(lineup))
           ? '赛前首发已确认，实际出场尚未录入。'
