@@ -22,6 +22,7 @@ import { readSession } from '../../features/product/session'
 import { openMatch } from '../../features/product/match-navigation'
 import { openDesktopTeam, openTeamCrest } from '../../features/product/team-navigation'
 import { PostTags } from '../post-tags'
+import { PostQuote } from '../post-quote'
 import { PlayerTrigger } from '../player-trigger'
 import { VerificationBadge } from '../verification-badge'
 import { PersonTrigger } from '../person-trigger'
@@ -254,6 +255,7 @@ export function PostCard({
     event.stopPropagation()
     onMessageAuthor()
   }
+  if (post.deleted) return null
   return (
     <View
       className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${imageUrl ? 'post-card--with-image' : ''}`}
@@ -324,12 +326,20 @@ export function PostCard({
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
       <PostTags tags={post.tags} tournamentId={post.tournamentId} />
+      {Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches && (
+        <PostQuote post={post.quotedPost ?? null} sourceId={post.quotedPostId} />
+      )}
       <View className="post-card__actions">
         <Button
           aria-label={`${post.likedByMe ? '取消点赞' : '点赞'}，当前 ${post.likeCount} 赞`}
           aria-pressed={post.likedByMe}
           className={`post-card__action ${post.likedByMe ? 'post-card__action--active' : ''}`}
-          disabled={!onLike}
+          disabled={
+            !onLike &&
+            !(
+              Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches
+            )
+          }
           onClick={stopAndLike}
         >
           <ReactionHeart active={post.likedByMe} />

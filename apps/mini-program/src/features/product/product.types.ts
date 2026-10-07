@@ -97,6 +97,11 @@ export interface PostSummary {
   likeCount: number
   commentCount: number
   likedByMe: boolean
+  favoritedByMe?: boolean
+  updatedAt?: string
+  quotedPostId?: string | null
+  quotedPost?: PostSummary | null
+  deleted?: boolean
 }
 
 export interface PostComment {
@@ -105,6 +110,9 @@ export interface PostComment {
   parentCommentId: string | null
   createdAt: string
   author: PostAuthor
+  updatedAt?: string
+  likeCount?: number
+  likedByMe?: boolean
 }
 
 export interface PostDetail extends PostSummary {

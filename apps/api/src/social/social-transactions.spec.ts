@@ -125,6 +125,9 @@ class CommunityPrismaFake {
         ...create,
         id: `comment-${this.nextId++}`,
         createdAt: new Date('2026-09-02T08:00:00.000Z'),
+        updatedAt: new Date('2026-09-02T08:00:00.000Z'),
+        _count: { likes: 0 },
+        likes: [],
         user: {
           id: create.userId,
           displayName: '评论用户',

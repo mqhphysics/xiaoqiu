@@ -122,6 +122,27 @@ export default function IndexPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return
+    const published = (event: Event) => {
+      const post = (event as CustomEvent<PostSummary>).detail
+      if (!post?.id) return
+      setState((current) =>
+        current.phase === 'ready' && post.tournamentId === current.data.tournament.id
+          ? {
+              ...current,
+              data: {
+                ...current.data,
+                posts: [post, ...current.data.posts.filter((item) => item.id !== post.id)],
+              },
+            }
+          : current,
+      )
+    }
+    window.addEventListener('xiaoqiu:post-published', published)
+    return () => window.removeEventListener('xiaoqiu:post-published', published)
+  }, [])
+
   const runSearch = useCallback(async (text: string, category: SearchCategory) => {
     const query = text.trim()
     const requestId = ++searchRequestId.current

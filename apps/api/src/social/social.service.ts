@@ -1350,12 +1350,23 @@ export class SocialService {
     const exists =
       targetType === 'POST'
         ? await this.prisma.post.findFirst({
-            where: { id: targetId, organizationId: session.organizationId },
+            where: {
+              id: targetId,
+              organizationId: session.organizationId,
+              status: 'PUBLISHED',
+              OR: [{ authorUserId: null }, { authorUserId: { not: session.userId } }],
+            },
             select: { id: true },
           })
         : targetType === 'COMMENT'
           ? await this.prisma.postComment.findFirst({
-              where: { id: targetId, organizationId: session.organizationId },
+              where: {
+                id: targetId,
+                organizationId: session.organizationId,
+                hiddenAt: null,
+                userId: { not: session.userId },
+                post: { status: 'PUBLISHED' },
+              },
               select: { id: true },
             })
           : targetType === 'MATCH_REVIEW'

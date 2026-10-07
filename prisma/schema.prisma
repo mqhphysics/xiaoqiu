@@ -320,6 +320,8 @@ model Organization {
   matchReviews         MatchReview[]
   posts                Post[]
   postLikes            PostLike[]
+  postFavorites        PostFavorite[]
+  postCommentLikes     PostCommentLike[]
   postComments         PostComment[]
   postTags             PostTag[]
   playerFollows        UserPlayerFollow[]
@@ -375,6 +377,8 @@ model User {
   badgePreferences             UserBadgePreference[]
   posts                        Post[]                   @relation("PostAuthor")
   postLikes                    PostLike[]
+  postFavorites                PostFavorite[]
+  postCommentLikes             PostCommentLike[]
   postComments                 PostComment[]
   matchReviews                 MatchReview[]
   playerFollows                UserPlayerFollow[]
@@ -1087,6 +1091,7 @@ model Post {
   title          String?       @db.VarChar(180)
   body           String        @db.VarChar(2000)
   imageUrl       String?       @map("image_url") @db.VarChar(512)
+  quotedPostId   String?       @map("quoted_post_id") @db.Uuid
   publishedAt    DateTime      @default(now()) @map("published_at") @db.Timestamptz(3)
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1095,6 +1100,9 @@ model Post {
   author         User?         @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
   team           Team?         @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "posts_team_organization_fkey")
   likes          PostLike[]
+  favorites      PostFavorite[]
+  quotedPost     Post?         @relation("PostQuotes", fields: [quotedPostId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  quotes         Post[]        @relation("PostQuotes")
   comments       PostComment[]
   tags           PostTag[]
 
@@ -1103,6 +1111,7 @@ model Post {
   @@index([organizationId, status, publishedAt], map: "posts_org_status_published_at_idx")
   @@index([tournamentId, status, publishedAt], map: "posts_tournament_status_published_at_idx")
   @@index([teamId, status, publishedAt], map: "posts_team_status_published_at_idx")
+  @@index([quotedPostId], map: "posts_quoted_post_id_idx")
   @@map("posts")
 }
 
@@ -1153,18 +1162,51 @@ model PostComment {
   clientCommentId String?       @map("client_comment_id") @db.VarChar(120)
   body            String        @db.VarChar(500)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   hiddenAt        DateTime?     @map("hidden_at") @db.Timestamptz(3)
   organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentComment   PostComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: SetNull)
   replies         PostComment[] @relation("CommentReplies")
+  likes           PostCommentLike[]
 
   @@unique([userId, clientCommentId], map: "post_comments_user_id_client_comment_id_key")
+  @@unique([id, organizationId], map: "post_comments_id_organization_id_key")
   @@index([postId, createdAt], map: "post_comments_post_id_created_at_idx")
   @@index([organizationId, userId, createdAt], map: "post_comments_org_user_created_at_idx")
   @@index([parentCommentId, createdAt], map: "post_comments_parent_created_at_idx")
   @@map("post_comments")
+}
+
+model PostFavorite {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  postId         String       @map("post_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  post           Post         @relation(fields: [postId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId], map: "post_favorites_post_id_user_id_key")
+  @@index([organizationId, userId, createdAt], map: "post_favorites_org_user_created_at_idx")
+  @@map("post_favorites")
+}
+
+model PostCommentLike {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  commentId      String       @map("comment_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  comment        PostComment  @relation(fields: [commentId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId], map: "post_comment_likes_comment_id_user_id_key")
+  @@index([organizationId, userId, createdAt], map: "post_comment_likes_org_user_created_at_idx")
+  @@map("post_comment_likes")
 }
 
 model UserNotification {

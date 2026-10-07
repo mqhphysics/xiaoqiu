@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsOptional,
@@ -79,6 +80,10 @@ export class PostTagQueryDto {
 }
 
 export class CreatePostDto {
+  @ApiPropertyOptional({ type: String, format: 'uuid', description: '引用的已发布动态' })
+  @IsOptional()
+  @IsUUID()
+  quotedPostId?: string
   @ApiProperty({ type: String, description: '客户端生成的动态发布幂等键' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -170,4 +175,26 @@ export class CreateMatchReviewDto {
   @IsString()
   @Length(1, 500)
   body?: string
+}
+
+export class ContentVersionDto {
+  @ApiProperty({ type: String, format: 'date-time', description: '最后读取的内容版本时间' })
+  @IsDateString()
+  expectedUpdatedAt!: string
+}
+
+export class UpdatePostDto extends ContentVersionDto {
+  @ApiProperty({ type: String, maxLength: 1000 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(0, 1000)
+  body!: string
+}
+
+export class UpdateCommentDto extends ContentVersionDto {
+  @ApiProperty({ type: String, maxLength: 300 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(1, 300)
+  body!: string
 }

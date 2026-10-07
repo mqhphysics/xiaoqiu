@@ -188,6 +188,7 @@ export const productRepository = {
     imageDataUrls?: string[],
     tags?: PostTag[],
     tournamentId?: string,
+    quotedPostId?: string,
   ) =>
     request<PostSummary>('/community/posts', {
       method: 'POST',
@@ -200,6 +201,7 @@ export const productRepository = {
         ...(imageDataUrls?.length ? { imageDataUrls } : {}),
         ...(tags ? { tags } : {}),
         ...(tournamentId ? { tournamentId } : {}),
+        ...(quotedPostId ? { quotedPostId } : {}),
       },
     }),
 
@@ -207,6 +209,49 @@ export const productRepository = {
     request<LikeResponse>(`/community/posts/${encodeURIComponent(postId)}/like`, {
       method: liked ? 'PUT' : 'DELETE',
     }),
+
+  setPostFavorite: (postId: string, favorited: boolean) =>
+    request<{ favorited: boolean }>(`/community/posts/${encodeURIComponent(postId)}/favorite`, {
+      method: favorited ? 'PUT' : 'DELETE',
+    }),
+
+  setCommentLike: (postId: string, commentId: string, liked: boolean) =>
+    request<LikeResponse>(
+      `/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
+      {
+        method: liked ? 'PUT' : 'DELETE',
+      },
+    ),
+
+  updatePost: (postId: string, body: string, expectedUpdatedAt: string) =>
+    request<PostDetail>(`/community/posts/${encodeURIComponent(postId)}`, {
+      method: 'PATCH',
+      data: { body, expectedUpdatedAt },
+    }),
+
+  deletePost: (postId: string, expectedUpdatedAt: string) =>
+    request<{ deleted: boolean }>(`/community/posts/${encodeURIComponent(postId)}`, {
+      method: 'DELETE',
+      data: { expectedUpdatedAt },
+    }),
+
+  updateComment: (postId: string, commentId: string, body: string, expectedUpdatedAt: string) =>
+    request<PostComment>(
+      `/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+      {
+        method: 'PATCH',
+        data: { body, expectedUpdatedAt },
+      },
+    ),
+
+  deleteComment: (postId: string, commentId: string, expectedUpdatedAt: string) =>
+    request<{ deleted: boolean }>(
+      `/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+      {
+        method: 'DELETE',
+        data: { expectedUpdatedAt },
+      },
+    ),
 
   createComment: (
     postId: string,
