@@ -158,11 +158,12 @@ export class CreateCommentDto {
 }
 
 export class CreateMatchReviewDto {
-  @ApiProperty({ type: Number, minimum: 1, maximum: 5 })
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 5 })
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(5)
-  rating!: number
+  rating?: number
 
   @ApiPropertyOptional({ type: String, maxLength: 500 })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

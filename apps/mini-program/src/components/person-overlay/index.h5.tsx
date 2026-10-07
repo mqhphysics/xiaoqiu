@@ -20,6 +20,7 @@ import { openMessaging } from '../messaging-drawer/index.h5'
 import { PostIcon } from '../post-social/icons'
 import cover from '../../assets/home-visual/home-campus-action.webp'
 import './index.h5.scss'
+import { useHoverPosition } from '../player-overlay/hover-position.h5'
 
 const pending = new Map<string, Promise<PublicPersonResponse>>()
 function usePerson(request: PersonRequest) {
@@ -221,14 +222,7 @@ export function PersonHoverCard({
   onClose: () => void
 }) {
   const { person, error, retry } = usePerson(request)
-  const rect = request.anchor.getBoundingClientRect()
-  const width = Math.min(358, window.innerWidth - 32)
-  const left = Math.max(16, Math.min(rect.left - 20, window.innerWidth - width - 16))
-  const height = person?.player ? 272 : 225
-  const top =
-    rect.bottom + height + 12 <= window.innerHeight
-      ? rect.bottom + 12
-      : Math.max(16, rect.top - height - 12)
+  const position = useHoverPosition(request.anchor)
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -256,8 +250,9 @@ export function PersonHoverCard({
   return createPortal(
     <aside
       className="player-hover-card person-hover-card"
+      ref={position.ref}
       aria-label="人物信息预览"
-      style={{ left, top, width }}
+      style={position.style}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       onFocus={onEnter}

@@ -6,7 +6,13 @@ import { matchReportGateway } from './repository'
 import type { ReportWorkspace } from './types'
 import './index.scss'
 
-export function MatchReportEntry({ matchId }: { matchId: string }) {
+export function MatchReportEntry({
+  matchId,
+  compact = false,
+}: {
+  matchId: string
+  compact?: boolean
+}) {
   const session = readSession()
   const token = session?.accessToken
   const candidate =
@@ -39,14 +45,16 @@ export function MatchReportEntry({ matchId }: { matchId: string }) {
   )
     return null
   return (
-    <div className="report-entry">
-      <div>
-        <span className="report-entry__title">比赛信息录入</span>
-        <span className="report-entry__note">
-          {message ||
-            (workspace ? '比分、进球和红黄牌 · 保存后可查看历史版本' : '正在确认本场比赛权限…')}
-        </span>
-      </div>
+    <div className={`report-entry ${compact ? 'report-entry--compact' : ''}`}>
+      {!compact && (
+        <div>
+          <span className="report-entry__title">比赛信息录入</span>
+          <span className="report-entry__note">
+            {message ||
+              (workspace ? '比分、进球和红黄牌 · 保存后可查看历史版本' : '正在确认本场比赛权限…')}
+          </span>
+        </div>
+      )}
       {message ? (
         <Button
           className="mr-button mr-button--secondary"

@@ -19,6 +19,7 @@ import {
   type FocusIdentity,
 } from '../../features/readonly-match/focus-origin.logic'
 import './index.h5.scss'
+import { MatchReportEntry } from '../../features/match-report/MatchReportEntry.h5'
 
 const loadContent = () => import('../../features/readonly-match/match-content.h5')
 const MATCH_RESOURCE_EVENT = 'xiaoqiu:match-resource-navigation'
@@ -182,26 +183,30 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
         onClickCapture={(event) => {
           if (
             event.target instanceof Element &&
-            event.target.closest('[data-match-resource], .person-trigger')
+            event.target.closest(
+              '[data-match-resource], .person-trigger, .player-trigger, .team-trigger',
+            )
           )
             window.dispatchEvent(new Event(MATCH_RESOURCE_EVENT))
         }}
       >
         <header className="match-dialog__bar">
           <h1 id={titleId}>比赛详情</h1>
+          <MatchReportEntry matchId={request.matchId} compact />
           <button
             type="button"
             className="match-dialog__close"
             aria-label="关闭比赛详情"
             onClick={onClose}
           >
-            关闭 <span aria-hidden="true">×</span>
+            <span aria-hidden="true">×</span>
           </button>
         </header>
         <div className="match-dialog__body">
           {state.phase === 'ready' ? (
             <state.Content
               match={state.match}
+              showReportEntry={false}
               onMatchUpdated={(match) =>
                 setState((previous) =>
                   previous.phase === 'ready' ? { ...previous, match } : previous,

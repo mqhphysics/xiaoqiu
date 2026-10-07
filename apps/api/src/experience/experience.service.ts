@@ -28,6 +28,7 @@ import { parseResultsRules } from '../results/parse-rules'
 import { SocialService } from '../social/social.service'
 import { calculateOfficialTeamRecord } from './official-team-record'
 import { confirmedMatchLineup } from './confirmed-match-lineup'
+import { saveMatchReview, summarizeMatchRatings } from './match-reviews'
 import type {
   CreateCommentDto,
   CreateMatchReviewDto,
@@ -964,7 +965,7 @@ export class ExperienceService {
     const viewerReview = session
       ? match.reviews.find((review) => review.userId === session.userId)
       : undefined
-    const ratingTotal = match.reviews.reduce((total, review) => total + review.rating, 0)
+    const ratings = summarizeMatchRatings(match.reviews)
 
     return {
       ...mapResultMatch(match, resultContext.official),
@@ -1026,11 +1027,7 @@ export class ExperienceService {
           }
         }),
       reviews: {
-        averageRating:
-          match.reviews.length > 0
-            ? Math.round((ratingTotal / match.reviews.length) * 10) / 10
-            : null,
-        ratingCount: match.reviews.length,
+        ...ratings,
         viewerReview: viewerReview
           ? { rating: viewerReview.rating, body: viewerReview.body }
           : null,
@@ -1053,30 +1050,7 @@ export class ExperienceService {
     input: CreateMatchReviewDto,
   ) {
     const session = await this.authService.requireSession(authorization)
-    const match = await this.prisma.match.findFirst({
-      where: { id: matchId, organizationId: session.organizationId },
-      select: { id: true, status: true },
-    })
-    if (!match) throw notFound('比赛不存在')
-    if (match.status !== MatchStatus.FINISHED) {
-      throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
-        code: ERROR_CODES.BAD_REQUEST,
-        message: '比赛结束后才可评分',
-      })
-    }
-
-    const body = input.body?.trim() || null
-    await this.prisma.matchReview.upsert({
-      where: { matchId_userId: { matchId, userId: session.userId } },
-      create: {
-        organizationId: session.organizationId,
-        matchId,
-        userId: session.userId,
-        rating: input.rating,
-        body,
-      },
-      update: { rating: input.rating, body },
-    })
+    await saveMatchReview(this.prisma, session.organizationId, session.userId, matchId, input)
     return this.getMatchExperience(session.organizationId, matchId, authorization)
   }
 

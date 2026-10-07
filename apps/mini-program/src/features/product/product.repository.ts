@@ -152,10 +152,13 @@ export const productRepository = {
 
   getAdminIdentities: () => request<AdminIdentity[]>('/admin/identities'),
 
-  reviewMatch: (matchId: string, rating: number, body?: string) =>
+  reviewMatch: (matchId: string, rating: number | undefined, body?: string) =>
     request<MatchExperienceResponse>(`/matches/${encodeURIComponent(matchId)}/reviews`, {
       method: 'POST',
-      data: { rating, ...(body?.trim() ? { body: body.trim() } : {}) },
+      data: {
+        ...(rating !== undefined ? { rating } : {}),
+        ...(body?.trim() ? { body: body.trim() } : {}),
+      },
     }),
 
   logout: async () => {

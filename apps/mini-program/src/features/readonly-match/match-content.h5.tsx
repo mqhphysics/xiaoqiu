@@ -1,6 +1,6 @@
-import { Text, Textarea, View } from '@tarojs/components'
-import Taro, { getCurrentInstance } from '@tarojs/taro'
-import { useEffect, useState } from 'react'
+import { Text, View } from '@tarojs/components'
+import Taro from '@tarojs/taro'
+import { useEffect, useRef, useState } from 'react'
 import { openTeam } from '../product/team-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
 import { DataState } from '../../components/public-ui'
@@ -19,9 +19,11 @@ type DetailTab = 'ratings' | 'events' | 'lineups'
 export function MatchContent({
   match,
   onMatchUpdated,
+  showReportEntry = true,
 }: {
   match: MatchExperienceResponse
   onMatchUpdated: (match: MatchExperienceResponse) => void
+  showReportEntry?: boolean
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>('ratings')
   const [rating, setRating] = useState(match.reviews.viewerReview?.rating ?? 0)
@@ -33,29 +35,39 @@ export function MatchContent({
   useEffect(() => {
     setRating(match.reviews.viewerReview?.rating ?? 0)
     setReviewBody(match.reviews.viewerReview?.body ?? '')
-  }, [match.id, match.reviews.viewerReview])
+  }, [match.id])
 
-  const submitReview = async () => {
-    if (!isFinished || submitting) return
+  const submitReview = async (kind: 'rating' | 'comment') => {
+    if (!isFinished || submitting) return false
     if (!readSession()) {
       await Taro.showToast({ title: '登录后可以评分', icon: 'none' })
       await Taro.reLaunch({ url: '/pages/login/index' })
-      return
+      return false
     }
-    if (rating < 1) {
+    if (kind === 'rating' && (rating < 1 || (match.reviews.viewerReview?.rating ?? 0) > 0)) {
       await Taro.showToast({ title: '请先选择 1 至 5 星', icon: 'none' })
-      return
+      return false
     }
+    if (kind === 'comment' && !reviewBody.trim()) return false
     setSubmitting(true)
     try {
-      const updated = await productRepository.reviewMatch(match.id, rating, reviewBody)
+      const updated = await productRepository.reviewMatch(
+        match.id,
+        kind === 'rating' ? rating : undefined,
+        kind === 'comment' ? reviewBody : undefined,
+      )
       onMatchUpdated(updated)
-      await Taro.showToast({ title: '评分已保存', icon: 'success' })
+      await Taro.showToast({
+        title: kind === 'rating' ? '评分已确认' : '评论已发布',
+        icon: 'success',
+      })
+      return true
     } catch (error) {
       await Taro.showToast({
-        title: error instanceof Error ? error.message : '评分提交失败',
+        title: error instanceof Error ? error.message : '提交失败',
         icon: 'none',
       })
+      return false
     } finally {
       setSubmitting(false)
     }
@@ -70,10 +82,12 @@ export function MatchContent({
           </Text>
           <MatchStatus status={match.status} />
         </View>
-        <Text className="experience-match-header__date">
-          {formatLongDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
-        </Text>
-        <Text className="experience-match-header__venue">{match.venue?.name ?? '场地待定'}</Text>
+        <View className="experience-match-header__context">
+          <Text className="experience-match-header__date">
+            {formatLongDate(match.scheduledStartAt)} {formatTime(match.scheduledStartAt)}
+          </Text>
+          <Text className="experience-match-header__venue">{match.venue?.name ?? '场地待定'}</Text>
+        </View>
 
         <View className="experience-scoreboard">
           <TeamSide
@@ -82,9 +96,11 @@ export function MatchContent({
             tournamentId={match.tournamentId}
           />
           <View className="experience-scoreboard__score">
-            <Text>{hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}</Text>
+            <Text className="experience-scoreboard__result">
+              {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}
+            </Text>
             {(match.homePenaltyScore !== null || match.awayPenaltyScore !== null) && (
-              <Text>
+              <Text className="experience-scoreboard__penalty">
                 点球 {match.homePenaltyScore ?? 0} : {match.awayPenaltyScore ?? 0}
               </Text>
             )}
@@ -97,7 +113,7 @@ export function MatchContent({
         </View>
       </View>
 
-      <MatchReportEntry matchId={match.id} />
+      {showReportEntry && <MatchReportEntry matchId={match.id} />}
 
       {(match.summary || match.statusReason) && (
         <View className="match-summary surface">
@@ -140,7 +156,8 @@ export function MatchContent({
           submitting={submitting}
           onBodyChange={setReviewBody}
           onRatingChange={setRating}
-          onSubmit={() => void submitReview()}
+          onSubmitRating={() => void submitReview('rating')}
+          onSubmitComment={() => submitReview('comment')}
         />
       )}
 
@@ -158,7 +175,8 @@ function RatingsPanel({
   submitting,
   onRatingChange,
   onBodyChange,
-  onSubmit,
+  onSubmitRating,
+  onSubmitComment,
 }: {
   match: MatchExperienceResponse
   rating: number
@@ -167,10 +185,15 @@ function RatingsPanel({
   submitting: boolean
   onRatingChange: (rating: number) => void
   onBodyChange: (body: string) => void
-  onSubmit: () => void
+  onSubmitRating: () => void
+  onSubmitComment: () => Promise<boolean>
 }) {
   const session = readSession()
   const [reportId, setReportId] = useState<string | null>(null)
+  const [commenting, setCommenting] = useState(false)
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const lockedRating = match.reviews.viewerReview?.rating ?? 0
+  const distribution = match.reviews.ratingDistribution
   return (
     <View className="ratings-layout match-tab-content">
       <View className="rating-overview surface">
@@ -184,48 +207,120 @@ function RatingsPanel({
             {!isFinished
               ? '赛后开放评分'
               : session
-                ? match.reviews.viewerReview
-                  ? '更新我的评分'
+                ? lockedRating > 0
+                  ? `我的评分 ${lockedRating} 分 · 已确认`
                   : '为这场比赛评分'
                 : '登录后参与评分'}
           </Text>
-          <View className="rating-stars" aria-label="选择星级">
-            {[1, 2, 3, 4, 5].map((value) => (
+          {lockedRating > 0 ? (
+            <div className="rating-distribution" aria-label="1 至 5 分的评分分布">
+              {distribution ? (
+                [1, 2, 3, 4, 5].map((value) => {
+                  const count = distribution.find((item) => item.rating === value)?.count ?? 0
+                  const percentage = match.reviews.ratingCount
+                    ? (count / match.reviews.ratingCount) * 100
+                    : 0
+                  return (
+                    <div
+                      className="rating-distribution__item"
+                      key={value}
+                      title={`${value} 分：${count} 人`}
+                    >
+                      <span>{value} 分</span>
+                      <i>
+                        <b style={{ width: `${percentage}%` }} />
+                      </i>
+                      <strong>{Number(percentage.toFixed(1))}%</strong>
+                    </div>
+                  )
+                })
+              ) : (
+                <span>评分分布暂不可用</span>
+              )}
+            </div>
+          ) : (
+            <View className="rating-choice">
+              <View className="rating-stars" aria-label="选择星级">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    type="button"
+                    aria-label={`${value} 星`}
+                    className={value <= rating ? 'rating-star rating-star--active' : 'rating-star'}
+                    disabled={!isFinished || submitting}
+                    aria-pressed={rating === value}
+                    key={value}
+                    onClick={() => onRatingChange(value)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </View>
               <button
                 type="button"
-                aria-label={`${value} 星`}
-                className={value <= rating ? 'rating-star rating-star--active' : 'rating-star'}
-                disabled={!isFinished}
-                key={value}
-                onClick={() => onRatingChange(value)}
+                className="button button--primary rating-form__submit"
+                disabled={!isFinished || rating < 1 || submitting}
+                aria-busy={submitting}
+                onClick={onSubmitRating}
               >
-                ★
+                {submitting ? '提交中…' : session ? '确认评分' : '登录后评分'}
               </button>
-            ))}
-          </View>
-          <Textarea
-            className="rating-form__textarea"
-            disabled={!isFinished}
-            maxlength={500}
-            placeholder={
-              isFinished ? '说说这场比赛的节奏、表现或现场体验（可选）' : '比赛结束后可评论'
-            }
-            value={body}
-            onInput={(event) => onBodyChange(event.detail.value)}
-          />
-          <button
-            type="button"
-            className="button button--primary rating-form__submit"
-            disabled={!isFinished || rating < 1 || submitting}
-            aria-busy={submitting}
-            onClick={onSubmit}
-          >
-            {session ? '保存评分' : '登录后评分'}
-          </button>
+            </View>
+          )}
+          <span className="rating-form__hint">
+            {lockedRating > 0 ? '评分确认后不可修改' : '1 至 5 分 · 确认后不可修改'}
+          </span>
         </View>
       </View>
 
       <View className="match-review-section">
+        <div className="match-comment-entry">
+          <span>聊聊这场比赛，不评分也可以评论</span>
+          <button
+            type="button"
+            disabled={!isFinished || submitting}
+            aria-expanded={commenting}
+            onClick={() => {
+              setCommenting(true)
+              window.requestAnimationFrame(() => textarea.current?.focus())
+            }}
+          >
+            {match.reviews.viewerReview?.body ? '编辑我的评论' : '写评论'}
+          </button>
+        </div>
+        {commenting && (
+          <form
+            className="match-comment-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void onSubmitComment().then((saved) => {
+                if (saved) setCommenting(false)
+              })
+            }}
+          >
+            <label className="match-comment-form__label" htmlFor={`match-comment-${match.id}`}>
+              观赛评论
+            </label>
+            <textarea
+              className="match-comment-form__textarea"
+              id={`match-comment-${match.id}`}
+              ref={textarea}
+              maxLength={500}
+              value={body}
+              disabled={submitting}
+              placeholder="说说比赛节奏、球员表现或现场体验…"
+              onChange={(event) => onBodyChange(event.target.value)}
+            />
+            <div>
+              <small className="match-comment-form__count">{body.length}/500</small>
+              <button type="button" disabled={submitting} onClick={() => setCommenting(false)}>
+                收起
+              </button>
+              <button type="submit" disabled={!body.trim() || submitting}>
+                {submitting ? '发布中…' : '发布评论'}
+              </button>
+            </div>
+          </form>
+        )}
         <ProductSection
           kicker="MATCH REVIEWS"
           title="观赛评论"
@@ -248,7 +343,7 @@ function RatingsPanel({
                     <PersonTrigger userId={review.author.id} name={review.author.displayName}>
                       <Text>{review.author.displayName}</Text>
                     </PersonTrigger>
-                    <Text>{renderStars(review.rating)}</Text>
+                    {review.rating > 0 && <Text>{renderStars(review.rating)}</Text>}
                     <Text>{formatRelativeTime(review.createdAt)}</Text>
                   </View>
                   <Text className="match-review__body">{review.body}</Text>
@@ -328,23 +423,24 @@ function TeamSide({
   tournamentId: string
 }) {
   return (
-    <button
-      type="button"
+    <div
       className={`experience-scoreboard__team ${team ? 'experience-scoreboard__team--linked' : ''}`}
-      disabled={!team}
-      aria-label={team ? `查看${team.name}球队资料` : (placeholder ?? '席位待定')}
-      data-match-resource="team"
-      onClick={() =>
-        team &&
-        void (getCurrentInstance().router?.path.includes('readonly-match-detail')
-          ? Taro.navigateTo({
-              url: `/pages/readonly-team-detail/index?teamId=${encodeURIComponent(team.id)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-            })
-          : openTeam(team.id, tournamentId))
-      }
     >
-      <TeamCrest team={team} size="large" />
-      <Text>{team?.name ?? placeholder ?? '席位待定'}</Text>
-    </button>
+      <span data-match-resource="team">
+        <TeamCrest team={team} size="large" />
+      </span>
+      {team ? (
+        <button
+          type="button"
+          data-match-resource="team"
+          className="experience-scoreboard__name"
+          onClick={() => void openTeam(team.id, tournamentId)}
+        >
+          {team.name}
+        </button>
+      ) : (
+        <Text>{placeholder ?? '席位待定'}</Text>
+      )}
+    </div>
   )
 }

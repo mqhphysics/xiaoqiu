@@ -44,6 +44,7 @@ import { OPEN_POST_EVENT } from '../../features/product/post-navigation.h5'
 import cover from '../../assets/home-visual/home-campus-action.webp'
 import { MediaUploadButton, usePersonalBackground } from '../../features/managed-media/index.h5'
 import './index.h5.scss'
+import { useHoverPosition } from './hover-position.h5'
 
 // Presentation inputs are separate from the public API contract. Team pages can supply
 // verified account/media/stat links here when those sources are available.
@@ -145,12 +146,14 @@ export function PlayerOverlayHost() {
   const [request, setRequest] = useState<PlayerRequest | PersonRequest | null>(null)
   const [hover, setHover] = useState<PlayerHoverRequest | PersonHoverRequest | null>(null)
   const timers = useRef<{ enter?: number; leave?: number }>({})
+  const hoverAnchor = useRef<HTMLElement | null>(null)
   const clearTimers = useCallback(() => {
     window.clearTimeout(timers.current.enter)
     window.clearTimeout(timers.current.leave)
   }, [])
   const closeHover = useCallback(() => {
     clearTimers()
+    hoverAnchor.current = null
     setHover(null)
   }, [clearTimers])
   const leaveHover = useCallback(() => {
@@ -178,6 +181,7 @@ export function PlayerOverlayHost() {
       )
         return
       const anchor = detail.anchor
+      hoverAnchor.current = anchor
       clearTimers()
       timers.current.enter = window.setTimeout(() => {
         if (anchor.isConnected) setHover({ ...next, anchor })
@@ -217,6 +221,7 @@ export function PlayerOverlayHost() {
       )
         return
       const anchor = detail.anchor
+      hoverAnchor.current = anchor
       clearTimers()
       timers.current.enter = window.setTimeout(() => {
         if (anchor.isConnected) setHover({ ...next, anchor })
@@ -230,6 +235,16 @@ export function PlayerOverlayHost() {
       closeHover()
       if (!window.matchMedia('(min-width: 721px)').matches) setRequest(null)
     }
+    const scroll = (event: Event) => {
+      const anchor = hoverAnchor.current
+      if (
+        !anchor ||
+        event.target === document ||
+        event.target === window ||
+        (event.target instanceof Element && event.target.contains(anchor))
+      )
+        closeHover()
+    }
     window.addEventListener(OPEN_PLAYER_EVENT, open)
     window.addEventListener(OPEN_TEAM_EVENT, close)
     window.addEventListener(HOVER_TEAM_EVENT, closeHover)
@@ -241,7 +256,7 @@ export function PlayerOverlayHost() {
     window.addEventListener('hashchange', close)
     window.addEventListener('popstate', close)
     window.addEventListener('resize', resize)
-    window.addEventListener('scroll', closeHover, true)
+    window.addEventListener('scroll', scroll, true)
     return () => {
       clearTimers()
       window.removeEventListener(OPEN_PLAYER_EVENT, open)
@@ -255,7 +270,7 @@ export function PlayerOverlayHost() {
       window.removeEventListener('hashchange', close)
       window.removeEventListener('popstate', close)
       window.removeEventListener('resize', resize)
-      window.removeEventListener('scroll', closeHover, true)
+      window.removeEventListener('scroll', scroll, true)
     }
   }, [clearTimers, closeHover, leaveHover])
   return (
@@ -1069,11 +1084,7 @@ export function PlayerHoverCard({
 }) {
   const { state, retry } = usePlayer(request)
   if (state.phase === 'ready') presentation = playerPresentation(state.player, presentation)
-  const rect = request.anchor.getBoundingClientRect()
-  const width = Math.min(358, window.innerWidth - 32)
-  const left = Math.max(16, Math.min(rect.left - 20, window.innerWidth - width - 16))
-  const top =
-    rect.bottom + 12 + 272 <= window.innerHeight ? rect.bottom + 12 : Math.max(16, rect.top - 284)
+  const position = useHoverPosition(request.anchor)
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -1100,8 +1111,9 @@ export function PlayerHoverCard({
   return createPortal(
     <aside
       className="player-hover-card"
+      ref={position.ref}
       aria-label="球员信息预览"
-      style={{ left, top, width }}
+      style={position.style}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       onFocus={onEnter}

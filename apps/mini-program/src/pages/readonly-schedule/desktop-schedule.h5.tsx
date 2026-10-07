@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, TeamCrest } from '../../components/product-ui'
+import { TeamTrigger } from '../../components/team-trigger/index.h5'
 import {
   createBracketLayout,
   isFinishedMatch,
@@ -686,10 +687,22 @@ function ScheduleContent({
 }
 
 function MatchRow({ match }: { match: MatchSummary }) {
+  const { navigate } = useScheduleInteraction()
   const hasScore = match.homeScore !== null && match.awayScore !== null
   const hasPenalty = match.homePenaltyScore !== null || match.awayPenaltyScore !== null
   return (
-    <article className="schedule-row">
+    <article
+      className="schedule-row"
+      role="button"
+      tabIndex={0}
+      aria-label={`查看${match.homeTeam?.name ?? '主队待定'}对阵${match.awayTeam?.name ?? '客队待定'}的比赛详情`}
+      onClick={() => void navigate(matchUrl(match.id, match.tournamentId))}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || !['Enter', ' '].includes(event.key)) return
+        event.preventDefault()
+        void navigate(matchUrl(match.id, match.tournamentId))
+      }}
+    >
       <div className="schedule-row__body">
         <time>{formatTime(match.scheduledStartAt)}</time>
         <div className="schedule-row__phase">
@@ -750,18 +763,25 @@ function RowTeam({
   const content = (
     <>
       <span>{team?.name ?? placeholder}</span>
-      {team ? <TeamCrest team={team} size="medium" /> : <span className="schedule-tbd">?</span>}
+      {team ? (
+        <TeamCrest team={team} size="medium" interactive={false} />
+      ) : (
+        <span className="schedule-tbd">?</span>
+      )}
     </>
   )
   return team ? (
-    <ScheduleLink
+    <div
       className={`schedule-row__team ${away ? 'schedule-row__team--away' : ''}`}
-      aria-label={`查看${team.name}`}
       title={team.name}
-      url={teamUrl(team.id, tournamentId)}
     >
-      {content}
-    </ScheduleLink>
+      <TeamTrigger teamId={team.id} name={team.name} tournamentId={tournamentId}>
+        <span className="schedule-row__team-name">{team.name}</span>
+      </TeamTrigger>
+      <TeamTrigger teamId={team.id} name={team.name} tournamentId={tournamentId}>
+        <TeamCrest team={team} size="medium" interactive={false} />
+      </TeamTrigger>
+    </div>
   ) : (
     <div
       className={`schedule-row__team ${away ? 'schedule-row__team--away' : ''}`}
