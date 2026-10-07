@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayFocus } from '../overlay-focus/index.h5'
+import { EmailCodeField } from '../email-code/index.h5'
+import { emailAuth } from '../../features/product/email-auth.repository.h5'
 
 import './index.h5.scss'
 
@@ -9,6 +11,12 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 export function AuthRecoveryDialog({ onClose }: { onClose: () => void }) {
   const [method, setMethod] = useState<'email' | 'wechat' | 'manual'>('email')
   const [email, setEmail] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetSuccess, setResetSuccess] = useState(false)
+  const resetBusy = useRef(false)
   const [name, setName] = useState('')
   const [studentId, setStudentId] = useState('')
   const [contact, setContact] = useState('')
@@ -140,7 +148,9 @@ export function AuthRecoveryDialog({ onClose }: { onClose: () => void }) {
             </div>
             {method === 'email' ? (
               <div className="auth-recovery__body">
-                <p className="auth-recovery__intro">使用注册时绑定的邮箱，接收密码重置链接。</p>
+                <p className="auth-recovery__intro">
+                  使用已验证的绑定邮箱接收验证码，再设置新密码。旧账号需先登录验证邮箱。
+                </p>
                 <label className="auth-recovery__field" htmlFor="recovery-email">
                   绑定邮箱
                   <input
@@ -150,15 +160,91 @@ export function AuthRecoveryDialog({ onClose }: { onClose: () => void }) {
                     autoComplete="email"
                     placeholder="name@example.com"
                     value={email}
-                    onChange={(event) => setEmail(event.currentTarget.value)}
+                    onChange={(event) => {
+                      setEmail(event.currentTarget.value)
+                      setEmailCode('')
+                      setResetSuccess(false)
+                    }}
                   />
                 </label>
-                <p className="auth-recovery__notice">
-                  邮箱找回即将开放。开放后，验证链接将发送至绑定邮箱。
-                </p>
-                <button className="auth-recovery__primary" type="button" disabled>
-                  发送验证邮件 · 即将开放
-                </button>
+                {resetSuccess ? (
+                  <p role="status">密码已重置，旧登录已失效。请关闭窗口，用新密码登录。</p>
+                ) : (
+                  <>
+                    <EmailCodeField
+                      email={email}
+                      purpose="RESET_PASSWORD"
+                      value={emailCode}
+                      onChange={setEmailCode}
+                    />
+                    <label className="auth-recovery__field" htmlFor="recovery-new-password">
+                      新密码（至少8位）
+                      <input
+                        className="auth-recovery__input"
+                        id="recovery-new-password"
+                        type="password"
+                        autoComplete="new-password"
+                        maxLength={128}
+                        value={newPassword}
+                        onChange={(event) => setNewPassword(event.target.value)}
+                      />
+                    </label>
+                    <label className="auth-recovery__field" htmlFor="recovery-confirm-password">
+                      确认新密码
+                      <input
+                        className="auth-recovery__input"
+                        id="recovery-confirm-password"
+                        type="password"
+                        autoComplete="new-password"
+                        maxLength={128}
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                      />
+                    </label>
+                    {error && (
+                      <p className="auth-recovery__error" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    <button
+                      className="auth-recovery__primary"
+                      type="button"
+                      disabled={
+                        resetting ||
+                        emailCode.length !== 6 ||
+                        newPassword.length < 8 ||
+                        !confirmPassword
+                      }
+                      onClick={() => {
+                        if (resetBusy.current) return
+                        if (newPassword !== confirmPassword) {
+                          setError('两次输入的密码不一致')
+                          return
+                        }
+                        resetBusy.current = true
+                        setResetting(true)
+                        setError('')
+                        void emailAuth
+                          .resetPassword(email, emailCode, newPassword)
+                          .then(() => {
+                            setResetSuccess(true)
+                            setNewPassword('')
+                            setConfirmPassword('')
+                            setEmailCode('')
+                          })
+                          .catch((issue: unknown) =>
+                            setError(issue instanceof Error ? issue.message : '密码重置失败'),
+                          )
+                          .finally(() => {
+                            resetBusy.current = false
+                            setResetting(false)
+                          })
+                      }}
+                    >
+                      {resetting ? '重置中…' : '验证并重置密码'}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="auth-recovery__body auth-recovery__wechat">

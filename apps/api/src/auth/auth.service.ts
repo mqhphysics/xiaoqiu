@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 
-import { HttpStatus, Inject, Injectable } from '@nestjs/common'
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 
 import { ApiHttpException } from '../common/api-http.exception'
@@ -23,6 +23,14 @@ import type {
   UpdateProfileDto,
 } from './auth.dto'
 import { hashPassword, verifyPassword } from './password'
+import {
+  EmailCodeService,
+  invalidCode,
+  normalizeEmail,
+  type EmailRequestContext,
+} from './email-code.service'
+import { MailService, type EmailPurpose } from './mail.service'
+import type { EmailPasswordResetDto, EmailVerificationDto } from './email-auth.dto'
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_ALIAS_CANDIDATES = 10
@@ -37,7 +45,11 @@ export interface AuthenticatedSession {
 
 @Injectable()
 export class AuthService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional() @Inject(EmailCodeService) private readonly emailCodes?: EmailCodeService,
+    @Optional() @Inject(MailService) private readonly mail?: MailService,
+  ) {}
 
   async login(
     identifier: string,
@@ -120,9 +132,18 @@ export class AuthService {
       })
     }
 
+    return this.createSession(this.prisma, user, organizationId, request)
+  }
+
+  private async createSession(
+    tx: Prisma.TransactionClient,
+    user: Prisma.UserGetPayload<{ include: typeof userInclude }>,
+    organizationId: string,
+    request: { ip?: string | undefined; userAgent?: string | undefined },
+  ): Promise<LoginResponseDto> {
     const token = randomBytes(32).toString('base64url')
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS)
-    await this.prisma.userSession.create({
+    await tx.userSession.create({
       data: {
         userId: user.id,
         organizationId,
@@ -188,58 +209,229 @@ export class AuthService {
     }
 
     const credential = hashPassword(body.password)
-    await this.prisma
-      .$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            loginNameNormalized: username,
-            displayName: body.displayName.trim(),
-            realName: body.realName.trim(),
-            realNameNormalized: normalizeIdentifier(body.realName),
-            studentId,
-            email: body.email.trim(),
-            emailNormalized: email,
-            verificationLevel: VerificationLevel.UNVERIFIED,
-            status: UserStatus.ACTIVE,
+    const create = async (tx: Prisma.TransactionClient) => {
+      const user = await tx.user.create({
+        data: {
+          loginNameNormalized: username,
+          displayName: body.displayName.trim(),
+          realName: body.realName.trim(),
+          realNameNormalized: normalizeIdentifier(body.realName),
+          studentId,
+          email: body.email.trim(),
+          emailNormalized: email,
+          emailVerifiedAt: this.emailCodes?.enabled ? new Date() : null,
+          verificationLevel: VerificationLevel.UNVERIFIED,
+          status: UserStatus.ACTIVE,
+        },
+      })
+      await tx.passwordCredential.create({
+        data: {
+          userId: user.id,
+          passwordHash: credential.hash,
+          passwordSalt: credential.salt,
+          algorithm: credential.algorithm,
+        },
+      })
+      await tx.organizationMembership.create({
+        data: {
+          organizationId,
+          userId: user.id,
+          status: MembershipStatus.ACTIVE,
+          joinedAt: new Date(),
+        },
+      })
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorType: AuditActorType.USER,
+          actorUserId: user.id,
+          action: 'ACCOUNT_REGISTERED',
+          targetType: 'User',
+          targetId: user.id,
+          reason: '用户自主注册',
+          requestId: request.requestId,
+          ipAddress: request.ip ?? null,
+          userAgent: request.userAgent?.slice(0, 512) ?? null,
+          source: 'API',
+        },
+      })
+    }
+    await (
+      this.emailCodes?.enabled
+        ? this.emailCodes.withCode(
+            email,
+            'REGISTER',
+            organizationId,
+            body.emailCode,
+            undefined,
+            create,
+          )
+        : this.prisma.$transaction(create)
+    ).catch((error: unknown) => rethrowUniqueConflict(error, '用户名、学号或邮箱已被使用'))
+
+    // The verified registration write owns this email; a numeric username may
+    // collide with another account's student ID and must not break auto-login.
+    return this.login(email, body.password, organizationId, request)
+  }
+
+  async requestEmailCode(
+    email: string,
+    purpose: EmailPurpose,
+    organizationId: string,
+    request: EmailRequestContext,
+    authorization?: string,
+  ) {
+    const owner = purpose === 'VERIFY_EMAIL' ? await this.requireSession(authorization) : undefined
+    if (owner && owner.organizationId !== organizationId) throw invalidCode()
+    if (!this.emailCodes) throw invalidCode()
+    return this.emailCodes.requestCode(email, purpose, organizationId, request, owner?.userId)
+  }
+
+  async loginByEmail(
+    body: EmailVerificationDto,
+    organizationId: string,
+    request: EmailRequestContext,
+  ): Promise<LoginResponseDto> {
+    if (!this.emailCodes) throw invalidCode()
+    return this.emailCodes.withCode(
+      body.email,
+      'LOGIN',
+      organizationId,
+      body.emailCode,
+      undefined,
+      async (tx, userId) => {
+        const user = await this.verifiedEmailUser(tx, userId, body.email, organizationId)
+        await this.emailAudit(tx, user.id, organizationId, 'EMAIL_LOGIN', request)
+        return this.createSession(tx, user, organizationId, request)
+      },
+    )
+  }
+
+  async verifyCurrentEmail(
+    authorization: string | undefined,
+    body: EmailVerificationDto,
+    request: EmailRequestContext,
+  ): Promise<AuthUserDto> {
+    const session = await this.requireSession(authorization)
+    if (!this.emailCodes) throw invalidCode()
+    return this.emailCodes.withCode(
+      body.email,
+      'VERIFY_EMAIL',
+      session.organizationId,
+      body.emailCode,
+      session.userId,
+      async (tx) => {
+        // Recheck the current binding, never grant verification to a replacement email.
+        const changed = await tx.user.updateMany({
+          where: {
+            id: session.userId,
+            emailNormalized: normalizeEmail(body.email),
+            status: 'ACTIVE',
           },
+          data: { emailVerifiedAt: new Date() },
         })
-        await tx.passwordCredential.create({
-          data: {
+        if (changed.count !== 1) throw invalidCode()
+        await this.emailAudit(tx, session.userId, session.organizationId, 'EMAIL_VERIFIED', request)
+        const user = await tx.user.findUniqueOrThrow({
+          where: { id: session.userId },
+          include: userInclude,
+        })
+        return mapAuthUser(user, session.organizationId)
+      },
+    )
+  }
+
+  async resetPasswordByEmail(
+    body: EmailPasswordResetDto,
+    organizationId: string,
+    request: EmailRequestContext,
+  ): Promise<void> {
+    if (!this.emailCodes) throw invalidCode()
+    const credential = hashPassword(body.newPassword)
+    await this.emailCodes.withCode(
+      body.email,
+      'RESET_PASSWORD',
+      organizationId,
+      body.emailCode,
+      undefined,
+      async (tx, userId) => {
+        const user = await this.verifiedEmailUser(tx, userId, body.email, organizationId)
+        await tx.passwordCredential.upsert({
+          where: { userId: user.id },
+          create: {
             userId: user.id,
             passwordHash: credential.hash,
             passwordSalt: credential.salt,
             algorithm: credential.algorithm,
           },
-        })
-        await tx.organizationMembership.create({
-          data: {
-            organizationId,
-            userId: user.id,
-            status: MembershipStatus.ACTIVE,
-            joinedAt: new Date(),
+          update: {
+            passwordHash: credential.hash,
+            passwordSalt: credential.salt,
+            algorithm: credential.algorithm,
           },
         })
-        await tx.auditLog.create({
-          data: {
-            organizationId,
-            actorType: AuditActorType.USER,
-            actorUserId: user.id,
-            action: 'ACCOUNT_REGISTERED',
-            targetType: 'User',
-            targetId: user.id,
-            reason: '用户自主注册',
-            requestId: request.requestId,
-            ipAddress: request.ip ?? null,
-            userAgent: request.userAgent?.slice(0, 512) ?? null,
-            source: 'API',
-          },
+        await tx.userSession.updateMany({
+          where: { userId: user.id, revokedAt: null },
+          data: { revokedAt: new Date() },
         })
-      })
-      .catch((error: unknown) => rethrowUniqueConflict(error, '用户名、学号或邮箱已被使用'))
+        await tx.emailAuthCode.updateMany({
+          where: { userId: user.id, consumedAt: null },
+          data: { consumedAt: new Date() },
+        })
+        await this.emailAudit(tx, user.id, organizationId, 'SELF_PASSWORD_RESET', request)
+      },
+    )
+    // Password write already committed. A failed notification cannot undo it.
+    void this.mail
+      ?.sendPasswordChanged(normalizeEmail(body.email))
+      .catch(() => new Logger(AuthService.name).error('PASSWORD_CHANGE_NOTICE_FAILED'))
+  }
 
-    // The verified registration write owns this email; a numeric username may
-    // collide with another account's student ID and must not break auto-login.
-    return this.login(email, body.password, organizationId, request)
+  private async verifiedEmailUser(
+    tx: Prisma.TransactionClient,
+    userId: string | null,
+    email: string,
+    organizationId: string,
+  ) {
+    if (!userId) throw invalidCode()
+    const user = await tx.user.findFirst({
+      where: {
+        id: userId,
+        emailNormalized: normalizeEmail(email),
+        emailVerifiedAt: { not: null },
+        status: 'ACTIVE',
+        memberships: {
+          some: { organizationId, status: 'ACTIVE', organization: { status: 'ACTIVE' } },
+        },
+      },
+      include: userInclude,
+    })
+    if (!user) throw invalidCode()
+    return user
+  }
+
+  private async emailAudit(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    organizationId: string,
+    action: string,
+    request: EmailRequestContext,
+  ) {
+    await tx.auditLog.create({
+      data: {
+        organizationId,
+        actorType: 'USER',
+        actorUserId: userId,
+        action,
+        targetType: 'User',
+        targetId: userId,
+        reason: '邮箱验证码验证',
+        source: 'API',
+        requestId: request.requestId,
+        ipAddress: request.ip ?? null,
+        userAgent: request.userAgent?.slice(0, 512) ?? null,
+      },
+    })
   }
 
   async getSession(authorization: string | undefined): Promise<AuthenticatedSession | null> {
@@ -336,6 +528,9 @@ export class AuthService {
             displayName: body.displayName.trim(),
             email,
             emailNormalized,
+            ...(normalizeEmail(session.user.email ?? '') === emailNormalized
+              ? {}
+              : { emailVerifiedAt: null }),
             bio: body.bio?.trim() || null,
           },
           include: userInclude,
@@ -550,6 +745,7 @@ function mapAuthUser(
     realName: string | null
     studentId: string | null
     email: string | null
+    emailVerifiedAt?: Date | null
     bio: string | null
     avatarUrl: string | null
     verificationLevel: string
@@ -588,6 +784,7 @@ function mapAuthUser(
     realName: user.realName,
     studentId: user.studentId,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     bio: user.bio,
     avatarUrl: user.avatarUrl,
     verificationLevel: user.verificationLevel,

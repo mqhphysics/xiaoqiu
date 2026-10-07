@@ -118,6 +118,7 @@ export class AdminPeopleService {
         if (text && !isEmail(text)) throw centerError(400, '邮箱格式无效')
         patch.email = text
         patch.emailNormalized = text?.toLocaleLowerCase('zh-CN') ?? null
+        patch.emailVerifiedAt = null
       } else if (field === 'studentId') patch.studentId = text
       else if (field === 'bio') patch.bio = text
     }

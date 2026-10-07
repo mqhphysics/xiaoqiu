@@ -336,6 +336,8 @@ model Organization {
   resultProjections      MatchResultProjection[]
   tournamentProgressions TournamentProgression[]
 
+  emailAuthCodes EmailAuthCode[]
+
   @@map("organizations")
 }
 
@@ -355,6 +357,7 @@ model User {
   studentId                    String?                  @unique(map: "app_users_student_id_key") @map("student_id") @db.VarChar(32)
   email                        String?                  @db.VarChar(254)
   emailNormalized              String?                  @unique(map: "app_users_email_normalized_key") @map("email_normalized") @db.VarChar(254)
+  emailVerifiedAt              DateTime?                @map("email_verified_at") @db.Timestamptz(3)
   avatarUrl                    String?                  @map("avatar_url") @db.VarChar(512)
   bio                          String?                  @db.VarChar(280)
   verificationLevel            VerificationLevel        @default(UNVERIFIED) @map("verification_level")
@@ -393,9 +396,33 @@ model User {
   lineupRevisions        TeamLineupRevision[]    @relation("LineupRevisionAuthor")
   lineupConfirmations    TeamLineupPlan[]        @relation("LineupConfirmationAuthor")
   tournamentProgressions TournamentProgression[] @relation("ProgressionAuthor")
+  emailAuthCodes         EmailAuthCode[]
 
   @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
+}
+
+model EmailAuthCode {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  emailNormalized String       @map("email_normalized") @db.VarChar(254)
+  purpose         String       @db.VarChar(32)
+  userId          String?      @map("user_id") @db.Uuid
+  codeDigest      String       @map("code_digest") @db.VarChar(64)
+  expiresAt       DateTime     @map("expires_at") @db.Timestamptz(3)
+  attempts        Int          @default(0)
+  sendStatus      String       @default("PENDING") @map("send_status") @db.VarChar(16)
+  consumedAt      DateTime?    @map("consumed_at") @db.Timestamptz(3)
+  ipAddress       String?      @map("ip_address") @db.Inet
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, emailNormalized, purpose, createdAt], map: "email_auth_codes_lookup_idx")
+  @@index([emailNormalized, createdAt], map: "email_auth_codes_email_rate_idx")
+  @@index([ipAddress, createdAt], map: "email_auth_codes_ip_rate_idx")
+  @@index([createdAt], map: "email_auth_codes_created_idx")
+  @@map("email_auth_codes")
 }
 
 model PasswordCredential {

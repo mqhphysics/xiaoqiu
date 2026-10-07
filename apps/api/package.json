@@ -9,6 +9,7 @@
     "prebuild": "npm run contracts:build && npm run prisma:generate",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-prisma-engine.mjs dist/generated/prisma",
     "start": "node dist/main.js",
+    "mail:check": "tsx src/auth/check-mail.cli.ts",
     "pretypecheck": "npm run contracts:build && npm run prisma:generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run contracts:build && npm run prisma:generate && npm --prefix ../worker run build",
@@ -34,12 +35,14 @@
     "class-validator": "latest",
     "reflect-metadata": "latest",
     "rxjs": "latest",
+    "nodemailer": "10.0.16",
     "sharp": "0.34.5"
   },
   "devDependencies": {
     "@nestjs/testing": "11.1.26",
     "@types/express": "latest",
     "@types/node": "latest",
+    "@types/nodemailer": "8.0.2",
     "@types/supertest": "7.2.0",
     "prisma": "6.19.3",
     "supertest": "7.2.2",

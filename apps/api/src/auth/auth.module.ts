@@ -7,12 +7,20 @@ import { AuthContextGuard } from './auth-context.guard'
 import { AdminIdentityController } from './admin-identity.controller'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { EmailCodeService } from './email-code.service'
+import { MailService } from './mail.service'
 
 @Global()
 @Module({
   imports: [DatabaseModule],
   controllers: [AuthController, AdminIdentityController],
   exports: [AuthService, AccessPolicyService],
-  providers: [AuthService, AccessPolicyService, { provide: APP_GUARD, useClass: AuthContextGuard }],
+  providers: [
+    AuthService,
+    AccessPolicyService,
+    EmailCodeService,
+    MailService,
+    { provide: APP_GUARD, useClass: AuthContextGuard },
+  ],
 })
 export class AuthModule {}

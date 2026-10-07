@@ -3,6 +3,7 @@ import { openTeam as openTeamDetail } from '../../features/product/team-navigati
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AvatarCropper } from '../../components/avatar-cropper'
+import { EmailVerificationPanel } from '../../components/email-code/index.h5'
 import { MediaAccountEntry, usePersonalBackground } from '../../features/managed-media/index.h5'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
@@ -1314,6 +1315,7 @@ function ProfileEditor({
           />
           <small>{bio.length}/280</small>
         </label>
+        <EmailVerificationPanel user={user} onVerified={onUserChange} />
         {error && (
           <p role="alert" className="profile-error">
             {error}

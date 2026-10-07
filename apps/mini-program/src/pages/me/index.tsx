@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { IdentityEntry } from '../../components/identity-center'
+import { EmailVerificationPanel } from '../../components/email-code'
 import { AvatarCropper } from '../../components/avatar-cropper'
 import { openMessaging } from '../../components/messaging-drawer'
 import { ReportModal } from '../../components/report-modal'
@@ -273,6 +274,7 @@ function ProfilePanel({
         <Text>仅本人可见的账户信息</Text>
         <Text>实名资料不会出现在公开球队与社区页面</Text>
       </View>
+      <EmailVerificationPanel user={user} onVerified={onUserChange} />
       <View className="identity-summary">
         <View>
           <Text className="identity-summary__label">真实姓名</Text>

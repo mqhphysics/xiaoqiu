@@ -5,18 +5,20 @@ import sceneSource from '../../assets/login-art/stadium-particle-plate.png'
 import brandMark from '../../assets/home-visual/brand-mark.png'
 import { AuthRecoveryDialog } from '../../components/auth-recovery/index.h5'
 import { AuthScene } from '../../components/auth-scene/index.h5'
+import { EmailCodeField } from '../../components/email-code/index.h5'
+import { emailAuth } from '../../features/product/email-auth.repository.h5'
 import { productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import type { RegisterInput } from '../../features/product/product.types'
 import { CLOSED_GUEST_POLICY } from '../../features/product-config/product-config.logic'
 import { dispatchGuestEntry } from '../../features/product-config/guest-entry.logic'
 import { useProductConfiguration } from '../../features/product-config/use-product-config.h5'
-import ExistingLoginPage from './login.shared'
+import ExistingLoginPage from './mobile-email-login.h5'
 
 import '../../components/auth-cursor/native-cursors.h5.scss'
 import './index.h5.scss'
 
-const emptyRegistration: RegisterInput & { confirmPassword: string } = {
+const emptyRegistration: RegisterInput & { confirmPassword: string; emailCode: string } = {
   username: '',
   displayName: '',
   realName: '',
@@ -24,6 +26,7 @@ const emptyRegistration: RegisterInput & { confirmPassword: string } = {
   email: '',
   password: '',
   confirmPassword: '',
+  emailCode: '',
 }
 
 const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
@@ -109,8 +112,19 @@ function ArtLoginPage({
       setSubmitting(false)
     }
   }
-  const emailPlaceholder = () =>
-    Taro.showToast({ title: '邮箱验证码服务正在接入', icon: 'none', duration: 2200 })
+  const loginWithEmail = async () => {
+    if (submitting || code.length !== 6) return
+    setSubmitting(true)
+    setFailureMessage('')
+    try {
+      await emailAuth.login(email, code)
+      await Taro.reLaunch({ url: '/pages/index/index' })
+    } catch (error) {
+      setFailureMessage(error instanceof Error ? error.message : '邮箱登录失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
   const updateRegistration = (key: keyof typeof emptyRegistration, value: string) =>
     setRegistration((previous) => ({ ...previous, [key]: value }))
 
@@ -261,39 +275,26 @@ function ArtLoginPage({
                   noValidate
                   onSubmit={(event) => {
                     event.preventDefault()
-                    void emailPlaceholder()
+                    void loginWithEmail()
                   }}
                 >
                   <Field
                     id="art-email"
                     label="绑定邮箱"
                     value={email}
-                    onChange={setEmail}
+                    onChange={(value) => {
+                      setEmail(value)
+                      setCode('')
+                    }}
                     placeholder="name@example.com"
                     autoComplete="email"
                     icon="user"
                   />
-                  <div className="art-login__code-row">
-                    <Field
-                      id="art-code"
-                      label="验证码"
-                      value={code}
-                      onChange={setCode}
-                      placeholder="6 位验证码"
-                      autoComplete="one-time-code"
-                    />
-                    <button
-                      type="button"
-                      className="art-login__control art-login__code-button"
-                      onClick={() => void emailPlaceholder()}
-                    >
-                      获取验证码
-                    </button>
-                  </div>
+                  <EmailCodeField email={email} purpose="LOGIN" value={code} onChange={setCode} />
                   <button
                     type="submit"
                     className="art-login__control art-login__primary"
-                    disabled={!email.trim() || code.length !== 6}
+                    disabled={!email.trim() || code.length !== 6 || submitting}
                   >
                     邮箱登录
                   </button>
@@ -341,9 +342,20 @@ function ArtLoginPage({
                   className="art-login__wide"
                   label="绑定邮箱"
                   value={registration.email}
-                  onChange={(value) => updateRegistration('email', value)}
+                  onChange={(value) => {
+                    updateRegistration('email', value)
+                    updateRegistration('emailCode', '')
+                  }}
                   autoComplete="email"
                 />
+                <div className="art-login__wide">
+                  <EmailCodeField
+                    email={registration.email}
+                    purpose="REGISTER"
+                    value={registration.emailCode}
+                    onChange={(value) => updateRegistration('emailCode', value)}
+                  />
+                </div>
                 <Field
                   id="art-register-password"
                   label="密码"
@@ -487,13 +499,14 @@ function Icon({ kind }: { kind: 'user' | 'lock' | 'eye' | 'eye-off' }) {
   )
 }
 
-function canRegister(input: RegisterInput & { confirmPassword: string }) {
+function canRegister(input: RegisterInput & { confirmPassword: string; emailCode: string }) {
   return Boolean(
     input.username.trim().length >= 3 &&
     input.displayName.trim().length >= 2 &&
     input.realName.trim().length >= 2 &&
     /^\d{10}$/.test(input.studentId.trim()) &&
     input.email.includes('@') &&
+    /^\d{6}$/.test(input.emailCode) &&
     input.password.length >= 8 &&
     input.confirmPassword.length >= 8,
   )

@@ -82,6 +82,13 @@ export function anonymousReadAllowed(
 export function explicitAnonymousAuthRequest(path: string, method: string): boolean {
   return (
     method === 'POST' &&
-    ['/auth/login', '/auth/register', '/auth/password/reset-by-identity'].includes(path)
+    [
+      '/auth/login',
+      '/auth/register',
+      '/auth/password/reset-by-identity',
+      '/auth/email/code',
+      '/auth/email/login',
+      '/auth/password/reset-by-email',
+    ].includes(path)
   )
 }

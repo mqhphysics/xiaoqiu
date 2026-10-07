@@ -32,11 +32,87 @@ import {
   UpdateProfileDto,
 } from './auth.dto'
 import { AuthService } from './auth.service'
+import { EmailCodeRequestDto, EmailPasswordResetDto, EmailVerificationDto } from './email-auth.dto'
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
+
+  @Post('email/code')
+  @ApiBody({ type: EmailCodeRequestDto })
+  @HttpCode(202)
+  @ApiOperation({ summary: '申请邮箱验证码；受理不等于送达' })
+  requestEmailCode(
+    @Body() body: EmailCodeRequestDto,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+    @Headers('authorization') authorization?: string,
+  ) {
+    return this.authService.requestEmailCode(
+      body.email,
+      body.purpose,
+      getOrganizationId(request),
+      {
+        ip,
+        requestId: getRequestId(request),
+        userAgent: request.headers['user-agent'],
+      },
+      authorization,
+    )
+  }
+
+  @Post('email/login')
+  @ApiBody({ type: EmailVerificationDto })
+  @HttpCode(200)
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiOperation({ summary: '已验证邮箱验证码登录' })
+  loginByEmail(
+    @Body() body: EmailVerificationDto,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ) {
+    return this.authService.loginByEmail(body, getOrganizationId(request), {
+      ip,
+      requestId: getRequestId(request),
+      userAgent: request.headers['user-agent'],
+    })
+  }
+
+  @Post('email/verify')
+  @ApiBody({ type: EmailVerificationDto })
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: AuthUserDto })
+  @ApiOperation({ summary: '登录后验证当前绑定邮箱' })
+  verifyEmail(
+    @Body() body: EmailVerificationDto,
+    @Headers('authorization') authorization: string | undefined,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ) {
+    return this.authService.verifyCurrentEmail(authorization, body, {
+      ip,
+      requestId: getRequestId(request),
+      userAgent: request.headers['user-agent'],
+    })
+  }
+
+  @Post('password/reset-by-email')
+  @ApiBody({ type: EmailPasswordResetDto })
+  @HttpCode(204)
+  @ApiOperation({ summary: '已验证邮箱验证码重置密码并撤销全部旧会话' })
+  async resetByEmail(
+    @Body() body: EmailPasswordResetDto,
+    @Ip() ip: string,
+    @Req() request: RequestWithId,
+  ): Promise<void> {
+    await this.authService.resetPasswordByEmail(body, getOrganizationId(request), {
+      ip,
+      requestId: getRequestId(request),
+      userAgent: request.headers['user-agent'],
+    })
+  }
 
   @Post('login')
   @HttpCode(200)
