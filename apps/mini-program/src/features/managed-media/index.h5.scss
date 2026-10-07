@@ -174,3 +174,113 @@
     width: 75px;
   }
 }
+
+/* Native H5 controls need attribute selectors; Taro rewrites tag selectors. */
+@media (min-width: 721px) {
+  .managed-media-dialog {
+    box-sizing: border-box;
+    width: min(580px, 100%);
+    padding: 24px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .managed-media-dialog > header {
+    margin-bottom: 6px;
+  }
+  .managed-media-dialog > header h2 {
+    font-size: 22px;
+  }
+  .managed-media-dialog > header [data-media-control] {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #f2f5ef;
+    color: #526957;
+    font-size: 22px;
+    cursor: pointer;
+  }
+  .managed-media-form {
+    gap: 14px;
+    padding-top: 18px;
+  }
+  .managed-media-form > p {
+    margin: 0;
+    color: #768177;
+    font-size: 12px;
+  }
+  .managed-media-picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 172px;
+    padding: 18px;
+    border: 1px dashed #b7c7b7;
+    border-radius: 9px;
+    background: #f7faf5;
+    cursor: pointer;
+    color: #44644a;
+    text-align: center;
+  }
+  .managed-media-picker:focus-within {
+    outline: 2px solid #315c3d;
+    outline-offset: 3px;
+  }
+  .managed-media-picker [data-media-input] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .managed-media-picker [data-media-input]:disabled {
+    cursor: default;
+  }
+  .managed-media-picker strong {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
+  .managed-media-picker small {
+    font-size: 11px;
+    color: #7a8679;
+  }
+  .managed-media-picker__preview {
+    max-width: 100%;
+    height: 140px;
+    object-fit: contain;
+    border-radius: 5px;
+  }
+  .managed-media-form > .managed-media-button {
+    justify-self: end;
+    min-width: 104px;
+    background: #31573c;
+    color: white;
+    border: 0;
+    font-size: 13px;
+    padding: 9px 20px;
+  }
+  .managed-media-button {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+  .managed-media-button--compact {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 9px;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.9);
+  }
+  .managed-media-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}

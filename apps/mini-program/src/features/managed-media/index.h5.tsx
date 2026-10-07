@@ -54,7 +54,7 @@ function MediaDialog({
       >
         <header>
           <h2>{title}</h2>
-          <button type="button" onClick={onClose} aria-label="关闭">
+          <button data-media-control type="button" onClick={onClose} aria-label="关闭">
             ×
           </button>
         </header>
@@ -70,11 +70,13 @@ export function MediaUploadButton({
   targetId,
   label,
   onSubmitted,
+  compact = false,
 }: {
   purpose: MediaPurpose
   targetId: string
   label?: string
   onSubmitted?: () => void
+  compact?: boolean
 }) {
   const [capabilities, setCapabilities] = useState<MediaCapabilities | null>(null)
   const [opening, setOpening] = useState(false)
@@ -102,11 +104,27 @@ export function MediaUploadButton({
   return (
     <>
       <button
+        data-media-control
         type="button"
-        className="managed-media-button"
+        className={`managed-media-button${compact ? ' managed-media-button--compact' : ''}`}
         aria-busy={opening}
+        disabled={opening}
         onClick={() => void open()}
       >
+        {compact ? (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            aria-hidden="true"
+          >
+            <path d="m16 3 5 5-12 12H4v-5Z" />
+            <path d="m14 5 5 5" />
+          </svg>
+        ) : null}
         {label ?? `上传${LABELS[purpose]}`}
       </button>
       {capabilities ? (
@@ -142,6 +160,16 @@ function UploadDialog({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [success, setSuccess] = useState(false)
+  const [preview, setPreview] = useState('')
+  useEffect(() => {
+    if (!file || purpose === 'GOAL_GIF') {
+      setPreview('')
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file, purpose])
   // Kept across retry of this file. A new selected file gets its own idempotency key.
   const clientId = useRef(crypto.randomUUID())
   const submit = async () => {
@@ -167,34 +195,73 @@ function UploadDialog({
     }
   }
   return (
-    <MediaDialog title={`上传${LABELS[purpose]}`} onClose={onClose}>
+    <MediaDialog
+      title={`${purpose === 'USER_BACKGROUND' ? '更换' : '上传'}${LABELS[purpose]}`}
+      onClose={() => {
+        if (!busy) onClose()
+      }}
+    >
       <div className="managed-media-form">
         <p>
           {purpose === 'GOAL_GIF'
             ? 'GIF ≤ 6 MiB，16–960 像素，2–120 帧，单次 ≤ 15 秒。'
-            : 'JPEG、PNG 或静态 WebP ≤ 4 MiB。头像需为 64–512 像素的正方形。'}
+            : purpose === 'USER_AVATAR'
+              ? 'JPEG、PNG 或静态 WebP，最大 4 MiB；头像需为 64–512 像素的正方形。'
+              : 'JPEG、PNG 或静态 WebP，最大 4 MiB。个人背景建议选择横向照片。'}
         </p>
         <p>
           {direct ? '总管理员上传后直接发布。' : '上传后经审核显示，审核结果在“我的投稿”中可见。'}
         </p>
-        <label>
-          选择文件
+        <label data-media-field className="managed-media-picker">
           <input
+            data-media-input
             type="file"
             accept={purpose === 'GOAL_GIF' ? 'image/gif' : 'image/jpeg,image/png,image/webp'}
             disabled={busy || success}
             onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null)
+              const selected = event.target.files?.[0] ?? null
+              const allowed =
+                purpose === 'GOAL_GIF' ? ['image/gif'] : ['image/jpeg', 'image/png', 'image/webp']
+              if (
+                selected &&
+                (!allowed.includes(selected.type) ||
+                  selected.size > (purpose === 'GOAL_GIF' ? 6 : 4) * 1024 * 1024)
+              ) {
+                setFile(null)
+                setMessage('请选择符合格式和大小要求的文件')
+                return
+              }
+              setFile(selected)
               clientId.current = crypto.randomUUID()
               setMessage('')
             }}
           />
+          {preview ? (
+            <img className="managed-media-picker__preview" src={preview} alt="待上传图片预览" />
+          ) : (
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="8" cy="8" r="1.5" />
+              <path d="m3 17 5-5 4 4 4-6 5 7" />
+            </svg>
+          )}
+          <strong>{file?.name ?? '点击选择图片'}</strong>
+          <small>{file ? '重新选择' : '选择一张属于你的球场记忆'}</small>
         </label>
         {purpose === 'GOAL_GIF' ? (
           <small>该投稿只关联当前进球事件，事件更正或撤销后停止展示。</small>
         ) : null}
         <div role="status">{message}</div>
         <button
+          data-media-control
           type="button"
           className="managed-media-button"
           disabled={!file || busy || success}
@@ -588,7 +655,9 @@ function MediaLibrary({ review }: { review: boolean }) {
   )
 }
 
-export function MediaAccountEntry() {
+export function MediaAccountEntry({
+  includeBackground = true,
+}: { includeBackground?: boolean } = {}) {
   const user = readSession()?.user
   const [canReview, setCanReview] = useState(false)
   useEffect(() => {
@@ -614,7 +683,9 @@ export function MediaAccountEntry() {
   )
   return (
     <div className="media-account-entry">
-      <MediaUploadButton purpose="USER_BACKGROUND" targetId={user.id} label="更换个人背景" />
+      {includeBackground && (
+        <MediaUploadButton purpose="USER_BACKGROUND" targetId={user.id} label="更换个人背景" />
+      )}
       <MediaLibraryButton />
       {user.linkedPlayer ? (
         <MediaUploadButton purpose="PLAYER_PORTRAIT" targetId={user.linkedPlayer.id} />

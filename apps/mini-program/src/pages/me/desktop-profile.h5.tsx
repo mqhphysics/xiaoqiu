@@ -3,7 +3,13 @@ import { openTeam as openTeamDetail } from '../../features/product/team-navigati
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AvatarCropper } from '../../components/avatar-cropper'
-import { MediaAccountEntry, usePersonalBackground } from '../../features/managed-media/index.h5'
+import {
+  MediaAccountEntry,
+  MediaUploadButton,
+  usePersonalBackground,
+} from '../../features/managed-media/index.h5'
+import { SettingsDialog } from '../../components/settings-dialog'
+import { identityEntryActions } from '../../features/identity/entry-actions.h5'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { useOverlayFocus } from '../../components/overlay-focus'
 import { openMessaging } from '../../components/messaging-drawer'
@@ -52,12 +58,13 @@ import {
 } from './profile.logic'
 import type { DesktopProfileProps, ProfileService } from './desktop-profile'
 import './desktop-profile.h5.scss'
+import { TeamRelationsDialog } from './team-relations.h5'
 
 type Tab = 'posts' | 'matches' | 'bookmarks'
 type Modal =
   | 'edit'
   | 'team'
-  | 'manage'
+  | 'relationship'
   | 'follow'
   | 'collect'
   | 'identity'
@@ -131,6 +138,15 @@ function useProfileLibrary(key: string) {
 }
 
 export function DesktopProfile({ home, user, onUserChange, renderService }: DesktopProfileProps) {
+  useEffect(() => {
+    const changed = (event: Event) => {
+      const updated = (event as CustomEvent<DesktopProfileProps['user']>).detail
+      if (updated.id === user.id && updated.organizationId === user.organizationId)
+        onUserChange(updated)
+    }
+    window.addEventListener('xiaoqiu:identity:changed', changed)
+    return () => window.removeEventListener('xiaoqiu:identity:changed', changed)
+  }, [user.id, user.organizationId, onUserChange])
   const personalBackground = usePersonalBackground(user.id)
   const displayedKind = useBadgeDisplay(user.id)
   const badgeKind = displayedBadgeKind(user.verificationLevel, user.roles, false, displayedKind)
@@ -151,6 +167,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   const [avatar, setAvatar] = useState(false)
   const [feedback, setFeedback] = useState(false)
   const [composer, setComposer] = useState(false)
+  const [settings, setSettings] = useState(false)
   const [reminder, setReminder] = useState<MatchSummary | null>(null)
   const [preferences, setPreferences] = useState<TeamPreferencesResponse | null>(null)
   const [dashboard, setDashboard] = useState<TeamDashboardResponse | null>(null)
@@ -196,11 +213,6 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
         (match.awayTeam && watchedTeamIds.has(match.awayTeam.id)),
       ),
   )
-  const pendingMatches = followedMatches
-    .filter(isPendingMatch)
-    .sort((a, b) => (a.scheduledStartAt ?? '9999').localeCompare(b.scheduledStartAt ?? '9999'))
-  const nextMatch =
-    pendingMatches.find((match) => match.status === 'LIVE' || canRemind(match)) ?? pendingMatches[0]
   const visibleMatches = followedMatches
     .filter(
       (match) =>
@@ -252,6 +264,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
       setAvatar(false)
       setFeedback(false)
       setComposer(false)
+      setSettings(false)
     }
     window.addEventListener('hashchange', closeOverlays)
     return () => window.removeEventListener('hashchange', closeOverlays)
@@ -304,20 +317,9 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
     setSelectedTeam(primary?.id ?? '')
     setModal(value)
   }
-  const openTeam = (teamId: string, manage = false) => {
+  const openTeam = (teamId: string) => {
     setModal(null)
-    if (!manage) {
-      void openTeamDetail(teamId, home.tournament.id).catch(toastError)
-      return
-    }
-    const page = manage ? 'my-team' : 'readonly-team-detail'
-    void Taro.navigateTo({
-      url: `/pages/${page}/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(home.tournament.id)}`,
-    }).catch(toastError)
-  }
-  const openManage = () => {
-    if (authorizedIds.length === 1) openTeam(authorizedIds[0]!, true)
-    else openModal('manage')
+    void openTeamDetail(teamId, home.tournament.id).catch(toastError)
   }
   const saveTeam = async () => {
     if (!selectedTeam || actionBusy.current) return
@@ -386,6 +388,14 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               loading="lazy"
             />
           ) : null}
+          <div className="profile-background-change">
+            <MediaUploadButton
+              purpose="USER_BACKGROUND"
+              targetId={user.id}
+              label="更换背景"
+              compact
+            />
+          </div>
           <div className="profile-person__main">
             <button
               data-profile-button=""
@@ -428,7 +438,6 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 <ProfileIcon name="pencil" />
                 编辑资料
               </button>
-              <MediaAccountEntry />
             </div>
           </div>
           <div className="profile-person__stats">
@@ -505,6 +514,88 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
         </section>
       </div>
       <div className="profile-body">
+        <aside className="profile-functions" aria-label="我的功能">
+          <section className="profile-function-card profile-surface">
+            <div className="profile-function-heading">
+              <h2>我的功能</h2>
+              <p>个人资料与球队事务，都在这里。</p>
+            </div>
+            <div className="profile-function-grid">
+              <Shortcut
+                icon="user"
+                title="个人信息"
+                note="头像、昵称与账户资料"
+                onClick={() => openModal('edit')}
+              />
+              <Shortcut
+                icon="shield"
+                title="我的身份"
+                note={badgeKind ? identityLabels[badgeKind] : '查看当前身份'}
+                onClick={() => openModal('identity')}
+              />
+              <Shortcut
+                icon="users"
+                title={
+                  authorizedIds.length ? '管理球队' : user.linkedPlayer ? '我的球队' : '加入球队'
+                }
+                note={
+                  authorizedIds.length
+                    ? '名单、阵容与成员'
+                    : user.linkedPlayer
+                      ? '查看球队与球员'
+                      : '发现球队，申请加入'
+                }
+                onClick={() => openModal('relationship')}
+              />
+              <Shortcut
+                icon="comment"
+                title="我的消息"
+                note="通知与校内私信"
+                onClick={() => openMessaging()}
+              />
+              <Shortcut
+                icon="exchange"
+                title="身份管理"
+                note="认证申请 · 展示身份"
+                onClick={() => openModal('badge')}
+              />
+              <Shortcut
+                icon="settings"
+                title="设置"
+                note="调整浏览偏好"
+                onClick={() => setSettings(true)}
+              />
+              <Shortcut
+                icon="comment"
+                title="问题反馈"
+                note="反馈问题 · 查看回复"
+                onClick={() => setFeedback(true)}
+              />
+              <Shortcut
+                icon="logout"
+                title="退出登录"
+                note="退出当前账号"
+                onClick={() => openModal('logout')}
+              />
+            </div>
+            <div className="profile-function-links">
+              <button data-profile-button onClick={() => openModal('reports')}>
+                反馈记录 <ProfileIcon name="right" />
+              </button>
+              <button data-profile-button onClick={() => openModal('notifications')}>
+                通知记录 <ProfileIcon name="right" />
+              </button>
+              {isAdmin && (
+                <button
+                  data-profile-button
+                  onClick={() => void identityEntryActions.administrationEntry()}
+                >
+                  管理中心 <ProfileIcon name="right" />
+                </button>
+              )}
+            </div>
+          </section>
+        </aside>
         <section className="profile-stream profile-surface" id="profile-stream">
           <div className="profile-tabs" role="tablist" aria-label="个人内容">
             {(
@@ -708,183 +799,37 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             )}
           </div>
         </section>
-        <aside className="profile-sidebar">
-          <section className="profile-side-card profile-surface">
-            <div className="profile-side-heading">
-              <h2>下场关注的比赛</h2>
-              <button
-                data-profile-button=""
-                onClick={() =>
-                  void Taro.navigateTo({
-                    url: `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(home.tournament.id)}`,
-                  }).catch(toastError)
-                }
-              >
-                完整赛程
-                <ProfileIcon name="arrow" />
-              </button>
-            </div>
-            {errors.matches || errors.team ? (
-              <DataState kind="error" title="关注赛程不可用" onRetry={() => void load()} />
-            ) : nextMatch ? (
-              <ProfileMatch
-                match={nextMatch}
-                compact
-                reminded={library.reminderMatchIds.includes(nextMatch.id)}
-                onReminder={() => setReminder(nextMatch)}
-              />
-            ) : (
-              <ProfileEmpty
-                icon="calendar"
-                title={loading ? '正在读取赛程' : '暂无待进行的关注比赛'}
-                note="新的比赛安排会在这里显示。"
-                action="查看全部比赛"
-                onAction={() => chooseTab('matches')}
-              />
-            )}
-          </section>
-          <section className="profile-side-card profile-surface">
-            <div className="profile-side-heading">
-              <h2>快捷入口</h2>
-            </div>
-            <div className="profile-shortcuts">
-              <Shortcut
-                icon="comment"
-                title="我的消息"
-                note="通知与校内私信"
-                onClick={() => openMessaging()}
-              />
-              <Shortcut
-                icon="pencil"
-                title="编辑信息"
-                note="完善个人资料"
-                onClick={() => openModal('edit')}
-              />
-              <Shortcut
-                icon="users"
-                title={authorizedIds.length ? '管理球队' : '我的主队'}
-                note={authorizedIds.length ? '名单、阵容与成员' : '关注球队与球员'}
-                onClick={() =>
-                  authorizedIds.length
-                    ? openManage()
-                    : primary
-                      ? void Taro.navigateTo({
-                          url: `/pages/my-team/index?tournamentId=${encodeURIComponent(home.tournament.id)}`,
-                        }).catch(toastError)
-                      : openModal('team')
-                }
-              />
-              <Shortcut
-                icon="exchange"
-                title="发现球队"
-                note="浏览球队 · 申请加入"
-                onClick={() =>
-                  void Taro.navigateTo({
-                    url: `/pages/readonly-teams/index?tournamentId=${encodeURIComponent(home.tournament.id)}`,
-                  }).catch(toastError)
-                }
-              />
-            </div>
-          </section>
-          {authorizedIds.length > 0 && (
-            <section className="profile-captain profile-surface">
-              <span>
-                <ProfileIcon name="shield" />
-                球队管理工作台
-              </span>
-              <h2>把球队的下一场准备好</h2>
-              <p>入队申请、成员位置、赛事名单、战术与单场阵容。</p>
-              <button
-                data-profile-button=""
-                className="profile-button profile-button--primary"
-                onClick={openManage}
-              >
-                进入球队管理
-                <ProfileIcon name="arrow" />
-              </button>
-            </section>
-          )}
-          <section className="profile-account-tools profile-surface" aria-label="账户服务">
-            <button data-profile-button="" onClick={() => openModal('notifications')}>
-              <ProfileIcon name="bell" />
-              我的通知
-              <ProfileIcon name="right" />
-            </button>
-            <button data-profile-button="" onClick={() => openModal('identity')}>
-              <ProfileIcon name="user" />
-              账户与身份
-              <ProfileIcon name="right" />
-            </button>
-            <button data-profile-button="" onClick={() => openModal('badge')}>
-              <ProfileIcon name="shield" />
-              展示标志管理
-              <ProfileIcon name="right" />
-            </button>
-            <button data-profile-button="" onClick={() => setFeedback(true)}>
-              <ProfileIcon name="comment" />
-              问题反馈
-              <ProfileIcon name="right" />
-            </button>
-            <button data-profile-button="" onClick={() => openModal('reports')}>
-              <ProfileIcon name="bookmark" />
-              反馈记录
-              <ProfileIcon name="right" />
-            </button>
-            {isAdmin && (
-              <>
-                <button data-profile-button="" onClick={() => openModal('adminReports')}>
-                  <ProfileIcon name="shield" />
-                  投诉处理
-                  <ProfileIcon name="right" />
-                </button>
-                <button data-profile-button="" onClick={() => openModal('identities')}>
-                  <ProfileIcon name="users" />
-                  实名目录
-                  <ProfileIcon name="right" />
-                </button>
-              </>
-            )}
-            <button
-              data-profile-button=""
-              className="profile-account-tools__logout"
-              onClick={() => openModal('logout')}
-            >
-              <ProfileIcon name="logout" />
-              退出登录
-              <ProfileIcon name="right" />
-            </button>
-          </section>
-          <div className="profile-signature" aria-hidden="true">
-            记录每一场
-            <br />
-            <span>属于我们的校园足球</span>
-            <i />
-          </div>
-        </aside>
       </div>
       {modal === 'edit' && (
-        <ProfileEditor user={user} onUserChange={onUserChange} onClose={closeModal} />
+        <ProfileInformation
+          user={user}
+          onUserChange={onUserChange}
+          onClose={closeModal}
+          onAvatar={() => setAvatar(true)}
+        />
       )}
-      {(modal === 'team' || modal === 'manage') && (
+      {modal === 'relationship' && (
+        <TeamRelationsDialog
+          teams={teams}
+          tournamentId={home.tournament.id}
+          managedIds={authorizedIds}
+          onClose={closeModal}
+        />
+      )}
+      {modal === 'team' && (
         <ProfileDialog
-          title={modal === 'team' ? '选择我的主队' : '管理我的球队'}
-          note={
-            modal === 'team'
-              ? '每个账号可以选择一支主队，已有关注球队会保留。'
-              : '以下是当前账号有权管理的球队，主队偏好不会改变管理权限。'
-          }
+          title="选择我的主队"
+          note="每个账号可以选择一支主队，已有关注球队会保留。"
           onClose={closeModal}
           footer={
-            modal === 'team' ? (
-              <button
-                data-profile-button=""
-                className="profile-button profile-button--primary"
-                disabled={!selectedTeam || busy || Boolean(errors.team) || loading}
-                onClick={() => void saveTeam()}
-              >
-                {busy ? '正在保存…' : '保存主队'}
-              </button>
-            ) : undefined
+            <button
+              data-profile-button=""
+              className="profile-button profile-button--primary"
+              disabled={!selectedTeam || busy || Boolean(errors.team) || loading}
+              onClick={() => void saveTeam()}
+            >
+              {busy ? '正在保存…' : '保存主队'}
+            </button>
           }
         >
           <input
@@ -898,37 +843,26 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
           {errors.team && <p className="profile-error">主队偏好读取失败，请关闭后重试。</p>}
           <div className="profile-team-options">
             {teams
-              .filter(
-                (team) =>
-                  (modal === 'team' || authorizedIds.includes(team.id)) &&
-                  `${team.name}${team.collegeName ?? ''}`.includes(query.trim()),
-              )
+              .filter((team) => `${team.name}${team.collegeName ?? ''}`.includes(query.trim()))
               .map((team) => (
                 <button
                   data-profile-button=""
                   key={team.id}
-                  aria-pressed={modal === 'team' ? selectedTeam === team.id : undefined}
-                  className={modal === 'team' && selectedTeam === team.id ? 'is-active' : ''}
-                  onClick={() =>
-                    modal === 'team' ? setSelectedTeam(team.id) : openTeam(team.id, true)
-                  }
+                  aria-pressed={selectedTeam === team.id}
+                  className={selectedTeam === team.id ? 'is-active' : ''}
+                  onClick={() => setSelectedTeam(team.id)}
                 >
                   <TeamCrest team={team} size="small" />
                   <span>
                     <strong>{team.name}</strong>
                     <small>{team.collegeName || '校园球队'}</small>
                   </span>
-                  <ProfileIcon
-                    name={modal === 'team' && selectedTeam === team.id ? 'check' : 'right'}
-                  />
+                  <ProfileIcon name={selectedTeam === team.id ? 'check' : 'right'} />
                 </button>
               ))}
           </div>
-          {teams.filter(
-            (team) =>
-              (modal === 'team' || authorizedIds.includes(team.id)) &&
-              `${team.name}${team.collegeName ?? ''}`.includes(query.trim()),
-          ).length === 0 && <p className="profile-data-note">没有匹配的球队。</p>}
+          {teams.filter((team) => `${team.name}${team.collegeName ?? ''}`.includes(query.trim()))
+            .length === 0 && <p className="profile-data-note">没有匹配的球队。</p>}
         </ProfileDialog>
       )}
       {(modal === 'follow' || modal === 'collect') && (
@@ -1026,7 +960,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
       )}
       {modal === 'identity' && (
         <ProfileDialog
-          title="账户与身份"
+          title="我的身份"
           note="以下实名信息仅本人可见，不会出现在公开档案中。"
           onClose={closeModal}
         >
@@ -1063,13 +997,31 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
       )}
       {modal === 'badge' && (
         <ProfileDialog
-          title="展示标志管理"
-          note="仅选择自己已有的身份，所有页面每人显示一个标志。"
+          title="身份管理"
+          note="申请新的认证身份，也可以选择当前对外展示的身份。"
           onClose={closeModal}
         >
+          <div className="profile-identity-apply">
+            <div>
+              <strong>认证与申请</strong>
+              <p>认领球员档案，申请队长、教练或信息员身份。</p>
+            </div>
+            <button
+              data-profile-button
+              className="profile-button profile-button--outline"
+              onClick={() => {
+                setModal(null)
+                void identityEntryActions.identity()
+              }}
+            >
+              认证身份 <ProfileIcon name="arrow" />
+            </button>
+          </div>
+          <h3 className="profile-display-heading">选择展示身份</h3>
           <BadgeManager user={user} onClose={closeModal} />
         </ProfileDialog>
       )}
+      {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {modal && modal in SERVICE_TITLES && (
         <ProfileDialog wide title={SERVICE_TITLES[modal as ProfileService]} onClose={closeModal}>
           {renderService(modal as ProfileService, (service) => setModal(service))}
@@ -1238,11 +1190,108 @@ function ProfileDialog({
   )
 }
 
+function ProfileInformation({
+  user,
+  onUserChange,
+  onClose,
+  onAvatar,
+}: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & {
+  onClose: () => void
+  onAvatar: () => void
+}) {
+  const [editing, setEditing] = useState<'name' | 'email' | 'bio' | null>(null)
+  const [correction, setCorrection] = useState(false)
+  const background = usePersonalBackground(user.id)
+  return (
+    <ProfileDialog title="个人信息" note="公开资料与仅本人可见的账户信息。" onClose={onClose}>
+      <div className="profile-info-list">
+        <div className="profile-info-row">
+          <span>头像</span>
+          <UserAvatar name={user.displayName} avatarUrl={user.avatarUrl} size="small" />
+          <button data-profile-button onClick={onAvatar}>
+            更换
+          </button>
+        </div>
+        <div className="profile-info-row">
+          <span>昵称</span>
+          <strong>{user.displayName}</strong>
+          <button data-profile-button onClick={() => setEditing('name')}>
+            更改
+          </button>
+        </div>
+        <div className="profile-info-row">
+          <span>个人背景</span>
+          <span>
+            {background ? (
+              <img className="profile-info-background" src={background} alt="当前个人背景" />
+            ) : (
+              '默认背景'
+            )}
+          </span>
+          <MediaUploadButton purpose="USER_BACKGROUND" targetId={user.id} label="更换" />
+        </div>
+        <div className="profile-info-row">
+          <span>个人简介</span>
+          <span>{user.bio || '还没有填写简介'}</span>
+          <button data-profile-button onClick={() => setEditing('bio')}>
+            更改
+          </button>
+        </div>
+        <p className="profile-info-private">以下信息仅本人可见</p>
+        <div className="profile-info-row">
+          <span>姓名</span>
+          <strong>{user.realName || '未登记'}</strong>
+          <button data-profile-button onClick={() => setCorrection(true)}>
+            申请更正
+          </button>
+        </div>
+        <div className="profile-info-row">
+          <span>学号</span>
+          <span>{user.studentId || '未登记'}</span>
+          <button data-profile-button onClick={() => setCorrection(true)}>
+            申请更正
+          </button>
+        </div>
+        <div className="profile-info-row">
+          <span>绑定邮箱</span>
+          <span>{user.email || '未绑定'}</span>
+          <button data-profile-button onClick={() => setEditing('email')}>
+            {user.email ? '更换' : '绑定'}
+          </button>
+        </div>
+      </div>
+      {editing && (
+        <ProfileEditor
+          key={editing}
+          user={user}
+          field={editing}
+          onUserChange={onUserChange}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <div className="profile-info-media">
+        <MediaAccountEntry includeBackground={false} />
+      </div>
+      {correction && (
+        <ReportModal
+          targetType="FEEDBACK"
+          title="实名资料更正申请"
+          onClose={() => setCorrection(false)}
+        />
+      )}
+    </ProfileDialog>
+  )
+}
+
 function ProfileEditor({
   user,
   onUserChange,
   onClose,
-}: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & { onClose: () => void }) {
+  field,
+}: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & {
+  onClose: () => void
+  field: 'name' | 'email' | 'bio'
+}) {
   const [name, setName] = useState(user.displayName)
   const [email, setEmail] = useState(user.email ?? '')
   const [bio, setBio] = useState(user.bio ?? '')
@@ -1259,7 +1308,7 @@ function ProfileEditor({
       setError('昵称至少需要 2 个字。')
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (field === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError('请输入有效的邮箱地址。')
       return
     }
@@ -1278,8 +1327,11 @@ function ProfileEditor({
     }
   }
   return (
-    <ProfileDialog title="编辑个人资料" note="让每一次球场相遇，都从认识你开始。" onClose={close}>
-      <form className="profile-edit-form" onSubmit={(event) => void save(event)}>
+    <form
+      className="profile-edit-form profile-edit-form--inline"
+      onSubmit={(event) => void save(event)}
+    >
+      {field === 'name' && (
         <label data-profile-field="">
           昵称
           <input
@@ -1291,6 +1343,8 @@ function ProfileEditor({
             onChange={(event) => setName(event.target.value)}
           />
         </label>
+      )}
+      {field === 'email' && (
         <label data-profile-field="">
           绑定邮箱
           <input
@@ -1302,7 +1356,10 @@ function ProfileEditor({
             required
             onChange={(event) => setEmail(event.target.value)}
           />
+          <small>用于账号联系与登录，当前未提供邮件验证码验证。</small>
         </label>
+      )}
+      {field === 'bio' && (
         <label data-profile-field="">
           个人简介
           <textarea
@@ -1314,31 +1371,31 @@ function ProfileEditor({
           />
           <small>{bio.length}/280</small>
         </label>
-        {error && (
-          <p role="alert" className="profile-error">
-            {error}
-          </p>
-        )}
-        <div className="profile-dialog__actions">
-          <button
-            data-profile-button=""
-            type="button"
-            className="profile-button profile-button--outline"
-            disabled={saving}
-            onClick={close}
-          >
-            取消
-          </button>
-          <button
-            data-profile-button=""
-            className="profile-button profile-button--primary"
-            disabled={saving}
-          >
-            {saving ? '正在保存…' : '保存资料'}
-          </button>
-        </div>
-      </form>
-    </ProfileDialog>
+      )}
+      {error && (
+        <p role="alert" className="profile-error">
+          {error}
+        </p>
+      )}
+      <div className="profile-dialog__actions">
+        <button
+          data-profile-button=""
+          type="button"
+          className="profile-button profile-button--outline"
+          disabled={saving}
+          onClick={close}
+        >
+          取消
+        </button>
+        <button
+          data-profile-button=""
+          className="profile-button profile-button--primary"
+          disabled={saving}
+        >
+          {saving ? '正在保存…' : '保存资料'}
+        </button>
+      </div>
+    </form>
   )
 }
 

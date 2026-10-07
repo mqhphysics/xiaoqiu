@@ -45,7 +45,21 @@ const icons = {
   plus,
   right,
 }
-export type ProfileIconName = keyof typeof icons
+export type ProfileIconName = keyof typeof icons | 'settings'
 export function ProfileIcon({ name }: { name: ProfileIconName }) {
+  if (name === 'settings')
+    return (
+      <svg
+        className="profile-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        aria-hidden="true"
+      >
+        <path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h6l1-3 3-2v-3l2-2-2-4-3-1-1-3Z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    )
   return <img className="profile-icon" src={icons[name]} alt="" aria-hidden="true" />
 }

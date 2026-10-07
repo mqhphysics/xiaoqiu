@@ -33,6 +33,7 @@ import {
   playTeamFocus,
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
+import { DesktopAccount, useDesktopAccount } from './desktop-account'
 
 import './index.scss'
 
@@ -76,6 +77,7 @@ export function PublicShell({
   children,
 }: PublicShellProps) {
   const session = readSession()
+  const desktopAccount = useDesktopAccount()
   useProductConfiguration()
   const teamCacheKey = session ? `${session.user.id}:${session.expiresAt}` : null
   const [menuOpen, setMenuOpen] = useState(false)
@@ -301,75 +303,91 @@ export function PublicShell({
             <View className="public-header-search">
               {headerSearch === undefined ? <PersistentHeaderSearch /> : headerSearch}
             </View>
-            <Button
-              aria-label="打开账户菜单"
-              aria-expanded={menuOpen}
-              className="public-account"
-              onClick={() => setMenuOpen((value) => !value)}
-            >
-              <View className="public-account__avatar">
-                <UserAvatar
-                  avatarUrl={session?.user.avatarUrl ?? null}
-                  name={session?.user.displayName ?? '访客'}
-                  size="small"
-                />
-              </View>
-              <View className="public-account__copy">
-                <Text className="public-account__name">
-                  {session?.user.displayName ?? '游客模式'}
-                </Text>
-              </View>
-            </Button>
-
-            {menuOpen && (
-              <View className="public-account-menu">
-                <View className="public-account-menu__identity">
-                  <Text>{session?.user.displayName ?? '游客'}</Text>
-                  <Text>{session ? `@${session.user.username}` : '公开浏览模式'}</Text>
-                </View>
-                {!session && (
-                  <Button
-                    className="public-account-menu__item"
-                    onClick={() => void Taro.reLaunch({ url: '/pages/login/index' })}
-                  >
-                    登录或注册
-                  </Button>
-                )}
-                {session && (
-                  <Button
-                    className="public-account-menu__item"
-                    onClick={() => void openPrivateMenu('messages')}
-                  >
-                    消息与私信
-                  </Button>
-                )}
-                <Button className="public-account-menu__item" onClick={() => void openFeedback()}>
-                  问题反馈
-                </Button>
+            {desktopAccount ? (
+              <DesktopAccount
+                user={session?.user ?? null}
+                onProfile={() => void navigateToSection('me')}
+                onMessages={() => void openPrivateMenu('messages')}
+                onSettings={() => void openPrivateMenu('settings')}
+                onFeedback={() => void openFeedback()}
+                onLogout={() => void logout()}
+              />
+            ) : (
+              <>
                 <Button
-                  className="public-account-menu__item"
-                  onClick={() => void openPrivateMenu('settings')}
+                  aria-label="打开账户菜单"
+                  aria-expanded={menuOpen}
+                  className="public-account"
+                  onClick={() => setMenuOpen((value) => !value)}
                 >
-                  设置
+                  <View className="public-account__avatar">
+                    <UserAvatar
+                      avatarUrl={session?.user.avatarUrl ?? null}
+                      name={session?.user.displayName ?? '访客'}
+                      size="small"
+                    />
+                  </View>
+                  <View className="public-account__copy">
+                    <Text className="public-account__name">
+                      {session?.user.displayName ?? '游客模式'}
+                    </Text>
+                  </View>
                 </Button>
-                <View className="public-account-menu__version">
-                  <Text>晓球 V1.0.0</Text>
-                </View>
-                {session && (
-                  <Button
-                    className="public-account-menu__item public-account-menu__item--danger"
-                    onClick={() => void logout()}
-                  >
-                    退出登录
-                  </Button>
+
+                {menuOpen && (
+                  <View className="public-account-menu">
+                    <View className="public-account-menu__identity">
+                      <Text>{session?.user.displayName ?? '游客'}</Text>
+                      <Text>{session ? `@${session.user.username}` : '公开浏览模式'}</Text>
+                    </View>
+                    {!session && (
+                      <Button
+                        className="public-account-menu__item"
+                        onClick={() => void Taro.reLaunch({ url: '/pages/login/index' })}
+                      >
+                        登录或注册
+                      </Button>
+                    )}
+                    {session && (
+                      <Button
+                        className="public-account-menu__item"
+                        onClick={() => void openPrivateMenu('messages')}
+                      >
+                        消息与私信
+                      </Button>
+                    )}
+                    <Button
+                      className="public-account-menu__item"
+                      onClick={() => void openFeedback()}
+                    >
+                      问题反馈
+                    </Button>
+                    <Button
+                      className="public-account-menu__item"
+                      onClick={() => void openPrivateMenu('settings')}
+                    >
+                      设置
+                    </Button>
+                    <View className="public-account-menu__version">
+                      <Text>晓球 V1.0.0</Text>
+                    </View>
+                    {session && (
+                      <Button
+                        className="public-account-menu__item public-account-menu__item--danger"
+                        onClick={() => void logout()}
+                      >
+                        退出登录
+                      </Button>
+                    )}
+                  </View>
                 )}
-              </View>
+              </>
             )}
           </View>
         </View>
       </View>
 
-      {menuOpen && <View className="public-menu-scrim" onClick={closeMenu} />}
+      {menuOpen && !desktopAccount && <View className="public-menu-scrim" onClick={closeMenu} />}
 
       {source === 'mock' && (
         <View className="mock-banner">

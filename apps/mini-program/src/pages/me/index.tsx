@@ -66,7 +66,7 @@ export default function MePage() {
   const tournamentId = state.phase === 'ready' ? state.home.tournament.id : undefined
   return (
     <PublicShell active="me" tournamentId={tournamentId}>
-      {state.phase === 'ready' && (
+      {state.phase === 'ready' && !desktop && (
         <IdentityEntry
           user={state.user}
           onUserChange={(user) =>
