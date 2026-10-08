@@ -34,6 +34,164 @@ export class MatchReportService {
     @Inject(AuthService) private readonly auth: AuthService,
   ) {}
 
+  async begin(authorization: string | undefined, matchId: string, key: string, requestId: string) {
+    return this.inlineAction(
+      authorization,
+      matchId,
+      'editor',
+      key,
+      {},
+      requestId,
+      async (tx, session, match, privilege) => {
+        const workspace = await this.workspace(tx, match, privilege)
+        if (!workspace.inline.canStart)
+          throw conflict(workspace.blockingReasons[0] || '比赛已完成编辑，请申请修改')
+        const record = await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorType: 'MATCH_REPORTER',
+            actorUserId: session.userId,
+            actorRoleSnapshot: privilege.roles,
+            action: 'MATCH_REPORT_EDITOR_STARTED',
+            targetType: 'MatchReportEditor',
+            targetId: match.id,
+            afterSummary: {
+              matchContext: this.matchContext(match),
+              version: match.reportVersion,
+              confirmedReportVersion: match.confirmedReportVersion,
+              approvedCorrection: workspace.inline.completed,
+              homeRosterSnapshotId: workspace.homeTeam.rosterSnapshotId!,
+              awayRosterSnapshotId: workspace.awayTeam.rosterSnapshotId!,
+              ruleVersionId: workspace.ruleVersionId!,
+              tournamentId: match.tournamentId,
+              homeTeamId: match.homeTeamId,
+              awayTeamId: match.awayTeamId,
+            },
+            requestId,
+            source: 'INLINE_MATCH_EDITOR',
+          },
+        })
+        return { ...workspace, editorToken: record.id }
+      },
+    )
+  }
+
+  async requestChange(
+    authorization: string | undefined,
+    matchId: string,
+    body: { clientActionId: string; reason: string },
+    requestId: string,
+  ) {
+    return this.inlineAction(
+      authorization,
+      matchId,
+      'change-requests',
+      body.clientActionId,
+      { reason: body.reason.trim() },
+      requestId,
+      async (tx, session, match, privilege) => {
+        const workspace = await this.workspace(tx, match, privilege)
+        if (!workspace.inline.completed) throw conflict('尚未完成编辑，可以继续补全')
+        if (body.reason.trim().length < 2) throw invalid('请填写修改原因')
+        if (workspace.inline.changeRequested) return workspace
+        const recipients = await this.administrators(tx, session, match)
+        if (!recipients.size) throw invalid('本赛事尚未配置修改审批人')
+        const audit = await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorType: 'MATCH_REPORTER',
+            actorUserId: session.userId,
+            actorRoleSnapshot: privilege.roles,
+            action: 'MATCH_REPORT_CHANGE_REQUESTED',
+            targetType: 'MatchReport',
+            targetId: match.id,
+            afterSummary: {
+              reportVersion: match.reportVersion,
+              confirmedReportVersion: match.confirmedReportVersion,
+            },
+            reason: body.reason.trim(),
+            requestId,
+            source: 'INLINE_MATCH_EDITOR',
+          },
+        })
+        for (const recipientUserId of recipients)
+          await tx.userNotification.create({
+            data: {
+              organizationId: session.organizationId,
+              actorUserId: session.userId,
+              recipientUserId,
+              type: 'MATCH_REPORT_SUBMITTED',
+              title: '比赛修改申请',
+              body: `${match.title} · ${body.reason.trim()}`,
+              linkPath: `/pages/readonly-match-detail/index?matchId=${match.id}`,
+              deduplicationKey: `match-change-request:${audit.id}:${recipientUserId}`,
+              metadata: {
+                matchId: match.id,
+                requestId: audit.id,
+                reportVersion: match.reportVersion,
+                action: 'REQUEST_CHANGE',
+              },
+            },
+          })
+        return this.workspace(tx, match, privilege)
+      },
+    )
+  }
+
+  private async lockMatch(tx: Database, organizationId: string, matchId: string) {
+    await tx.$queryRaw`SELECT id FROM matches WHERE id = ${matchId}::uuid AND organization_id = ${organizationId}::uuid FOR UPDATE`
+  }
+
+  private async inlineAction(
+    authorization: string | undefined,
+    matchId: string,
+    suffix: string,
+    key: string,
+    payload: object,
+    _requestId: string,
+    run: (
+      tx: Database,
+      session: AuthenticatedSession,
+      match: ReportMatch,
+      privilege: Awaited<ReturnType<MatchReportService['privilege']>>,
+    ) => Promise<unknown>,
+  ) {
+    matchId = matchId.toLowerCase()
+    const session = await this.auth.requireSession(authorization)
+    const route = `POST /matches/${matchId}/report/${suffix}`
+    const requestHash = createHash('sha256').update(JSON.stringify(payload)).digest('hex')
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.lockMatch(tx, session.organizationId, matchId)
+        const match = await this.requireMatch(tx, session.organizationId, matchId)
+        const privilege = await this.privilege(tx, session, match)
+        if (!privilege.inlineEditor) throw forbidden('只有本场比赛的编辑员可以操作')
+        const where = {
+          userId_route_idempotencyKey: { userId: session.userId, route, idempotencyKey: key },
+        }
+        const existing = await tx.idempotencyRecord.findUnique({ where })
+        if (existing) return this.replay(existing, requestHash, session.organizationId)
+        await tx.idempotencyRecord.create({
+          data: {
+            organizationId: session.organizationId,
+            userId: session.userId,
+            route,
+            idempotencyKey: key,
+            requestHash,
+            expiresAt: new Date(Date.now() + 30 * DAY),
+          },
+        })
+        const result = await run(tx, session, match, privilege)
+        await tx.idempotencyRecord.update({
+          where,
+          data: { responseStatus: 200, responseBody: result as Prisma.InputJsonValue },
+        })
+        return result
+      },
+      { timeout: 10000 },
+    )
+  }
+
   async get(authorization: string | undefined, matchId: string) {
     matchId = matchId.toLowerCase()
     const session = await this.auth.requireSession(authorization)
@@ -101,6 +259,7 @@ export class MatchReportService {
     try {
       return await this.prisma.$transaction(
         async (tx) => {
+          await this.lockMatch(tx, session.organizationId, matchId)
           const match = await this.requireMatch(tx, session.organizationId, matchId)
           const privilege = await this.privilege(tx, session, match)
           this.requireRead(privilege)
@@ -116,6 +275,61 @@ export class MatchReportService {
             },
           })
           if (existing) return this.replay(existing, requestHash, session.organizationId)
+          let editorContext: Prisma.JsonObject | null = null
+          if (body.editorToken) {
+            if (!privilege.inlineEditor) throw forbidden('只有本场比赛的编辑员可以操作')
+            const editor = await tx.auditLog.findFirst({
+              where: {
+                id: body.editorToken,
+                organizationId: session.organizationId,
+                actorUserId: session.userId,
+                targetType: 'MatchReportEditor',
+                targetId: match.id,
+                action: 'MATCH_REPORT_EDITOR_STARTED',
+              },
+            })
+            if (
+              !editor ||
+              !editor.afterSummary ||
+              typeof editor.afterSummary !== 'object' ||
+              Array.isArray(editor.afterSummary)
+            )
+              throw forbidden('编辑凭据无效，请重新进入编辑')
+            editorContext = editor.afterSummary as Prisma.JsonObject
+            const capturedContext = editorContext.matchContext
+            if (
+              !capturedContext ||
+              typeof capturedContext !== 'object' ||
+              Array.isArray(capturedContext) ||
+              Object.entries(this.matchContext(match)).some(
+                ([key, value]) => capturedContext[key] !== value,
+              )
+            )
+              throw conflict('比赛对阵、阶段或时间已改变，请重新进入编辑')
+            if (
+              editorContext.tournamentId !== match.tournamentId ||
+              editorContext.homeTeamId !== match.homeTeamId ||
+              editorContext.awayTeamId !== match.awayTeamId
+            )
+              throw conflict('比赛对阵已改变，请重新进入编辑')
+            if (
+              editorContext.homeRosterSnapshotId !== body.homeRosterSnapshotId ||
+              editorContext.awayRosterSnapshotId !== body.awayRosterSnapshotId ||
+              editorContext.ruleVersionId !== body.ruleVersionId
+            )
+              throw conflict('编辑名单或规程与开始编辑时不一致')
+            const completed = await tx.auditLog.findFirst({
+              where: {
+                organizationId: session.organizationId,
+                targetType: 'MatchReportEditor',
+                targetId: body.editorToken,
+                action: 'MATCH_REPORT_EDITOR_COMPLETED',
+              },
+            })
+            if (completed) throw conflict('这次编辑已经完成，请申请修改')
+          }
+          if (body.action === 'COMPLETE' && !editorContext)
+            throw forbidden('请先从比赛详情开始编辑')
           await tx.idempotencyRecord.create({
             data: {
               organizationId: session.organizationId,
@@ -126,7 +340,7 @@ export class MatchReportService {
               expiresAt: new Date(Date.now() + 30 * DAY),
             },
           })
-          if (match.reportVersion !== body.expectedVersion)
+          if (body.action !== 'COMPLETE' && match.reportVersion !== body.expectedVersion)
             throw conflict('其他工作人员已保存新版本。请先核对最新版本。', {
               currentVersion: match.reportVersion,
               expectedVersion: body.expectedVersion,
@@ -134,12 +348,24 @@ export class MatchReportService {
           const previous = await this.latest(tx, match)
           if (previous) this.requireUnchangedMatchContext(match, previous)
           let status: ReportStatus
+          const published =
+            body.action === 'COMPLETE' &&
+            match.confirmedReportVersion === editorContext?.confirmedReportVersion
+          const effectiveAction =
+            body.action === 'COMPLETE' ? (published ? 'CONFIRM' : 'SUBMIT') : body.action
           try {
-            status = nextReportStatus(
-              (previous?.status as ReportStatus) ?? null,
-              body.action,
-              privilege.administrator,
-            )
+            status =
+              body.action === 'COMPLETE'
+                ? published
+                  ? 'CONFIRMED'
+                  : 'SUBMITTED'
+                : nextReportStatus(
+                    body.action === 'CORRECT' && (await this.isComplete(tx, match))
+                      ? 'CONFIRMED'
+                      : ((previous?.status as ReportStatus) ?? null),
+                    body.action,
+                    privilege.administrator,
+                  )
           } catch (cause) {
             if (cause instanceof ReportRuleError) throw conflict(cause.message)
             throw cause
@@ -190,14 +416,21 @@ export class MatchReportService {
                 awayPlayerIds: new Set(context.away.entries.map((entry) => entry.playerProfileId)),
                 isKnockout: match.stage?.type === 'KNOCKOUT',
               },
-              body.action === 'SUBMIT' || body.action === 'CONFIRM',
+              body.action === 'SUBMIT' || body.action === 'CONFIRM' || body.action === 'COMPLETE',
+              body.action === 'SAVE' && !!editorContext,
             )
           } catch (cause) {
             if (cause instanceof ReportRuleError) throw invalid(cause.message)
             throw cause
           }
-          const reason = body.reason.trim()
-          if (body.action === 'CONFIRM') {
+          const reason =
+            body.reason.trim() ||
+            (body.action === 'COMPLETE'
+              ? published
+                ? '首次完成编辑并公开'
+                : '保存较晚完成的编辑版本'
+              : '')
+          if (effectiveAction === 'CONFIRM') {
             try {
               requireForfeitScore(fields, context.rule.rules)
             } catch (cause) {
@@ -219,7 +452,7 @@ export class MatchReportService {
             where: {
               id: match.id,
               organizationId: session.organizationId,
-              reportVersion: body.expectedVersion,
+              reportVersion: match.reportVersion,
             },
             data: { reportVersion: version },
           })
@@ -230,8 +463,12 @@ export class MatchReportService {
               matchId: match.id,
               version,
               status,
-              action: body.action,
-              fields: { ...canonicalFields(fields), _matchContext: this.matchContext(match) },
+              action: effectiveAction,
+              fields: {
+                ...canonicalFields(fields),
+                _matchContext: this.matchContext(match),
+                ...(editorContext?.approvedCorrection ? { _inlineCorrection: true } : {}),
+              },
               homeRosterSnapshotId: context.home.id,
               awayRosterSnapshotId: context.away.id,
               ruleVersionId: context.rule.id,
@@ -239,7 +476,7 @@ export class MatchReportService {
               reason: reason || (fields.outcome !== 'FINISHED' ? (previous?.reason ?? '') : ''),
             },
           })
-          if (body.action === 'CONFIRM') {
+          if (effectiveAction === 'CONFIRM') {
             const abandoned = fields.outcome === 'ABANDONED'
             await tx.match.updateMany({
               where: {
@@ -308,7 +545,30 @@ export class MatchReportService {
               },
             })
           }
-          await this.notifications(tx, session, match, revision, previous, requestId)
+          await this.notifications(
+            tx,
+            session,
+            match,
+            revision,
+            previous,
+            requestId,
+            body.action === 'COMPLETE',
+          )
+          if (body.action === 'COMPLETE')
+            await tx.auditLog.create({
+              data: {
+                organizationId: session.organizationId,
+                actorType: 'MATCH_REPORTER',
+                actorUserId: session.userId,
+                actorRoleSnapshot: privilege.roles,
+                action: 'MATCH_REPORT_EDITOR_COMPLETED',
+                targetType: 'MatchReportEditor',
+                targetId: body.editorToken!,
+                afterSummary: { version, published, retained: !published },
+                requestId,
+                source: 'INLINE_MATCH_EDITOR',
+              },
+            })
           await tx.auditLog.create({
             data: {
               organizationId: session.organizationId,
@@ -339,6 +599,9 @@ export class MatchReportService {
           const response = {
             ...(await this.workspace(tx, updated, privilege)),
             savedVersion: revision.version,
+            ...(body.action === 'COMPLETE'
+              ? { completion: { published, retained: !published } }
+              : {}),
           }
           await tx.idempotencyRecord.update({
             where: {
@@ -428,53 +691,13 @@ export class MatchReportService {
     revision: MatchReportRevision,
     previous: MatchReportRevision | null,
     requestId: string,
+    allowNoReviewer = false,
   ) {
     if (!['SUBMIT', 'RETURN', 'CONFIRM', 'CORRECT'].includes(revision.action)) return
     const recipients = new Set<string>()
     if (revision.action === 'SUBMIT') {
-      const candidates = await tx.user.findMany({
-        where: {
-          status: 'ACTIVE',
-          memberships: { some: { organizationId: match.organizationId, status: 'ACTIVE' } },
-          roleAssignments: {
-            some: {
-              revokedAt: null,
-              role: { in: ['PLATFORM_ADMIN', 'ORGANIZATION_ADMIN', 'TOURNAMENT_ADMIN'] },
-            },
-          },
-        },
-        select: {
-          id: true,
-          roleAssignments: {
-            where: {
-              revokedAt: null,
-              grantedAt: { lte: new Date() },
-              OR: [
-                { organizationId: match.organizationId },
-                { organizationId: null, role: 'PLATFORM_ADMIN' },
-              ],
-            },
-            select: { role: true, scopeType: true, scopeId: true },
-          },
-        },
-      })
-      const policy = new AccessPolicyService(tx as PrismaService)
-      for (const candidate of candidates) {
-        // An authorization view for the real notification recipient, not a login session.
-        const subject = {
-          ...session,
-          userId: candidate.id,
-          user: { ...session.user, id: candidate.id, roles: candidate.roleAssignments },
-        }
-        try {
-          await policy.requireTournamentAdministrator(subject, match.tournamentId)
-          recipients.add(candidate.id)
-        } catch (cause) {
-          if (!(cause instanceof ApiHttpException && cause.getStatus() === HttpStatus.FORBIDDEN))
-            throw cause
-        }
-      }
-      if (!recipients.size)
+      for (const id of await this.administrators(tx, session, match)) recipients.add(id)
+      if (!recipients.size && !allowNoReviewer)
         throw invalid('当前赛事没有有效审核人。请先由组织管理员安排审核权限；报告仍可保存为草稿。')
     } else {
       const submitted =
@@ -594,7 +817,13 @@ export class MatchReportService {
         administrator = false
       else throw cause
     }
-    return { administrator, reporter: true, roles }
+    const inlineEditor = roles.some(
+      (role) =>
+        role.role === 'MATCH_REPORTER' &&
+        ((role.scopeType === 'MATCH' && role.scopeId.toLowerCase() === match.id) ||
+          (role.scopeType === 'TOURNAMENT' && role.scopeId.toLowerCase() === match.tournamentId)),
+    )
+    return { administrator, reporter: true, inlineEditor, roles }
   }
   private requireRead(privilege: { administrator: boolean; reporter: boolean }) {
     if (!privilege.administrator && !privilege.reporter) throw forbidden('你没有这场比赛的报告权限')
@@ -667,7 +896,7 @@ export class MatchReportService {
   private async workspace(
     tx: Database,
     match: ReportMatch,
-    privilege: { administrator: boolean; reporter: boolean },
+    privilege: { administrator: boolean; reporter: boolean; inlineEditor?: boolean },
   ) {
     const latest = await this.latest(tx, match)
     if (latest) this.requireUnchangedMatchContext(match, latest)
@@ -675,6 +904,24 @@ export class MatchReportService {
     const blockingReasons = this.blockingReasons(match, context)
     const ready = blockingReasons.length === 0
     const editable = !latest || latest.status === 'DRAFT' || latest.status === 'RETURNED'
+    const completed = (await this.isComplete(tx, match)) || latest?.status === 'SUBMITTED'
+    const correction =
+      editable &&
+      latest &&
+      (latest.action === 'CORRECT' ||
+        (latest.fields &&
+          typeof latest.fields === 'object' &&
+          !Array.isArray(latest.fields) &&
+          latest.fields._inlineCorrection === true))
+    const requested = await tx.auditLog.findFirst({
+      where: {
+        organizationId: match.organizationId,
+        targetType: 'MatchReport',
+        targetId: match.id,
+        action: 'MATCH_REPORT_CHANGE_REQUESTED',
+        afterSummary: { path: ['reportVersion'], equals: match.reportVersion },
+      },
+    })
     const authors = await this.authors(tx, latest ? [latest] : [])
     return {
       organizationId: match.organizationId,
@@ -700,9 +947,15 @@ export class MatchReportService {
         canEdit: ready && editable,
         canSubmit: ready && editable,
         canViewHistory: true,
-        canCorrect: ready && privilege.administrator && latest?.status === 'CONFIRMED',
+        canCorrect: ready && privilege.administrator && completed && latest?.status !== 'SUBMITTED',
         canConfirm: ready && privilege.administrator && latest?.status === 'SUBMITTED',
         canReturn: privilege.administrator && latest?.status === 'SUBMITTED',
+      },
+      inline: {
+        editor: !!privilege.inlineEditor,
+        canStart: !!privilege.inlineEditor && ready && editable && (!completed || !!correction),
+        completed,
+        changeRequested: !!requested,
       },
       blockingReasons,
       latest: latest ? this.revisionView(latest, authors) : null,
@@ -715,6 +968,78 @@ export class MatchReportService {
         status: match.status,
       },
     }
+  }
+  private async isComplete(tx: Database, match: ReportMatch) {
+    if (match.confirmedReportVersion !== null) return true
+    if (match.status !== 'FINISHED' || match.homeScore === null || match.awayScore === null)
+      return false
+    const events = await tx.matchEvent.findMany({
+      where: {
+        organizationId: match.organizationId,
+        matchId: match.id,
+        type: { in: ['GOAL', 'OWN_GOAL'] },
+      },
+      select: { teamId: true, type: true },
+    })
+    let home = 0,
+      away = 0
+    for (const event of events) {
+      const homeGoal =
+        event.type === 'OWN_GOAL'
+          ? event.teamId === match.awayTeamId
+          : event.teamId === match.homeTeamId
+      if (homeGoal) home++
+      else away++
+    }
+    return home === match.homeScore && away === match.awayScore
+  }
+
+  private async administrators(tx: Database, session: AuthenticatedSession, match: ReportMatch) {
+    const candidates = await tx.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        memberships: { some: { organizationId: match.organizationId, status: 'ACTIVE' } },
+        roleAssignments: {
+          some: {
+            revokedAt: null,
+            role: { in: ['PLATFORM_ADMIN', 'ORGANIZATION_ADMIN', 'TOURNAMENT_ADMIN'] },
+          },
+        },
+      },
+      select: {
+        id: true,
+        roleAssignments: {
+          where: {
+            revokedAt: null,
+            grantedAt: { lte: new Date() },
+            OR: [
+              { organizationId: match.organizationId },
+              { organizationId: null, role: 'PLATFORM_ADMIN' },
+            ],
+          },
+          select: { role: true, scopeType: true, scopeId: true },
+        },
+      },
+    })
+    const policy = new AccessPolicyService(tx as PrismaService)
+    const recipients = new Set<string>()
+    for (const user of candidates) {
+      try {
+        await policy.requireTournamentAdministrator(
+          {
+            ...session,
+            userId: user.id,
+            user: { ...session.user, id: user.id, roles: user.roleAssignments },
+          },
+          match.tournamentId,
+        )
+        recipients.add(user.id)
+      } catch (cause) {
+        if (!(cause instanceof ApiHttpException && cause.getStatus() === HttpStatus.FORBIDDEN))
+          throw cause
+      }
+    }
+    return recipients
   }
   private async authors(tx: Database, revisions: MatchReportRevision[]) {
     const users = await tx.user.findMany({
@@ -795,6 +1120,7 @@ function parseFields(value: Prisma.JsonValue): ReportFieldsDto {
 }
 function canonicalCommand(body: WriteMatchReportDto) {
   return {
+    editorToken: body.editorToken ?? null,
     action: body.action,
     expectedVersion: body.expectedVersion,
     reason: body.reason.trim(),

@@ -10,7 +10,8 @@ import { ReportModal } from '../../components/report-modal'
 import { formatLongDate, formatRelativeTime, formatTime } from '../product/product.format'
 import { productRepository } from '../product/product.repository'
 import { readSession } from '../product/session'
-import { MatchReportEntry } from '../match-report/MatchReportEntry'
+import { InlineEventEditor, MatchChangeRequest } from '../match-report/inline-editor.h5'
+import type { InlineReportController } from '../match-report/use-inline-report.h5'
 import type { MatchExperienceResponse } from '../product/product.types'
 import { LineupsPanel, EventsPanel } from './panels.h5'
 import './match-content.h5.scss'
@@ -19,13 +20,18 @@ type DetailTab = 'ratings' | 'events' | 'lineups'
 export function MatchContent({
   match,
   onMatchUpdated,
-  showReportEntry = true,
+  editor,
 }: {
   match: MatchExperienceResponse
   onMatchUpdated: (match: MatchExperienceResponse) => void
-  showReportEntry?: boolean
+  editor?: InlineReportController
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>('ratings')
+  const wasEditing = useRef(false)
+  useEffect(() => {
+    if (wasEditing.current && !editor?.editing) setActiveTab('events')
+    wasEditing.current = editor?.editing ?? false
+  }, [editor?.editing])
   const [rating, setRating] = useState(match.reviews.viewerReview?.rating ?? 0)
   const [reviewBody, setReviewBody] = useState(match.reviews.viewerReview?.body ?? '')
   const [submitting, setSubmitting] = useState(false)
@@ -94,11 +100,38 @@ export function MatchContent({
             team={match.homeTeam}
             placeholder={match.homePlaceholder}
             tournamentId={match.tournamentId}
+            blocked={editor?.editing}
           />
           <View className="experience-scoreboard__score">
-            <Text className="experience-scoreboard__result">
-              {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}
-            </Text>
+            {editor?.editing ? (
+              <div className="experience-scoreboard__inputs">
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  className="experience-scoreboard__input"
+                  aria-label="主队比分"
+                  value={editor.fields.homeScore}
+                  disabled={editor.locked}
+                  onChange={(event) => editor.score('HOME', event.target.value)}
+                />
+                <span>:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  className="experience-scoreboard__input"
+                  aria-label="客队比分"
+                  value={editor.fields.awayScore}
+                  disabled={editor.locked}
+                  onChange={(event) => editor.score('AWAY', event.target.value)}
+                />
+              </div>
+            ) : (
+              <Text className="experience-scoreboard__result">
+                {hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}
+              </Text>
+            )}
             {(match.homePenaltyScore !== null || match.awayPenaltyScore !== null) && (
               <Text className="experience-scoreboard__penalty">
                 点球 {match.homePenaltyScore ?? 0} : {match.awayPenaltyScore ?? 0}
@@ -109,11 +142,17 @@ export function MatchContent({
             team={match.awayTeam}
             placeholder={match.awayPlaceholder}
             tournamentId={match.tournamentId}
+            blocked={editor?.editing}
           />
         </View>
       </View>
 
-      {showReportEntry && <MatchReportEntry matchId={match.id} />}
+      {editor && <MatchChangeRequest editor={editor} />}
+      {editor?.error && !editor.editing && !editor.requesting && (
+        <p className="inline-match-error" role="alert">
+          {editor.error}
+        </p>
+      )}
 
       {match.statusReason && (
         <View className="match-summary surface">
@@ -122,27 +161,29 @@ export function MatchContent({
         </View>
       )}
 
-      <View className="match-detail-tabs">
-        <TabButton
-          active={activeTab === 'ratings'}
-          label="评分与评论"
-          note={match.reviews.ratingCount > 0 ? String(match.reviews.ratingCount) : undefined}
-          onClick={() => setActiveTab('ratings')}
-        />
-        <TabButton
-          active={activeTab === 'events'}
-          label="比赛事件"
-          note={match.events.length > 0 ? String(match.events.length) : undefined}
-          onClick={() => setActiveTab('events')}
-        />
-        <TabButton
-          active={activeTab === 'lineups'}
-          label="双方阵容"
-          onClick={() => setActiveTab('lineups')}
-        />
-      </View>
+      {!editor?.editing && (
+        <View className="match-detail-tabs">
+          <TabButton
+            active={activeTab === 'ratings'}
+            label="评分与评论"
+            note={match.reviews.ratingCount > 0 ? String(match.reviews.ratingCount) : undefined}
+            onClick={() => setActiveTab('ratings')}
+          />
+          <TabButton
+            active={activeTab === 'events'}
+            label="比赛事件"
+            note={match.events.length > 0 ? String(match.events.length) : undefined}
+            onClick={() => setActiveTab('events')}
+          />
+          <TabButton
+            active={activeTab === 'lineups'}
+            label="双方阵容"
+            onClick={() => setActiveTab('lineups')}
+          />
+        </View>
+      )}
 
-      {activeTab === 'ratings' && (
+      {!editor?.editing && activeTab === 'ratings' && (
         <RatingsPanel
           body={reviewBody}
           isFinished={isFinished}
@@ -156,8 +197,13 @@ export function MatchContent({
         />
       )}
 
-      {activeTab === 'events' && <EventsPanel match={match} />}
-      {activeTab === 'lineups' && <LineupsPanel match={match} />}
+      {editor?.editing ? (
+        <InlineEventEditor editor={editor} />
+      ) : activeTab === 'events' ? (
+        <EventsPanel match={match} />
+      ) : activeTab === 'lineups' ? (
+        <LineupsPanel match={match} />
+      ) : null}
     </View>
   )
 }
@@ -261,15 +307,11 @@ function RatingsPanel({
               </button>
             </View>
           )}
-          <span className="rating-form__hint">
-            {lockedRating > 0 ? '评分确认后不可修改' : '1 至 5 分 · 确认后不可修改'}
-          </span>
         </View>
       </View>
 
       <View className="match-review-section">
         <div className="match-comment-entry">
-          <span>聊聊这场比赛，不评分也可以评论</span>
           <button
             type="button"
             disabled={!isFinished || submitting}
@@ -412,19 +454,21 @@ function TeamSide({
   team,
   placeholder,
   tournamentId,
+  blocked = false,
 }: {
   team: MatchExperienceResponse['homeTeam']
   placeholder: string | null | undefined
   tournamentId: string
+  blocked?: boolean | undefined
 }) {
   return (
     <div
       className={`experience-scoreboard__team ${team ? 'experience-scoreboard__team--linked' : ''}`}
     >
       <span data-match-resource="team">
-        <TeamCrest team={team} size="large" />
+        <TeamCrest team={team} size="large" interactive={!blocked} />
       </span>
-      {team ? (
+      {team && !blocked ? (
         <button
           type="button"
           data-match-resource="team"
@@ -434,7 +478,7 @@ function TeamSide({
           {team.name}
         </button>
       ) : (
-        <Text>{placeholder ?? '席位待定'}</Text>
+        <Text>{team?.name ?? placeholder ?? '席位待定'}</Text>
       )}
     </div>
   )

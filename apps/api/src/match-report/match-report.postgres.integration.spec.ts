@@ -650,6 +650,214 @@ test(
           .send(command)
 
       await t.test(
+        '详情内编辑：草稿可补全，首次完成直接公开，较晚版本留存且不能伪造开始凭据',
+        async () => {
+          const target = await createExtraMatch('INLINE-PUBLISH')
+          await prisma.roleAssignment.createMany({
+            data: [reporter, reporter2].map((user) => ({
+              organizationId: organization.id,
+              userId: user.id,
+              role: 'MATCH_REPORTER',
+              scopeType: 'MATCH',
+              scopeId: target.id,
+            })),
+          })
+          const inlinePath = `/api/matches/${target.id}/report`
+          const begin = (userId: string) =>
+            request(server)
+              .post(`${inlinePath}/editor`)
+              .set('authorization', bearer(userId))
+              .send({ clientActionId: randomUUID() })
+          await begin(admin.id).expect(403)
+          await begin(student.id).expect(403)
+          const first = (await begin(reporter.id).expect(200)).body
+          const second = (await begin(reporter2.id).expect(200)).body
+          assert.equal(first.inline.canStart, true)
+          assert.notEqual(first.editorToken, second.editorToken)
+          const fields: ReportFieldsDto = {
+            ...report,
+            events: report.events.map((event, index) => ({
+              ...event,
+              playerId:
+                event.side === 'HOME'
+                  ? first.homeTeam.players[index === 0 ? 0 : 1].id
+                  : first.awayTeam.players[0].id,
+              relatedPlayerId: index === 0 ? first.homeTeam.players[1].id : '',
+            })),
+          }
+          const command = (
+            workspace: typeof first,
+            data: ReportFieldsDto,
+            action: 'SAVE' | 'COMPLETE',
+            expectedVersion: number,
+          ): WriteMatchReportDto => ({
+            ...content(expectedVersion, data, action),
+            reason: 'FICTIONAL_TEST 详情页编辑',
+            editorToken: workspace.editorToken,
+            homeRosterSnapshotId: workspace.homeTeam.rosterSnapshotId,
+            awayRosterSnapshotId: workspace.awayTeam.rosterSnapshotId,
+            ruleVersionId: workspace.ruleVersionId,
+          })
+          const unfinished = {
+            ...fields,
+            events: [{ ...fields.events[0]!, minute: '', playerId: '', relatedPlayerId: '' }],
+          }
+          await postExtra(target, reporter.id, command(first, unfinished, 'SAVE', 0)).expect(200)
+          await postExtra(target, reporter.id, command(first, unfinished, 'COMPLETE', 1)).expect(
+            400,
+          )
+          assert.equal(
+            (await prisma.match.findUniqueOrThrow({ where: { id: target.id } }))
+              .confirmedReportVersion,
+            null,
+          )
+          const publish = command(first, fields, 'COMPLETE', 1)
+          const published = (await postExtra(target, reporter.id, publish).expect(200)).body
+          assert.equal(published.completion.published, true)
+          assert.equal(published.confirmedReportVersion, 2)
+          await postExtra(target, reporter.id, publish).expect(200)
+          await begin(reporter.id).expect(409)
+          const alternative = {
+            ...fields,
+            homeScore: '3',
+            events: [
+              ...fields.events,
+              {
+                ...fields.events[0]!,
+                clientEventId: 'late-extra-goal',
+                minute: '22',
+                relatedPlayerId: '',
+              },
+            ],
+          }
+          const later = (
+            await postExtra(
+              target,
+              reporter2.id,
+              command(second, alternative, 'COMPLETE', 0),
+            ).expect(200)
+          ).body
+          assert.equal(later.completion.retained, true)
+          const official = await prisma.match.findUniqueOrThrow({ where: { id: target.id } })
+          assert.equal(official.homeScore, 2)
+          assert.equal(official.awayScore, 1)
+          assert.equal(official.confirmedReportVersion, 2)
+          assert.equal(official.reportVersion, 3)
+          assert.equal(await prisma.matchEvent.count({ where: { matchId: target.id } }), 3)
+          assert.equal(
+            await prisma.outboxJob.count({
+              where: { aggregateId: target.id, eventType: 'MatchReportConfirmed' },
+            }),
+            1,
+          )
+          const history = (
+            await request(server)
+              .get(`${inlinePath}/history`)
+              .set('authorization', bearer(reporter.id))
+              .expect(200)
+          ).body
+          assert.equal(history.items.length, 3)
+          assert.equal(history.items[0].status, 'SUBMITTED')
+          assert.equal(history.items[0].fields.homeScore, '3')
+          await postExtra(target, reporter.id, {
+            ...content(3, fields, 'COMPLETE'),
+            editorToken: second.editorToken,
+          }).expect(403)
+          await postExtra(target, reporter.id, content(3, fields, 'COMPLETE')).expect(403)
+          const apply = { clientActionId: randomUUID(), reason: 'FICTIONAL_TEST 申请核对进球分钟' }
+          const application = request(server)
+            .post(`${inlinePath}/change-requests`)
+            .set('authorization', bearer(reporter.id))
+          const applied = (await application.send(apply).expect(200)).body
+          assert.equal(applied.inline.changeRequested, true)
+          await request(server)
+            .post(`${inlinePath}/change-requests`)
+            .set('authorization', bearer(reporter.id))
+            .send(apply)
+            .expect(200)
+          assert.equal(
+            await prisma.auditLog.count({
+              where: { targetId: target.id, action: 'MATCH_REPORT_CHANGE_REQUESTED' },
+            }),
+            1,
+          )
+          assert.equal(
+            await prisma.userNotification.count({
+              where: { recipientUserId: admin.id, title: '比赛修改申请' },
+            }),
+            1,
+          )
+        },
+      )
+      await t.test('两个编辑员并发完成：两个版本都留存，恰好一份公开', async () => {
+        const target = await createExtraMatch('INLINE-RACE')
+        await prisma.roleAssignment.createMany({
+          data: [reporter, reporter2].map((user) => ({
+            organizationId: organization.id,
+            userId: user.id,
+            role: 'MATCH_REPORTER',
+            scopeType: 'MATCH',
+            scopeId: target.id,
+          })),
+        })
+        const begin = async (userId: string) =>
+          (
+            await request(server)
+              .post(`/api/matches/${target.id}/report/editor`)
+              .set('authorization', bearer(userId))
+              .send({ clientActionId: randomUUID() })
+              .expect(200)
+          ).body
+        const started = await Promise.all([begin(reporter.id), begin(reporter2.id)])
+        const variants = [
+          report,
+          {
+            ...report,
+            homeScore: '3',
+            events: [
+              ...report.events,
+              {
+                ...report.events[0]!,
+                clientEventId: 'race-extra-goal',
+                minute: '22',
+                relatedPlayerId: '',
+              },
+            ],
+          },
+        ]
+        const outcomes = await Promise.all(
+          [reporter, reporter2].map((user, index) =>
+            postExtra(target, user.id, {
+              ...content(0, variants[index]!, 'COMPLETE'),
+              editorToken: started[index].editorToken,
+              homeRosterSnapshotId: started[index].homeTeam.rosterSnapshotId,
+              awayRosterSnapshotId: started[index].awayTeam.rosterSnapshotId,
+              ruleVersionId: started[index].ruleVersionId,
+            }),
+          ),
+        )
+        assert.deepEqual(
+          outcomes.map((result) => result.status),
+          [200, 200],
+        )
+        assert.deepEqual(outcomes.map((result) => result.body.completion.published).sort(), [
+          false,
+          true,
+        ])
+        const winner = outcomes.findIndex((result) => result.body.completion.published)
+        const official = await prisma.match.findUniqueOrThrow({ where: { id: target.id } })
+        assert.equal(official.homeScore, Number(variants[winner]!.homeScore))
+        assert.equal(official.reportVersion, 2)
+        assert.equal(official.confirmedReportVersion, 1)
+        assert.equal(await prisma.matchReportRevision.count({ where: { matchId: target.id } }), 2)
+        assert.equal(
+          await prisma.outboxJob.count({
+            where: { aggregateId: target.id, eventType: 'MatchReportConfirmed' },
+          }),
+          1,
+        )
+      })
+      await t.test(
         '完整事件流：成对换人、编辑撤销、非法输入、提交退回和官方更正均保留版本',
         async () => {
           const target = await createExtraMatch('EVENT-FLOW')

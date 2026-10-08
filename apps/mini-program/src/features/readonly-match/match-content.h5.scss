@@ -24,6 +24,32 @@
   font-weight: 800;
   cursor: pointer;
 }
+.experience-scoreboard__inputs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 48px;
+  font-weight: 900;
+  color: white;
+}
+.experience-scoreboard__input {
+  box-sizing: border-box;
+  width: 74px;
+  height: 72px;
+  padding: 0;
+  color: white;
+  background: #ffffff12;
+  border: 1px solid #d5e2cc8c;
+  border-radius: 5px;
+  font: inherit;
+  text-align: center;
+  appearance: textfield;
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    appearance: none;
+  }
+}
 .rating-choice {
   display: flex;
   align-items: center;
@@ -67,7 +93,7 @@
 .match-comment-entry {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: end;
   gap: 12px;
   padding: 14px 0;
   color: #738078;

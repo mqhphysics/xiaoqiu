@@ -32,6 +32,15 @@
 .match-icon--off {
   color: #cb796c;
 }
+.match-events__tools {
+  display: flex;
+  justify-content: end;
+  margin: 0 0 8px;
+}
+.match-event__team .team-crest {
+  width: 22px;
+  height: 22px;
+}
 @media (min-width: 721px) and (hover: hover) and (pointer: fine) {
   .match-horizontal-player .player-trigger:hover {
     color: #d8c984;
