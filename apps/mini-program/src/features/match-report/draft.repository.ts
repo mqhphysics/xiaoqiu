@@ -29,7 +29,9 @@ export function readDraft(key: string): LocalReportDraft | null {
         !pending.clientActionId ||
         !Number.isSafeInteger(pending.expectedVersion) ||
         Number(pending.expectedVersion) < 0 ||
-        !['SAVE', 'SUBMIT', 'RETURN', 'CONFIRM', 'CORRECT'].includes(String(pending.action)) ||
+        !['SAVE', 'SUBMIT', 'RETURN', 'CONFIRM', 'CORRECT', 'COMPLETE', 'SAVE_SCORE'].includes(
+          String(pending.action),
+        ) ||
         typeof pending.reason !== 'string' ||
         !isFields(pending.fields)
       )

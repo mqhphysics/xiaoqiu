@@ -16,7 +16,15 @@ import {
   ValidateNested,
 } from 'class-validator'
 
-export const REPORT_ACTIONS = ['SAVE', 'SUBMIT', 'RETURN', 'CONFIRM', 'CORRECT'] as const
+export const REPORT_ACTIONS = [
+  'SAVE',
+  'SUBMIT',
+  'RETURN',
+  'CONFIRM',
+  'CORRECT',
+  'COMPLETE',
+  'SAVE_SCORE',
+] as const
 export type ReportAction = (typeof REPORT_ACTIONS)[number]
 export const EVENT_KINDS = ['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'] as const
 
@@ -37,7 +45,7 @@ export class ReportEventDto {
 
   @ApiProperty({ type: String })
   @IsString()
-  @Matches(/^\d{1,3}$/)
+  @Matches(/^$|^\d{1,3}$/)
   minute!: string
 
   @ApiProperty({ type: String, description: '空字符串表示没有补时' })
@@ -46,6 +54,8 @@ export class ReportEventDto {
   addedMinute!: string
 
   @ApiProperty({ format: 'uuid' })
+  @IsString()
+  @ValidateIf((_object, value) => value !== '')
   @IsUUID()
   playerId!: string
 
@@ -89,6 +99,10 @@ export class ReportFieldsDto {
 }
 
 export class WriteMatchReportDto {
+  @ApiPropertyOptional({ format: 'uuid', description: '详情内编辑的开始凭据' })
+  @IsOptional()
+  @IsUUID()
+  editorToken?: string
   @ApiProperty({ type: String, description: '同一保存及网络重试始终使用同一个键' })
   @IsString()
   @Length(8, 120)
@@ -126,6 +140,21 @@ export class WriteMatchReportDto {
   @ValidateNested()
   @Type(() => ReportFieldsDto)
   fields?: ReportFieldsDto
+}
+
+export class BeginMatchReportDto {
+  @ApiProperty()
+  @IsString()
+  @Length(8, 120)
+  @Matches(/^[A-Za-z0-9._:-]+$/)
+  clientActionId!: string
+}
+
+export class RequestMatchReportChangeDto extends BeginMatchReportDto {
+  @ApiProperty({ maxLength: 240 })
+  @IsString()
+  @Length(2, 240)
+  reason!: string
 }
 
 export class ReportHistoryQueryDto {
@@ -185,6 +214,10 @@ export class OfficialReportResultDto {
   @ApiProperty() status!: string
 }
 export class ReportWorkspaceResponseDto {
+  @ApiProperty({ type: Object, description: '本场详情编辑的真实权限和完成状态' })
+  inline!: { editor: boolean; canStart: boolean; completed: boolean; changeRequested: boolean }
+  @ApiPropertyOptional({ format: 'uuid' }) editorToken?: string
+  @ApiPropertyOptional({ type: Object }) completion?: { published: boolean; retained: boolean }
   @ApiProperty({ format: 'uuid' }) organizationId!: string
   @ApiProperty({ format: 'uuid' }) matchId!: string
   @ApiProperty() title!: string

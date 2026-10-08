@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Taro from '@tarojs/taro'
 import { OPEN_MATCH_EVENT } from '../../features/product/match-navigation.h5'
@@ -19,6 +19,8 @@ import {
   type FocusIdentity,
 } from '../../features/readonly-match/focus-origin.logic'
 import './index.h5.scss'
+import { MatchReportEntry } from '../../features/match-report/MatchReportEntry.h5'
+import { useInlineReport } from '../../features/match-report/use-inline-report.h5'
 
 const loadContent = () => import('../../features/readonly-match/match-content.h5')
 const MATCH_RESOURCE_EVENT = 'xiaoqiu:match-resource-navigation'
@@ -139,9 +141,28 @@ type State =
 export function MatchDialog({ request, onClose }: { request: MatchRequest; onClose: () => void }) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [retry, setRetry] = useState(0)
+  const updateMatch = (match: MatchExperienceResponse) =>
+    setState((previous) => (previous.phase === 'ready' ? { ...previous, match } : previous))
+  const editor = useInlineReport(state.phase === 'ready' ? state.match : null, updateMatch)
+  const autoEdit = useRef(false)
+  useEffect(() => {
+    if (
+      !autoEdit.current &&
+      editor.workspace?.inline?.canStart &&
+      Taro.getCurrentInstance().router?.params.edit === '1'
+    ) {
+      autoEdit.current = true
+      void editor.start()
+    }
+  }, [editor.workspace?.inline?.canStart])
+  const close = () => {
+    void (async () => {
+      if (!editor.editing || (await editor.saveDraft())) onClose()
+    })()
+  }
   const titleId = useId()
   const panelId = useId().replace(/:/g, '')
-  useOverlayFocus(true, `#match-dialog-${panelId}`, onClose)
+  useOverlayFocus(true, `#match-dialog-${panelId}`, close)
   useEffect(() => {
     let current = true
     setState({ phase: 'loading' })
@@ -169,7 +190,7 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
     <div
       className="match-scrim"
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) close()
       }}
     >
       <section
@@ -181,33 +202,30 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
         tabIndex={-1}
         onClickCapture={(event) => {
           if (
+            !editor.editing &&
             event.target instanceof Element &&
-            event.target.closest('[data-match-resource], .person-trigger')
+            event.target.closest(
+              '[data-match-resource], .person-trigger, .player-trigger, .team-trigger',
+            )
           )
             window.dispatchEvent(new Event(MATCH_RESOURCE_EVENT))
         }}
       >
         <header className="match-dialog__bar">
           <h1 id={titleId}>比赛详情</h1>
+          <MatchReportEntry editor={editor} />
           <button
             type="button"
             className="match-dialog__close"
             aria-label="关闭比赛详情"
-            onClick={onClose}
+            onClick={close}
           >
-            关闭 <span aria-hidden="true">×</span>
+            <span aria-hidden="true">×</span>
           </button>
         </header>
         <div className="match-dialog__body">
           {state.phase === 'ready' ? (
-            <state.Content
-              match={state.match}
-              onMatchUpdated={(match) =>
-                setState((previous) =>
-                  previous.phase === 'ready' ? { ...previous, match } : previous,
-                )
-              }
-            />
+            <state.Content match={state.match} editor={editor} onMatchUpdated={updateMatch} />
           ) : (
             <div
               className="match-dialog__state"

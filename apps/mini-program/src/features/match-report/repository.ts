@@ -52,6 +52,23 @@ export const matchReportGateway: ReportGateway = {
     ),
 }
 
+export const inlineReportGateway = {
+  ...matchReportGateway,
+  begin: async (matchId: string, clientActionId: string) =>
+    parseWorkspace(
+      await request(`/matches/${encodeURIComponent(matchId)}/report/editor`, 'POST', {
+        clientActionId,
+      }),
+    ),
+  requestChange: async (matchId: string, clientActionId: string, reason: string) =>
+    parseWorkspace(
+      await request(`/matches/${encodeURIComponent(matchId)}/report/change-requests`, 'POST', {
+        clientActionId,
+        reason,
+      }),
+    ),
+}
+
 async function request(
   path: string,
   method: 'GET' | 'POST' = 'GET',
@@ -205,6 +222,7 @@ function fromWireRevision(value: unknown): unknown {
 
 function toWireCommand(command: SaveReportCommand) {
   const base = {
+    ...(command.editorToken ? { editorToken: command.editorToken } : {}),
     clientActionId: command.clientActionId,
     expectedVersion: command.expectedVersion,
     action: command.action,

@@ -35,6 +35,7 @@ export function validateReportFields(
   fields: ReportFieldsDto,
   context: FrozenReportContext,
   complete: boolean,
+  allowPlaceholders = false,
 ): void {
   if (!['FINISHED', 'HOME_FORFEIT', 'AWAY_FORFEIT', 'ABANDONED'].includes(fields.outcome))
     throw new ReportRuleError('比赛结果无效')
@@ -78,7 +79,7 @@ export function validateReportFields(
       throw new ReportRuleError('事件标识必须唯一')
     ids.add(event.clientEventId)
     if (
-      !/^\d{1,3}$/.test(event.minute) ||
+      (!(allowPlaceholders && event.minute === '') && !/^\d{1,3}$/.test(event.minute)) ||
       Number(event.minute) > 120 ||
       (event.addedMinute !== '' &&
         (!/^\d{1,2}$/.test(event.addedMinute) || Number(event.addedMinute) > 30))
@@ -86,13 +87,13 @@ export function validateReportFields(
       throw new ReportRuleError('比赛分钟或补时无效')
     const players = event.side === 'HOME' ? context.homePlayerIds : context.awayPlayerIds
     if (
-      !players.has(event.playerId) ||
+      (!(allowPlaceholders && event.playerId === '') && !players.has(event.playerId)) ||
       (event.relatedPlayerId !== '' && !players.has(event.relatedPlayerId))
     )
       throw new ReportRuleError('事件球员必须来自本次报告绑定的对应球队锁定名单')
     if (event.relatedPlayerId && event.relatedPlayerId === event.playerId)
       throw new ReportRuleError('事件球员与关联球员不能相同')
-    if (event.kind === 'SUBSTITUTION' && !event.relatedPlayerId)
+    if (event.kind === 'SUBSTITUTION' && !event.relatedPlayerId && !allowPlaceholders)
       throw new ReportRuleError('换人必须同时填写换下与换上球员')
     if (event.relatedPlayerId && event.kind !== 'GOAL' && event.kind !== 'SUBSTITUTION')
       throw new ReportRuleError('该事件不需要关联球员')
@@ -105,16 +106,18 @@ export function validateReportFields(
       event.playerId,
       event.relatedPlayerId,
     ])
-    if (facts.has(fact))
+    if (event.minute !== '' && event.playerId !== '' && facts.has(fact))
       throw new ReportRuleError('同一球队、球员、分钟的相同事件重复，请撤销多录的一条')
-    facts.add(fact)
+    if (event.minute !== '' && event.playerId !== '') facts.add(fact)
     if (event.kind === 'GOAL' || event.kind === 'OWN_GOAL') {
       const side =
         event.kind === 'OWN_GOAL' ? (event.side === 'HOME' ? 'AWAY' : 'HOME') : event.side
       counts[side] += 1
     }
   }
-  validateSubstitutionSequence(fields.events)
+  validateSubstitutionSequence(
+    fields.events.filter((event) => event.minute && event.playerId && event.relatedPlayerId),
+  )
   if (
     fields.outcome === 'FINISHED' &&
     (counts.HOME > Number(fields.homeScore) ||
