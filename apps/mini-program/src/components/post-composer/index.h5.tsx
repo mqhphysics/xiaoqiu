@@ -14,6 +14,7 @@ import {
   prepareDesktopPostImage,
 } from '../post-social/media'
 import type { PostComposerProps } from './index'
+import { PostQuote } from '../post-quote'
 import '../post-social/index.h5.scss'
 
 export function DesktopPostComposer({
@@ -23,8 +24,10 @@ export function DesktopPostComposer({
   teamId,
   tournamentId,
   initialTags,
+  quotePost,
+  editPost,
 }: PostComposerProps) {
-  const [body, setBody] = useState('')
+  const [body, setBody] = useState(() => editPost?.body ?? '')
   const [images, setImages] = useState<string[]>([])
   const [processing, setProcessing] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -42,31 +45,48 @@ export function DesktopPostComposer({
   useOverlayFocus(enabled, '.post-composer', close)
   const session = readSession()
   const canPublish =
-    Boolean(body.trim() || images.length) && !processing && !publishing && !tagResolving
+    Boolean(
+      body.trim() || images.length || quotePost || editPost?.imageUrl || editPost?.quotedPostId,
+    ) &&
+    !processing &&
+    !publishing &&
+    !tagResolving
   const publish = async () => {
     if (!canPublish || busy.current) return
     busy.current = true
     setPublishing(true)
     setError('')
-    const signature = JSON.stringify([body.trim(), images, teamId, tags, tournamentId])
+    const signature = JSON.stringify([
+      body.trim(),
+      images,
+      teamId,
+      tags,
+      tournamentId,
+      quotePost?.id,
+    ])
     if (pending.current?.signature !== signature)
       pending.current = { signature, id: createClientActionId('post') }
     try {
-      const post = await productRepository.createPost(
-        body.trim(),
-        pending.current.id,
-        undefined,
-        teamId,
-        undefined,
-        images,
-        tags,
-        tournamentId,
-      )
+      const post = editPost
+        ? await productRepository.updatePost(editPost.id, body.trim(), editPost.updatedAt!)
+        : await productRepository.createPost(
+            body.trim(),
+            pending.current.id,
+            undefined,
+            teamId,
+            undefined,
+            images,
+            tags,
+            tournamentId,
+            quotePost?.id,
+          )
       setBody('')
       setImages([])
       setTags(initialTags ?? [])
       pending.current = null
       onPublished(post)
+      if (!editPost)
+        window.dispatchEvent(new CustomEvent('xiaoqiu:post-published', { detail: post }))
       onClose()
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : '发布失败，请重试')
@@ -89,14 +109,21 @@ export function DesktopPostComposer({
         aria-modal="true"
         aria-labelledby="post-composer-title"
         onKeyDown={(event) => {
-          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key === 'Enter' &&
+            !event.nativeEvent.isComposing &&
+            event.nativeEvent.keyCode !== 229
+          ) {
             event.preventDefault()
             void publish()
           }
         }}
       >
         <header className="post-composer__header">
-          <h2 id="post-composer-title">发布动态</h2>
+          <h2 id="post-composer-title">
+            {editPost ? '编辑动态' : quotePost ? '转发到动态' : '发布动态'}
+          </h2>
           <button
             type="button"
             className="post-tool"
@@ -118,19 +145,26 @@ export function DesktopPostComposer({
             <strong>{session?.user.displayName ?? '我'}</strong>
             <span>分享你的绿茵时刻</span>
           </div>
-          <span className="post-composer__visibility">全校可见</span>
         </div>
         <textarea
           data-post-input
           ref={textarea}
           className="post-composer__input"
           aria-label="动态正文"
-          placeholder="今天的球场，有什么想分享的？"
-          maxLength={500}
+          placeholder={quotePost ? '说说你的想法（选填）…' : '今天的球场，有什么想分享的？'}
+          maxLength={editPost ? 1000 : 500}
           value={body}
           disabled={publishing}
           onChange={(event) => setBody(event.target.value)}
         />
+        {quotePost && <PostQuote post={quotePost} interactive={false} />}
+        {editPost?.quotedPostId && (
+          <PostQuote
+            post={editPost.quotedPost ?? null}
+            sourceId={editPost.quotedPostId}
+            interactive={false}
+          />
+        )}
         {images.length > 0 && (
           <div className="post-composer__previews" aria-label="待发布图片">
             {images.map((source, index) => (
@@ -211,33 +245,37 @@ export function DesktopPostComposer({
             {error}
           </p>
         )}
-        <div className="post-composer__toolbar">
-          <div className="post-composer__tools">
-            <EmojiPicker
-              disabled={publishing}
-              onSelect={(emoji) => insertAtCursor(textarea.current, body, emoji, 500, setBody)}
-            />
-            <button
-              type="button"
-              className="post-tool"
-              title="图片 / GIF"
-              aria-label="添加图片或 GIF"
-              disabled={publishing || processing || images.length >= MAX_POST_IMAGES}
-              onClick={() => input.current?.click()}
-            >
-              <PostIcon name="photo" />
-            </button>
-            <span>{processing ? '正在处理图片…' : `图片 / GIF · ${images.length}/9`}</span>
+        {!editPost && (
+          <div className="post-composer__toolbar">
+            <div className="post-composer__tools">
+              <EmojiPicker
+                disabled={publishing}
+                onSelect={(emoji) => insertAtCursor(textarea.current, body, emoji, 500, setBody)}
+              />
+              <button
+                type="button"
+                className="post-tool"
+                title="图片 / GIF"
+                aria-label="添加图片或 GIF"
+                disabled={publishing || processing || images.length >= MAX_POST_IMAGES}
+                onClick={() => input.current?.click()}
+              >
+                <PostIcon name="photo" />
+              </button>
+              <span>{processing ? '正在处理图片…' : `图片 / GIF · ${images.length}/9`}</span>
+            </div>
+            <span className="post-composer__counter">{body.length}/500</span>
           </div>
-          <span className="post-composer__counter">{body.length}/500</span>
-        </div>
-        <PostTagPicker
-          tags={tags}
-          onChange={setTags}
-          disabled={publishing || processing}
-          tournamentId={tournamentId}
-          onPendingChange={setTagResolving}
-        />
+        )}
+        {!editPost && (
+          <PostTagPicker
+            tags={tags}
+            onChange={setTags}
+            disabled={publishing || processing}
+            tournamentId={tournamentId}
+            onPendingChange={setTagResolving}
+          />
+        )}
         <footer className="post-composer__footer">
           <span>让每一个绿茵时刻被看见</span>
           <button
@@ -246,7 +284,7 @@ export function DesktopPostComposer({
             disabled={!canPublish}
             onClick={() => void publish()}
           >
-            {publishing ? '正在发布…' : '发布动态'}
+            {publishing ? '正在保存…' : editPost ? '保存修改' : quotePost ? '发布转发' : '发布动态'}
           </button>
         </footer>
       </section>

@@ -6,6 +6,8 @@ export interface PostComposerProps {
   teamId?: string
   tournamentId?: string | undefined
   initialTags?: PostTag[]
+  quotePost?: PostSummary
+  editPost?: PostSummary
 }
 export function DesktopPostComposer(_props: PostComposerProps) {
   return null

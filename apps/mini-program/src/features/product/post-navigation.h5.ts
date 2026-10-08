@@ -6,7 +6,18 @@ import { readSession } from './session'
 export const OPEN_POST_EVENT = 'xiaoqiu:open-post'
 const interactions = new Map<
   string,
-  Pick<PostSummary, 'likedByMe' | 'likeCount' | 'commentCount'>
+  Partial<
+    Pick<
+      PostSummary,
+      | 'likedByMe'
+      | 'likeCount'
+      | 'commentCount'
+      | 'favoritedByMe'
+      | 'body'
+      | 'updatedAt'
+      | 'deleted'
+    >
+  >
 >()
 const listeners = new Set<() => void>()
 function subscribe(listener: () => void) {
@@ -20,6 +31,10 @@ export function updatePostInteraction(post: PostSummary) {
     likedByMe: post.likedByMe,
     likeCount: post.likeCount,
     commentCount: post.commentCount,
+    ...(post.favoritedByMe !== undefined ? { favoritedByMe: post.favoritedByMe } : {}),
+    body: post.body,
+    ...(post.updatedAt !== undefined ? { updatedAt: post.updatedAt } : {}),
+    ...(post.deleted !== undefined ? { deleted: post.deleted } : {}),
   })
   for (const listener of listeners) listener()
 }

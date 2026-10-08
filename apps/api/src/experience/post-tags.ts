@@ -68,7 +68,6 @@ export async function resolvePostTags(
           where: {
             organizationId,
             id: { in: teamIds },
-            registrations: { some: { organizationId, tournamentId, status: 'APPROVED' } },
           },
           select: { id: true, name: true },
         })
@@ -99,7 +98,7 @@ export async function resolvePostTags(
   return tags.map((tag) => {
     if (tag.teamId) {
       const label = teamNames.get(tag.teamId)
-      if (!label) invalid('标签中的球队不在当前公开赛事中')
+      if (!label) invalid('标签中的球队不在当前组织公开目录中')
       return { ...tag, label }
     }
     if (tag.playerId) {

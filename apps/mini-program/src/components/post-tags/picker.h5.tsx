@@ -25,6 +25,7 @@ export function PostTagPicker({
 }) {
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<PostTagSuggestion[]>([])
+  const [primaryTag, setPrimaryTag] = useState<PostTagSuggestion | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [resolving, setResolving] = useState(false)
@@ -38,10 +39,25 @@ export function PostTagPicker({
     setError('')
     const timer = window.setTimeout(
       () => {
-        void productRepository
-          .getPostTagSuggestions(query, tournamentId)
-          .then((result) => {
-            if (active) setOptions(result.items)
+        void Promise.all([
+          productRepository.getPostTagSuggestions(query, tournamentId),
+          !query ? productRepository.getTeamPreferences(tournamentId) : Promise.resolve(null),
+        ])
+          .then(([result, preferences]) => {
+            if (active) {
+              setOptions(result.items)
+              if (preferences)
+                setPrimaryTag(
+                  preferences.primaryTeam
+                    ? {
+                        kind: 'TEAM',
+                        targetId: preferences.primaryTeam.id,
+                        label: preferences.primaryTeam.name,
+                        description: '我的主队',
+                      }
+                    : null,
+                )
+            }
           })
           .catch((issue) => {
             if (active) setError(issue instanceof Error ? issue.message : '标签建议暂不可用')
@@ -108,7 +124,13 @@ export function PostTagPicker({
       requestAnimationFrame(() => input.current?.focus())
     }
   }
-  const visible = options.filter((tag) => !tags.some((current) => tagKey(current) === tagKey(tag)))
+  const recommended =
+    !query && primaryTag
+      ? [primaryTag, ...options.filter((tag) => tagKey(tag) !== tagKey(primaryTag))]
+      : options
+  const visible = recommended.filter(
+    (tag) => !tags.some((current) => tagKey(current) === tagKey(tag)),
+  )
   const suggestions = visible.slice(0, 4)
   return (
     <section className="post-tag-picker" aria-label="添加动态标签">

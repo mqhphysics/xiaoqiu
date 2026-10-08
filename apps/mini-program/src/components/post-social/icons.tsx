@@ -12,6 +12,8 @@ import reset from '../../assets/post-icons/refresh.svg'
 import send from '../../assets/post-icons/send.svg'
 import more from '../../assets/post-icons/dots.svg'
 import plus from '../../assets/post-icons/plus.svg'
+import bookmark from '../../assets/post-icons/bookmark.svg'
+import repost from '../../assets/post-icons/repost.svg'
 
 const icons = {
   close,
@@ -27,6 +29,8 @@ const icons = {
   send,
   more,
   plus,
+  bookmark,
+  repost,
 }
 export function PostIcon({
   name,

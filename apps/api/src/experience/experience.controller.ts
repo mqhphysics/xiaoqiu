@@ -7,6 +7,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -31,6 +32,9 @@ import {
   PostTagQueryDto,
   SearchQueryDto,
   UpdateTeamPreferencesDto,
+  ContentVersionDto,
+  UpdateCommentDto,
+  UpdatePostDto,
 } from './experience.dto'
 import { ExperienceService } from './experience.service'
 
@@ -257,6 +261,106 @@ export class ExperienceController {
     @Body() body: CreateCommentDto,
   ) {
     return this.experienceService.createComment(authorization, postId, body)
+  }
+
+  @Put('community/posts/:postId/favorite')
+  @ApiBearerAuth()
+  favorite(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+  ) {
+    return this.experienceService.setPostFavorite(authorization, postId, true)
+  }
+
+  @Delete('community/posts/:postId/favorite')
+  @ApiBearerAuth()
+  unfavorite(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+  ) {
+    return this.experienceService.setPostFavorite(authorization, postId, false)
+  }
+
+  @Put('community/posts/:postId/comments/:commentId/like')
+  @ApiBearerAuth()
+  likeComment(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.experienceService.setCommentLike(authorization, postId, commentId, true)
+  }
+
+  @Delete('community/posts/:postId/comments/:commentId/like')
+  @ApiBearerAuth()
+  unlikeComment(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.experienceService.setCommentLike(authorization, postId, commentId, false)
+  }
+
+  @Patch('community/posts/:postId')
+  @ApiBearerAuth()
+  @ApiBody({ type: UpdatePostDto })
+  updatePost(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Body() body: UpdatePostDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.experienceService.updatePost(authorization, postId, body, getRequestId(request))
+  }
+
+  @Delete('community/posts/:postId')
+  @ApiBearerAuth()
+  @ApiBody({ type: ContentVersionDto })
+  deletePost(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Body() body: ContentVersionDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.experienceService.deletePost(authorization, postId, body, getRequestId(request))
+  }
+
+  @Patch('community/posts/:postId/comments/:commentId')
+  @ApiBearerAuth()
+  @ApiBody({ type: UpdateCommentDto })
+  updateComment(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+    @Body() body: UpdateCommentDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.experienceService.updateComment(
+      authorization,
+      postId,
+      commentId,
+      body,
+      getRequestId(request),
+    )
+  }
+
+  @Delete('community/posts/:postId/comments/:commentId')
+  @ApiBearerAuth()
+  @ApiBody({ type: ContentVersionDto })
+  deleteComment(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+    @Body() body: ContentVersionDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.experienceService.deleteComment(
+      authorization,
+      postId,
+      commentId,
+      body,
+      getRequestId(request),
+    )
   }
 }
 

@@ -34,6 +34,9 @@ import type {
   CreatePostDto,
   SearchQueryDto,
   UpdateTeamPreferencesDto,
+  ContentVersionDto,
+  UpdateCommentDto,
+  UpdatePostDto,
 } from './experience.dto'
 import { calculateStandings } from './ranking'
 import {
@@ -1107,9 +1110,6 @@ export class ExperienceService {
       this.prisma.team.findMany({
         where: {
           organizationId,
-          registrations: {
-            some: { organizationId, tournamentId: tournament.id, status: 'APPROVED' },
-          },
           ...(normalized
             ? {
                 OR: [
@@ -1222,7 +1222,7 @@ export class ExperienceService {
         ...postSummaryInclude(session?.userId),
         comments: {
           where: { hiddenAt: null },
-          include: { user: { select: publicIdentitySelect } },
+          include: commentInclude(session?.userId),
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -1230,13 +1230,9 @@ export class ExperienceService {
     if (!post) throw notFound('动态不存在')
     return {
       ...mapPost(post, session?.userId),
-      comments: post.comments.map((comment) => ({
-        id: comment.id,
-        body: comment.body,
-        parentCommentId: comment.parentCommentId,
-        createdAt: comment.createdAt.toISOString(),
-        author: publicIdentity(comment.user, organizationId, session?.userId),
-      })),
+      comments: post.comments.map((comment) =>
+        mapComment(comment, organizationId, session?.userId),
+      ),
     }
   }
 
@@ -1297,6 +1293,19 @@ export class ExperienceService {
   async createPost(authorization: string | undefined, input: CreatePostDto, requestId = 'unknown') {
     const session = await this.authService.requireSession(authorization)
     const tournament = await this.getFeaturedTournament(session.organizationId, input.tournamentId)
+    const quotedPostId = input.quotedPostId ?? null
+    if (
+      quotedPostId &&
+      !(await this.prisma.post.findFirst({
+        where: {
+          id: quotedPostId,
+          organizationId: session.organizationId,
+          status: PostStatus.PUBLISHED,
+        },
+        select: { id: true },
+      }))
+    )
+      throw notFound('要转发的动态不存在或已删除')
     normalizePostTags(input.tags)
     if (input.teamId) {
       const [team, relationship] = await Promise.all([
@@ -1342,7 +1351,7 @@ export class ExperienceService {
     const teamId = input.teamId ?? null
     if (input.imageDataUrl && input.imageDataUrls) throw conflict('请只提交一种图片格式')
     const imageDataUrls = input.imageDataUrls ?? (input.imageDataUrl ? [input.imageDataUrl] : [])
-    if (!body && imageDataUrls.length === 0)
+    if (!body && imageDataUrls.length === 0 && !quotedPostId)
       throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
         code: ERROR_CODES.BAD_REQUEST,
         message: '请填写正文或添加图片',
@@ -1369,6 +1378,7 @@ export class ExperienceService {
               title,
               body,
               imageUrl,
+              quotedPostId,
             },
           ],
           skipDuplicates: true,
@@ -1389,7 +1399,8 @@ export class ExperienceService {
           post.teamId !== teamId ||
           post.title !== title ||
           post.body !== body ||
-          post.imageUrl !== imageUrl
+          post.imageUrl !== imageUrl ||
+          post.quotedPostId !== quotedPostId
         ) {
           throw conflict('同一提交编号已用于其他动态内容，请重新发布')
         }
@@ -1426,6 +1437,7 @@ export class ExperienceService {
                 teamId,
                 hasImage: Boolean(imageUrl),
                 imageCount: imageDataUrls.length,
+                quotedPostId,
                 tags: mapPostTags(tags),
               },
               reason: '用户发布校园足球动态',
@@ -1545,32 +1557,79 @@ export class ExperienceService {
     const body = input.body.trim()
     const parentCommentId = parent?.id ?? null
     const recipientUserId = parent?.userId ?? post.authorUserId
-    const comment = await this.prisma.$transaction(async (tx) => {
-      const stored = await tx.postComment.upsert({
+    const result = await this.prisma.$transaction(async (tx) => {
+      const inserted = await tx.postComment.createMany({
+        data: [
+          {
+            organizationId: session.organizationId,
+            postId,
+            userId: session.userId,
+            parentCommentId,
+            clientCommentId: input.clientCommentId,
+            body,
+          },
+        ],
+        skipDuplicates: true,
+      })
+      const stored = await tx.postComment.findUnique({
         where: {
           userId_clientCommentId: {
             userId: session.userId,
             clientCommentId: input.clientCommentId,
           },
         },
-        create: {
-          organizationId: session.organizationId,
-          postId,
-          userId: session.userId,
-          parentCommentId,
-          clientCommentId: input.clientCommentId,
-          body,
-        },
-        update: {},
-        include: { user: { select: publicIdentitySelect } },
+        include: commentInclude(session.userId),
       })
       if (
+        !stored ||
         stored.organizationId !== session.organizationId ||
         stored.postId !== postId ||
         stored.parentCommentId !== parentCommentId ||
         stored.body !== body
       ) {
         throw conflict('同一提交编号已用于其他评论内容，请重新发布')
+      }
+      const clientPostId = `comment-repost:${stored.id}`
+      let repostedPost = await tx.post.findUnique({
+        where: { authorUserId_clientPostId: { authorUserId: session.userId, clientPostId } },
+        include: postSummaryInclude(session.userId),
+      })
+      if (inserted.count === 0 && Boolean(repostedPost) !== Boolean(input.repostToFeed)) {
+        throw conflict('同一提交编号已用于不同的同步转发选项，请重新发布')
+      }
+      if (input.repostToFeed && !repostedPost) {
+        repostedPost = await tx.post.create({
+          data: {
+            organizationId: session.organizationId,
+            authorUserId: session.userId,
+            tournamentId: post.tournamentId,
+            clientPostId,
+            quotedPostId: post.id,
+            body,
+            type: PostType.COMMUNITY,
+            status: PostStatus.PUBLISHED,
+          },
+          include: postSummaryInclude(session.userId),
+        })
+        await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorType: AuditActorType.USER,
+            actorUserId: session.userId,
+            actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+              role,
+              scopeType,
+              scopeId,
+            })),
+            action: 'COMMUNITY_POST_CREATED',
+            targetType: 'Post',
+            targetId: repostedPost.id,
+            afterSummary: { quotedPostId: post.id, sourceCommentId: stored.id, tags: [] },
+            requestId: input.clientCommentId,
+            source: 'API',
+            reason: '评论同步转发到动态',
+          },
+        })
       }
       if (recipientUserId) {
         await this.socialService.notify(
@@ -1587,16 +1646,263 @@ export class ExperienceService {
           tx,
         )
       }
-      return stored
+      return { comment: stored, repostedPost }
     })
     const mappedComment = {
-      id: comment.id,
-      body: comment.body,
-      parentCommentId: comment.parentCommentId,
-      createdAt: comment.createdAt.toISOString(),
-      author: publicIdentity(comment.user, session.organizationId, session.userId),
+      ...mapComment(result.comment, session.organizationId, session.userId),
+      ...(input.repostToFeed
+        ? {
+            repostedPost:
+              result.repostedPost?.status === PostStatus.PUBLISHED
+                ? mapPost(result.repostedPost, session.userId)
+                : null,
+          }
+        : {}),
     }
     return mappedComment
+  }
+
+  async setPostFavorite(authorization: string | undefined, postId: string, favorited: boolean) {
+    const session = await this.authService.requireSession(authorization)
+    return this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findFirst({
+        where: { id: postId, organizationId: session.organizationId, status: PostStatus.PUBLISHED },
+        select: { id: true },
+      })
+      if (!post) throw notFound('动态不存在')
+      if (favorited)
+        await tx.postFavorite.upsert({
+          where: { postId_userId: { postId, userId: session.userId } },
+          create: { organizationId: session.organizationId, postId, userId: session.userId },
+          update: {},
+        })
+      else
+        await tx.postFavorite.deleteMany({
+          where: { organizationId: session.organizationId, postId, userId: session.userId },
+        })
+      return { favorited }
+    })
+  }
+
+  async setCommentLike(
+    authorization: string | undefined,
+    postId: string,
+    commentId: string,
+    liked: boolean,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.postComment.findFirst({
+        where: {
+          id: commentId,
+          postId,
+          organizationId: session.organizationId,
+          hiddenAt: null,
+          post: { status: PostStatus.PUBLISHED, organizationId: session.organizationId },
+        },
+        select: { id: true },
+      })
+      if (!comment) throw notFound('评论不存在')
+      if (liked)
+        await tx.postCommentLike.createMany({
+          data: [{ organizationId: session.organizationId, commentId, userId: session.userId }],
+          skipDuplicates: true,
+        })
+      else
+        await tx.postCommentLike.deleteMany({
+          where: { organizationId: session.organizationId, commentId, userId: session.userId },
+        })
+      return {
+        liked,
+        likeCount: await tx.postCommentLike.count({
+          where: { organizationId: session.organizationId, commentId },
+        }),
+      }
+    })
+  }
+
+  async updatePost(
+    authorization: string | undefined,
+    postId: string,
+    input: UpdatePostDto,
+    requestId: string,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    await this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findFirst({
+        where: { id: postId, organizationId: session.organizationId, status: PostStatus.PUBLISHED },
+      })
+      if (!post) throw notFound('动态不存在')
+      if (post.authorUserId !== session.userId) throw forbidden('只能编辑自己发布的动态')
+      const body = input.body.trim()
+      if (!body && !post.imageUrl && !post.quotedPostId) throw conflict('请保留正文、图片或引用')
+      if (post.body === body) return
+      if (post.updatedAt.toISOString() !== input.expectedUpdatedAt)
+        throw conflict('动态已发生变化，请刷新后编辑')
+      const changed = await tx.post.updateMany({
+        where: {
+          id: postId,
+          organizationId: session.organizationId,
+          authorUserId: session.userId,
+          status: PostStatus.PUBLISHED,
+          updatedAt: post.updatedAt,
+        },
+        data: { body, updatedAt: nextContentVersion(post.updatedAt) },
+      })
+      if (changed.count !== 1) throw conflict('动态已发生变化，请刷新后编辑')
+      await contentAudit(
+        tx,
+        session,
+        'COMMUNITY_POST_UPDATED',
+        'Post',
+        postId,
+        { body: post.body },
+        { body },
+        requestId,
+      )
+    })
+    return this.getPost(session.organizationId, postId, authorization)
+  }
+
+  async deletePost(
+    authorization: string | undefined,
+    postId: string,
+    input: ContentVersionDto,
+    requestId: string,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    return this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findFirst({
+        where: { id: postId, organizationId: session.organizationId },
+      })
+      if (!post) throw notFound('动态不存在')
+      if (post.authorUserId !== session.userId) throw forbidden('只能删除自己发布的动态')
+      if (post.status === PostStatus.HIDDEN) return { deleted: true }
+      if (post.updatedAt.toISOString() !== input.expectedUpdatedAt)
+        throw conflict('动态已发生变化，请刷新后删除')
+      const changed = await tx.post.updateMany({
+        where: {
+          id: postId,
+          organizationId: session.organizationId,
+          authorUserId: session.userId,
+          status: PostStatus.PUBLISHED,
+          updatedAt: post.updatedAt,
+        },
+        data: { status: PostStatus.HIDDEN, updatedAt: nextContentVersion(post.updatedAt) },
+      })
+      if (changed.count !== 1) throw conflict('动态已发生变化，请刷新后删除')
+      await contentAudit(
+        tx,
+        session,
+        'COMMUNITY_POST_DELETED',
+        'Post',
+        postId,
+        { status: post.status },
+        { status: PostStatus.HIDDEN },
+        requestId,
+      )
+      return { deleted: true }
+    })
+  }
+
+  async updateComment(
+    authorization: string | undefined,
+    postId: string,
+    commentId: string,
+    input: UpdateCommentDto,
+    requestId: string,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.postComment.findFirst({
+        where: {
+          id: commentId,
+          postId,
+          organizationId: session.organizationId,
+          hiddenAt: null,
+          post: { status: PostStatus.PUBLISHED },
+        },
+        include: commentInclude(session.userId),
+      })
+      if (!comment) throw notFound('评论不存在')
+      if (comment.userId !== session.userId) throw forbidden('只能编辑自己的评论')
+      const body = input.body.trim()
+      if (comment.body === body) return mapComment(comment, session.organizationId, session.userId)
+      if (comment.updatedAt.toISOString() !== input.expectedUpdatedAt)
+        throw conflict('评论已发生变化，请刷新后编辑')
+      const updatedAt = nextContentVersion(comment.updatedAt)
+      const changed = await tx.postComment.updateMany({
+        where: {
+          id: commentId,
+          postId,
+          organizationId: session.organizationId,
+          userId: session.userId,
+          hiddenAt: null,
+          updatedAt: comment.updatedAt,
+        },
+        data: { body, updatedAt },
+      })
+      if (changed.count !== 1) throw conflict('评论已发生变化，请刷新后编辑')
+      await contentAudit(
+        tx,
+        session,
+        'COMMUNITY_COMMENT_UPDATED',
+        'PostComment',
+        commentId,
+        { body: comment.body },
+        { body },
+        requestId,
+      )
+      return mapComment({ ...comment, body, updatedAt }, session.organizationId, session.userId)
+    })
+  }
+
+  async deleteComment(
+    authorization: string | undefined,
+    postId: string,
+    commentId: string,
+    input: ContentVersionDto,
+    requestId: string,
+  ) {
+    const session = await this.authService.requireSession(authorization)
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.postComment.findFirst({
+        where: {
+          id: commentId,
+          postId,
+          organizationId: session.organizationId,
+          post: { status: PostStatus.PUBLISHED },
+        },
+      })
+      if (!comment) throw notFound('评论不存在')
+      if (comment.userId !== session.userId) throw forbidden('只能删除自己的评论')
+      if (comment.hiddenAt) return { deleted: true }
+      if (comment.updatedAt.toISOString() !== input.expectedUpdatedAt)
+        throw conflict('评论已发生变化，请刷新后删除')
+      const changed = await tx.postComment.updateMany({
+        where: {
+          id: commentId,
+          postId,
+          organizationId: session.organizationId,
+          userId: session.userId,
+          hiddenAt: null,
+          updatedAt: comment.updatedAt,
+        },
+        data: { hiddenAt: new Date(), updatedAt: nextContentVersion(comment.updatedAt) },
+      })
+      if (changed.count !== 1) throw conflict('评论已发生变化，请刷新后删除')
+      await contentAudit(
+        tx,
+        session,
+        'COMMUNITY_COMMENT_DELETED',
+        'PostComment',
+        commentId,
+        { hidden: false },
+        { hidden: true },
+        requestId,
+      )
+      return { deleted: true }
+    })
   }
 
   private async getFeaturedTournament(
@@ -1665,6 +1971,13 @@ const matchSummaryInclude = {
 
 function postSummaryInclude(userId?: string) {
   return {
+    ...postBaseInclude(userId),
+    quotedPost: { include: postBaseInclude(userId) },
+  } as const
+}
+
+function postBaseInclude(userId?: string) {
+  return {
     author: { select: publicIdentitySelect },
     team: true,
     tags: { orderBy: { position: 'asc' } },
@@ -1672,6 +1985,10 @@ function postSummaryInclude(userId?: string) {
     likes: userId
       ? { where: { userId }, select: { id: true } }
       : { where: { userId: '00000000-0000-4000-8000-000000000000' }, select: { id: true } },
+    favorites: {
+      where: { userId: userId ?? '00000000-0000-4000-8000-000000000000' },
+      select: { id: true },
+    },
   } as const
 }
 
@@ -1776,13 +2093,17 @@ function mapPost(
     body: string
     imageUrl: string | null
     publishedAt: Date
+    updatedAt?: Date
+    quotedPostId?: string | null
+    quotedPost?: (Parameters<typeof mapPost>[0] & { status: PostStatus }) | null
     author: PublicIdentitySource | null
     team: Parameters<typeof mapTeam>[0] | null
     _count: { likes: number; comments: number }
     likes: Array<{ id: string }>
+    favorites?: Array<{ id: string }>
   },
   viewerUserId?: string,
-) {
+): MappedPost {
   return {
     id: post.id,
     ...(post.tournamentId ? { tournamentId: post.tournamentId } : {}),
@@ -1793,6 +2114,13 @@ function mapPost(
     imageUrl: post.imageUrl,
     imageUrls: postImageUrls(post.imageUrl),
     publishedAt: post.publishedAt.toISOString(),
+    updatedAt: (post.updatedAt ?? post.publishedAt).toISOString(),
+    quotedPostId: post.quotedPostId ?? null,
+    quotedPost:
+      post.quotedPost?.status === PostStatus.PUBLISHED
+        ? mapPost(post.quotedPost, viewerUserId)
+        : null,
+    favoritedByMe: (post.favorites?.length ?? 0) > 0,
     author: post.author
       ? publicIdentity(post.author, post.organizationId, viewerUserId)
       : officialIdentity,
@@ -1932,4 +2260,101 @@ function conflict(message: string): ApiHttpException {
     code: ERROR_CODES.CONFLICT,
     message,
   })
+}
+
+export interface MappedPost {
+  id: string
+  tournamentId?: string
+  tags: ReturnType<typeof mapPostTags>
+  type: PostType
+  title: string | null
+  body: string
+  imageUrl: string | null
+  imageUrls: string[]
+  publishedAt: string
+  updatedAt: string
+  author: ReturnType<typeof publicIdentity> | typeof officialIdentity
+  team: ReturnType<typeof mapTeam> | null
+  likeCount: number
+  commentCount: number
+  likedByMe: boolean
+  favoritedByMe: boolean
+  quotedPostId: string | null
+  quotedPost: MappedPost | null
+}
+
+function commentInclude(userId?: string) {
+  return {
+    user: { select: publicIdentitySelect },
+    _count: { select: { likes: true } },
+    likes: {
+      where: { userId: userId ?? '00000000-0000-4000-8000-000000000000' },
+      select: { id: true },
+    },
+  } as const
+}
+
+function mapComment(
+  comment: {
+    id: string
+    body: string
+    parentCommentId: string | null
+    createdAt: Date
+    updatedAt: Date
+    user: PublicIdentitySource
+    _count: { likes: number }
+    likes: Array<{ id: string }>
+  },
+  organizationId: string,
+  viewerUserId?: string,
+) {
+  return {
+    id: comment.id,
+    body: comment.body,
+    parentCommentId: comment.parentCommentId,
+    createdAt: comment.createdAt.toISOString(),
+    updatedAt: comment.updatedAt.toISOString(),
+    author: publicIdentity(comment.user, organizationId, viewerUserId),
+    likeCount: comment._count.likes,
+    likedByMe: comment.likes.length > 0,
+  }
+}
+
+function nextContentVersion(previous: Date) {
+  return new Date(Math.max(Date.now(), previous.getTime() + 1))
+}
+
+async function contentAudit(
+  tx: Prisma.TransactionClient,
+  session: Awaited<ReturnType<AuthService['requireSession']>>,
+  action: string,
+  targetType: string,
+  targetId: string,
+  before: Prisma.InputJsonObject,
+  after: Prisma.InputJsonObject,
+  requestId: string,
+) {
+  await tx.auditLog.create({
+    data: {
+      organizationId: session.organizationId,
+      actorType: AuditActorType.USER,
+      actorUserId: session.userId,
+      actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+        role,
+        scopeType,
+        scopeId,
+      })),
+      action,
+      targetType,
+      targetId,
+      beforeSummary: before,
+      afterSummary: after,
+      requestId,
+      source: 'API',
+    },
+  })
+}
+
+function forbidden(message: string) {
+  return new ApiHttpException(HttpStatus.FORBIDDEN, { code: ERROR_CODES.FORBIDDEN, message })
 }
