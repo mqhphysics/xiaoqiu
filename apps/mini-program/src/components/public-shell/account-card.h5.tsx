@@ -19,6 +19,8 @@ import { runPrivateEntry } from '../../features/product-config/navigation-entry.
 import { getConfiguration, readAccountPresence } from '../../features/product-config/policy-state'
 import { productConfigRepository } from '../../features/product-config/product-config.repository'
 import type { DesktopAccountProps } from './desktop-account'
+import { canShowTestRoles, endTestRoleControl } from '../../features/product/test-role.h5'
+import { TestRoleDialog } from './test-role-dialog.h5'
 import './desktop-account.h5.scss'
 
 export function useDesktopAccount() {
@@ -53,6 +55,7 @@ export function DesktopAccount({
   const [open, setOpen] = useState(false),
     [mailOpen, setMailOpen] = useState(false),
     [report, setReport] = useState(false)
+  const [testRoles, setTestRoles] = useState(false)
   const [placement, setPlacement] = useState({ left: -116, shift: 0 })
   const [stats, setStats] = useState<Array<number | string>>(['—', '—', '—'])
   const account = useRef<HTMLDivElement>(null),
@@ -243,11 +246,24 @@ export function DesktopAccount({
               <span>问题反馈</span>
               <ProfileIcon name="right" />
             </button>
+            {canShowTestRoles(user) && (
+              <button data-account-control onClick={() => select(() => setTestRoles(true))}>
+                <ProfileIcon name="user" />
+                <span>切换测试角色</span>
+                <ProfileIcon name="right" />
+              </button>
+            )}
             {user && (
               <button
                 data-account-control
                 className="desktop-account-popover__logout"
-                onClick={() => select(onLogout)}
+                onClick={() =>
+                  select(() => {
+                    void endTestRoleControl()
+                      .catch(() => undefined)
+                      .then(onLogout)
+                  })
+                }
               >
                 <ProfileIcon name="logout" />
                 <span>退出登录</span>
@@ -326,6 +342,7 @@ export function DesktopAccount({
         </button>
       )}
       {report && user && <InformationEntryDialog onClose={() => setReport(false)} />}
+      {testRoles && <TestRoleDialog onClose={() => setTestRoles(false)} />}
     </div>
   )
 }

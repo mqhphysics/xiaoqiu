@@ -31,6 +31,7 @@ import {
 } from './email-code.service'
 import { MailService, type EmailPurpose } from './mail.service'
 import type { EmailPasswordResetDto, EmailVerificationDto } from './email-auth.dto'
+import { requireTestRoleController, TEST_ROLES, type TestRole } from './test-role-policy'
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_ALIAS_CANDIDATES = 10
@@ -133,6 +134,161 @@ export class AuthService {
     }
 
     return this.createSession(this.prisma, user, organizationId, request)
+  }
+
+  async listTestRoles(authorization: string | undefined) {
+    const actor = await this.requireSession(authorization)
+    requireTestRoleController(actor)
+    return { items: TEST_ROLES }
+  }
+
+  async switchTestRole(
+    authorization: string | undefined,
+    role: TestRole,
+    request: { ip?: string | undefined; userAgent?: string | undefined; requestId: string },
+  ): Promise<LoginResponseDto> {
+    const actor = await this.requireSession(authorization)
+    requireTestRoleController(actor)
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM app_users WHERE id=${actor.userId}::uuid FOR UPDATE`,
+      )
+      const current = await tx.userSession.findFirst({
+        where: { id: actor.sessionId, revokedAt: null, expiresAt: { gt: new Date() } },
+        include: { user: { include: userInclude } },
+      })
+      if (!current) throw testRoleError('管理会话已失效，请重新登录')
+      requireTestRoleController({ ...actor, user: mapAuthUser(current.user, actor.organizationId) })
+      const membership = current.user.memberships.find(
+        (item) => item.organizationId === actor.organizationId && item.status === 'ACTIVE',
+      )
+      if (!membership || current.user.status !== 'ACTIVE') throw testRoleError('管理账号不可用')
+      let target = current.user
+      if (role !== 'ADMIN') {
+        const tournament = await tx.tournament.findFirst({
+          where: {
+            organizationId: actor.organizationId,
+            tournamentCode: 'DEMO-GREEN-CUP-2026',
+            status: 'PUBLISHED',
+          },
+          select: { id: true },
+        })
+        const registration =
+          tournament &&
+          (await tx.teamRegistration.findFirst({
+            where: {
+              organizationId: actor.organizationId,
+              tournamentId: tournament.id,
+              status: 'APPROVED',
+            },
+            orderBy: { team: { teamCode: 'asc' } },
+            select: { teamId: true },
+          }))
+        if (!tournament || !registration) throw testRoleError('模拟赛事尚未准备好测试身份')
+        const targetId = fixtureId(`test-role:${actor.organizationId}:${actor.userId}:${role}`)
+        const existing = await tx.user.findUnique({ where: { id: targetId }, include: userInclude })
+        let playerId = existing?.playerProfileId ?? null
+        if (['PLAYER', 'TEAM_CAPTAIN', 'TEAM_COACH'].includes(role) && !playerId) {
+          const player = await tx.playerProfile.findFirst({
+            where: {
+              organizationId: actor.organizationId,
+              isDemo: true,
+              linkedUser: { is: null },
+              OR: [
+                { teamMemberships: { some: { teamId: registration.teamId, status: 'ACTIVE' } } },
+                {
+                  snapshotEntries: {
+                    some: {
+                      rosterSnapshot: {
+                        teamId: registration.teamId,
+                        tournamentId: tournament.id,
+                        lockedAt: { not: null },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            orderBy: { id: 'asc' },
+            select: { id: true },
+          })
+          if (!player) throw testRoleError('模拟球队没有可关联的测试球员')
+          playerId = player.id
+        }
+        const label = TEST_ROLES.find((item) => item.id === role)!.label
+        target = await tx.user.upsert({
+          where: { id: targetId },
+          create: {
+            id: targetId,
+            loginNameNormalized: `test-role-${targetId}`,
+            displayName: `测试${label}`,
+            bio: '模拟赛事测试身份，无密码登录入口',
+            playerProfileId: playerId,
+            verificationLevel: playerId
+              ? VerificationLevel.PLAYER_CONFIRMED
+              : VerificationLevel.STUDENT_VERIFIED,
+            memberships: { create: { organizationId: actor.organizationId, status: 'ACTIVE' } },
+          },
+          update: {},
+          include: userInclude,
+        })
+        if (
+          target.status !== 'ACTIVE' ||
+          !target.memberships.some(
+            (item) => item.organizationId === actor.organizationId && item.status === 'ACTIVE',
+          )
+        )
+          throw testRoleError('该测试身份已停用')
+        if (['TEAM_CAPTAIN', 'TEAM_COACH', 'MATCH_REPORTER'].includes(role)) {
+          const grantedRole = role as 'TEAM_CAPTAIN' | 'TEAM_COACH' | 'MATCH_REPORTER'
+          const scopeType = role === 'MATCH_REPORTER' ? 'TOURNAMENT' : 'TEAM'
+          const scopeId = role === 'MATCH_REPORTER' ? tournament.id : registration.teamId
+          await tx.roleAssignment.upsert({
+            where: {
+              userId_role_scopeType_scopeId: {
+                userId: targetId,
+                role: grantedRole,
+                scopeType,
+                scopeId,
+              },
+            },
+            create: {
+              organizationId: actor.organizationId,
+              userId: targetId,
+              role: grantedRole,
+              scopeType,
+              scopeId,
+              grantedByUserId: actor.userId,
+            },
+            update: { revokedAt: null, grantedAt: new Date(), grantedByUserId: actor.userId },
+          })
+          target = await tx.user.findUniqueOrThrow({
+            where: { id: targetId },
+            include: userInclude,
+          })
+        }
+      }
+      await tx.auditLog.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorType: 'ADMIN',
+          actorUserId: actor.userId,
+          actorRoleSnapshot: actor.user.roles.map(({ role, scopeType, scopeId }) => ({
+            role,
+            scopeType,
+            scopeId,
+          })),
+          action: 'TEST_ROLE_SWITCHED',
+          targetType: 'User',
+          targetId: target.id,
+          afterSummary: { role },
+          reason: '管理账号通过测试入口切换模拟赛事身份',
+          source: 'API',
+          requestId: request.requestId,
+        },
+      })
+      return this.createSession(tx, target, actor.organizationId, request)
+    })
   }
 
   private async createSession(
@@ -816,6 +972,10 @@ function ambiguousIdentifier(): ApiHttpException {
     code: ERROR_CODES.UNAUTHORIZED,
     message: '登录标识无法唯一识别账号，请改用自己的用户名、学号或邮箱',
   })
+}
+
+function testRoleError(message: string): ApiHttpException {
+  return new ApiHttpException(HttpStatus.CONFLICT, { code: ERROR_CODES.CONFLICT, message })
 }
 
 function rethrowUniqueConflict(error: unknown, message: string): never {

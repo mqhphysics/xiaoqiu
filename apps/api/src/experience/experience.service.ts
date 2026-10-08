@@ -1914,6 +1914,27 @@ export class ExperienceService {
         code: ERROR_CODES.INTERNAL_ERROR,
         message: '正式赛果服务尚未接入',
       })
+    const publishedRule = await prisma.competitionRuleVersion.findFirst({
+      where: { organizationId, tournamentId: tournament.id, status: 'PUBLISHED' },
+      select: { id: true },
+    })
+    if (!publishedRule) {
+      const [fixtures, registrations] = await Promise.all([
+        prisma.match.count({ where: { organizationId, tournamentId: tournament.id } }),
+        prisma.teamRegistration.count({ where: { organizationId, tournamentId: tournament.id } }),
+      ])
+      if (fixtures === 0 && registrations === 0)
+        return {
+          mode: 'PENDING' as const,
+          official: null,
+          rules: null,
+          matchWhere: {
+            organizationId,
+            tournamentId: tournament.id,
+            id: { in: [] },
+          } satisfies Prisma.MatchWhereInput,
+        }
+    }
     const official = await this.resultsService.readTournamentResults(
       organizationId,
       tournament.id,

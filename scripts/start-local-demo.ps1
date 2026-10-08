@@ -14,6 +14,12 @@ $composeEnv = Join-Path $repoRoot 'infra\.env.example'
 $databaseUrl = 'postgresql://xiaoqiu:xiaoqiu-local-only@localhost:5432/xiaoqiu'
 $logDirectory = Join-Path $repoRoot 'private-data\runtime'
 
+if (Test-Path -LiteralPath (Join-Path $repoRoot 'private-data/shared-runtime/config.json')) {
+  if ($Seed) { throw '统一数据模式不运行Seed；原本机数据库仍保留。' }
+  & (Join-Path $PSScriptRoot 'start-shared-local.ps1') -NoBrowser:$NoBrowser -PrepareOnly:$PrepareOnly
+  exit $LASTEXITCODE
+}
+
 if ($Seed -and $SkipSeed) {
   throw 'Choose either -Seed or -SkipSeed, not both.'
 }

@@ -11,11 +11,12 @@ import { EmailCodeService } from './email-code.service'
 import { MailService } from './mail.service'
 import { EmailChangeController } from './email-change.controller'
 import { EmailChangeService } from './email-change.service'
+import { TestRoleController } from './test-role.controller'
 
 @Global()
 @Module({
   imports: [DatabaseModule],
-  controllers: [AuthController, AdminIdentityController, EmailChangeController],
+  controllers: [AuthController, AdminIdentityController, EmailChangeController, TestRoleController],
   exports: [AuthService, AccessPolicyService],
   providers: [
     AuthService,

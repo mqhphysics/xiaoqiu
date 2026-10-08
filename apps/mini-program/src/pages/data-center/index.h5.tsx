@@ -19,7 +19,7 @@ import { KnockoutPanel } from './knockout-tree.h5'
 
 import './index.h5.scss'
 
-type CompetitionData = CompetitionDataResponse & { resultsMode?: 'DEMO' | 'OFFICIAL' }
+type CompetitionData = CompetitionDataResponse & { resultsMode?: 'DEMO' | 'OFFICIAL' | 'PENDING' }
 type PageState =
   | { phase: 'loading' }
   | { phase: 'failed'; message: string }
@@ -257,6 +257,9 @@ function DataHero({
           </label>
           {data.resultsMode === 'DEMO' && selectedTournamentId === data.tournament.id && (
             <span className="data-desktop__demo">演示赛季</span>
+          )}
+          {data.resultsMode === 'PENDING' && (
+            <span className="data-desktop__demo">赛事筹备中 · 数据待上传</span>
           )}
         </div>
       </div>
