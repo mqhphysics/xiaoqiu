@@ -11,7 +11,7 @@
     display: grid;
     gap: 9px;
   }
-  .badge-manager__choices label {
+  .badge-manager__choices [data-badge-choice] {
     display: flex;
     align-items: center;
     gap: 10px;

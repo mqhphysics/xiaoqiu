@@ -18,9 +18,9 @@ export function modulesForRoute(route: string): ProductModuleId[] {
     .replace(/^\/+|\/+$/g, '')
     .toLowerCase()
   if (path === 'public/home') return ['home']
-  if (/^me\/identity(?:\/applications)?$/.test(path)) return ['identityApplications']
+  if (/^me\/identity(?:\/(?:applications|confirm))?$/.test(path)) return ['identityApplications']
   if (
-    /^admin\/identity\/(?:applications(?:\/:[^/]+\/review)?|records(?:\/:[^/]+\/revoke)?)$/.test(
+    /^admin\/identity\/(?:applications(?:\/:[^/]+\/review)?|records(?:\/:[^/]+\/(?:revoke|verify-user))?)$/.test(
       path,
     )
   )

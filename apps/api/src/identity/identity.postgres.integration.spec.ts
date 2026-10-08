@@ -438,5 +438,141 @@ test(
         assert.ok(secondPlayer.id)
       },
     )
+
+    await t.test(
+      'verified account association requires self confirmation and cannot revive duplicate appointments',
+      async () => {
+        const trusted = await account('trusted')
+        const created = await post('admin/identity/records', admin.token, {
+          kind: 'TEAM_COACH',
+          displayName: '虚构同名',
+          teamId: otherTeam.id,
+          reason: '核对虚构实名与任职后关联账号',
+        }).expect(201)
+        const confirmation = { recordId: created.body.id, expectedVersion: created.body.version }
+        await post('me/identity/confirm', trusted.token, confirmation).expect(409)
+        await post(`admin/identity/records/${created.body.id}/verify-user`, sameName.token, {
+          verifiedUserId: trusted.user.id,
+          expectedVersion: 1,
+          reason: '普通账号不能核验名单',
+        }).expect(403)
+        await post(`admin/identity/records/${created.body.id}/verify-user`, admin.token, {
+          verifiedUserId: outsider.user.id,
+          expectedVersion: 1,
+          reason: '同名但跨组织不能核验',
+        }).expect(400)
+        const verified = await post(
+          `admin/identity/records/${created.body.id}/verify-user`,
+          admin.token,
+          {
+            verifiedUserId: trusted.user.id,
+            expectedVersion: 1,
+            reason: '已核验虚构账号实名与任职',
+          },
+        ).expect(201)
+        await get('auth/me', trusted.token)
+          .expect(200)
+          .then((r) => assert.deepEqual(r.body.roles, []))
+        const ready = await get('me/identity', trusted.token).expect(200)
+        assert.ok(
+          ready.body.verifiedCandidates.some(
+            (item: { id: string }) => item.id === `record:${created.body.id}`,
+          ),
+        )
+        const body = { ...confirmation, expectedVersion: verified.body.version }
+        await post('me/identity/confirm', sameName.token, body).expect(409)
+        const key = randomUUID()
+        await post('me/identity/confirm', trusted.token, body, key).expect(201)
+        await post('me/identity/confirm', trusted.token, body, key).expect(201)
+        assert.equal(
+          await prisma.roleAssignment.count({
+            where: {
+              userId: trusted.user.id,
+              role: 'TEAM_COACH',
+              scopeId: otherTeam.id,
+              revokedAt: null,
+            },
+          }),
+          1,
+        )
+        assert.equal(
+          await prisma.userNotification.count({
+            where: {
+              recipientUserId: trusted.user.id,
+              deduplicationKey: `identity-confirmed:${created.body.id}`,
+            },
+          }),
+          1,
+        )
+        const duplicate = await post('admin/identity/records', admin.token, {
+          kind: 'TEAM_COACH',
+          displayName: '虚构同名',
+          teamId: otherTeam.id,
+          verifiedUserId: trusted.user.id,
+          reason: '用于验证重复任职不能自动恢复授权',
+        }).expect(201)
+        await prisma.roleAssignment.updateMany({
+          where: { userId: trusted.user.id, role: 'TEAM_COACH', scopeId: otherTeam.id },
+          data: { revokedAt: new Date() },
+        })
+        await post('me/identity/confirm', trusted.token, {
+          recordId: duplicate.body.id,
+          expectedVersion: duplicate.body.version,
+        }).expect(409)
+        assert.equal(
+          await prisma.roleAssignment.count({
+            where: {
+              userId: trusted.user.id,
+              role: 'TEAM_COACH',
+              scopeId: otherTeam.id,
+              revokedAt: null,
+            },
+          }),
+          0,
+        )
+      },
+    )
+
+    await t.test(
+      'own player editing preserves ownership, version checks and restricted identity fields',
+      async () => {
+        const original = await get('me/player-profile', coach.token).expect(200)
+        await get('me/player-profile', outsider.token).expect(403)
+        await http.get('/api/me/player-profile').expect(401)
+        const save = (token: string, body: object, key = randomUUID()) =>
+          http
+            .put('/api/me/player-profile')
+            .set('authorization', `Bearer ${token}`)
+            .set('idempotency-key', key)
+            .send(body)
+        const body = {
+          playerId: original.body.id,
+          expectedUpdatedAt: original.body.updatedAt,
+          patch: { bio: 'FICTIONAL_TEST 本人编辑资料' },
+        }
+        const key = randomUUID()
+        const saved = await save(coach.token, body, key).expect(200)
+        await save(coach.token, body, key)
+          .expect(200)
+          .then((r) => assert.equal(r.body.updatedAt, saved.body.updatedAt))
+        await save(coach.token, body).expect(409)
+        await save(coach.token, {
+          ...body,
+          playerId: secondPlayer.id,
+          expectedUpdatedAt: saved.body.updatedAt,
+        }).expect(409)
+        await save(coach.token, { ...body, patch: { studentId: 'FORBIDDEN_TEST' } }).expect(400)
+        await save(coach.token, { ...body, patch: { ratingSpeed: 101 } }).expect(400)
+        await save(coach.token, {
+          ...body,
+          expectedUpdatedAt: saved.body.updatedAt,
+          patch: { bio: original.body.bio },
+        }).expect(200)
+        assert.equal(
+          (await prisma.playerProfile.findUniqueOrThrow({ where: { id: original.body.id } })).bio,
+          original.body.bio,
+        )
+      },
+    )
   },
 )

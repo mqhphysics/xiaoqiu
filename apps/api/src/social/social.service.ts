@@ -299,6 +299,18 @@ export class SocialService {
           tx,
         )
       }
+      await this.notify(
+        {
+          organizationId: session.organizationId,
+          recipientUserId: session.userId,
+          type: NotificationType.TEAM_APPLICATION_DECIDED,
+          title: '入队申请已收到',
+          body: `我们已收到你加入${team.name}的申请，预计48小时内核实并回复。请耐心等待后续消息。`,
+          linkPath: `/pages/my-team/index?teamId=${encodeURIComponent(teamId)}`,
+          deduplicationKey: `team-application-received:${application.id}`,
+        },
+        tx,
+      )
     })
     return this.getTeamRelationship(authorization, teamId)
   }
@@ -724,6 +736,13 @@ export class SocialService {
       items: items.map((item) => ({
         id: item.id,
         type: item.type,
+        messageCategory:
+          item.metadata &&
+          typeof item.metadata === 'object' &&
+          !Array.isArray(item.metadata) &&
+          item.metadata.messageCategory === 'mentions'
+            ? 'mentions'
+            : null,
         title: item.title,
         body: item.body,
         linkPath: item.linkPath,
@@ -823,6 +842,23 @@ export class SocialService {
           tx,
         )
       }
+      await this.notify(
+        {
+          organizationId: session.organizationId,
+          recipientUserId: session.userId,
+          type: NotificationType.REPORT_UPDATED,
+          title:
+            reason === '转会申请'
+              ? '转会申请已收到'
+              : input.targetType === 'FEEDBACK'
+                ? '反馈已收到'
+                : '投诉已收到',
+          body: `我们已收到你提交的${input.targetType === 'FEEDBACK' ? '反馈' : '投诉'}，预计48小时内处理并回复。请耐心等待后续消息。`,
+          linkPath: '/pages/me/index?panel=reports',
+          deduplicationKey: `report-received:${stored.id}`,
+        },
+        tx,
+      )
       return stored
     })
     return mapReport(report)

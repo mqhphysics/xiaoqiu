@@ -1,18 +1,15 @@
 import Taro from '@tarojs/taro'
 import { openTeam as openTeamDetail } from '../../features/product/team-navigation'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ProfileDialog } from './profile-dialog.h5'
+import { ProfileInformation } from './personal-information.h5'
 import { AvatarCropper } from '../../components/avatar-cropper'
-import {
-  MediaAccountEntry,
-  MediaUploadButton,
-  usePersonalBackground,
-} from '../../features/managed-media/index.h5'
+import { usePersonalBackground } from '../../features/managed-media/index.h5'
 import { SettingsDialog } from '../../components/settings-dialog'
 import { identityEntryActions } from '../../features/identity/entry-actions.h5'
 import { DesktopPostComposer } from '../../components/post-composer'
-import { useOverlayFocus } from '../../components/overlay-focus'
-import { openMessaging } from '../../components/messaging-drawer'
+
+import { openMessaging } from '../../components/messaging-drawer/index.h5'
 import { TeamCrest, TeamName, UserAvatar } from '../../components/product-ui'
 import { PostTags } from '../../components/post-tags'
 import { openPlayer } from '../../features/product/player-navigation'
@@ -35,7 +32,6 @@ import {
   formatDate,
   formatTime,
   matchStatusLabel,
-  roleLabel,
   verificationLabel,
 } from '../../features/product/product.format'
 import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
@@ -58,7 +54,11 @@ import {
 } from './profile.logic'
 import type { DesktopProfileProps, ProfileService } from './desktop-profile'
 import './desktop-profile.h5.scss'
+import './identity-manager.h5.scss'
 import { TeamRelationsDialog } from './team-relations.h5'
+import { IdentityMatchDialog } from './identity-match.h5'
+import { openPerson } from '../../features/product/person-navigation.h5'
+import { InformationEntryDialog } from '../../features/match-report/information-entry-dialog.h5'
 
 type Tab = 'posts' | 'matches' | 'bookmarks'
 type Modal =
@@ -85,6 +85,13 @@ const toastError = (error: unknown) =>
   })
 const matchUrl = (id: string) =>
   `/pages/readonly-match-detail/index?matchId=${encodeURIComponent(id)}`
+
+function linkedProfileModal(): Modal {
+  const [path, query] = window.location.hash.slice(1).split('?')
+  if (path !== '/pages/me/index') return null
+  const panel = new URLSearchParams(query).get('panel')
+  return panel === 'reports' ? 'reports' : panel === 'identity' ? 'badge' : null
+}
 
 export function useDesktopProfile() {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 721px)').matches)
@@ -163,11 +170,13 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
     }
   }, [user.id, user.organizationId])
   const [tab, setTab] = useState<Tab>('posts')
-  const [modal, setModal] = useState<Modal>(null)
+  const [modal, setModal] = useState<Modal>(linkedProfileModal)
   const [avatar, setAvatar] = useState(false)
   const [feedback, setFeedback] = useState(false)
   const [composer, setComposer] = useState(false)
   const [settings, setSettings] = useState(false)
+  const [matching, setMatching] = useState<'identity' | 'manage' | null>(null)
+  const [information, setInformation] = useState(false)
   const [reminder, setReminder] = useState<MatchSummary | null>(null)
   const [preferences, setPreferences] = useState<TeamPreferencesResponse | null>(null)
   const [dashboard, setDashboard] = useState<TeamDashboardResponse | null>(null)
@@ -259,15 +268,26 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   }, [load])
   useEffect(() => {
     const closeOverlays = () => {
-      setModal(null)
+      setModal(linkedProfileModal())
       setReminder(null)
       setAvatar(false)
       setFeedback(false)
       setComposer(false)
       setSettings(false)
+      setMatching(null)
+      setInformation(false)
+    }
+    const openLinkedPanel = (event: Event) => {
+      const panel = (event as CustomEvent<string>).detail
+      if (panel === 'reports' || panel === 'identity')
+        setModal(panel === 'reports' ? 'reports' : 'badge')
     }
     window.addEventListener('hashchange', closeOverlays)
-    return () => window.removeEventListener('hashchange', closeOverlays)
+    window.addEventListener('xiaoqiu:profile-panel', openLinkedPanel)
+    return () => {
+      window.removeEventListener('hashchange', closeOverlays)
+      window.removeEventListener('xiaoqiu:profile-panel', openLinkedPanel)
+    }
   }, [])
   useEffect(() => {
     let active = true
@@ -388,14 +408,15 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               loading="lazy"
             />
           ) : null}
-          <div className="profile-background-change">
-            <MediaUploadButton
-              purpose="USER_BACKGROUND"
-              targetId={user.id}
-              label="更换背景"
-              compact
-            />
-          </div>
+          <button
+            data-profile-button
+            className="profile-person-edit"
+            aria-label="编辑个人信息"
+            onClick={() => openModal('edit')}
+          >
+            <span>编辑个人信息</span>
+            <ProfileIcon name="pencil" />
+          </button>
           <div className="profile-person__main">
             <button
               data-profile-button=""
@@ -415,7 +436,6 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                   {user.displayName}
                 </PersonTrigger>
               </h1>
-              <p>{user.bio || '写一句简介，让球友更了解你。'}</p>
               <div className="profile-person__meta">
                 <span>
                   <ProfileIcon name="shield" />
@@ -430,14 +450,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                     : `@${user.username}`}
                 </span>
               </div>
-              <button
-                data-profile-button=""
-                className="profile-button profile-button--outline"
-                onClick={() => openModal('edit')}
-              >
-                <ProfileIcon name="pencil" />
-                编辑资料
-              </button>
+              <p>{user.bio || '写一句简介，让球友更了解你。'}</p>
             </div>
           </div>
           <div className="profile-person__stats">
@@ -531,7 +544,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 icon="shield"
                 title="我的身份"
                 note={badgeKind ? identityLabels[badgeKind] : '查看当前身份'}
-                onClick={() => openModal('identity')}
+                onClick={() => setMatching('identity')}
               />
               <Shortcut
                 icon="users"
@@ -582,7 +595,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               <button data-profile-button onClick={() => openModal('reports')}>
                 反馈记录 <ProfileIcon name="right" />
               </button>
-              <button data-profile-button onClick={() => openModal('notifications')}>
+              <button data-profile-button onClick={() => openMessaging({ category: 'system' })}>
                 通知记录 <ProfileIcon name="right" />
               </button>
               {isAdmin && (
@@ -959,27 +972,30 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
         </ProfileDialog>
       )}
       {modal === 'identity' && (
-        <ProfileDialog
-          title="我的身份"
-          note="以下实名信息仅本人可见，不会出现在公开档案中。"
-          onClose={closeModal}
-        >
-          <dl className="profile-identity">
-            {[
-              ['昵称', user.displayName],
-              ['账号', `@${user.username}`],
-              ['认证', verificationLabel(user.verificationLevel)],
-              ['姓名', user.realName || '未登记'],
-              ['学号', user.studentId || '未登记'],
-              ['邮箱', user.email || '未绑定'],
-              ['角色', user.roles.map((role) => roleLabel(role.role)).join('、') || '普通用户'],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
+        <ProfileDialog title="我的身份" note="查看当前身份与对应的功能。" onClose={closeModal}>
+          <div className="profile-current-identity">
+            <VerificationBadge
+              level={user.verificationLevel}
+              roles={user.roles}
+              displayedKind={badgeKind}
+            />
+            <strong>{badgeKind ? identityLabels[badgeKind] : '学生'}</strong>
+          </div>
+          {user.roles.some((role) => role.role === 'MATCH_REPORTER') && (
+            <div className="profile-identity-work">
+              <p>管理已授权比赛的信息与报告记录。</p>
+              <button
+                data-profile-button
+                className="profile-button profile-button--primary"
+                onClick={() => {
+                  setModal(null)
+                  setInformation(true)
+                }}
+              >
+                编辑比赛信息与查看记录 <ProfileIcon name="arrow" />
+              </button>
+            </div>
+          )}
           {user.linkedPlayer && (
             <button
               data-profile-button=""
@@ -993,6 +1009,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               <ProfileIcon name="arrow" />
             </button>
           )}
+          <div className="profile-identity-refresh">
+            <button
+              data-profile-button
+              className="profile-button profile-button--outline"
+              onClick={() => {
+                setModal(null)
+                setMatching('identity')
+              }}
+            >
+              自动匹配 <ProfileIcon name="reset" />
+            </button>
+          </div>
         </ProfileDialog>
       )}
       {modal === 'badge' && (
@@ -1001,9 +1029,22 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
           note="申请新的认证身份，也可以选择当前对外展示的身份。"
           onClose={closeModal}
         >
+          <div className="profile-identity-manager-heading">
+            <h3>已认证身份</h3>
+            <button
+              data-profile-button
+              onClick={() => {
+                setModal(null)
+                setMatching('manage')
+              }}
+            >
+              自动匹配 <ProfileIcon name="reset" />
+            </button>
+          </div>
+          <BadgeManager user={user} onClose={closeModal} />
           <div className="profile-identity-apply">
             <div>
-              <strong>认证与申请</strong>
+              <strong>申请认证</strong>
               <p>认领球员档案，申请队长、教练或信息员身份。</p>
             </div>
             <button
@@ -1014,13 +1055,32 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 void identityEntryActions.identity()
               }}
             >
-              认证身份 <ProfileIcon name="arrow" />
+              前往认证 <ProfileIcon name="arrow" />
             </button>
           </div>
-          <h3 className="profile-display-heading">选择展示身份</h3>
-          <BadgeManager user={user} onClose={closeModal} />
         </ProfileDialog>
       )}
+      {matching && (
+        <IdentityMatchDialog
+          onClose={() => setMatching(null)}
+          onApply={() => {
+            setMatching(null)
+            void identityEntryActions.identity()
+          }}
+          onResolved={(current, kind) => {
+            const origin = matching
+            setMatching(null)
+            onUserChange(current)
+            if (origin === 'manage') setModal('badge')
+            else if (kind === 'coach')
+              void openPerson(current.id, home.tournament.id, 'coach').catch(toastError)
+            else if (current.linkedPlayer && kind !== 'reporter')
+              void openPlayer(current.linkedPlayer.id, home.tournament.id).catch(toastError)
+            else setModal('identity')
+          }}
+        />
+      )}
+      {information && <InformationEntryDialog onClose={() => setInformation(false)} />}
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {modal && modal in SERVICE_TITLES && (
         <ProfileDialog wide title={SERVICE_TITLES[modal as ProfileService]} onClose={closeModal}>
@@ -1140,262 +1200,6 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
         }}
       />
     </div>
-  )
-}
-
-function ProfileDialog({
-  title,
-  note,
-  onClose,
-  children,
-  footer,
-  wide,
-}: {
-  title: string
-  note?: string
-  onClose: () => void
-  children: ReactNode
-  footer?: ReactNode
-  wide?: boolean
-}) {
-  useOverlayFocus(true, '.profile-dialog', onClose)
-  return createPortal(
-    <div
-      className="profile-dialog-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <section
-        className={`profile-dialog ${wide ? 'profile-dialog--wide' : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-dialog-title"
-        tabIndex={-1}
-      >
-        <header>
-          <div>
-            <h2 id="profile-dialog-title">{title}</h2>
-            {note && <p>{note}</p>}
-          </div>
-          <button data-profile-button="" aria-label="关闭弹窗" onClick={onClose}>
-            <ProfileIcon name="close" />
-          </button>
-        </header>
-        <div className="profile-dialog__body">{children}</div>
-        {footer && <footer>{footer}</footer>}
-      </section>
-    </div>,
-    document.body,
-  )
-}
-
-function ProfileInformation({
-  user,
-  onUserChange,
-  onClose,
-  onAvatar,
-}: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & {
-  onClose: () => void
-  onAvatar: () => void
-}) {
-  const [editing, setEditing] = useState<'name' | 'email' | 'bio' | null>(null)
-  const [correction, setCorrection] = useState(false)
-  const background = usePersonalBackground(user.id)
-  return (
-    <ProfileDialog title="个人信息" note="公开资料与仅本人可见的账户信息。" onClose={onClose}>
-      <div className="profile-info-list">
-        <div className="profile-info-row">
-          <span>头像</span>
-          <UserAvatar name={user.displayName} avatarUrl={user.avatarUrl} size="small" />
-          <button data-profile-button onClick={onAvatar}>
-            更换
-          </button>
-        </div>
-        <div className="profile-info-row">
-          <span>昵称</span>
-          <strong>{user.displayName}</strong>
-          <button data-profile-button onClick={() => setEditing('name')}>
-            更改
-          </button>
-        </div>
-        <div className="profile-info-row">
-          <span>个人背景</span>
-          <span>
-            {background ? (
-              <img className="profile-info-background" src={background} alt="当前个人背景" />
-            ) : (
-              '默认背景'
-            )}
-          </span>
-          <MediaUploadButton purpose="USER_BACKGROUND" targetId={user.id} label="更换" />
-        </div>
-        <div className="profile-info-row">
-          <span>个人简介</span>
-          <span>{user.bio || '还没有填写简介'}</span>
-          <button data-profile-button onClick={() => setEditing('bio')}>
-            更改
-          </button>
-        </div>
-        <p className="profile-info-private">以下信息仅本人可见</p>
-        <div className="profile-info-row">
-          <span>姓名</span>
-          <strong>{user.realName || '未登记'}</strong>
-          <button data-profile-button onClick={() => setCorrection(true)}>
-            申请更正
-          </button>
-        </div>
-        <div className="profile-info-row">
-          <span>学号</span>
-          <span>{user.studentId || '未登记'}</span>
-          <button data-profile-button onClick={() => setCorrection(true)}>
-            申请更正
-          </button>
-        </div>
-        <div className="profile-info-row">
-          <span>绑定邮箱</span>
-          <span>{user.email || '未绑定'}</span>
-          <button data-profile-button onClick={() => setEditing('email')}>
-            {user.email ? '更换' : '绑定'}
-          </button>
-        </div>
-      </div>
-      {editing && (
-        <ProfileEditor
-          key={editing}
-          user={user}
-          field={editing}
-          onUserChange={onUserChange}
-          onClose={() => setEditing(null)}
-        />
-      )}
-      <div className="profile-info-media">
-        <MediaAccountEntry includeBackground={false} />
-      </div>
-      {correction && (
-        <ReportModal
-          targetType="FEEDBACK"
-          title="实名资料更正申请"
-          onClose={() => setCorrection(false)}
-        />
-      )}
-    </ProfileDialog>
-  )
-}
-
-function ProfileEditor({
-  user,
-  onUserChange,
-  onClose,
-  field,
-}: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & {
-  onClose: () => void
-  field: 'name' | 'email' | 'bio'
-}) {
-  const [name, setName] = useState(user.displayName)
-  const [email, setEmail] = useState(user.email ?? '')
-  const [bio, setBio] = useState(user.bio ?? '')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const busy = useRef(false)
-  const close = () => {
-    if (!busy.current) onClose()
-  }
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (busy.current) return
-    if (name.trim().length < 2) {
-      setError('昵称至少需要 2 个字。')
-      return
-    }
-    if (field === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('请输入有效的邮箱地址。')
-      return
-    }
-    busy.current = true
-    setSaving(true)
-    setError('')
-    try {
-      onUserChange(await productRepository.updateProfile(name.trim(), email.trim(), bio.trim()))
-      onClose()
-      void Taro.showToast({ title: '资料已保存', icon: 'success' })
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : '保存失败，请重试')
-    } finally {
-      busy.current = false
-      setSaving(false)
-    }
-  }
-  return (
-    <form
-      className="profile-edit-form profile-edit-form--inline"
-      onSubmit={(event) => void save(event)}
-    >
-      {field === 'name' && (
-        <label data-profile-field="">
-          昵称
-          <input
-            data-profile-input=""
-            autoComplete="nickname"
-            value={name}
-            maxLength={120}
-            required
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-      )}
-      {field === 'email' && (
-        <label data-profile-field="">
-          绑定邮箱
-          <input
-            data-profile-input=""
-            type="email"
-            autoComplete="email"
-            value={email}
-            maxLength={254}
-            required
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <small>用于账号联系与登录，当前未提供邮件验证码验证。</small>
-        </label>
-      )}
-      {field === 'bio' && (
-        <label data-profile-field="">
-          个人简介
-          <textarea
-            data-profile-textarea=""
-            value={bio}
-            maxLength={280}
-            rows={4}
-            onChange={(event) => setBio(event.target.value)}
-          />
-          <small>{bio.length}/280</small>
-        </label>
-      )}
-      {error && (
-        <p role="alert" className="profile-error">
-          {error}
-        </p>
-      )}
-      <div className="profile-dialog__actions">
-        <button
-          data-profile-button=""
-          type="button"
-          className="profile-button profile-button--outline"
-          disabled={saving}
-          onClick={close}
-        >
-          取消
-        </button>
-        <button
-          data-profile-button=""
-          className="profile-button profile-button--primary"
-          disabled={saving}
-        >
-          {saving ? '正在保存…' : '保存资料'}
-        </button>
-      </div>
-    </form>
   )
 }
 

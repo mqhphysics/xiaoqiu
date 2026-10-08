@@ -11,6 +11,7 @@ import type {
   ConversationListResponse,
   MessageListResponse,
   MessageUser,
+  NotificationResponse,
 } from '../../features/product/product.types'
 import { useOverlayFocus } from '../overlay-focus'
 import { ReportModal } from '../report-modal'
@@ -19,12 +20,30 @@ import { readSession } from '../../features/product/session'
 
 import './index.scss'
 import './index.h5.scss'
+import {
+  visibleMessageCategories,
+  notificationCategory,
+  type MessageCategory,
+} from './message-categories.h5'
+import { NotificationColumns } from './notification-columns.h5'
+import { usePreferenceValues } from '../settings-dialog/preferences.h5'
+import { SettingsDialog } from '../settings-dialog/index.h5'
+import { ProfileIcon } from '../../pages/me/profile-icons.h5'
 
-type OpenRequest = MessageUser | { conversationId: string } | { chooseRecipient: true } | undefined
+type OpenRequest =
+  | MessageUser
+  | { conversationId: string }
+  | { chooseRecipient: true }
+  | { category: MessageCategory }
+  | undefined
 const listeners = new Set<(user: OpenRequest) => void>()
 
 export function openMessaging(
-  request?: MessageUser | { conversationId: string } | { chooseRecipient: true },
+  request?:
+    | MessageUser
+    | { conversationId: string }
+    | { chooseRecipient: true }
+    | { category: MessageCategory },
 ) {
   for (const listener of listeners) listener(request)
 }
@@ -50,7 +69,18 @@ export function MessagingOverlayHost() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [canSend, setCanSend] = useState(false)
-  const unavailable = () => void Taro.showToast({ title: '此功能暂未开放，敬请期待', icon: 'none' })
+  const [category, setCategory] = useState<MessageCategory>('messages')
+  const [notifications, setNotifications] = useState<NotificationResponse>({
+    items: [],
+    unreadCount: 0,
+  })
+  const [messageSettings, setMessageSettings] = useState(false)
+  const preferences = usePreferenceValues()
+  useEffect(() => {
+    if (!visibleMessageCategories(preferences).some((item) => item.id === category))
+      setCategory('messages')
+  }, [preferences, category])
+  const unavailable = () => void Taro.showToast({ title: '暂未开放', icon: 'none' })
   const [listError, setListError] = useState('')
   const [threadError, setThreadError] = useState('')
   const [threadLoading, setThreadLoading] = useState(false)
@@ -119,12 +149,14 @@ export function MessagingOverlayHost() {
   }, [query])
 
   const loadLists = useCallback(async () => {
-    const [people, list] = await Promise.all([
+    const [people, list, alerts] = await Promise.all([
       productRepository.getMessageDirectory(),
       productRepository.getConversations(),
+      productRepository.getNotifications(),
     ])
     if (!queryRef.current.trim()) setDirectory(people.items)
     setConversations(list.items)
+    setNotifications(alerts)
     setCanSend(list.canSend === true)
     setListError('')
     return list.items
@@ -166,7 +198,9 @@ export function MessagingOverlayHost() {
   }, [])
 
   useEffect(() => {
-    const listener = (user: OpenRequest) => {
+    const listener = (request: OpenRequest) => {
+      const user = request && 'category' in request ? undefined : request
+      setCategory(request && 'category' in request ? request.category : 'messages')
       const openRequestId = ++openRequestRef.current
       setOpen(true)
       setChooseRecipient(Boolean(user && 'chooseRecipient' in user))
@@ -243,6 +277,10 @@ export function MessagingOverlayHost() {
           setConversations(data.items)
           setCanSend(data.canSend === true)
         })
+        .catch(() => undefined)
+      void productRepository
+        .getNotifications()
+        .then(setNotifications)
         .catch(() => undefined)
       if (conversationId && selected) void selectConversation(conversationId, selected, true)
     }, 5000)
@@ -366,7 +404,7 @@ export function MessagingOverlayHost() {
           <header className="dm-head">
             <div>
               <PostIcon name="comment" />
-              <h2>消息</h2>
+              <h2>消息中心</h2>
               <span>校园里的对话，从这里开始</span>
             </div>
             <button type="button" aria-label="关闭私信" onClick={closeDrawer}>
@@ -374,257 +412,320 @@ export function MessagingOverlayHost() {
             </button>
           </header>
           <div className="dm-workspace">
-            <aside className="dm-sidebar">
-              <label className="dm-search">
-                <PostIcon name="comment" />
-                <input
-                  aria-label="搜索校内用户"
-                  placeholder="搜索校内用户"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <div className="dm-sidebar__label">
-                {normalized
-                  ? '搜索结果'
-                  : chooseRecipient
-                    ? '校内用户'
-                    : conversations.length
-                      ? '最近对话'
-                      : '校内用户'}
-                <span>{contacts.length}</span>
-              </div>
-              {listError && (
-                <div className="dm-error" role="alert">
-                  {listError}
+            <nav className="dm-categories" aria-label="消息分类">
+              <div>
+                {visibleMessageCategories(preferences).map((item) => (
                   <button
                     type="button"
-                    onClick={() => {
-                      setLoading(true)
-                      void loadLists()
-                        .catch((error) =>
-                          setListError(error instanceof Error ? error.message : '读取失败'),
-                        )
-                        .finally(() => setLoading(false))
-                    }}
+                    key={item.id}
+                    className={category === item.id ? 'is-active' : ''}
+                    aria-current={category === item.id ? 'page' : undefined}
+                    onClick={() => setCategory(item.id)}
                   >
-                    重试
+                    <span>{item.label}</span>
+                    {(item.id === 'messages'
+                      ? conversations.some((value) => value.unreadCount > 0)
+                      : notifications.items.some(
+                          (value) => !value.readAt && notificationCategory(value) === item.id,
+                        )) && <i aria-label="有未读消息" />}
                   </button>
-                </div>
-              )}
-              <div className="dm-contacts">
-                {contacts.map((user) => {
-                  const conversation = conversationsByUser.get(user.id)
-                  return (
-                    <button
-                      type="button"
-                      key={user.id}
-                      className={`dm-contact ${selected?.id === user.id ? 'is-selected' : ''}`}
-                      aria-pressed={selected?.id === user.id}
-                      disabled={sending}
-                      onClick={() => selectUser(user)}
-                    >
-                      <UserAvatar
-                        avatarUrl={user.avatarUrl}
-                        name={user.displayName}
-                        userId={user.id}
-                        size="small"
-                      />
-                      <div className="dm-contact__copy">
-                        <div>
-                          <PersonTrigger userId={user.id} name={user.displayName}>
-                            <strong>{user.displayName}</strong>
-                          </PersonTrigger>
-                          <time>
-                            {conversation?.lastMessageAt
-                              ? messageTime(conversation.lastMessageAt, true)
-                              : ''}
-                          </time>
-                        </div>
-                        <p>
-                          {conversation?.latestMessage
-                            ? `${conversation.latestMessage.isMine ? '我：' : ''}${conversation.latestMessage.body}`
-                            : '开始一段新对话'}
-                        </p>
-                      </div>
-                      {(conversation?.unreadCount ?? 0) > 0 && (
-                        <span
-                          className="dm-unread"
-                          aria-label={`${conversation!.unreadCount} 条未读`}
-                        >
-                          {conversation!.unreadCount > 99 ? '99+' : conversation!.unreadCount}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-                {!contacts.length && (
-                  <div className="dm-empty" role="status">
-                    {loading
-                      ? '正在读取联系人'
-                      : normalized
-                        ? '没有找到这个名字'
-                        : '暂无可私信用户'}
-                  </div>
-                )}
+                ))}
               </div>
-            </aside>
-            <div className="dm-thread">
-              {selected ? (
-                <>
-                  <header className="dm-thread__head">
-                    <UserAvatar
-                      name={selected.displayName}
-                      userId={selected.id}
-                      avatarUrl={selected.avatarUrl}
-                      size="small"
+              <button
+                type="button"
+                className="dm-message-settings"
+                onClick={() => setMessageSettings(true)}
+              >
+                <ProfileIcon name="settings" />
+                消息设置
+              </button>
+            </nav>
+            {category === 'messages' ? (
+              <>
+                <aside className="dm-sidebar">
+                  <label className="dm-search">
+                    <PostIcon name="comment" />
+                    <input
+                      aria-label="搜索校内用户"
+                      placeholder="搜索校内用户"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
                     />
-                    <div>
-                      <PersonTrigger userId={selected.id} name={selected.displayName}>
-                        <strong>{selected.displayName}</strong>
-                      </PersonTrigger>
-                      <span>校内私信</span>
+                  </label>
+                  <div className="dm-sidebar__label">
+                    {normalized
+                      ? '搜索结果'
+                      : chooseRecipient
+                        ? '校内用户'
+                        : conversations.length
+                          ? '最近对话'
+                          : '校内用户'}
+                    <span>{contacts.length}</span>
+                  </div>
+                  {listError && (
+                    <div className="dm-error" role="alert">
+                      {listError}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoading(true)
+                          void loadLists()
+                            .catch((error) =>
+                              setListError(error instanceof Error ? error.message : '读取失败'),
+                            )
+                            .finally(() => setLoading(false))
+                        }}
+                      >
+                        重试
+                      </button>
                     </div>
-                  </header>
-                  <div
-                    className="dm-history"
-                    role="log"
-                    aria-label="对话记录"
-                    aria-live="polite"
-                    ref={historyRef}
-                    onScroll={(event) => {
-                      const element = event.currentTarget
-                      nearBottomRef.current =
-                        element.scrollHeight - element.scrollTop - element.clientHeight < 64
-                    }}
-                  >
-                    {threadLoading ? (
-                      <div className="dm-empty" role="status">
-                        正在读取对话
-                      </div>
-                    ) : threadError ? (
-                      <div className="dm-error" role="alert">
-                        {threadError}
+                  )}
+                  <div className="dm-contacts">
+                    {contacts.map((user) => {
+                      const conversation = conversationsByUser.get(user.id)
+                      return (
                         <button
                           type="button"
-                          onClick={() => {
-                            if (conversationId) void selectConversation(conversationId, selected)
-                          }}
+                          key={user.id}
+                          className={`dm-contact ${selected?.id === user.id ? 'is-selected' : ''}`}
+                          aria-pressed={selected?.id === user.id}
+                          disabled={sending}
+                          onClick={() => selectUser(user)}
                         >
-                          重试
-                        </button>
-                      </div>
-                    ) : messages.length ? (
-                      messages.map((message, index) => (
-                        <div key={message.id}>
-                          {(index === 0 ||
-                            new Date(message.createdAt).getTime() -
-                              new Date(messages[index - 1]!.createdAt).getTime() >
-                              300000) && (
-                            <time className="dm-time">{messageTime(message.createdAt)}</time>
-                          )}
-                          <div className={`dm-message ${message.isMine ? 'is-mine' : ''}`}>
-                            <UserAvatar
-                              name={message.isMine ? '我' : selected.displayName}
-                              userId={message.isMine ? (viewerId ?? undefined) : selected.id}
-                              avatarUrl={message.isMine ? null : selected.avatarUrl}
-                              size="small"
-                            />
+                          <UserAvatar
+                            avatarUrl={user.avatarUrl}
+                            name={user.displayName}
+                            userId={user.id}
+                            size="small"
+                          />
+                          <div className="dm-contact__copy">
                             <div>
-                              <p>{message.body}</p>
-                              <div className="dm-message__meta">
-                                <time>
-                                  {new Date(message.createdAt).toLocaleTimeString('zh-CN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </time>
-                                {message.isMine ? (
-                                  <span>{message.readAt ? '已读' : '已发送'}</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setReportTarget({ id: message.id, body: message.body })
-                                    }
-                                  >
-                                    投诉
-                                  </button>
-                                )}
-                              </div>
+                              <PersonTrigger userId={user.id} name={user.displayName}>
+                                <strong>{user.displayName}</strong>
+                              </PersonTrigger>
+                              <time>
+                                {conversation?.lastMessageAt
+                                  ? messageTime(conversation.lastMessageAt, true)
+                                  : ''}
+                              </time>
                             </div>
+                            <p>
+                              {conversation?.latestMessage
+                                ? `${conversation.latestMessage.isMine ? '我：' : ''}${conversation.latestMessage.body}`
+                                : '开始一段新对话'}
+                            </p>
                           </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="dm-welcome">
-                        <PostIcon name="comment" />
-                        <strong>和{selected.displayName}打个招呼</strong>
-                        <p>聊聊比赛，或者约一场球。</p>
+                          {(conversation?.unreadCount ?? 0) > 0 && (
+                            <span
+                              className="dm-unread"
+                              aria-label={`${conversation!.unreadCount} 条未读`}
+                            >
+                              {conversation!.unreadCount > 99 ? '99+' : conversation!.unreadCount}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                    {!contacts.length && (
+                      <div className="dm-empty" role="status">
+                        {loading
+                          ? '正在读取联系人'
+                          : normalized
+                            ? '没有找到这个名字'
+                            : '暂无可私信用户'}
                       </div>
                     )}
                   </div>
-                  <form
-                    className="dm-compose"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void send()
-                    }}
-                  >
-                    <textarea
-                      aria-label="输入私信"
-                      placeholder={
-                        canSend ? `发消息给${selected.displayName}…` : '此功能暂未开放，敬请期待'
-                      }
-                      readOnly={!canSend}
-                      onFocus={() => {
-                        if (!canSend) unavailable()
-                      }}
-                      maxLength={2000}
-                      disabled={sending || threadLoading || Boolean(threadError)}
-                      value={body}
-                      onChange={(event) => setBody(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (
-                          event.key === 'Enter' &&
-                          !event.shiftKey &&
-                          !event.nativeEvent.isComposing
-                        ) {
+                </aside>
+                <div className="dm-thread">
+                  {selected ? (
+                    <>
+                      <header className="dm-thread__head">
+                        <UserAvatar
+                          name={selected.displayName}
+                          userId={selected.id}
+                          avatarUrl={selected.avatarUrl}
+                          size="small"
+                        />
+                        <div>
+                          <PersonTrigger userId={selected.id} name={selected.displayName}>
+                            <strong>{selected.displayName}</strong>
+                          </PersonTrigger>
+                          <span>校内私信</span>
+                        </div>
+                      </header>
+                      <div
+                        className="dm-history"
+                        role="log"
+                        aria-label="对话记录"
+                        aria-live="polite"
+                        ref={historyRef}
+                        onScroll={(event) => {
+                          const element = event.currentTarget
+                          nearBottomRef.current =
+                            element.scrollHeight - element.scrollTop - element.clientHeight < 64
+                        }}
+                      >
+                        {threadLoading ? (
+                          <div className="dm-empty" role="status">
+                            正在读取对话
+                          </div>
+                        ) : threadError ? (
+                          <div className="dm-error" role="alert">
+                            {threadError}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (conversationId)
+                                  void selectConversation(conversationId, selected)
+                              }}
+                            >
+                              重试
+                            </button>
+                          </div>
+                        ) : messages.length ? (
+                          messages.map((message, index) => (
+                            <div key={message.id}>
+                              {(index === 0 ||
+                                new Date(message.createdAt).getTime() -
+                                  new Date(messages[index - 1]!.createdAt).getTime() >
+                                  300000) && (
+                                <time className="dm-time">{messageTime(message.createdAt)}</time>
+                              )}
+                              <div className={`dm-message ${message.isMine ? 'is-mine' : ''}`}>
+                                <UserAvatar
+                                  name={message.isMine ? '我' : selected.displayName}
+                                  userId={message.isMine ? (viewerId ?? undefined) : selected.id}
+                                  avatarUrl={message.isMine ? null : selected.avatarUrl}
+                                  size="small"
+                                />
+                                <div>
+                                  <p>{message.body}</p>
+                                  <div className="dm-message__meta">
+                                    <time>
+                                      {new Date(message.createdAt).toLocaleTimeString('zh-CN', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </time>
+                                    {message.isMine ? (
+                                      <span>{message.readAt ? '已读' : '已发送'}</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setReportTarget({ id: message.id, body: message.body })
+                                        }
+                                      >
+                                        投诉
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="dm-welcome">
+                            <PostIcon name="comment" />
+                            <strong>
+                              {canSend ? `和${selected.displayName}打个招呼` : '暂无对话记录'}
+                            </strong>
+                            <p>{canSend ? '聊聊比赛，或者约一场球。' : '私信发送暂未开放。'}</p>
+                          </div>
+                        )}
+                      </div>
+                      <form
+                        className="dm-compose"
+                        onSubmit={(event) => {
                           event.preventDefault()
                           void send()
-                        }
-                      }}
-                    />
-                    <div>
-                      <span>
-                        {canSend ? 'Enter 发送 · Shift + Enter 换行' : '当前仅平台管理员可发送私信'}
-                      </span>
-                      <button
-                        type="submit"
-                        disabled={
-                          !canSend ||
-                          !body.trim() ||
-                          sending ||
-                          threadLoading ||
-                          Boolean(threadError)
-                        }
+                        }}
                       >
-                        <PostIcon name="send" />
-                        {sending ? '发送中' : '发送'}
-                      </button>
+                        <textarea
+                          aria-label="输入私信"
+                          placeholder={canSend ? `发消息给${selected.displayName}…` : '暂未开放'}
+                          readOnly={!canSend}
+                          onFocus={() => {
+                            if (!canSend) unavailable()
+                          }}
+                          maxLength={2000}
+                          disabled={sending || threadLoading || Boolean(threadError)}
+                          value={body}
+                          onChange={(event) => setBody(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === 'Enter' &&
+                              preferences.enterSends &&
+                              !event.shiftKey &&
+                              !event.nativeEvent.isComposing
+                            ) {
+                              event.preventDefault()
+                              void send()
+                            }
+                          }}
+                        />
+                        <div>
+                          <span>
+                            {canSend
+                              ? preferences.enterSends
+                                ? 'Enter 发送 · Shift + Enter 换行'
+                                : '使用发送按钮 · Enter 换行'
+                              : '暂未开放'}
+                          </span>
+                          <button
+                            type="submit"
+                            disabled={
+                              !canSend ||
+                              !body.trim() ||
+                              sending ||
+                              threadLoading ||
+                              Boolean(threadError)
+                            }
+                          >
+                            <PostIcon name="send" />
+                            {sending ? '发送中' : '发送'}
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  ) : (
+                    <div className="dm-welcome">
+                      <PostIcon name="comment" />
+                      <strong>选择一个人，开始对话</strong>
+                      <p>在左侧选择联系人，或搜索校内用户。</p>
                     </div>
-                  </form>
-                </>
-              ) : (
-                <div className="dm-welcome">
-                  <PostIcon name="comment" />
-                  <strong>选择一个人，开始对话</strong>
-                  <p>在左侧选择联系人，或搜索校内用户。</p>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <NotificationColumns
+                items={notifications.items.filter(
+                  (item) => notificationCategory(item) === category,
+                )}
+                label={
+                  visibleMessageCategories(preferences).find((item) => item.id === category)
+                    ?.label ?? '系统消息'
+                }
+                onRead={async (item) => {
+                  try {
+                    setNotifications(await productRepository.readNotification(item.id))
+                  } catch (error) {
+                    await Taro.showToast({
+                      title: error instanceof Error ? error.message : '消息读取失败',
+                      icon: 'none',
+                    })
+                  }
+                }}
+                onClose={closeDrawer}
+                onConversation={(id) => openMessaging({ conversationId: id })}
+              />
+            )}
           </div>
         </section>
+        {messageSettings && (
+          <SettingsDialog section="messages" onClose={() => setMessageSettings(false)} />
+        )}
         {reportTarget && (
           <ReportModal
             targetId={reportTarget.id}

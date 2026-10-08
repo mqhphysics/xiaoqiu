@@ -25,6 +25,7 @@ interface IdentityRecord {
   status: string
   linkedUserId: string | null
   version: number
+  awaitingConfirmation?: boolean
 }
 interface Registry {
   items: IdentityRecord[]
@@ -32,6 +33,7 @@ interface Registry {
   players: { id: string; displayName: string }[]
   tournaments: Named[]
   matches: { id: string; matchCode: string }[]
+  users?: { id: string; displayName: string; realName: string | null }[]
 }
 interface Application {
   id: string
@@ -60,6 +62,9 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
     [scopeType, setScopeType] = useState('TOURNAMENT'),
     [scopeId, setScopeId] = useState(''),
     [reason, setReason] = useState('')
+  const [verifiedUserId, setVerifiedUserId] = useState('')
+  const [recordUsers, setRecordUsers] = useState<Record<string, string>>({})
+  const [recordReasons, setRecordReasons] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({}),
     [choices, setChoices] = useState<Record<string, string>>({}),
     [error, setError] = useState(''),
@@ -94,6 +99,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
       kind,
       displayName: name.trim(),
       reason: reason.trim(),
+      ...(verifiedUserId ? { verifiedUserId } : {}),
       ...(['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) ? { teamId } : {}),
       ...(kind === 'PLAYER' ? { playerProfileId: playerId } : {}),
       ...(kind === 'MATCH_REPORTER' ? { scopeType, scopeId } : {}),
@@ -101,6 +107,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
     if (await mutate('/admin/identity/records', body, '录入任职')) {
       setName('')
       setReason('')
+      setVerifiedUserId('')
     }
   }
   const review = (a: Application, decision: 'APPROVED' | 'REJECTED') => {
@@ -164,6 +171,25 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </label>
+        <label>
+          已核验的账号（可选）
+          <select
+            value={verifiedUserId}
+            onChange={(event) => {
+              setVerifiedUserId(event.target.value)
+              const user = records.data?.users?.find((item) => item.id === event.target.value)
+              if (user?.realName) setName(user.realName)
+            }}
+          >
+            <option value="">尚未核验账号，由申请流程人工核实</option>
+            {records.data?.users?.map((user) => (
+              <option key={user.id} value={user.id} disabled={!user.realName}>
+                {user.realName ?? user.displayName} · {user.displayName}
+              </option>
+            ))}
+          </select>
+          <small>仅在核实账号本人及身份依据后选择。该账号可匹配此记录，确认后完成认证。</small>
         </label>
         {['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) && (
           <label>
@@ -345,9 +371,61 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
               </strong>
               <p>
                 {r.team?.name ?? r.scopeType} · {r.linkedUserId ? '已关联账号' : '待认领'} ·{' '}
-                {r.status === 'ACTIVE' ? '有效' : '已撤销'}
+                {r.awaitingConfirmation
+                  ? '已核验，待本人确认'
+                  : r.status === 'ACTIVE'
+                    ? '有效'
+                    : '已撤销'}
               </p>
             </div>
+            {r.status === 'ACTIVE' && !r.linkedUserId && (
+              <div className="mc-identity-verify">
+                <select
+                  aria-label={`核验${r.displayName}的账号`}
+                  value={recordUsers[r.id] ?? ''}
+                  onChange={(event) =>
+                    setRecordUsers((current) => ({ ...current, [r.id]: event.target.value }))
+                  }
+                >
+                  <option value="">选择已核验账号</option>
+                  {records.data?.users
+                    ?.filter((user) => user.realName === r.displayName)
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.realName} · {user.displayName}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  aria-label={`核验${r.displayName}的依据`}
+                  minLength={8}
+                  maxLength={1000}
+                  placeholder="填写核实依据（至少8个字）"
+                  value={recordReasons[r.id] ?? ''}
+                  onChange={(event) =>
+                    setRecordReasons((current) => ({ ...current, [r.id]: event.target.value }))
+                  }
+                />
+                <button
+                  disabled={
+                    !!busy || !recordUsers[r.id] || (recordReasons[r.id]?.trim().length ?? 0) < 8
+                  }
+                  onClick={() =>
+                    void mutate(
+                      `/admin/identity/records/${r.id}/verify-user`,
+                      {
+                        verifiedUserId: recordUsers[r.id],
+                        expectedVersion: r.version,
+                        reason: recordReasons[r.id]?.trim(),
+                      },
+                      r.id,
+                    )
+                  }
+                >
+                  核验并关联账号
+                </button>
+              </div>
+            )}
             {r.status === 'ACTIVE' &&
               ['TEAM_COACH', 'TEAM_CAPTAIN', 'MATCH_REPORTER'].includes(r.kind) && (
                 <button

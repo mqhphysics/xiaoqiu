@@ -70,7 +70,7 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
   }
   return (
     <div className="badge-manager">
-      <p>每个人只展示一个标志。你可以从已有身份中选择，选择不会改变实际权限。</p>
+      <p>选择一个已认证身份展示在名字旁。</p>
       {error && (
         <p className="badge-manager__error" role="alert">
           {error}
@@ -92,7 +92,7 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
       ) : (
         <>
           <div className="badge-manager__choices" role="radiogroup" aria-label="选择展示标志">
-            <label className={choice === '' ? 'is-selected' : ''}>
+            <label data-badge-choice className={choice === '' ? 'is-selected' : ''}>
               <input
                 type="radio"
                 name="display-badge"
@@ -101,11 +101,11 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
                 disabled={saving}
                 onChange={() => setChoice('')}
               />
-              <span>自动显示最高身份</span>
+              <span>自动选择</span>
               <small>身份变化后自动调整</small>
             </label>
             {data.availableKinds.map((kind) => (
-              <label key={kind} className={choice === kind ? 'is-selected' : ''}>
+              <label data-badge-choice key={kind} className={choice === kind ? 'is-selected' : ''}>
                 <input
                   type="radio"
                   name="display-badge"
@@ -143,7 +143,7 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
               disabled={saving}
               onClick={() => void save()}
             >
-              {saving ? '保存中' : '保存展示标志'}
+              {saving ? '保存中' : '保存展示身份'}
             </button>
           </div>
         </>

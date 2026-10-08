@@ -1,3 +1,4 @@
+import { SelfPlayerEditor } from './self-editor.h5'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { openTeam } from '../../features/product/team-navigation'
@@ -120,6 +121,14 @@ function readRequest(detail: unknown): PlayerRequest | null {
 function usePlayer(request: PlayerRequest) {
   const [state, setState] = useState<PlayerState>({ phase: 'loading' })
   const [reload, setReload] = useState(0)
+  useEffect(() => {
+    const changed = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === request.playerId)
+        setReload((value) => value + 1)
+    }
+    window.addEventListener('xiaoqiu:player-profile:changed', changed)
+    return () => window.removeEventListener('xiaoqiu:player-profile:changed', changed)
+  }, [request.playerId])
   useEffect(() => {
     let active = true
     setState({ phase: 'loading' })
@@ -369,6 +378,7 @@ export function PlayerProfile({
 }) {
   presentation = playerPresentation(player, presentation)
   const personalBackground = usePersonalBackground(player.person?.id)
+  const [editing, setEditing] = useState(false)
   const [portraitUrl, setPortraitUrl] = useState(player.portraitUrl)
   useEffect(() => {
     let active = true
@@ -393,6 +403,25 @@ export function PlayerProfile({
     user?.roles.some((role) => role.role === 'PLATFORM_ADMIN' && role.scopeType === 'PLATFORM')
   return (
     <>
+      {user?.linkedPlayer?.id === player.id && (
+        <button
+          type="button"
+          className="own-profile-edit-button own-profile-edit-button--floating"
+          onClick={() => setEditing(true)}
+        >
+          编辑球员资料
+        </button>
+      )}
+      {editing && (
+        <SelfPlayerEditor
+          onClose={() => setEditing(false)}
+          onSaved={() =>
+            window.dispatchEvent(
+              new CustomEvent('xiaoqiu:player-profile:changed', { detail: player.id }),
+            )
+          }
+        />
+      )}
       <header className="player-profile-hero">
         <img
           className="player-profile-hero__cover"

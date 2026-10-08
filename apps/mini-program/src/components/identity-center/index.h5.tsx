@@ -137,8 +137,8 @@ export function IdentityCenterHost() {
   const [data, setData] = useState<IdentitySnapshot | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [candidateId, setCandidateId] = useState('')
-  const [kind, setKind] = useState<IdentityKind>('PLAYER')
+
+  const [kind, setKind] = useState<IdentityKind | ''>('')
   const [teamId, setTeamId] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -184,27 +184,11 @@ export function IdentityCenterHost() {
     setOpen(false)
     setData(null)
     setMessage('')
-    setCandidateId('')
+
     setTeamId('')
     pending.current = null
     if (!token || !identityEnabled) return
-    let active = true
-    void load().then((snapshot) => {
-      if (!active || !snapshot || !snapshot.candidates.length) return
-      const user = readSession()?.user
-      if (!user) return
-      const signature = snapshot.candidates.map((c) => c.id).join(',')
-      const key = `xiaoqiu.identity-prompt.${user.organizationId}.${user.id}`
-      try {
-        if (sessionStorage.getItem(key) === signature) return
-        sessionStorage.setItem(key, signature)
-      } catch {
-        /* Storage is optional; authorization remains on the server. */
-      }
-      setOpen(true)
-    })
     return () => {
-      active = false
       sequence.current++
     }
   }, [token, load, identityEnabled])
@@ -220,14 +204,17 @@ export function IdentityCenterHost() {
     if (saving) return
     setError('')
     if (message.trim().length < 8) {
-      setError('请填写至少8个字的核验说明，帮助管理员核实身份。')
+      setError('请填写至少8个字的申请原因，帮助管理员核实身份。')
       return
     }
-    const candidate = data?.candidates.find((c) => c.id === candidateId)
+    if (!kind) {
+      setError('请选择要申请的身份')
+      return
+    }
     const body = {
       kind,
-      ...(candidateId ? { candidateId } : {}),
-      ...(candidate?.teamId || teamId ? { teamId: candidate?.teamId || teamId } : {}),
+
+      ...(teamId ? { teamId } : {}),
       message: message.trim(),
     }
     const fingerprint = JSON.stringify(body)
@@ -265,15 +252,13 @@ export function IdentityCenterHost() {
         <header>
           <div>
             <small>身份与认证</small>
-            <h2 id="identity-title">确认属于你的身份</h2>
+            <h2 id="identity-title">申请身份认证</h2>
           </div>
           <button data-identity-button type="button" aria-label="关闭认证窗口" onClick={close}>
             ×
           </button>
         </header>
-        <p>
-          姓名仅提示可能匹配。提交申请后，管理员核实并批准才会关联档案或授予权限。教练可独立任职，也可另行认证球员。
-        </p>
+        <p>选择要申请的身份并说明原因。申请结果会通过系统消息通知你。</p>
         {error && (
           <p className="identity-error" role="alert">
             {error}
@@ -293,29 +278,8 @@ export function IdentityCenterHost() {
                 void submit()
               }}
             >
-              <label data-identity-field>
-                可能匹配的身份
-                <select
-                  data-identity-control
-                  value={candidateId}
-                  onChange={(e) => {
-                    const candidate = data.candidates.find((c) => c.id === e.target.value)
-                    setCandidateId(e.target.value)
-                    setKind(candidate?.kind ?? 'PLAYER')
-                    setTeamId(candidate?.teamId ?? '')
-                  }}
-                >
-                  <option value="">没有匹配，主动申请</option>
-                  {data.candidates.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.displayName} · {identityLabels[c.kind]}
-                      {c.teamName ? ` · ${c.teamName}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
               {data.hasMoreCandidates && <p>同名候选较多，请主动申请并向管理员提供核实说明。</p>}
-              {!candidateId && (
+              {
                 <label data-identity-field>
                   申请身份
                   <select
@@ -326,6 +290,7 @@ export function IdentityCenterHost() {
                       setTeamId('')
                     }}
                   >
+                    <option value="">请选择要申请的身份</option>
                     {Object.entries(identityLabels).map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
@@ -333,8 +298,8 @@ export function IdentityCenterHost() {
                     ))}
                   </select>
                 </label>
-              )}
-              {!candidateId && ['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) && (
+              }
+              {['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) && (
                 <label data-identity-field>
                   所属球队
                   <select
@@ -353,7 +318,7 @@ export function IdentityCenterHost() {
                 </label>
               )}
               <label data-identity-field>
-                核验说明
+                申请原因
                 <textarea
                   data-identity-control="textarea"
                   required

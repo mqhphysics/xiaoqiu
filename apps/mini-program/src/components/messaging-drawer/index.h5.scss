@@ -400,3 +400,96 @@
     pointer-events: auto;
   }
 }
+
+@media (min-width: 721px) {
+  .message-drawer--desktop {
+    width: min(720px, calc(100vw - 40px));
+  }
+  .dm-workspace {
+    grid-template-columns: 120px 205px minmax(0, 1fr);
+  }
+  .dm-categories {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 10px 16px;
+    border-right: 1px solid #e4ebe0;
+    background: #f4f7f1;
+  }
+  .dm-categories > div {
+    display: grid;
+    gap: 7px;
+  }
+  .dm-categories [type='button'] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    width: 100%;
+    padding: 11px 9px;
+    border-radius: 7px;
+    background: transparent;
+    color: #7c8979;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .dm-categories [type='button']:hover {
+    background: #edf2e8;
+  }
+  .dm-categories [type='button'].is-active {
+    color: #31563b;
+    background: #e5eee0;
+    font-weight: 650;
+  }
+  .dm-categories i,
+  .dm-unread--dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #6d9974;
+  }
+  .dm-categories .dm-message-settings {
+    justify-content: flex-start;
+    border-top: 1px solid #e4ebe0;
+    border-radius: 0;
+    padding-top: 16px;
+  }
+  .dm-message-settings .profile-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .dm-notification-sidebar .dm-sidebar__label {
+    padding-top: 22px;
+  }
+  .dm-notification-detail {
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .dm-notification-detail time {
+    display: block;
+    text-align: center;
+    font-size: 10px;
+    color: #a2ad9b;
+    margin-bottom: 25px;
+  }
+  .dm-notification-detail h3 {
+    font-size: 16px;
+    color: #34543c;
+    margin: 0 0 14px;
+  }
+  .dm-notification-detail p {
+    color: #75816f;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
+  .dm-notification-action {
+    margin-top: 16px;
+    padding: 9px 14px;
+    border-radius: 6px;
+    background: #eaf2e4;
+    color: #4a724d;
+    font-size: 12px;
+  }
+}

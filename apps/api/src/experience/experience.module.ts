@@ -6,10 +6,12 @@ import { MediaModule } from '../media/media.module'
 import { ResultsModule } from '../results/results.module'
 import { ExperienceController } from './experience.controller'
 import { ExperienceService } from './experience.service'
+import { SelfPlayerProfileController } from './self-player-profile.controller'
+import { SelfPlayerProfileService } from './self-player-profile.service'
 
 @Module({
-  controllers: [ExperienceController],
+  controllers: [ExperienceController, SelfPlayerProfileController],
   imports: [AuthModule, SocialModule, MediaModule, ResultsModule],
-  providers: [ExperienceService],
+  providers: [ExperienceService, SelfPlayerProfileService],
 })
 export class ExperienceModule {}

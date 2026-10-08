@@ -664,13 +664,17 @@ test('report client key is idempotent, rejects changed content, and stays organi
 
   assert.equal(first.id, duplicate.id)
   assert.equal(prisma.reports.length, 1)
-  assert.equal(prisma.notifications.length, 1)
+  assert.equal(prisma.notifications.length, 2)
+  assert.equal(
+    prisma.notifications.filter((item) => item.recipientUserId === makeSession().userId).length,
+    1,
+  )
   await assert.rejects(
     social.createReport('Bearer token', { ...input, reason: '相同编号的不同原因' }),
     (error: unknown) => assertHttpStatus(error, HttpStatus.CONFLICT),
   )
   assert.equal(prisma.reports.length, 1)
-  assert.equal(prisma.notifications.length, 1)
+  assert.equal(prisma.notifications.length, 2)
 
   const crossOrgPrisma = new ReportPrismaFake()
   crossOrgPrisma.postOrganizationId = OTHER_ORGANIZATION_ID

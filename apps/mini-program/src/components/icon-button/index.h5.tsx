@@ -5,6 +5,7 @@ import closeIcon from '../../assets/ui-icons/close.svg'
 import type { IconButtonProps } from './types'
 
 import './index.h5.scss'
+import './close-control.h5.scss'
 
 export function IconButton({ icon, children, className = '', ...props }: IconButtonProps) {
   return (

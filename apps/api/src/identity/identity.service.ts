@@ -7,12 +7,15 @@ import { AccessPolicyService } from '../auth/access-policy.service'
 import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
 import { PrismaService } from '../database/prisma.service'
 import { Prisma } from '../generated/prisma/client'
+import { SocialService } from '../social/social.service'
 import type {
   IdentityApplicationDto,
   IdentityKind,
   IdentityRecordDto,
   IdentityReviewDto,
   RevokeIdentityRecordDto,
+  ConfirmIdentityDto,
+  VerifyIdentityUserDto,
 } from './identity.dto'
 
 type Tx = Prisma.TransactionClient
@@ -31,6 +34,7 @@ export class IdentityService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuthService) private readonly auth: AuthService,
     @Inject(AccessPolicyService) private readonly policy: AccessPolicyService,
+    @Inject(SocialService) private readonly social: SocialService,
   ) {}
 
   async myIdentity(authorization: string | undefined) {
@@ -106,12 +110,38 @@ export class IdentityService {
             teamName: r.team?.name ?? null,
           })),
         ]
+        const verifiedRecords = await tx.identityRecord.findMany({
+          where: {
+            organizationId: actor.organizationId,
+            linkedUserId: actor.userId,
+            status: 'ACTIVE',
+            grantedAssignmentId: null,
+          },
+          include: { team: { select: { name: true } } },
+          orderBy: { id: 'asc' },
+          take: 20,
+        })
+        const confirmed = await this.confirmedRecordIds(
+          tx,
+          actor.organizationId,
+          verifiedRecords.map((record) => record.id),
+        )
         return {
           candidates: candidates.slice(0, 20),
           hasMoreCandidates: candidates.length > 20,
           applications,
           teams,
           notice: '姓名仅用于提示可能匹配。申请需管理员核实，确认候选不会获得权限。',
+          verifiedCandidates: verifiedRecords
+            .filter((record) => !confirmed.has(record.id))
+            .map((record) => ({
+              id: `record:${record.id}`,
+              kind: record.kind,
+              displayName: record.displayName,
+              teamId: record.teamId,
+              teamName: record.team?.name ?? null,
+              expectedVersion: record.version,
+            })),
         }
       },
       { isolationLevel: 'RepeatableRead' },
@@ -180,6 +210,18 @@ export class IdentityService {
         teamId,
         status: result.status,
       })
+      await this.social.notify(
+        {
+          organizationId: actor.organizationId,
+          recipientUserId: actor.userId,
+          type: 'REPORT_UPDATED',
+          title: '认证申请已收到',
+          body: '我们已收到你的身份认证申请，预计48小时内核实并回复。请耐心等待后续消息。',
+          linkPath: '/pages/me/index?panel=identity',
+          deduplicationKey: `identity-received:${result.id}`,
+        },
+        tx,
+      )
       return result
     })
   }
@@ -223,10 +265,192 @@ export class IdentityService {
     )
   }
 
-  async records(authorization: string | undefined) {
+  async confirm(
+    authorization: string | undefined,
+    body: ConfirmIdentityDto,
+    key: string | undefined,
+    requestId: string,
+  ) {
+    return this.command(authorization, 'identity:confirm', body, key, false, async (tx, actor) => {
+      const record = await tx.identityRecord.findFirst({
+        where: {
+          id: body.recordId,
+          organizationId: actor.organizationId,
+          status: 'ACTIVE',
+          linkedUserId: actor.userId,
+          version: body.expectedVersion,
+          grantedAssignmentId: null,
+        },
+      })
+      if (!record) throw fail(409, '未找到本账号的待确认核验记录，请重新匹配')
+      if ((await this.confirmedRecordIds(tx, actor.organizationId, [record.id])).has(record.id))
+        throw fail(409, '该身份已经确认，请刷新身份信息')
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: actor.userId },
+        select: { playerProfileId: true, verificationLevel: true },
+      })
+      let assignmentId: string | null = null
+      if (record.kind === 'PLAYER') {
+        if (
+          !record.playerProfileId ||
+          !(await tx.playerProfile.findFirst({
+            where: { id: record.playerProfileId, organizationId: actor.organizationId },
+            select: { id: true },
+          }))
+        )
+          throw fail(409, '核验记录中的球员档案不可用')
+        if (user.playerProfileId && user.playerProfileId !== record.playerProfileId)
+          throw fail(409, '账号已有其他球员档案，不能自动覆盖')
+        if (
+          await tx.user.findFirst({
+            where: { playerProfileId: record.playerProfileId, id: { not: actor.userId } },
+            select: { id: true },
+          })
+        )
+          throw fail(409, '该球员档案已经关联其他账号')
+        await tx.user.update({
+          where: { id: actor.userId },
+          data: { playerProfileId: record.playerProfileId, verificationLevel: 'PLAYER_CONFIRMED' },
+        })
+      } else if (record.kind === 'STUDENT') {
+        if (user.verificationLevel === 'UNVERIFIED')
+          await tx.user.update({
+            where: { id: actor.userId },
+            data: { verificationLevel: 'STUDENT_VERIFIED' },
+          })
+      } else {
+        if (
+          !['TEAM_CAPTAIN', 'TEAM_COACH', 'MATCH_REPORTER'].includes(record.kind) ||
+          !['TEAM', 'MATCH', 'TOURNAMENT'].includes(record.scopeType)
+        )
+          throw fail(409, '核验记录的身份范围无效')
+        const object =
+          record.scopeType === 'TEAM'
+            ? await tx.team.findFirst({
+                where: { id: record.scopeId, organizationId: actor.organizationId },
+                select: { id: true },
+              })
+            : record.scopeType === 'MATCH'
+              ? await tx.match.findFirst({
+                  where: { id: record.scopeId, organizationId: actor.organizationId },
+                  select: { id: true },
+                })
+              : await tx.tournament.findFirst({
+                  where: { id: record.scopeId, organizationId: actor.organizationId },
+                  select: { id: true },
+                })
+        if (!object) throw fail(409, '核验记录的授权对象不可用')
+        const role = record.kind as 'TEAM_CAPTAIN' | 'TEAM_COACH' | 'MATCH_REPORTER'
+        const scopeType = record.scopeType as 'TEAM' | 'MATCH' | 'TOURNAMENT'
+        const existingRecord = await tx.identityRecord.findFirst({
+          where: {
+            id: { not: record.id },
+            organizationId: actor.organizationId,
+            linkedUserId: actor.userId,
+            kind: role,
+            scopeType,
+            scopeId: record.scopeId,
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        })
+        if (existingRecord) throw fail(409, '账号已有同范围有效任职记录，请先核查并撤销原任职')
+        const active = await tx.roleAssignment.findFirst({
+          where: {
+            organizationId: actor.organizationId,
+            userId: actor.userId,
+            role,
+            scopeType,
+            scopeId: record.scopeId,
+            revokedAt: null,
+          },
+          select: { id: true },
+        })
+        if (active) throw fail(409, '账号已持有该范围任职，请先核查现有授权')
+        const assignment = await tx.roleAssignment.upsert({
+          where: {
+            userId_role_scopeType_scopeId: {
+              userId: actor.userId,
+              role,
+              scopeType,
+              scopeId: record.scopeId,
+            },
+          },
+          create: {
+            organizationId: actor.organizationId,
+            userId: actor.userId,
+            role,
+            scopeType,
+            scopeId: record.scopeId,
+            grantedByUserId: record.createdByUserId,
+          },
+          update: {
+            revokedAt: null,
+            grantedAt: new Date(),
+            grantedByUserId: record.createdByUserId,
+          },
+        })
+        assignmentId = assignment.id
+        if (user.verificationLevel === 'UNVERIFIED')
+          await tx.user.update({
+            where: { id: actor.userId },
+            data: { verificationLevel: 'STAFF_VERIFIED' },
+          })
+      }
+      const changed = await tx.identityRecord.updateMany({
+        where: {
+          id: record.id,
+          organizationId: actor.organizationId,
+          linkedUserId: actor.userId,
+          status: 'ACTIVE',
+          version: body.expectedVersion,
+        },
+        data: { status: 'ACTIVE', grantedAssignmentId: assignmentId, version: { increment: 1 } },
+      })
+      if (changed.count !== 1) throw fail(409, '核验记录已变化，请重新匹配')
+      await this.audit(
+        tx,
+        actor,
+        'IDENTITY_SELF_CONFIRMED',
+        record.id,
+        requestId,
+        {
+          kind: record.kind,
+          scopeType: record.scopeType,
+          scopeId: record.scopeId,
+          version: record.version + 1,
+          verifiedByUserId: record.createdByUserId,
+        },
+        '本人确认管理员已核验的账号关联',
+      )
+      await this.social.notify(
+        {
+          organizationId: actor.organizationId,
+          recipientUserId: actor.userId,
+          type: 'REPORT_UPDATED',
+          title: '身份认证成功',
+          body: '恭喜，你的身份认证已完成。可以前往身份管理选择展示身份。',
+          linkPath: '/pages/me/index?panel=identity',
+          deduplicationKey: `identity-confirmed:${record.id}`,
+        },
+        tx,
+      )
+      return { recordId: record.id, kind: record.kind, status: 'CONFIRMED' }
+    })
+  }
+
+  async records(authorization: string | undefined, requestId: string) {
     const actor = await this.auth.requireSession(authorization)
     this.policy.requireOrganizationAdministrator(actor)
-    const [items, teams, players, tournaments, matches] = await Promise.all([
+    await this.audit(
+      this.prisma,
+      actor,
+      'IDENTITY_VERIFICATION_DIRECTORY_VIEWED',
+      actor.organizationId,
+      requestId,
+      {},
+    )
+    const [items, teams, players, tournaments, matches, users] = await Promise.all([
       this.prisma.identityRecord.findMany({
         where: { organizationId: actor.organizationId },
         include: { team: { select: { name: true } } },
@@ -255,8 +479,36 @@ export class IdentityService {
         select: { id: true, matchCode: true },
         take: 500,
       }),
+      this.prisma.user.findMany({
+        where: {
+          status: 'ACTIVE',
+          memberships: { some: { organizationId: actor.organizationId, status: 'ACTIVE' } },
+        },
+        select: { id: true, displayName: true, realName: true },
+        orderBy: { displayName: 'asc' },
+        take: 500,
+      }),
     ])
-    return { items, teams, players, tournaments, matches }
+    const confirmed = await this.confirmedRecordIds(
+      this.prisma,
+      actor.organizationId,
+      items.filter((item) => item.linkedUserId && !item.grantedAssignmentId).map((item) => item.id),
+    )
+    return {
+      items: items.map((item) => ({
+        ...item,
+        awaitingConfirmation:
+          item.status === 'ACTIVE' &&
+          Boolean(item.linkedUserId) &&
+          !item.grantedAssignmentId &&
+          !confirmed.has(item.id),
+      })),
+      teams,
+      players,
+      tournaments,
+      matches,
+      users,
+    }
   }
 
   async createRecord(
@@ -272,6 +524,24 @@ export class IdentityService {
       key,
       true,
       async (tx, actor) => {
+        if (body.verifiedUserId) {
+          if (body.verifiedUserId === actor.userId)
+            throw fail(403, '不能核验本人账号，请由另一名管理员核实')
+          const verified = await tx.user.findFirst({
+            where: {
+              id: body.verifiedUserId,
+              status: 'ACTIVE',
+              memberships: { some: { organizationId: actor.organizationId, status: 'ACTIVE' } },
+            },
+            select: { id: true, realName: true },
+          })
+          if (
+            !verified ||
+            !verified.realName ||
+            normalize(verified.realName) !== normalize(body.displayName)
+          )
+            throw fail(400, '已核验账号必须属于本组织，且实名与名单一致')
+        }
         let scopeType = 'ORGANIZATION',
           scopeId = actor.organizationId
         if (body.kind === 'TEAM_CAPTAIN' || body.kind === 'TEAM_COACH') {
@@ -325,6 +595,8 @@ export class IdentityService {
             scopeType,
             scopeId,
             createdByUserId: actor.userId,
+            linkedUserId: body.verifiedUserId ?? null,
+            status: 'ACTIVE',
           },
         })
         await this.audit(
@@ -333,7 +605,7 @@ export class IdentityService {
           'IDENTITY_RECORD_CREATED',
           result.id,
           requestId,
-          { kind: result.kind, scopeType, scopeId },
+          { kind: result.kind, scopeType, scopeId, verifiedUserId: result.linkedUserId },
           body.reason,
         )
         return result
@@ -362,6 +634,25 @@ export class IdentityService {
         if (application.userId === actor.userId) throw fail(403, '不能审核自己的认证申请')
         if (application.status !== 'PENDING' || application.version !== body.expectedVersion)
           throw fail(409, '申请已处理或版本变化，请刷新后核对')
+        const resolved = body.resolvedCandidateId ?? application.candidateId
+        // Claim the application before locking the applicant or writing its notification.
+        const claimed = await tx.identityApplication.updateMany({
+          where: {
+            id,
+            organizationId: actor.organizationId,
+            status: 'PENDING',
+            version: body.expectedVersion,
+          },
+          data: {
+            status: body.decision,
+            reviewedByUserId: actor.userId,
+            reviewedAt: new Date(),
+            decisionNote: body.note,
+            resolvedCandidateId: body.decision === 'APPROVED' ? resolved : null,
+            version: { increment: 1 },
+          },
+        })
+        if (claimed.count !== 1) throw fail(409, '申请已处理或版本变化，请刷新后核对')
         const applicant = await tx.user.findFirst({
           where: {
             id: application.userId,
@@ -371,7 +662,6 @@ export class IdentityService {
           select: { id: true, playerProfileId: true, verificationLevel: true },
         })
         if (!applicant) throw fail(409, '申请人的账号或组织成员身份已失效')
-        const resolved = body.resolvedCandidateId ?? application.candidateId
         if (body.decision === 'APPROVED') {
           if (!resolved) throw fail(400, '批准前必须指定核实后的名单记录或球员档案，并填写核实依据')
           const candidate = await this.candidate(tx, actor.organizationId, resolved)
@@ -468,16 +758,8 @@ export class IdentityService {
               data: { linkedUserId: applicant.id, version: { increment: 1 } },
             })
         }
-        const result = await tx.identityApplication.update({
+        const result = await tx.identityApplication.findUniqueOrThrow({
           where: { id },
-          data: {
-            status: body.decision,
-            reviewedByUserId: actor.userId,
-            reviewedAt: new Date(),
-            decisionNote: body.note,
-            resolvedCandidateId: body.decision === 'APPROVED' ? resolved : null,
-            version: { increment: 1 },
-          },
           include: includeApplication,
         })
         await this.audit(
@@ -495,11 +777,87 @@ export class IdentityService {
           },
           body.note,
         )
+        await this.social.notify(
+          {
+            organizationId: actor.organizationId,
+            recipientUserId: applicant.id,
+            type: 'REPORT_UPDATED',
+            title: body.decision === 'APPROVED' ? '身份认证成功' : '认证申请处理结果',
+            body:
+              body.decision === 'APPROVED'
+                ? `恭喜，你的身份认证已完成。${body.note}`
+                : `你的认证申请暂未通过：${body.note}`,
+            linkPath: '/pages/me/index?panel=identity',
+            deduplicationKey: `identity-reviewed:${id}:${result.version}`,
+          },
+          tx,
+        )
         return result
       },
     )
   }
 
+  async verifyUser(
+    authorization: string | undefined,
+    id: string,
+    body: VerifyIdentityUserDto,
+    key: string | undefined,
+    requestId: string,
+  ) {
+    return this.command(
+      authorization,
+      `identity:record:verify-user:${id}`,
+      body,
+      key,
+      true,
+      async (tx, actor) => {
+        if (body.verifiedUserId === actor.userId)
+          throw fail(403, '不能核验本人账号，请由另一名管理员核实')
+        const record = await tx.identityRecord.findFirst({
+          where: {
+            id,
+            organizationId: actor.organizationId,
+            status: 'ACTIVE',
+            linkedUserId: null,
+            version: body.expectedVersion,
+          },
+        })
+        if (!record) throw fail(409, '记录已关联或发生变化，请刷新名册')
+        const user = await tx.user.findFirst({
+          where: {
+            id: body.verifiedUserId,
+            status: 'ACTIVE',
+            memberships: { some: { organizationId: actor.organizationId, status: 'ACTIVE' } },
+          },
+          select: { id: true, realName: true },
+        })
+        if (!user?.realName || normalize(user.realName) !== normalize(record.displayName))
+          throw fail(400, '核验账号必须属于本组织，且实名与名单一致')
+        const changed = await tx.identityRecord.updateMany({
+          where: {
+            id,
+            organizationId: actor.organizationId,
+            status: 'ACTIVE',
+            linkedUserId: null,
+            version: body.expectedVersion,
+          },
+          data: { linkedUserId: user.id, version: { increment: 1 } },
+        })
+        if (changed.count !== 1) throw fail(409, '记录已变化，请刷新后核验')
+        const updated = await tx.identityRecord.findUniqueOrThrow({ where: { id } })
+        await this.audit(
+          tx,
+          actor,
+          'IDENTITY_ACCOUNT_VERIFIED',
+          id,
+          requestId,
+          { verifiedUserId: user.id, kind: record.kind, version: updated.version },
+          body.reason,
+        )
+        return updated
+      },
+    )
+  }
   async revokeRecord(
     authorization: string | undefined,
     id: string,
@@ -549,6 +907,34 @@ export class IdentityService {
     )
   }
 
+  private async confirmedRecordIds(tx: Tx, organizationId: string, ids: string[]) {
+    if (!ids.length) return new Set<string>()
+    const [audits, applications] = await Promise.all([
+      tx.auditLog.findMany({
+        where: {
+          organizationId,
+          action: 'IDENTITY_SELF_CONFIRMED',
+          targetType: 'Identity',
+          targetId: { in: ids },
+        },
+        select: { targetId: true },
+      }),
+      tx.identityApplication.findMany({
+        where: {
+          organizationId,
+          status: 'APPROVED',
+          resolvedCandidateId: { in: ids.map((id) => `record:${id}`) },
+        },
+        select: { resolvedCandidateId: true },
+      }),
+    ])
+    return new Set([
+      ...audits.map((item) => item.targetId),
+      ...applications.flatMap((item) =>
+        item.resolvedCandidateId ? [item.resolvedCandidateId.replace(/^record:/, '')] : [],
+      ),
+    ])
+  }
   private async candidate(tx: Tx, organizationId: string, value: string): Promise<Candidate> {
     const parsed = parseCandidate(value)
     if (parsed.type === 'player') {

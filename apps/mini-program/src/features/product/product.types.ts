@@ -453,6 +453,7 @@ export interface NotificationResponse {
   items: Array<{
     id: string
     type: string
+    messageCategory?: 'mentions' | null
     title: string
     body: string | null
     linkPath: string | null

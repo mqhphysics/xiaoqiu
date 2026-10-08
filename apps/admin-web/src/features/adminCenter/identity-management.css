@@ -82,6 +82,28 @@
 .mc-identity small {
   color: #68796b;
 }
+.mc-identity-verify {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+}
+.mc-identity-verify select,
+.mc-identity-verify input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #d5dfd0;
+  border-radius: 6px;
+  font: inherit;
+  background: white;
+}
+.mc-identity-verify button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #edf4e7;
+  color: #45663e;
+  cursor: pointer;
+}
 @media (max-width: 760px) {
   .mc-identity-create {
     grid-template-columns: 1fr;

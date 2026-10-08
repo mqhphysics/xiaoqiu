@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { SelfPersonEditor } from './self-editor.h5'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PersonRequest, PersonHoverRequest } from '../../features/product/person-navigation.h5'
@@ -94,6 +95,7 @@ export function PersonDialog({
   onClose: () => void
 }) {
   const { person, error, retry } = usePerson(request)
+  const [editing, setEditing] = useState(false)
   useOverlayFocus(true, '.person-dialog', onClose)
   return createPortal(
     <div
@@ -118,7 +120,7 @@ export function PersonDialog({
           <PostIcon name="close" />
         </button>
         {person ? (
-          person.player ? (
+          person.player && request.mode !== 'coach' ? (
             <PlayerProfile
               player={{ ...person.player, displayName: person.displayName }}
               tournamentId={person.tournamentId}
@@ -150,6 +152,15 @@ export function PersonDialog({
                 </div>
                 <MessageAction person={person} />
               </header>
+              {readSession()?.user.id === person.id && (
+                <button
+                  type="button"
+                  className="own-profile-edit-button"
+                  onClick={() => setEditing(true)}
+                >
+                  编辑个人信息
+                </button>
+              )}
               <div className="person-content">
                 <div className="person-selection">动态与资料</div>
                 <div className="player-profile-grid">
@@ -205,6 +216,9 @@ export function PersonDialog({
           <ReadState error={error} retry={retry} />
         )}
       </section>
+      {editing && (
+        <SelfPersonEditor onClose={() => setEditing(false)} onChanged={() => void retry()} />
+      )}
     </div>,
     document.body,
   )

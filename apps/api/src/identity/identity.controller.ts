@@ -18,6 +18,8 @@ import {
   IdentityRecordDto,
   IdentityReviewDto,
   RevokeIdentityRecordDto,
+  ConfirmIdentityDto,
+  VerifyIdentityUserDto,
 } from './identity.dto'
 import { IdentityService } from './identity.service'
 
@@ -45,6 +47,18 @@ export class IdentityController {
     return this.service.apply(authorization, body, key, request.requestId ?? randomUUID())
   }
 
+  @Post('me/identity/confirm')
+  @ApiBody({ type: ConfirmIdentityDto })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  confirm(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() body: ConfirmIdentityDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.service.confirm(authorization, body, key, request.requestId ?? randomUUID())
+  }
+
   @Get('admin/identity/applications')
   applications(
     @Headers('authorization') authorization: string | undefined,
@@ -67,8 +81,11 @@ export class IdentityController {
   }
 
   @Get('admin/identity/records')
-  records(@Headers('authorization') authorization: string | undefined) {
-    return this.service.records(authorization)
+  records(
+    @Headers('authorization') authorization: string | undefined,
+    @Req() request: RequestWithId,
+  ) {
+    return this.service.records(authorization, request.requestId ?? randomUUID())
   }
 
   @Post('admin/identity/records')
@@ -81,6 +98,18 @@ export class IdentityController {
     @Req() request: RequestWithId,
   ) {
     return this.service.createRecord(authorization, body, key, request.requestId ?? randomUUID())
+  }
+  @Post('admin/identity/records/:id/verify-user')
+  @ApiBody({ type: VerifyIdentityUserDto })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  verifyUser(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: VerifyIdentityUserDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.service.verifyUser(authorization, id, body, key, request.requestId ?? randomUUID())
   }
 
   @Post('admin/identity/records/:id/revoke')

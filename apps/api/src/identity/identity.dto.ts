@@ -50,6 +50,9 @@ export class IdentityReviewDto {
 }
 
 export class IdentityRecordDto {
+  @IsOptional()
+  @IsUUID()
+  verifiedUserId?: string
   @IsIn(IDENTITY_KINDS)
   kind!: IdentityKind
 
@@ -80,12 +83,30 @@ export class IdentityRecordDto {
   reason!: string
 }
 
+export class ConfirmIdentityDto {
+  @IsUUID()
+  recordId!: string
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number
+}
+
 export class RevokeIdentityRecordDto {
+  // Both pending verified and active records can be withdrawn by administrators.
   @Type(() => Number)
   @IsInt()
   @Min(1)
   expectedVersion!: number
 
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Length(8, 1000)
+  reason!: string
+}
+export class VerifyIdentityUserDto {
+  @IsUUID() verifiedUserId!: string
+  @Type(() => Number) @IsInt() @Min(1) expectedVersion!: number
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @Length(8, 1000)

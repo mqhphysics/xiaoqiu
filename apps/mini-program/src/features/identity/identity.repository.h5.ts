@@ -30,9 +30,16 @@ export interface IdentitySnapshot {
   applications: IdentityApplication[]
   teams: { id: string; name: string }[]
   notice: string
+  verifiedCandidates?: Array<IdentityCandidate & { expectedVersion: number }>
 }
 export const identityRepository = {
   get: () => request<IdentitySnapshot>('/me/identity'),
+  confirm: (recordId: string, expectedVersion: number, key: string) =>
+    request<{ recordId: string; kind: IdentityKind; status: 'CONFIRMED' }>('/me/identity/confirm', {
+      method: 'POST',
+      data: { recordId, expectedVersion },
+      headers: { 'Idempotency-Key': key },
+    }),
   apply: (
     body: { kind: IdentityKind; candidateId?: string; teamId?: string; message: string },
     key: string,

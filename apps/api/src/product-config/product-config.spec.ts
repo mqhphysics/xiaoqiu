@@ -61,8 +61,10 @@ test('registered route mapping covers actual module endpoints and leaves authent
     ['admin/center/posts/:id', ['administration', 'community']],
     ['admin/tournaments/:tournamentId/team-registrations/:registrationId', ['administration']],
     ['me/identity', ['identityApplications']],
+    ['me/identity/confirm', ['identityApplications']],
     ['me/identity/applications', ['identityApplications']],
     ['admin/identity/records/:id/revoke', ['administration', 'identityApplications']],
+    ['admin/identity/records/:id/verify-user', ['administration', 'identityApplications']],
     ['admin/identity/applications/:id/review', ['administration', 'identityApplications']],
   ]
   for (const [path, expected] of routes) assert.deepEqual(modulesForRoute(path), expected, path)

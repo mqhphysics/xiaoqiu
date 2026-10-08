@@ -57,7 +57,10 @@ export function ProfileIcon({ name }: { name: ProfileIconName }) {
         strokeWidth="1.7"
         aria-hidden="true"
       >
-        <path d="m9 3-1 3-3 1-2 4 2 2v3l3 2 1 3h6l1-3 3-2v-3l2-2-2-4-3-1-1-3Z" />
+        <path
+          strokeLinejoin="round"
+          d="m9.7 4.3.6-2.3h3.4l.6 2.3 2.2 1.3 2.3-.5 1.7 2.9-1.7 1.8v2.5l1.7 1.8-1.7 2.9-2.3-.5-2.2 1.3-.6 2.3h-3.4l-.6-2.3-2.2-1.3-2.3.5-1.7-2.9 1.7-1.8V9.8L4.7 8l1.7-2.9 2.3.5Z"
+        />
         <circle cx="12" cy="12" r="3" />
       </svg>
     )

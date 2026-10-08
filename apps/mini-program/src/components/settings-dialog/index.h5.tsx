@@ -4,24 +4,37 @@ import { useOverlayFocus } from '../overlay-focus'
 import { SettingsDialog as LegacySettingsDialog } from './legacy-dialog'
 import {
   defaultPreferences,
-  readPreferences,
   savePreferences,
   type BrowserPreferences,
+  usePreferenceValues,
 } from './preferences.h5'
 import './desktop.h5.scss'
+import { MessageSettings } from './message-settings.h5'
 
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
+export function SettingsDialog({
+  onClose,
+  section,
+}: {
+  onClose: () => void
+  section?: 'messages' | undefined
+}) {
   const [desktop] = useState(() => window.matchMedia('(min-width: 721px)').matches)
   return desktop ? (
-    <DesktopSettings onClose={onClose} />
+    <DesktopSettings onClose={onClose} section={section} />
   ) : (
     <LegacySettingsDialog onClose={onClose} />
   )
 }
 
-function DesktopSettings({ onClose }: { onClose: () => void }) {
+function DesktopSettings({
+  onClose,
+  section,
+}: {
+  onClose: () => void
+  section?: 'messages' | undefined
+}) {
   useOverlayFocus(true, '.desktop-settings', onClose)
-  const [preferences, setPreferences] = useState(readPreferences)
+  const preferences = usePreferenceValues()
   const [message, setMessage] = useState('')
   const [fullscreen, setFullscreen] = useState(() => Boolean(document.fullscreenElement))
   useEffect(() => {
@@ -32,7 +45,6 @@ function DesktopSettings({ onClose }: { onClose: () => void }) {
   const update = (next: BrowserPreferences) => {
     try {
       savePreferences(next)
-      setPreferences(next)
       setMessage('已保存到当前浏览器')
     } catch {
       setMessage('保存失败，请检查浏览器存储权限')
@@ -72,7 +84,7 @@ function DesktopSettings({ onClose }: { onClose: () => void }) {
       >
         <header className="desktop-settings__header">
           <div>
-            <h2 id="desktop-settings-title">设置</h2>
+            <h2 id="desktop-settings-title">{section === 'messages' ? '消息设置' : '设置'}</h2>
             <p>让晓球更适合你的浏览习惯。</p>
           </div>
           <button data-settings-control aria-label="关闭设置" onClick={onClose}>
@@ -80,59 +92,68 @@ function DesktopSettings({ onClose }: { onClose: () => void }) {
           </button>
         </header>
         <div className="desktop-settings__body">
-          <h3>浏览体验</h3>
-          <div className="desktop-settings__group">
-            {options.map((option) => (
-              <div className="desktop-settings__row" key={option.key}>
+          {section === 'messages' ? (
+            <MessageSettings />
+          ) : (
+            <>
+              <h3>浏览体验</h3>
+              <div className="desktop-settings__group">
+                {options.map((option) => (
+                  <div className="desktop-settings__row" key={option.key}>
+                    <div>
+                      <strong>{option.title}</strong>
+                      <p>{option.description}</p>
+                    </div>
+                    <button
+                      data-settings-control
+                      className="desktop-settings__switch"
+                      role="switch"
+                      aria-label={option.title}
+                      aria-checked={preferences[option.key]}
+                      onClick={() =>
+                        update({ ...preferences, [option.key]: !preferences[option.key] })
+                      }
+                    >
+                      <span />
+                    </button>
+                  </div>
+                ))}
+                <div className="desktop-settings__row">
+                  <div>
+                    <strong>全屏浏览</strong>
+                    <p>让比赛内容铺满整个屏幕</p>
+                  </div>
+                  <button
+                    data-settings-control
+                    className="desktop-settings__action"
+                    disabled={!document.fullscreenEnabled}
+                    onClick={() => void toggleFullscreen()}
+                  >
+                    {fullscreen ? '退出全屏' : '进入全屏'}
+                  </button>
+                </div>
+              </div>
+              <MessageSettings />
+              <h3>本机偏好</h3>
+              <div className="desktop-settings__row desktop-settings__reset">
                 <div>
-                  <strong>{option.title}</strong>
-                  <p>{option.description}</p>
+                  <strong>恢复默认设置</strong>
+                  <p>恢复上面的浏览选项，保留你的关注和收藏。</p>
                 </div>
                 <button
                   data-settings-control
-                  className="desktop-settings__switch"
-                  role="switch"
-                  aria-label={option.title}
-                  aria-checked={preferences[option.key]}
-                  onClick={() => update({ ...preferences, [option.key]: !preferences[option.key] })}
+                  className="desktop-settings__action"
+                  onClick={() => update({ ...defaultPreferences })}
                 >
-                  <span />
+                  恢复默认
                 </button>
               </div>
-            ))}
-            <div className="desktop-settings__row">
-              <div>
-                <strong>全屏浏览</strong>
-                <p>让比赛内容铺满整个屏幕</p>
-              </div>
-              <button
-                data-settings-control
-                className="desktop-settings__action"
-                disabled={!document.fullscreenEnabled}
-                onClick={() => void toggleFullscreen()}
-              >
-                {fullscreen ? '退出全屏' : '进入全屏'}
-              </button>
-            </div>
-          </div>
-          <h3>本机偏好</h3>
-          <div className="desktop-settings__row desktop-settings__reset">
-            <div>
-              <strong>恢复默认设置</strong>
-              <p>恢复上面的浏览选项，保留你的关注和收藏。</p>
-            </div>
-            <button
-              data-settings-control
-              className="desktop-settings__action"
-              onClick={() => update({ ...defaultPreferences })}
-            >
-              恢复默认
-            </button>
-          </div>
-          <p className="desktop-settings__notice">这些设置即时生效，仅保存在当前浏览器。</p>
-          <p className="desktop-settings__status" role="status">
-            {message}
-          </p>
+              <p className="desktop-settings__notice">这些设置即时生效，仅保存在当前浏览器。</p>
+              <p className="desktop-settings__status" role="status">
+                {message}
+              </p>
+            </>
+          )}
         </div>
         <footer className="desktop-settings__footer">
           <span>晓球 V1.0.0</span>

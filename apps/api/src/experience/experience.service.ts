@@ -1434,6 +1434,42 @@ export class ExperienceService {
             },
           })
         }
+        if (inserted.count === 1) {
+          const ids = tags.flatMap((tag) => (tag.playerId ? [tag.playerId] : []))
+          if (ids.length) {
+            const mentioned = await tx.playerProfile.findMany({
+              where: {
+                organizationId: session.organizationId,
+                id: { in: ids },
+                linkedUser: {
+                  is: {
+                    status: 'ACTIVE',
+                    memberships: {
+                      some: { organizationId: session.organizationId, status: 'ACTIVE' },
+                    },
+                  },
+                },
+              },
+              select: { linkedUser: { select: { id: true } } },
+            })
+            for (const player of mentioned)
+              if (player.linkedUser)
+                await this.socialService.notify(
+                  {
+                    organizationId: session.organizationId,
+                    actorUserId: session.userId,
+                    recipientUserId: player.linkedUser.id,
+                    type: NotificationType.POST_COMMENTED,
+                    title: '有人在动态中提到了你',
+                    body: `${session.user.displayName} 在动态中提到了你：${body.slice(0, 160)}`,
+                    linkPath: `/pages/post-detail/index?postId=${encodeURIComponent(post.id)}`,
+                    metadata: { messageCategory: 'mentions' },
+                    deduplicationKey: `post-mentioned:${post.id}:${player.linkedUser.id}`,
+                  },
+                  tx,
+                )
+          }
+        }
         return mapPost(inserted.count === 1 ? { ...post, tags } : post, session.userId)
       })
     } catch (error) {
