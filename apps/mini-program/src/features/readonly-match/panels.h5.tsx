@@ -16,6 +16,9 @@ import {
   type PlayerMatchEvents,
 } from './lineup.logic'
 import './panels.h5.scss'
+import { MatchIcon, type MatchIconKind } from './match-icons.h5'
+import { createLineupDisplay } from './lineup-display.h5'
+import { PlayerTrigger } from '../../components/player-trigger/index.h5'
 import {
   GoalMedia,
   MediaLibraryButton,
@@ -30,13 +33,6 @@ export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
     : match.lineups[0]?.team.id
   return (
     <section className="match-tab-content match-lineups" aria-label="双方阵容">
-      <div className="match-panel-heading">
-        <div>
-          <small>STARTING LINEUPS</small>
-          <h2>双方阵容</h2>
-        </div>
-        <span>八人制 · 首发与比赛事件</span>
-      </div>
       <div className="match-lineups__switch" aria-label="选择球队">
         {match.lineups.map((lineup) => (
           <button
@@ -53,21 +49,169 @@ export function LineupsPanel({ match }: { match: MatchExperienceResponse }) {
       {match.lineups.length === 0 ? (
         <p className="match-lineups__empty">阵容尚未公布</p>
       ) : (
-        <div className="match-lineups__teams">
-          {match.lineups.map((lineup) => (
-            <LineupCard
-              key={lineup.team.id}
-              lineup={lineup}
-              match={match}
-              selected={selectedId === lineup.team.id}
-            />
-          ))}
-        </div>
+        <>
+          <DesktopLineups match={match} />
+          <div className="match-lineups__teams">
+            {match.lineups.map((lineup) => (
+              <LineupCard
+                key={lineup.team.id}
+                lineup={lineup}
+                match={match}
+                selected={selectedId === lineup.team.id}
+              />
+            ))}
+          </div>
+        </>
       )}
       <p className="match-lineups__footnote">
         点击号码查看球员与真实事件。球队默认阵容不代替本场首发；已确认赛前首发与正式出场记录分别标示。
       </p>
     </section>
+  )
+}
+
+function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const lineups = [...match.lineups].sort(
+    (a, b) => Number(b.team.id === match.homeTeam?.id) - Number(a.team.id === match.homeTeam?.id),
+  )
+  const events = useMemo(
+    () =>
+      new Map(
+        lineups.map((lineup) => [
+          lineup.team.id,
+          collectPlayerEvents(match.events, lineup.team.id),
+        ]),
+      ),
+    [match.events, match.lineups],
+  )
+  const selectedLineup = lineups.find((lineup) =>
+    lineup.players.some((player) => player.id === selected),
+  )
+  const selectedPlayer = selectedLineup?.players.find((player) => player.id === selected)
+  return (
+    <div className="match-horizontal-lineups">
+      <div className="match-horizontal-lineups__heading">
+        {lineups.map((lineup) => (
+          <div key={lineup.team.id}>
+            <TeamCrest team={lineup.team} size="small" />
+            <strong>{lineup.team.name}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="match-horizontal-pitch" aria-label="双方首发横向球场">
+        <svg
+          className="match-horizontal-pitch__lines"
+          viewBox="0 0 105 68"
+          aria-hidden="true"
+          fill="none"
+        >
+          <rect x=".5" y=".5" width="104" height="67" />
+          <path d="M52.5 .5v67M.5 13.84H16.5v40.32H.5M104.5 13.84H88.5v40.32h16M.5 24.84h5v18.32h-5M104.5 24.84h-5v18.32h5" />
+          <circle cx="52.5" cy="34" r="9.15" />
+          <circle cx="52.5" cy="34" r=".6" fill="currentColor" />
+          <circle cx="11" cy="34" r=".5" fill="currentColor" />
+          <circle cx="94" cy="34" r=".5" fill="currentColor" />
+          <path d="M16.5 26.68a9.15 9.15 0 0 1 0 14.64M88.5 26.68a9.15 9.15 0 0 0 0 14.64M.5 1.5a1 1 0 0 0 1-1M103.5 .5a1 1 0 0 0 1 1M.5 66.5a1 1 0 0 1 1 1M103.5 67.5a1 1 0 0 1 1-1" />
+        </svg>
+        {lineups.map((lineup, side) => {
+          const { starters } = lineupGroups(lineup)
+          const display = createLineupDisplay(starters)
+          return (
+            <div
+              key={lineup.team.id}
+              className="match-pitch-half match-pitch-half--positioned"
+              data-side={side}
+              data-position-source={display.source}
+              aria-label={`${lineup.team.name}${display.source === 'PUBLISHED' ? '已公布首发站位' : '按球员位置默认排布'}`}
+            >
+              {starters.length ? (
+                display.players.map(({ player, point }) => (
+                  <div
+                    key={player.id}
+                    className={`match-horizontal-player ${player.position === 'GOALKEEPER' ? 'match-horizontal-player--goalkeeper' : ''}`}
+                    style={{
+                      left: `${side === 0 ? 8 + point.y * 0.84 : 92 - point.y * 0.84}%`,
+                      top: `${10 + point.x * 0.8}%`,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="match-horizontal-player__number"
+                      aria-pressed={selected === player.id}
+                      aria-label={`${player.displayName}，${player.shirtNumber ?? '无'}号，${positionLabel(player.position)}，查看本场事件`}
+                      onClick={() => setSelected(selected === player.id ? null : player.id)}
+                    >
+                      {player.shirtNumber ?? '—'}
+                    </button>
+                    {player.position === 'GOALKEEPER' && (
+                      <span className="match-horizontal-player__keeper" title="门将">
+                        GK
+                      </span>
+                    )}
+                    <PlayerTrigger
+                      playerId={player.id}
+                      tournamentId={match.tournamentId}
+                      name={player.displayName}
+                    >
+                      <span className="match-horizontal-player__name">{player.displayName}</span>
+                    </PlayerTrigger>
+                    <EventBadges events={events.get(lineup.team.id)?.get(player.id)} compact />
+                  </div>
+                ))
+              ) : (
+                <p className="match-horizontal-pitch__empty">本场首发尚未确认</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {selectedPlayer && selectedLineup && (
+        <div className="match-player-detail" aria-live="polite">
+          <strong>
+            {selectedPlayer.shirtNumber ?? '—'}号 · {selectedPlayer.displayName}
+          </strong>
+          <span>
+            {positionLabel(selectedPlayer.position)} ·{' '}
+            {playerAppearanceLabel(
+              selectedPlayer,
+              lineupHasAppearances(selectedLineup),
+              events.get(selectedLineup.team.id)?.get(selectedPlayer.id),
+            )}
+          </span>
+          <span>
+            {playerEventDetails(events.get(selectedLineup.team.id)?.get(selectedPlayer.id)).join(
+              ' · ',
+            ) || '暂无已公布比赛事件'}
+          </span>
+          <button
+            type="button"
+            data-match-resource="player"
+            className="match-player-detail__profile"
+            onClick={() => void openPlayer(selectedPlayer.id, match.tournamentId)}
+          >
+            查看球员资料 ↗
+          </button>
+        </div>
+      )}
+      <div className="match-horizontal-lineups__bench">
+        {lineups.map((lineup) => (
+          <details key={lineup.team.id} open>
+            <summary>
+              {lineup.team.shortName} · 替补 {lineupGroups(lineup).substitutes.length} 人
+            </summary>
+            <PlayerList
+              title="替补名单"
+              players={lineupGroups(lineup).substitutes}
+              events={events.get(lineup.team.id)!}
+              onSelect={setSelected}
+              selectedId={selected}
+              appearances={lineupHasAppearances(lineup)}
+            />
+          </details>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -261,18 +405,49 @@ function EventBadges({
 }) {
   if (!events) return null
   return (
-    <span className="match-player-badges">
-      {events.goals.length > 0 && <span>球 {events.goals.length}</span>}
-      {events.assists.length > 0 && <span>助 {events.assists.length}</span>}
-      {events.ownGoals.length > 0 && <span>乌龙 {events.ownGoals.length}</span>}
+    <span className={`match-player-badges ${compact ? 'match-player-badges--compact' : ''}`}>
+      {events.goals.length > 0 && (
+        <span title={`进球 ${events.goals.join('、')}`}>
+          <MatchIcon kind="GOAL" />
+          {events.goals.length}
+        </span>
+      )}
+      {events.assists.length > 0 && (
+        <span title={`助攻 ${events.assists.join('、')}`}>
+          <MatchIcon kind="ASSIST" />
+          {events.assists.length}
+        </span>
+      )}
+      {events.ownGoals.length > 0 && (
+        <span title={`乌龙球 ${events.ownGoals.join('、')}`}>
+          <MatchIcon kind="OWN_GOAL" />
+          {events.ownGoals.length}
+        </span>
+      )}
       {events.on.map((minute, index) => (
-        <span key={`on-${index}`}>换上 {minute}</span>
+        <span key={`on-${index}`} title={`换上 ${minute}`}>
+          <MatchIcon kind="ON" />
+          {minute}
+        </span>
       ))}
       {events.off.map((minute, index) => (
-        <span key={`off-${index}`}>换下 {minute}</span>
+        <span key={`off-${index}`} title={`换下 ${minute}`}>
+          <MatchIcon kind="OFF" />
+          {minute}
+        </span>
       ))}
-      {!compact && events.yellowCards.length > 0 && <span>黄牌 {events.yellowCards.length}</span>}
-      {events.redCards.length > 0 && <span>红牌 {events.redCards.length}</span>}
+      {events.yellowCards.length > 0 && (
+        <span title={`黄牌 ${events.yellowCards.join('、')}`}>
+          <MatchIcon kind="YELLOW_CARD" />
+          {events.yellowCards.length}
+        </span>
+      )}
+      {events.redCards.length > 0 && (
+        <span title={`红牌 ${events.redCards.join('、')}`}>
+          <MatchIcon kind="RED_CARD" />
+          {events.redCards.length}
+        </span>
+      )}
     </span>
   )
 }
@@ -284,31 +459,37 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
     if (!goalMedia.has(item.targetId)) goalMedia.set(item.targetId, item)
   return (
     <section className="match-tab-content match-events" aria-label="比赛事件">
-      <div className="match-panel-heading">
-        <div>
-          <small>TIMELINE</small>
-          <h2>比赛事件</h2>
-        </div>
-        <span>{match.events.length} 条</span>
+      <div className="match-events__tools">
         <MediaLibraryButton />
       </div>
       {match.events.length ? (
         <ol className="match-events__list">
           {orderedEvents(match.events).map((event) => (
-            <li key={event.id}>
+            <li
+              key={event.id}
+              className="match-event"
+              data-event-type={event.type}
+              title={event.description ?? event.team.name}
+            >
               <time>{minuteLabel(event)}</time>
-              <span className="match-events__type">{eventLabel(event.type)}</span>
-              <div>
+              <span className="match-events__type" title={eventLabel(event.type)}>
+                <MatchIcon kind={event.type as MatchIconKind} />
+              </span>
+              <div className="match-event__copy">
                 <strong>
+                  <span className="match-event__team">
+                    <TeamCrest team={event.team} size="small" interactive={false} />
+                  </span>
+                  {event.type === 'SUBSTITUTION' && <MatchIcon kind="OFF" />}
                   <EventPlayerLink player={event.player} tournamentId={match.tournamentId}>
-                    {event.type === 'SUBSTITUTION' ? '换下 ' : ''}
                     {event.player?.displayName ?? event.team.shortName}
                   </EventPlayerLink>
                 </strong>
                 <span>
-                  {event.relatedPlayer ? (
+                  {event.relatedPlayer &&
+                  (event.type === 'GOAL' || event.type === 'SUBSTITUTION') ? (
                     <>
-                      {event.type === 'SUBSTITUTION' ? '换上 ' : '助攻 '}
+                      <MatchIcon kind={event.type === 'SUBSTITUTION' ? 'ON' : 'ASSIST'} />
                       <EventPlayerLink
                         player={event.relatedPlayer}
                         tournamentId={match.tournamentId}
@@ -316,24 +497,15 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
                         {event.relatedPlayer.displayName}
                       </EventPlayerLink>
                     </>
-                  ) : (
-                    (event.description ?? event.team.name)
-                  )}
+                  ) : null}
                 </span>
-                {event.relatedPlayer && <small>{event.team.name}</small>}
-                {event.type === 'GOAL' || event.type === 'OWN_GOAL' ? (
-                  <>
-                    {goalMedia.has(event.id) ? (
-                      <GoalMedia asset={goalMedia.get(event.id)!} />
-                    ) : null}
-                    <MediaUploadButton
-                      purpose="GOAL_GIF"
-                      targetId={event.id}
-                      label="投稿进球 GIF"
-                    />
-                  </>
-                ) : null}
               </div>
+              {['GOAL', 'OWN_GOAL', 'PENALTY_SCORED'].includes(event.type) ? (
+                <div className="match-event__media">
+                  {goalMedia.has(event.id) ? <GoalMedia asset={goalMedia.get(event.id)!} /> : null}
+                  <MediaUploadButton purpose="GOAL_GIF" targetId={event.id} label="+ GIF" />
+                </div>
+              ) : null}
             </li>
           ))}
         </ol>
@@ -356,14 +528,10 @@ function EventPlayerLink({
 }) {
   if (!player) return <>{children}</>
   return (
-    <button
-      type="button"
-      className="match-event-player"
-      data-match-resource="player"
-      aria-label={`查看${player.displayName}的球员资料`}
-      onClick={() => void openPlayer(player.id, tournamentId)}
-    >
-      {children}
-    </button>
+    <span className="match-event-player" data-match-resource="player">
+      <PlayerTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}>
+        {children}
+      </PlayerTrigger>
+    </span>
   )
 }

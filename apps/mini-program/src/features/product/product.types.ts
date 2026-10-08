@@ -362,6 +362,7 @@ export interface MatchExperienceResponse extends MatchSummary {
   reviews: {
     averageRating: number | null
     ratingCount: number
+    ratingDistribution?: Array<{ rating: number; count: number }>
     viewerReview: {
       rating: number
       body: string | null

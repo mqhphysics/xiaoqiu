@@ -45,6 +45,10 @@ export interface ReportRevision {
 }
 
 export interface ReportWorkspace {
+  reportVersion?: number
+  editorToken?: string
+  inline?: { editor: boolean; canStart: boolean; completed: boolean; changeRequested: boolean }
+  completion?: { published: boolean; retained: boolean }
   organizationId: string
   matchId: string
   title: string
@@ -71,7 +75,8 @@ export interface ReportWorkspace {
 export interface SaveReportCommand {
   clientActionId: string
   expectedVersion: number
-  action: 'SAVE' | 'SUBMIT' | 'RETURN' | 'CONFIRM' | 'CORRECT'
+  action: 'SAVE' | 'SUBMIT' | 'RETURN' | 'CONFIRM' | 'CORRECT' | 'COMPLETE' | 'SAVE_SCORE'
+  editorToken?: string
   reason: string
   fields: ReportFields
   homeRosterSnapshotId: string

@@ -393,6 +393,25 @@
   .schedule-row + .schedule-row {
     border-top: 1px solid #e8ede8;
   }
+  .schedule-row {
+    cursor: pointer;
+  }
+  .schedule-row:focus-visible {
+    outline: 2px solid #9b7f37;
+    outline-offset: -2px;
+  }
+  .schedule-row__team .team-trigger {
+    flex: 0 1 auto;
+    width: fit-content;
+  }
+  .schedule-row__team .team-trigger:has(.team-crest) {
+    flex: 0 0 auto;
+  }
+  .schedule-row__team .schedule-row__team-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .schedule-row__body {
     display: grid;
     grid-template-columns: 62px 110px minmax(0, 1fr) 66px 96px 94px;

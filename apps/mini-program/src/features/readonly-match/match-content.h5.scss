@@ -1,6 +1,296 @@
 /* postcss-pxtransform disable */
 @use '../../pages/readonly-match-detail/index';
 
+.experience-scoreboard .experience-scoreboard__score .experience-scoreboard__result {
+  margin: 0;
+  color: #fff;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.experience-scoreboard .experience-scoreboard__score .experience-scoreboard__penalty {
+  margin-top: 6px;
+  color: #d7c680;
+  font-size: 12px;
+}
+.experience-scoreboard__name {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.experience-scoreboard__inputs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 48px;
+  font-weight: 900;
+  color: white;
+}
+.experience-scoreboard__input {
+  box-sizing: border-box;
+  width: 74px;
+  height: 72px;
+  padding: 0;
+  color: white;
+  background: #ffffff12;
+  border: 1px solid #d5e2cc8c;
+  border-radius: 5px;
+  font: inherit;
+  text-align: center;
+  appearance: textfield;
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    appearance: none;
+  }
+}
+.rating-choice {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.rating-form__hint {
+  display: block;
+  margin-top: 8px;
+  color: #7a847d;
+  font-size: 11px;
+}
+.rating-distribution {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+}
+.rating-distribution__item {
+  display: grid;
+  grid-template-columns: auto 42px auto;
+  align-items: center;
+  gap: 6px;
+  color: #667368;
+  font-size: 11px;
+  i {
+    height: 5px;
+    overflow: hidden;
+    background: #e4e9e2;
+    border-radius: 3px;
+  }
+  b {
+    display: block;
+    height: 100%;
+    background: #b59a4b;
+  }
+  strong {
+    color: #28442f;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+}
+.match-comment-entry {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+  padding: 14px 0;
+  color: #738078;
+  font-size: 12px;
+  [type='button'] {
+    padding: 8px 16px;
+    color: #224e34;
+    background: #fff;
+    border: 1px solid #c9d5c8;
+    border-radius: 5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+.match-comment-form {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: #fff;
+  border: 1px solid #d4ddd2;
+  border-radius: 6px;
+  .match-comment-form__label {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .match-comment-form__textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 85px;
+    padding: 12px;
+    resize: vertical;
+    border: 1px solid #d4ddd2;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 13px;
+  }
+  > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .match-comment-form__count {
+    margin-right: auto;
+    color: #7a847d;
+    font-size: 11px;
+  }
+  [type='button'],
+  [type='submit'] {
+    padding: 8px 14px;
+    border: 1px solid #c9d5c8;
+    border-radius: 4px;
+    background: #f6f7f0;
+    color: #31543b;
+    cursor: pointer;
+  }
+  [type='submit'] {
+    color: #fff;
+    background: #234b33;
+    border-color: #234b33;
+  }
+  [type]:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+@media (min-width: 721px) {
+  .experience-match-header__context {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .experience-match-header__context .experience-match-header__date,
+  .experience-match-header__context .experience-match-header__venue {
+    margin: 0;
+  }
+  .experience-match-header {
+    position: relative;
+    padding: 12px 24px 16px;
+    border-bottom-width: 3px;
+  }
+  .experience-match-header__date {
+    margin-top: 5px;
+    font-size: 12px;
+  }
+  .experience-match-header__venue {
+    margin-top: 3px;
+  }
+  .experience-scoreboard {
+    grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr);
+    max-width: 680px;
+    margin: 12px auto 0;
+    gap: 22px;
+  }
+  .experience-scoreboard__team {
+    gap: 7px;
+    cursor: default;
+  }
+  .experience-scoreboard .team-crest {
+    width: 68px;
+    height: 68px;
+  }
+  .match-summary {
+    margin-top: 12px;
+    padding: 10px 14px;
+  }
+  .match-detail-tabs {
+    max-width: none;
+    margin: 16px 0 0;
+    padding: 3px;
+  }
+  .match-detail-tab {
+    min-height: 36px;
+    line-height: 36px;
+    font-size: 12px;
+  }
+  .match-tab-content {
+    margin-top: 16px;
+  }
+  .rating-overview {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+  .rating-overview__score {
+    min-height: 92px;
+    padding: 14px;
+  }
+  .rating-overview__score text:first-child {
+    font-size: 32px;
+  }
+  .rating-overview__score text:nth-child(2) {
+    margin-top: 5px;
+    font-size: 13px;
+  }
+  .rating-overview__score text:last-child {
+    margin-top: 4px;
+  }
+  .rating-form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 20px;
+  }
+  .rating-form__title {
+    font-size: 13px;
+  }
+  .rating-stars {
+    margin: 5px 0 0;
+  }
+  .rating-star {
+    width: 30px;
+    height: 32px;
+    font-size: 25px;
+    line-height: 32px;
+  }
+  .rating-form__submit {
+    width: auto;
+    min-height: 32px;
+    margin: 0;
+    padding: 6px 15px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .match-review-section {
+    margin-top: 0;
+  }
+  .match-review-section .product-section-heading__title {
+    font-size: 17px;
+  }
+  .match-review-section .product-section-heading__kicker {
+    display: none;
+  }
+  .match-review-section .product-section {
+    margin-top: 14px;
+  }
+  .match-review {
+    padding: 14px;
+  }
+}
+@media (min-width: 721px) and (max-width: 960px) {
+  .rating-distribution {
+    gap: 9px;
+  }
+  .rating-distribution__item {
+    grid-template-columns: auto auto;
+    i {
+      display: none;
+    }
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .experience-scoreboard__name:hover {
+    color: #d8c984;
+  }
+}
+
 // Existing match styling uses web pixel sizes; preserve them on H5 screens.
 @media (max-width: 720px) {
   .match-dialog .match-detail-tab {

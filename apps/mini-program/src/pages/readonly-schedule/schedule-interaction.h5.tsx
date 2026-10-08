@@ -142,7 +142,10 @@ export function ScheduleLink({
       data-team-tournament={teamParams?.get('tournamentId') ?? undefined}
       type="button"
       disabled={pending}
-      onClick={() => void navigate(url, replace)}
+      onClick={(event) => {
+        event.stopPropagation()
+        void navigate(url, replace)
+      }}
     >
       {children}
     </button>

@@ -26,6 +26,8 @@ import {
   ReportHistoryResponseDto,
   ReportWorkspaceResponseDto,
   WriteMatchReportDto,
+  BeginMatchReportDto,
+  RequestMatchReportChangeDto,
 } from './match-report.dto'
 import { MatchReportService } from './match-report.service'
 
@@ -36,6 +38,30 @@ import { MatchReportService } from './match-report.service'
 @AuthorizeInApplicationService()
 export class MatchReportController {
   constructor(@Inject(MatchReportService) private readonly reports: MatchReportService) {}
+
+  @Post('editor')
+  @HttpCode(200)
+  @ApiBody({ type: BeginMatchReportDto })
+  begin(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+    @Body() body: BeginMatchReportDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.reports.begin(authorization, matchId, body.clientActionId, getRequestId(request))
+  }
+
+  @Post('change-requests')
+  @HttpCode(200)
+  @ApiBody({ type: RequestMatchReportChangeDto })
+  requestChange(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+    @Body() body: RequestMatchReportChangeDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.reports.requestChange(authorization, matchId, body, getRequestId(request))
+  }
 
   @Get()
   @ApiOkResponse({ type: ReportWorkspaceResponseDto })

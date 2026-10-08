@@ -3,7 +3,13 @@
     display: inline-flex;
     vertical-align: middle;
     cursor: pointer;
-    border-radius: 50%;
+    border-radius: 3px;
+    transition: color 120ms ease-out;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .player-trigger:hover {
+      color: #63855f;
+    }
   }
   .player-trigger:focus-visible {
     outline: 2px solid #1f6b45;
