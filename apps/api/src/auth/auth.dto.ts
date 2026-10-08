@@ -21,6 +21,11 @@ export class LoginDto {
 }
 
 export class RegisterDto {
+  @ApiProperty({ required: false, description: '邮箱服务启用后必填，6位邮件验证码' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{6}$/)
+  emailCode?: string
   @ApiProperty({ type: String, description: '登录用户名', example: 'linzhixia' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -85,6 +90,8 @@ export class LinkedPlayerDto {
 }
 
 export class AuthUserDto {
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, required: false })
+  emailVerifiedAt?: string | null
   @ApiProperty({ type: String })
   id!: string
 

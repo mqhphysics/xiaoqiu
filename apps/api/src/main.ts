@@ -4,8 +4,11 @@ import { NestFactory } from '@nestjs/core'
 
 import { AppModule } from './app.module'
 import { configureApp } from './app.setup'
+import { resolve } from 'node:path'
+import { loadMailEnvironment } from './auth/mail-env'
 
 async function bootstrap(): Promise<void> {
+  loadMailEnvironment(resolve(__dirname, '../../..'))
   const app = await NestFactory.create(AppModule)
 
   configureApp(app)

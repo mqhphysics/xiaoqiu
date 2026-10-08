@@ -50,7 +50,13 @@ export class AuthContextGuard implements CanActivate {
       .replace(/\/+$/, '')
       .toLowerCase()
     const publicRead = path.startsWith('public/')
-    const login = path === 'auth/login' || path === 'auth/register'
+    const login = [
+      'auth/login',
+      'auth/register',
+      'auth/email/code',
+      'auth/email/login',
+      'auth/password/reset-by-email',
+    ].includes(path)
     const admin = path.startsWith('admin/')
     if (!publicRead && !login && !admin) return true
 

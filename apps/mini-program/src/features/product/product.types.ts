@@ -127,6 +127,7 @@ export interface AuthRole {
 }
 
 export interface AuthUser {
+  emailVerifiedAt?: string | null
   id: string
   organizationId: string
   username: string
