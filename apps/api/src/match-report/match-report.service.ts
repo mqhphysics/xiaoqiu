@@ -328,8 +328,8 @@ export class MatchReportService {
             })
             if (completed) throw conflict('这次编辑已经完成，请申请修改')
           }
-          if (body.action === 'COMPLETE' && !editorContext)
-            throw forbidden('请先从比赛详情开始编辑')
+          const inlineFinish = body.action === 'COMPLETE' || body.action === 'SAVE_SCORE'
+          if (inlineFinish && !editorContext) throw forbidden('请先从比赛详情开始编辑')
           await tx.idempotencyRecord.create({
             data: {
               organizationId: session.organizationId,
@@ -340,7 +340,7 @@ export class MatchReportService {
               expiresAt: new Date(Date.now() + 30 * DAY),
             },
           })
-          if (body.action !== 'COMPLETE' && match.reportVersion !== body.expectedVersion)
+          if (!inlineFinish && match.reportVersion !== body.expectedVersion)
             throw conflict('其他工作人员已保存新版本。请先核对最新版本。', {
               currentVersion: match.reportVersion,
               expectedVersion: body.expectedVersion,
@@ -349,23 +349,29 @@ export class MatchReportService {
           if (previous) this.requireUnchangedMatchContext(match, previous)
           let status: ReportStatus
           const published =
-            body.action === 'COMPLETE' &&
-            match.confirmedReportVersion === editorContext?.confirmedReportVersion
-          const effectiveAction =
-            body.action === 'COMPLETE' ? (published ? 'CONFIRM' : 'SUBMIT') : body.action
+            inlineFinish &&
+            (!(await this.isComplete(tx, match)) ||
+              (editorContext?.approvedCorrection === true &&
+                match.confirmedReportVersion === editorContext.confirmedReportVersion))
+          const effectiveAction = inlineFinish ? (published ? 'CONFIRM' : 'SUBMIT') : body.action
+          const partialContinuation =
+            !!editorContext &&
+            previous?.status === 'CONFIRMED' &&
+            !(await this.isComplete(tx, match))
           try {
-            status =
-              body.action === 'COMPLETE'
-                ? published
-                  ? 'CONFIRMED'
-                  : 'SUBMITTED'
-                : nextReportStatus(
-                    body.action === 'CORRECT' && (await this.isComplete(tx, match))
-                      ? 'CONFIRMED'
+            status = inlineFinish
+              ? published
+                ? 'CONFIRMED'
+                : 'SUBMITTED'
+              : nextReportStatus(
+                  body.action === 'CORRECT' && (await this.isComplete(tx, match))
+                    ? 'CONFIRMED'
+                    : partialContinuation
+                      ? 'DRAFT'
                       : ((previous?.status as ReportStatus) ?? null),
-                    body.action,
-                    privilege.administrator,
-                  )
+                  body.action,
+                  privilege.administrator,
+                )
           } catch (cause) {
             if (cause instanceof ReportRuleError) throw conflict(cause.message)
             throw cause
@@ -417,7 +423,7 @@ export class MatchReportService {
                 isKnockout: match.stage?.type === 'KNOCKOUT',
               },
               body.action === 'SUBMIT' || body.action === 'CONFIRM' || body.action === 'COMPLETE',
-              body.action === 'SAVE' && !!editorContext,
+              (body.action === 'SAVE' || body.action === 'SAVE_SCORE') && !!editorContext,
             )
           } catch (cause) {
             if (cause instanceof ReportRuleError) throw invalid(cause.message)
@@ -467,6 +473,7 @@ export class MatchReportService {
               fields: {
                 ...canonicalFields(fields),
                 _matchContext: this.matchContext(match),
+                ...(body.action === 'SAVE_SCORE' ? { _detailsIncomplete: true } : {}),
                 ...(editorContext?.approvedCorrection ? { _inlineCorrection: true } : {}),
               },
               homeRosterSnapshotId: context.home.id,
@@ -507,9 +514,15 @@ export class MatchReportService {
             await tx.matchEvent.deleteMany({
               where: { organizationId: session.organizationId, matchId: match.id },
             })
-            if (!abandoned && fields.events.length)
+            const projectedEvents = fields.events.filter(
+              (event) =>
+                event.minute !== '' &&
+                event.playerId !== '' &&
+                (event.kind !== 'SUBSTITUTION' || event.relatedPlayerId !== ''),
+            )
+            if (!abandoned && projectedEvents.length)
               await tx.matchEvent.createMany({
-                data: fields.events.map((event, index) => ({
+                data: projectedEvents.map((event, index) => ({
                   organizationId: session.organizationId,
                   matchId: match.id,
                   teamId: event.side === 'HOME' ? match.homeTeamId! : match.awayTeamId!,
@@ -545,16 +558,8 @@ export class MatchReportService {
               },
             })
           }
-          await this.notifications(
-            tx,
-            session,
-            match,
-            revision,
-            previous,
-            requestId,
-            body.action === 'COMPLETE',
-          )
-          if (body.action === 'COMPLETE')
+          await this.notifications(tx, session, match, revision, previous, requestId, inlineFinish)
+          if (inlineFinish)
             await tx.auditLog.create({
               data: {
                 organizationId: session.organizationId,
@@ -599,9 +604,7 @@ export class MatchReportService {
           const response = {
             ...(await this.workspace(tx, updated, privilege)),
             savedVersion: revision.version,
-            ...(body.action === 'COMPLETE'
-              ? { completion: { published, retained: !published } }
-              : {}),
+            ...(inlineFinish ? { completion: { published, retained: !published } } : {}),
           }
           await tx.idempotencyRecord.update({
             where: {
@@ -903,8 +906,12 @@ export class MatchReportService {
     const context = await this.context(tx, match, latest ?? undefined)
     const blockingReasons = this.blockingReasons(match, context)
     const ready = blockingReasons.length === 0
-    const editable = !latest || latest.status === 'DRAFT' || latest.status === 'RETURNED'
     const completed = (await this.isComplete(tx, match)) || latest?.status === 'SUBMITTED'
+    const editable =
+      !latest ||
+      latest.status === 'DRAFT' ||
+      latest.status === 'RETURNED' ||
+      (!completed && latest.status === 'CONFIRMED')
     const correction =
       editable &&
       latest &&
@@ -970,7 +977,22 @@ export class MatchReportService {
     }
   }
   private async isComplete(tx: Database, match: ReportMatch) {
-    if (match.confirmedReportVersion !== null) return true
+    if (match.confirmedReportVersion !== null) {
+      const confirmed = await tx.matchReportRevision.findFirst({
+        where: {
+          organizationId: match.organizationId,
+          matchId: match.id,
+          version: match.confirmedReportVersion,
+        },
+        select: { fields: true },
+      })
+      return !(
+        confirmed?.fields &&
+        typeof confirmed.fields === 'object' &&
+        !Array.isArray(confirmed.fields) &&
+        confirmed.fields._detailsIncomplete === true
+      )
+    }
     if (match.status !== 'FINISHED' || match.homeScore === null || match.awayScore === null)
       return false
     const events = await tx.matchEvent.findMany({

@@ -6,7 +6,15 @@ export function initialInlineFields(
   match: MatchExperienceResponse,
   workspace: ReportWorkspace,
 ): ReportFields {
-  if (workspace.latest) return cloneFields(workspace.latest.fields)
+  if (workspace.latest) {
+    const stored = cloneFields(workspace.latest.fields)
+    return changeInlineScore(
+      changeInlineScore(stored, 'HOME', stored.homeScore, () => crypto.randomUUID()),
+      'AWAY',
+      stored.awayScore,
+      () => crypto.randomUUID(),
+    )
+  }
   const fields = emptyFields()
   fields.homeScore = String(match.homeScore ?? 0)
   fields.awayScore = String(match.awayScore ?? 0)
@@ -25,7 +33,12 @@ export function initialInlineFields(
       playerId: event.player?.id ?? '',
       relatedPlayerId: event.relatedPlayer?.id ?? '',
     }))
-  return fields
+  return changeInlineScore(
+    changeInlineScore(fields, 'HOME', fields.homeScore, () => crypto.randomUUID()),
+    'AWAY',
+    fields.awayScore,
+    () => crypto.randomUUID(),
+  )
 }
 
 export function scoringSide(event: ReportEvent): Side {
@@ -86,6 +99,31 @@ export function orderedReportEvents(events: ReportEvent[]) {
       (a.minute === '' ? Infinity : Number(a.minute)) -
         (b.minute === '' ? Infinity : Number(b.minute)) ||
       Number(a.addedMinute) - Number(b.addedMinute),
+  )
+}
+
+export type EventClock = Pick<ReportEvent, 'minute' | 'addedMinute'>
+export function eventsByConfirmedClock(events: ReportEvent[], clocks: Record<string, EventClock>) {
+  const value = (event: ReportEvent) =>
+    clocks[event.id]?.minute ? Number(clocks[event.id]!.minute) : Infinity
+  return [...events].sort(
+    (a, b) =>
+      value(a) - value(b) ||
+      Number(clocks[a.id]?.addedMinute || 0) - Number(clocks[b.id]?.addedMinute || 0),
+  )
+}
+export function eventReady(event: ReportEvent, workspace: ReportWorkspace) {
+  const players = event.side === 'HOME' ? workspace.homeTeam.players : workspace.awayTeam.players
+  return (
+    /^\d{1,3}$/.test(event.minute) &&
+    Number(event.minute) <= 120 &&
+    (event.addedMinute === '' ||
+      (/^\d{1,2}$/.test(event.addedMinute) && Number(event.addedMinute) <= 30)) &&
+    players.some((player) => player.id === event.playerId) &&
+    (event.relatedPlayerId === '' ||
+      (event.relatedPlayerId !== event.playerId &&
+        players.some((player) => player.id === event.relatedPlayerId))) &&
+    (event.kind !== 'SUBSTITUTION' || event.relatedPlayerId !== '')
   )
 }
 

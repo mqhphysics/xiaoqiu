@@ -44,10 +44,10 @@
 .inline-match-events {
   position: relative;
   margin: 0;
-  padding: 0 0 0 20px;
+  padding: 0 0 0 28px;
   list-style: none;
   &::before {
-    content: '';
+    content: none;
     position: absolute;
     left: 4px;
     top: 26px;
@@ -68,14 +68,43 @@
   &::before {
     content: '';
     position: absolute;
-    left: -19px;
-    top: 27px;
-    width: 8px;
-    height: 8px;
+    box-sizing: border-box;
+    left: -24px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
     border: 2px solid #f6f6ef;
     border-radius: 50%;
     background: #557950;
+    z-index: 1;
   }
+  &::after {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: -1px;
+    width: 2px;
+    background: #bbcbb3;
+  }
+  &:first-child::after {
+    top: 50%;
+  }
+  &:last-child::after {
+    bottom: 50%;
+  }
+}
+.inline-match-event__done {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 7px 12px;
+  border: 1px solid #b9cbb6;
+  border-radius: 4px;
+  background: #eef3e8;
+  color: #30573b;
+  font-size: 12px;
+  cursor: pointer;
 }
 .inline-match-event__clock {
   font-size: 12px;
@@ -113,6 +142,7 @@
   background: #f3e5df;
 }
 .inline-match-event__player {
+  flex: 0 1 220px;
   min-width: 0;
   width: 220px;
   height: 36px;
@@ -123,6 +153,75 @@
   border-radius: 4px;
   font: inherit;
   font-size: 13px;
+}
+.inline-match-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #142a215e;
+}
+.inline-match-dialog {
+  box-sizing: border-box;
+  width: min(460px, 100%);
+  padding: 20px;
+  color: #294b35;
+  background: #f8f8f1;
+  border: 1px solid #cfdbca;
+  border-radius: 10px;
+  box-shadow: 0 18px 60px #102b2440;
+}
+.inline-match-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.inline-match-dialog h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.inline-match-dialog [type='button'],
+.inline-match-dialog [type='submit'] {
+  padding: 8px 16px;
+  color: #315239;
+  border: 1px solid #c4d2be;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.inline-match-dialog > header [type='button'] {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 25px;
+}
+.inline-match-dialog__copy {
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.inline-match-dialog__actions {
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.inline-match-dialog .inline-match-dialog__primary {
+  color: white;
+  background: #244e35;
+  border-color: #244e35;
+}
+.inline-match-dialog .inline-match-request {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .inline-match-penalties {
   display: flex;

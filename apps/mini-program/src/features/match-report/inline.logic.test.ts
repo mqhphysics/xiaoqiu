@@ -6,8 +6,33 @@ import {
   resizeEventRows,
   orderedReportEvents,
   scoringSide,
+  eventsByConfirmedClock,
 } from './inline.logic.ts'
 import type { ReportEvent } from './types.ts'
+
+test('editing time does not move an event until its confirmed clock is updated', () => {
+  const rows: ReportEvent[] = [12, 35].map((minute, index) => ({
+    id: String(index),
+    kind: 'GOAL',
+    side: 'HOME',
+    minute: String(minute),
+    addedMinute: '',
+    playerId: '',
+    relatedPlayerId: '',
+  }))
+  const clocks = { '0': { minute: '12', addedMinute: '' }, '1': { minute: '35', addedMinute: '' } }
+  rows[0]!.minute = '65'
+  assert.deepEqual(
+    eventsByConfirmedClock(rows, clocks).map((row) => row.id),
+    ['0', '1'],
+  )
+  assert.deepEqual(
+    eventsByConfirmedClock(rows, { ...clocks, '0': { minute: '65', addedMinute: '' } }).map(
+      (row) => row.id,
+    ),
+    ['1', '0'],
+  )
+})
 
 test('score and quantity changes generate exactly the required rows, keeping filled facts ahead of placeholders', () => {
   let sequence = 0

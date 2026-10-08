@@ -632,7 +632,7 @@
     background: transparent;
     border: 0;
     &::before {
-      content: '';
+      content: none;
       position: absolute;
       left: 26px;
       top: 26px;
@@ -652,14 +652,31 @@
       content: '';
       position: absolute;
       z-index: 1;
-      left: 3px;
-      top: 27px;
-      width: 8px;
-      height: 8px;
+      box-sizing: border-box;
+      left: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
       border: 2px solid #f6f6ef;
       border-radius: 50%;
       background: #47774f;
       box-shadow: 0 0 0 1px #7d9a6e;
+    }
+    li::after {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: -1px;
+      width: 2px;
+      background: #c0ceb8;
+    }
+    li:first-child::after {
+      top: 50%;
+    }
+    li:last-child::after {
+      bottom: 50%;
     }
     li > .match-event__copy {
       gap: 4px;

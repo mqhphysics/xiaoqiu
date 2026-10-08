@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useOverlayFocus } from '../../components/overlay-focus/index.h5'
 import { MatchIcon } from '../readonly-match/match-icons.h5'
 import type { InlineReportController } from './use-inline-report.h5'
-import { inlineEventCount, orderedReportEvents } from './inline.logic'
+import { inlineEventCount } from './inline.logic'
 import type { EventKind, Side } from './types'
 import './inline-editor.h5.scss'
 
@@ -34,7 +36,7 @@ export function InlineEventEditor({ editor }: { editor: InlineReportController }
         ))}
       </div>
       <ol className="inline-match-events">
-        {orderedReportEvents(editor.fields.events).map((event) => {
+        {editor.displayEvents.map((event) => {
           const team = event.side === 'HOME' ? workspace.homeTeam : workspace.awayTeam
           return (
             <li
@@ -110,6 +112,15 @@ export function InlineEventEditor({ editor }: { editor: InlineReportController }
                   </select>
                 </>
               ) : null}
+              <button
+                type="button"
+                className="inline-match-event__done"
+                disabled={editor.locked}
+                aria-label="完成本条事件"
+                onClick={() => editor.completeEvent(event.id)}
+              >
+                完成
+              </button>
             </li>
           )
         })}
@@ -152,6 +163,32 @@ export function InlineEventEditor({ editor }: { editor: InlineReportController }
       >
         {editor.busy ? '正在保存…' : '完成编辑'}
       </button>
+      {editor.confirmingScore && (
+        <InlineDialog
+          title="事件细节尚未填完"
+          onClose={editor.busy ? () => undefined : editor.cancelScore}
+        >
+          <p className="inline-match-dialog__copy">可以先保存比分，让其他编辑员继续补全事件。</p>
+          {editor.error && (
+            <p className="inline-match-error" role="alert">
+              {editor.error}
+            </p>
+          )}
+          <div className="inline-match-dialog__actions">
+            <button type="button" disabled={editor.busy} onClick={editor.cancelScore}>
+              继续填写
+            </button>
+            <button
+              type="button"
+              className="inline-match-dialog__primary"
+              disabled={editor.busy}
+              onClick={() => void editor.confirmScore()}
+            >
+              {editor.busy ? '正在保存…' : '先保存比分'}
+            </button>
+          </div>
+        </InlineDialog>
+      )}
     </section>
   )
 }
@@ -159,38 +196,76 @@ export function MatchChangeRequest({ editor }: { editor: InlineReportController 
   const [reason, setReason] = useState('')
   if (!editor.requesting) return null
   return (
-    <form
-      className="inline-match-request"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void editor.requestChange(reason)
+    <InlineDialog title="申请修改" onClose={editor.busy ? () => undefined : editor.closeRequest}>
+      <form
+        className="inline-match-request"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void editor.requestChange(reason)
+        }}
+      >
+        <textarea
+          id="match-change-reason"
+          className="inline-match-request__reason"
+          maxLength={240}
+          value={reason}
+          disabled={editor.busy}
+          placeholder="需要修改哪些比分或事件？"
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <div>
+          <button type="button" disabled={editor.busy} onClick={editor.closeRequest}>
+            取消
+          </button>
+          <button type="submit" disabled={reason.trim().length < 2 || editor.busy}>
+            {editor.busy ? '提交中…' : '提交申请'}
+          </button>
+        </div>
+        {editor.error && (
+          <p className="inline-match-error" role="alert">
+            {editor.error}
+          </p>
+        )}
+      </form>
+    </InlineDialog>
+  )
+}
+
+function InlineDialog({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  const id = `inline-match-dialog-${useId().replace(/:/g, '')}`
+  useOverlayFocus(true, `#${id}`, onClose)
+  return createPortal(
+    <div
+      className="inline-match-dialog-scrim"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
       }}
     >
-      <label className="inline-match-request__label" htmlFor="match-change-reason">
-        申请修改
-      </label>
-      <textarea
-        id="match-change-reason"
-        className="inline-match-request__reason"
-        maxLength={240}
-        value={reason}
-        disabled={editor.busy}
-        placeholder="需要修改哪些比分或事件？"
-        onChange={(event) => setReason(event.target.value)}
-      />
-      <div>
-        <button type="button" disabled={editor.busy} onClick={editor.closeRequest}>
-          取消
-        </button>
-        <button type="submit" disabled={reason.trim().length < 2 || editor.busy}>
-          {editor.busy ? '提交中…' : '提交申请'}
-        </button>
-      </div>
-      {editor.error && (
-        <p className="inline-match-error" role="alert">
-          {editor.error}
-        </p>
-      )}
-    </form>
+      <section
+        id={id}
+        className="inline-match-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+      >
+        <header>
+          <h2>{title}</h2>
+          <button type="button" aria-label={`关闭${title}`} onClick={onClose}>
+            ×
+          </button>
+        </header>
+        {children}
+      </section>
+    </div>,
+    document.body,
   )
 }

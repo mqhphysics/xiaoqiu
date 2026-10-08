@@ -789,6 +789,77 @@ test(
           )
         },
       )
+      await t.test('仅比分公开后仍可编辑，另一信息员可补齐且不生成空白球员事件', async () => {
+        const target = await createExtraMatch('SCORE-ONLY')
+        await prisma.roleAssignment.createMany({
+          data: [reporter, reporter2].map((user) => ({
+            organizationId: organization.id,
+            userId: user.id,
+            role: 'MATCH_REPORTER',
+            scopeType: 'MATCH',
+            scopeId: target.id,
+          })),
+        })
+        const begin = async (id: string) =>
+          (
+            await request(server)
+              .post(`/api/matches/${target.id}/report/editor`)
+              .set('authorization', bearer(id))
+              .send({ clientActionId: randomUUID() })
+              .expect(200)
+          ).body
+        const first = await begin(reporter.id),
+          peer = await begin(reporter2.id)
+        const bind = (
+          started: typeof first,
+          fields: ReportFieldsDto,
+          action: WriteMatchReportDto['action'],
+          expectedVersion = 0,
+        ): WriteMatchReportDto => ({
+          ...content(expectedVersion, fields, action),
+          editorToken: started.editorToken,
+          homeRosterSnapshotId: started.homeTeam.rosterSnapshotId,
+          awayRosterSnapshotId: started.awayTeam.rosterSnapshotId,
+          ruleVersionId: started.ruleVersionId,
+          reason: 'FICTIONAL_TEST 仅比分及后续补全',
+        })
+        const partial: ReportFieldsDto = {
+          ...report,
+          events: report.events.map((event) => ({
+            ...event,
+            minute: '',
+            playerId: '',
+            relatedPlayerId: '',
+          })),
+        }
+        const saved = (
+          await postExtra(target, reporter.id, bind(first, partial, 'SAVE_SCORE')).expect(200)
+        ).body
+        assert.equal(saved.inline.completed, false)
+        assert.equal(saved.inline.canStart, true)
+        assert.equal(saved.officialResult.homeScore, 2)
+        assert.equal(await prisma.matchEvent.count({ where: { matchId: target.id } }), 0)
+        const resumed = await begin(reporter.id)
+        await postExtra(target, reporter.id, bind(resumed, partial, 'SAVE', 1)).expect(200)
+        const full: ReportFieldsDto = {
+          ...report,
+          events: report.events.map((event, index) => ({
+            ...event,
+            playerId:
+              event.side === 'HOME'
+                ? peer.homeTeam.players[index === 0 ? 0 : 1].id
+                : peer.awayTeam.players[0].id,
+            relatedPlayerId: index === 0 ? peer.homeTeam.players[1].id : '',
+          })),
+        }
+        const completed = (
+          await postExtra(target, reporter2.id, bind(peer, full, 'COMPLETE')).expect(200)
+        ).body
+        assert.equal(completed.completion.published, true)
+        assert.equal(completed.inline.completed, true)
+        assert.equal(completed.inline.canStart, false)
+        assert.equal(await prisma.matchEvent.count({ where: { matchId: target.id } }), 3)
+      })
       await t.test('两个编辑员并发完成：两个版本都留存，恰好一份公开', async () => {
         const target = await createExtraMatch('INLINE-RACE')
         await prisma.roleAssignment.createMany({

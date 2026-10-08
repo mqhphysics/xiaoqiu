@@ -196,7 +196,7 @@ function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
       )}
       <div className="match-horizontal-lineups__bench">
         {lineups.map((lineup) => (
-          <details key={lineup.team.id}>
+          <details key={lineup.team.id} open>
             <summary>
               {lineup.team.shortName} · 替补 {lineupGroups(lineup).substitutes.length} 人
             </summary>

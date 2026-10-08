@@ -75,7 +75,7 @@ export interface ReportWorkspace {
 export interface SaveReportCommand {
   clientActionId: string
   expectedVersion: number
-  action: 'SAVE' | 'SUBMIT' | 'RETURN' | 'CONFIRM' | 'CORRECT' | 'COMPLETE'
+  action: 'SAVE' | 'SUBMIT' | 'RETURN' | 'CONFIRM' | 'CORRECT' | 'COMPLETE' | 'SAVE_SCORE'
   editorToken?: string
   reason: string
   fields: ReportFields

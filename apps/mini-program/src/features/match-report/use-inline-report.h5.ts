@@ -11,6 +11,9 @@ import {
   draftWithScores,
   initialInlineFields,
   resizeEventRows,
+  eventsByConfirmedClock,
+  eventReady,
+  type EventClock,
 } from './inline.logic'
 import type {
   EventKind,
@@ -33,6 +36,8 @@ export function useInlineReport(
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [requesting, setRequesting] = useState(false)
+  const [confirmingScore, setConfirmingScore] = useState(false)
+  const [eventClocks, setEventClocks] = useState<Record<string, EventClock>>({})
   const token = useRef('')
   const pending = useRef<SaveReportCommand | null>(null)
   const inFlight = useRef(false)
@@ -108,6 +113,13 @@ export function useInlineReport(
       workspaceRef.current = data
       setFields(next)
       fieldsRef.current = next
+      setEventClocks(
+        Object.fromEntries(
+          next.events
+            .filter((event) => eventReady(event, data))
+            .map((event) => [event.id, { minute: event.minute, addedMinute: event.addedMinute }]),
+        ),
+      )
       setEditing(true)
     } catch (cause) {
       if (mounted.current) setError(cause instanceof Error ? cause.message : '不能开始编辑')
@@ -116,7 +128,7 @@ export function useInlineReport(
       if (mounted.current) setBusy(false)
     }
   }
-  async function save(action: 'SAVE' | 'COMPLETE') {
+  async function save(action: 'SAVE' | 'COMPLETE' | 'SAVE_SCORE') {
     if (!match || !workspaceRef.current || inFlight.current) return false
     const current = workspaceRef.current
     const next = action === 'SAVE' ? draftWithScores(fieldsRef.current) : fieldsRef.current
@@ -155,10 +167,15 @@ export function useInlineReport(
       workspaceRef.current = data
       setEditing(false)
       removeDraft(key)
-      if (action === 'COMPLETE') {
+      if (action === 'COMPLETE' || action === 'SAVE_SCORE') {
         onUpdated(await productRepository.getMatch(match.id))
+        setConfirmingScore(false)
         await Taro.showToast({
-          title: data.completion?.published ? '编辑完成，已公开' : '已保存，先发布的结果保持不变',
+          title: !data.completion?.published
+            ? '已保存，先发布的结果保持不变'
+            : action === 'SAVE_SCORE'
+              ? '比分已保存，可继续补全'
+              : '编辑完成，已公开',
           icon: 'none',
         })
       }
@@ -172,6 +189,17 @@ export function useInlineReport(
       inFlight.current = false
       if (mounted.current) setBusy(false)
     }
+  }
+  function finish() {
+    const current = workspaceRef.current
+    if (!current) return Promise.resolve(false)
+    const issues = validateReport(fieldsRef.current, current, true, '详情页完成编辑')
+    if (issues.length && issues.every((issue) => issue.field.startsWith('event-'))) {
+      setError('')
+      setConfirmingScore(true)
+      return Promise.resolve(false)
+    }
+    return save('COMPLETE')
   }
   async function requestChange(reason: string) {
     if (!match || inFlight.current) return
@@ -205,8 +233,24 @@ export function useInlineReport(
     locked: busy || !!pending.current,
     error,
     requesting,
+    confirmingScore,
+    confirmScore: () => save('SAVE_SCORE'),
+    cancelScore: () => setConfirmingScore(false),
+    displayEvents: eventsByConfirmedClock(fields.events, eventClocks),
+    completeEvent: (id: string) => {
+      const event = fieldsRef.current.events.find((event) => event.id === id)
+      if (!event || !workspaceRef.current || !eventReady(event, workspaceRef.current)) {
+        setError('请补齐本条事件的分钟和球员，换人需选择换上球员')
+        return
+      }
+      setError('')
+      setEventClocks((current) => ({
+        ...current,
+        [id]: { minute: event.minute, addedMinute: event.addedMinute },
+      }))
+    },
     start,
-    finish: () => save('COMPLETE'),
+    finish,
     saveDraft: () => save('SAVE'),
     requestChange,
     openRequest: () => {
