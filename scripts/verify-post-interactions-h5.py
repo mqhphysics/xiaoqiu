@@ -85,6 +85,9 @@ with sync_playwright() as p:
         checks.append("post favorite, post like and comment like write successfully")
 
         input_box = modal.get_by_role("textbox", name="评论内容", exact=True)
+        sync_option = modal.get_by_role("checkbox", name="评论同步转发到动态", exact=True)
+        expect(sync_option).not_to_be_checked()
+        sync_option.check()
         input_box.fill("FICTIONAL_TEST 回车发送")
         input_box.focus()
         styles = input_box.evaluate("e => ({outline:getComputedStyle(e).outlineStyle,border:getComputedStyle(e).borderWidth})")
@@ -95,6 +98,11 @@ with sync_playwright() as p:
         assert input_box.input_value().strip() == "FICTIONAL_TEST 回车发送"
         input_box.press("Enter")
         expect(input_box).to_have_value("")
+        posts = context.request.get(fixture["api"] + "/api/public/posts", headers={"Authorization": "Bearer " + fixture["session"]["accessToken"]}).json()["items"]
+        synced = [post for post in posts if post["body"] == "FICTIONAL_TEST 回车发送" and post["quotedPostId"] == fixture["postId"]]
+        assert len(synced) == 1 and synced[0]["tags"] == [], synced
+        expect(page.locator(".post-card").filter(has_text="FICTIONAL_TEST 回车发送")).to_have_count(1)
+        checks.append("checked round option beside emoji sends comment and one untagged quoted post, updating the home feed")
         own = modal.locator(".post-comment").filter(has_text="FICTIONAL_TEST 回车发送")
         expect(own).to_have_count(1)
         own = page.locator("#" + own.get_attribute("id"))
@@ -111,6 +119,7 @@ with sync_playwright() as p:
 
         modal.get_by_role("button", name="关闭动态详情").click()
         page.evaluate("id => window.dispatchEvent(new CustomEvent('xiaoqiu:open-post', {detail:id}))", fixture["postId"])
+        expect(modal.get_by_role("checkbox", name="评论同步转发到动态", exact=True)).not_to_be_checked()
         expect(modal.get_by_role("button", name="取消收藏", exact=True)).to_be_visible()
         expect(modal.get_by_role("button", name="取消点赞", exact=True)).to_have_attribute("aria-pressed", "true")
         expect(modal.locator(".post-comment__like").first).to_have_attribute("aria-pressed", "true")

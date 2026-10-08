@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -144,6 +145,11 @@ export class CreatePostDto {
 }
 
 export class CreateCommentDto {
+  @ApiPropertyOptional({ type: Boolean, description: '发表评论时同步发布引用原帖的动态，不带标签' })
+  @IsOptional()
+  @IsBoolean()
+  repostToFeed?: boolean
+
   @ApiProperty({ type: String, description: '客户端生成的评论幂等键' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

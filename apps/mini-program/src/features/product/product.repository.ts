@@ -258,10 +258,16 @@ export const productRepository = {
     body: string,
     clientCommentId: string,
     parentCommentId?: string,
+    repostToFeed?: boolean,
   ) =>
     request<PostComment>(`/community/posts/${encodeURIComponent(postId)}/comments`, {
       method: 'POST',
-      data: { body, clientCommentId, ...(parentCommentId ? { parentCommentId } : {}) },
+      data: {
+        body,
+        clientCommentId,
+        ...(parentCommentId ? { parentCommentId } : {}),
+        ...(repostToFeed ? { repostToFeed: true } : {}),
+      },
     }),
 
   getPlayerFollows: () => request<PlayerFollowsResponse>('/me/player-follows'),

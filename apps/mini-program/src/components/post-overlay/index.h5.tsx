@@ -84,6 +84,7 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
   const [loadError, setLoadError] = useState('')
   const [reload, setReload] = useState(0)
   const [body, setBody] = useState('')
+  const [repostComment, setRepostComment] = useState(false)
   const [replyTo, setReplyTo] = useState<PostComment | null>(null)
   const [sending, setSending] = useState(false)
   const [liking, setLiking] = useState(false)
@@ -171,7 +172,7 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
     busy.current = true
     setSending(true)
     setError('')
-    const signature = JSON.stringify([post.id, replyTo?.id, body.trim()])
+    const signature = JSON.stringify([post.id, replyTo?.id, body.trim(), repostComment])
     if (pending.current?.signature !== signature)
       pending.current = { signature, id: createClientActionId('comment') }
     try {
@@ -180,7 +181,14 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
         body.trim(),
         pending.current.id,
         replyTo?.id,
+        repostComment,
       )
+      if (created.repostedPost) {
+        updatePostInteraction(created.repostedPost)
+        window.dispatchEvent(
+          new CustomEvent('xiaoqiu:post-published', { detail: created.repostedPost }),
+        )
+      }
       setPost((current) =>
         current && !current.comments.some((item) => item.id === created.id)
           ? {
@@ -707,6 +715,15 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
                           insertAtCursor(textarea.current, body, emoji, 300, setBody)
                         }
                       />
+                      <label className="post-comment-composer__repost">
+                        <input
+                          type="checkbox"
+                          checked={repostComment}
+                          disabled={sending}
+                          onChange={(event) => setRepostComment(event.target.checked)}
+                        />
+                        <span>评论同步转发到动态</span>
+                      </label>
                       <span>{body.length ? `${body.length}/300` : ''}</span>
                       <button
                         type="button"

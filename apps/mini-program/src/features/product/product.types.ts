@@ -105,6 +105,7 @@ export interface PostSummary {
 }
 
 export interface PostComment {
+  repostedPost?: PostSummary | null
   id: string
   body: string
   parentCommentId: string | null

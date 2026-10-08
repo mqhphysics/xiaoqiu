@@ -92,6 +92,7 @@ class CommunityPrismaFake {
   private transactionDepth = 0
 
   post = {
+    findUnique: async () => null,
     findFirst: async ({ where }: { where: { id: string; organizationId: string } }) =>
       where.id === POST_ID && where.organizationId === ORGANIZATION_ID
         ? { id: POST_ID, authorUserId: AUTHOR_ID }
@@ -100,43 +101,57 @@ class CommunityPrismaFake {
 
   postComment = {
     findFirst: async () => null,
-    upsert: async ({
-      create,
-      where,
+    createMany: async ({
+      data,
     }: {
-      create: {
+      data: Array<{
         body: string
         clientCommentId: string
         organizationId: string
         parentCommentId: string | null
         postId: string
         userId: string
+      }>
+    }) => {
+      let count = 0
+      for (const create of data) {
+        if (
+          this.comments.some(
+            (item) =>
+              item.userId === create.userId && item.clientCommentId === create.clientCommentId,
+          )
+        )
+          continue
+        const stored = {
+          ...create,
+          id: `comment-${this.nextId++}`,
+          createdAt: new Date('2026-09-02T08:00:00.000Z'),
+          updatedAt: new Date('2026-09-02T08:00:00.000Z'),
+          _count: { likes: 0 },
+          likes: [],
+          user: {
+            id: create.userId,
+            displayName: '评论用户',
+            verificationLevel: 'STUDENT_VERIFIED',
+            avatarUrl: null,
+          },
+        }
+        this.comments.push(stored)
+        count += 1
       }
-      where: {
-        userId_clientCommentId: { clientCommentId: string; userId: string }
-      }
+      return { count }
+    },
+    findUnique: async ({
+      where,
+    }: {
+      where: { userId_clientCommentId: { clientCommentId: string; userId: string } }
     }) => {
       const key = where.userId_clientCommentId
-      const existing = this.comments.find(
-        (item) => item.userId === key.userId && item.clientCommentId === key.clientCommentId,
+      return (
+        this.comments.find(
+          (item) => item.userId === key.userId && item.clientCommentId === key.clientCommentId,
+        ) ?? null
       )
-      if (existing) return existing
-      const stored = {
-        ...create,
-        id: `comment-${this.nextId++}`,
-        createdAt: new Date('2026-09-02T08:00:00.000Z'),
-        updatedAt: new Date('2026-09-02T08:00:00.000Z'),
-        _count: { likes: 0 },
-        likes: [],
-        user: {
-          id: create.userId,
-          displayName: '评论用户',
-          verificationLevel: 'STUDENT_VERIFIED',
-          avatarUrl: null,
-        },
-      }
-      this.comments.push(stored)
-      return stored
     },
   }
 

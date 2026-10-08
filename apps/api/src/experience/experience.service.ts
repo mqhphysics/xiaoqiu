@@ -1521,32 +1521,79 @@ export class ExperienceService {
     const body = input.body.trim()
     const parentCommentId = parent?.id ?? null
     const recipientUserId = parent?.userId ?? post.authorUserId
-    const comment = await this.prisma.$transaction(async (tx) => {
-      const stored = await tx.postComment.upsert({
+    const result = await this.prisma.$transaction(async (tx) => {
+      const inserted = await tx.postComment.createMany({
+        data: [
+          {
+            organizationId: session.organizationId,
+            postId,
+            userId: session.userId,
+            parentCommentId,
+            clientCommentId: input.clientCommentId,
+            body,
+          },
+        ],
+        skipDuplicates: true,
+      })
+      const stored = await tx.postComment.findUnique({
         where: {
           userId_clientCommentId: {
             userId: session.userId,
             clientCommentId: input.clientCommentId,
           },
         },
-        create: {
-          organizationId: session.organizationId,
-          postId,
-          userId: session.userId,
-          parentCommentId,
-          clientCommentId: input.clientCommentId,
-          body,
-        },
-        update: {},
         include: commentInclude(session.userId),
       })
       if (
+        !stored ||
         stored.organizationId !== session.organizationId ||
         stored.postId !== postId ||
         stored.parentCommentId !== parentCommentId ||
         stored.body !== body
       ) {
         throw conflict('同一提交编号已用于其他评论内容，请重新发布')
+      }
+      const clientPostId = `comment-repost:${stored.id}`
+      let repostedPost = await tx.post.findUnique({
+        where: { authorUserId_clientPostId: { authorUserId: session.userId, clientPostId } },
+        include: postSummaryInclude(session.userId),
+      })
+      if (inserted.count === 0 && Boolean(repostedPost) !== Boolean(input.repostToFeed)) {
+        throw conflict('同一提交编号已用于不同的同步转发选项，请重新发布')
+      }
+      if (input.repostToFeed && !repostedPost) {
+        repostedPost = await tx.post.create({
+          data: {
+            organizationId: session.organizationId,
+            authorUserId: session.userId,
+            tournamentId: post.tournamentId,
+            clientPostId,
+            quotedPostId: post.id,
+            body,
+            type: PostType.COMMUNITY,
+            status: PostStatus.PUBLISHED,
+          },
+          include: postSummaryInclude(session.userId),
+        })
+        await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorType: AuditActorType.USER,
+            actorUserId: session.userId,
+            actorRoleSnapshot: session.user.roles.map(({ role, scopeType, scopeId }) => ({
+              role,
+              scopeType,
+              scopeId,
+            })),
+            action: 'COMMUNITY_POST_CREATED',
+            targetType: 'Post',
+            targetId: repostedPost.id,
+            afterSummary: { quotedPostId: post.id, sourceCommentId: stored.id, tags: [] },
+            requestId: input.clientCommentId,
+            source: 'API',
+            reason: '评论同步转发到动态',
+          },
+        })
       }
       if (recipientUserId) {
         await this.socialService.notify(
@@ -1563,9 +1610,19 @@ export class ExperienceService {
           tx,
         )
       }
-      return stored
+      return { comment: stored, repostedPost }
     })
-    const mappedComment = mapComment(comment, session.organizationId, session.userId)
+    const mappedComment = {
+      ...mapComment(result.comment, session.organizationId, session.userId),
+      ...(input.repostToFeed
+        ? {
+            repostedPost:
+              result.repostedPost?.status === PostStatus.PUBLISHED
+                ? mapPost(result.repostedPost, session.userId)
+                : null,
+          }
+        : {}),
+    }
     return mappedComment
   }
 
@@ -1611,10 +1668,9 @@ export class ExperienceService {
       })
       if (!comment) throw notFound('评论不存在')
       if (liked)
-        await tx.postCommentLike.upsert({
-          where: { commentId_userId: { commentId, userId: session.userId } },
-          create: { organizationId: session.organizationId, commentId, userId: session.userId },
-          update: {},
+        await tx.postCommentLike.createMany({
+          data: [{ organizationId: session.organizationId, commentId, userId: session.userId }],
+          skipDuplicates: true,
         })
       else
         await tx.postCommentLike.deleteMany({

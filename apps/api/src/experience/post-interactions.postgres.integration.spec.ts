@@ -12,6 +12,7 @@ import { AppModule } from '../app.module'
 import { configureApp } from '../app.setup'
 import { PrismaClient } from '../generated/prisma/client'
 import { seedDemoFixture } from '../database/seed-demo-fixture'
+import { SocialService } from '../social/social.service'
 
 test(
   'post interactions persist with ownership, version, quote visibility and tenant checks',
@@ -87,6 +88,98 @@ test(
           .expect(201)
       ).body
       const commentBase = base + '/comments/' + comment.id
+
+      await t.test(
+        'comment sync publishes one untagged quote atomically and rejects option changes on retries',
+        async () => {
+          const input = {
+            clientCommentId: `sync-${randomUUID()}`,
+            body: 'FICTIONAL_TEST 评论同步动态',
+            parentCommentId: comment.id,
+            repostToFeed: true,
+          }
+          const responses = await Promise.all([
+            http('post', base + '/comments', captain)
+              .send(input)
+              .expect(201),
+            http('post', base + '/comments', captain)
+              .send(input)
+              .expect(201),
+          ])
+          const synced = responses[0]!.body
+          assert.equal(responses[1]!.body.id, synced.id)
+          assert.equal(responses[1]!.body.repostedPost.id, synced.repostedPost.id)
+          assert.equal(synced.parentCommentId, comment.id)
+          assert.equal(synced.repostedPost.quotedPostId, post.id)
+          assert.equal(synced.repostedPost.body, input.body)
+          assert.deepEqual(synced.repostedPost.tags, [])
+          assert.equal(synced.repostedPost.team, null)
+          assert.equal(
+            await prisma!.post.count({ where: { clientPostId: `comment-repost:${synced.id}` } }),
+            1,
+          )
+          assert.equal(
+            await prisma!.postComment.count({ where: { clientCommentId: input.clientCommentId } }),
+            1,
+          )
+          assert.equal(
+            await prisma!.auditLog.count({
+              where: { targetId: synced.repostedPost.id, action: 'COMMUNITY_POST_CREATED' },
+            }),
+            1,
+          )
+          await http('post', base + '/comments', captain)
+            .send({ ...input, repostToFeed: false })
+            .expect(409)
+          await http('post', base + '/comments', captain)
+            .send({
+              clientCommentId: comment.clientCommentId ?? 'unused-key',
+              body: comment.body,
+              repostToFeed: 'yes',
+            })
+            .expect(400)
+          const normalInput = {
+            clientCommentId: `normal-${randomUUID()}`,
+            body: 'FICTIONAL_TEST 普通评论不转发',
+          }
+          const normal = (
+            await http('post', base + '/comments')
+              .send(normalInput)
+              .expect(201)
+          ).body
+          assert.equal(normal.repostedPost, undefined)
+          assert.equal(
+            await prisma!.post.count({ where: { clientPostId: `comment-repost:${normal.id}` } }),
+            0,
+          )
+          await http('post', base + '/comments')
+            .send({ ...normalInput, repostToFeed: true })
+            .expect(409)
+        },
+      )
+
+      await t.test(
+        'a failed notification rolls back both the comment and synchronized post',
+        async () => {
+          const social = app!.get(SocialService)
+          const originalNotify = social.notify
+          social.notify = async () => {
+            throw new Error('FICTIONAL_TEST notification persistence failure')
+          }
+          const clientCommentId = `rollback-${randomUUID()}`
+          const beforePosts = await prisma!.post.count()
+          try {
+            await http('post', base + '/comments', captain)
+              .send({ clientCommentId, body: 'FICTIONAL_TEST 原子回滚验证', repostToFeed: true })
+              .expect(500)
+            assert.equal(await prisma!.postComment.count({ where: { clientCommentId } }), 0)
+            assert.equal(await prisma!.post.count(), beforePosts)
+            assert.equal(await prisma!.auditLog.count({ where: { requestId: clientCommentId } }), 0)
+          } finally {
+            social.notify = originalNotify
+          }
+        },
+      )
 
       await t.test(
         'post and comment likes and post-only favorites survive reads, retries and cancellation',
