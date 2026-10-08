@@ -339,6 +339,7 @@ model Organization {
   tournamentProgressions TournamentProgression[]
 
   emailAuthCodes EmailAuthCode[]
+  emailChanges   EmailChangeRequest[]
 
   @@map("organizations")
 }
@@ -401,32 +402,56 @@ model User {
   lineupConfirmations    TeamLineupPlan[]        @relation("LineupConfirmationAuthor")
   tournamentProgressions TournamentProgression[] @relation("ProgressionAuthor")
   emailAuthCodes         EmailAuthCode[]
+  emailChanges           EmailChangeRequest[]
 
   @@index([realNameNormalized], map: "app_users_real_name_normalized_idx")
   @@map("app_users")
 }
 
 model EmailAuthCode {
-  id              String       @id @default(uuid()) @db.Uuid
-  organizationId  String       @map("organization_id") @db.Uuid
-  emailNormalized String       @map("email_normalized") @db.VarChar(254)
-  purpose         String       @db.VarChar(32)
-  userId          String?      @map("user_id") @db.Uuid
-  codeDigest      String       @map("code_digest") @db.VarChar(64)
-  expiresAt       DateTime     @map("expires_at") @db.Timestamptz(3)
-  attempts        Int          @default(0)
-  sendStatus      String       @default("PENDING") @map("send_status") @db.VarChar(16)
-  consumedAt      DateTime?    @map("consumed_at") @db.Timestamptz(3)
-  ipAddress       String?      @map("ip_address") @db.Inet
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user            User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String              @id @default(uuid()) @db.Uuid
+  organizationId  String              @map("organization_id") @db.Uuid
+  emailNormalized String              @map("email_normalized") @db.VarChar(254)
+  purpose         String              @db.VarChar(32)
+  contextId       String?             @map("context_id") @db.Uuid
+  context         EmailChangeRequest? @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  userId          String?             @map("user_id") @db.Uuid
+  codeDigest      String              @map("code_digest") @db.VarChar(64)
+  expiresAt       DateTime            @map("expires_at") @db.Timestamptz(3)
+  attempts        Int                 @default(0)
+  sendStatus      String              @default("PENDING") @map("send_status") @db.VarChar(16)
+  consumedAt      DateTime?           @map("consumed_at") @db.Timestamptz(3)
+  ipAddress       String?             @map("ip_address") @db.Inet
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, emailNormalized, purpose, createdAt], map: "email_auth_codes_lookup_idx")
   @@index([emailNormalized, createdAt], map: "email_auth_codes_email_rate_idx")
   @@index([ipAddress, createdAt], map: "email_auth_codes_ip_rate_idx")
   @@index([createdAt], map: "email_auth_codes_created_idx")
   @@map("email_auth_codes")
+}
+
+model EmailChangeRequest {
+  codes                   EmailAuthCode[]
+  id                      String          @id @default(uuid()) @db.Uuid
+  organizationId          String          @map("organization_id") @db.Uuid
+  userId                  String          @map("user_id") @db.Uuid
+  sessionId               String          @map("session_id") @db.Uuid
+  previousEmailNormalized String?         @map("previous_email_normalized") @db.VarChar(254)
+  newEmailNormalized      String?         @map("new_email_normalized") @db.VarChar(254)
+  oldVerifiedAt           DateTime?       @map("old_verified_at") @db.Timestamptz(3)
+  expiresAt               DateTime        @map("expires_at") @db.Timestamptz(3)
+  completedAt             DateTime?       @map("completed_at") @db.Timestamptz(3)
+  version                 Int             @default(1)
+  createdAt               DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization            Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session                 UserSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId, expiresAt], map: "email_change_requests_session_idx")
+  @@map("email_change_requests")
 }
 
 model PasswordCredential {
@@ -475,19 +500,20 @@ model WechatIdentity {
 }
 
 model UserSession {
-  id               String       @id @default(uuid()) @db.Uuid
-  userId           String       @map("user_id") @db.Uuid
-  organizationId   String       @map("organization_id") @db.Uuid
-  refreshTokenHash String       @unique(map: "user_sessions_refresh_token_hash_key") @map("refresh_token_hash") @db.VarChar(128)
-  expiresAt        DateTime     @map("expires_at") @db.Timestamptz(3)
-  revokedAt        DateTime?    @map("revoked_at") @db.Timestamptz(3)
-  lastSeenAt       DateTime?    @map("last_seen_at") @db.Timestamptz(3)
-  ipAddress        String?      @map("ip_address") @db.Inet
-  userAgent        String?      @map("user_agent") @db.VarChar(512)
-  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  emailChanges     EmailChangeRequest[]
+  id               String               @id @default(uuid()) @db.Uuid
+  userId           String               @map("user_id") @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  refreshTokenHash String               @unique(map: "user_sessions_refresh_token_hash_key") @map("refresh_token_hash") @db.VarChar(128)
+  expiresAt        DateTime             @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime?            @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt       DateTime?            @map("last_seen_at") @db.Timestamptz(3)
+  ipAddress        String?              @map("ip_address") @db.Inet
+  userAgent        String?              @map("user_agent") @db.VarChar(512)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([userId, revokedAt, expiresAt], map: "user_sessions_user_id_revoked_at_expires_at_idx")
   @@index([organizationId, revokedAt, expiresAt], map: "user_sessions_organization_id_revoked_at_expires_at_idx")
@@ -1107,29 +1133,29 @@ model MatchAppearance {
 }
 
 model Post {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  tournamentId   String?       @map("tournament_id") @db.Uuid
-  authorUserId   String?       @map("author_user_id") @db.Uuid
-  clientPostId   String?       @map("client_post_id") @db.VarChar(120)
-  teamId         String?       @map("team_id") @db.Uuid
-  type           PostType      @default(COMMUNITY)
-  status         PostStatus    @default(PUBLISHED)
-  title          String?       @db.VarChar(180)
-  body           String        @db.VarChar(2000)
-  imageUrl       String?       @map("image_url") @db.VarChar(512)
-  quotedPostId   String?       @map("quoted_post_id") @db.Uuid
-  publishedAt    DateTime      @default(now()) @map("published_at") @db.Timestamptz(3)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  tournament     Tournament?   @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
-  author         User?         @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  team           Team?         @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "posts_team_organization_fkey")
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  tournamentId   String?        @map("tournament_id") @db.Uuid
+  authorUserId   String?        @map("author_user_id") @db.Uuid
+  clientPostId   String?        @map("client_post_id") @db.VarChar(120)
+  teamId         String?        @map("team_id") @db.Uuid
+  type           PostType       @default(COMMUNITY)
+  status         PostStatus     @default(PUBLISHED)
+  title          String?        @db.VarChar(180)
+  body           String         @db.VarChar(2000)
+  imageUrl       String?        @map("image_url") @db.VarChar(512)
+  quotedPostId   String?        @map("quoted_post_id") @db.Uuid
+  publishedAt    DateTime       @default(now()) @map("published_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament     Tournament?    @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  author         User?          @relation("PostAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  team           Team?          @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "posts_team_organization_fkey")
   likes          PostLike[]
   favorites      PostFavorite[]
-  quotedPost     Post?         @relation("PostQuotes", fields: [quotedPostId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  quotes         Post[]        @relation("PostQuotes")
+  quotedPost     Post?          @relation("PostQuotes", fields: [quotedPostId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  quotes         Post[]         @relation("PostQuotes")
   comments       PostComment[]
   tags           PostTag[]
 
@@ -1181,21 +1207,21 @@ model PostLike {
 }
 
 model PostComment {
-  id              String        @id @default(uuid()) @db.Uuid
-  organizationId  String        @map("organization_id") @db.Uuid
-  postId          String        @map("post_id") @db.Uuid
-  userId          String        @map("user_id") @db.Uuid
-  parentCommentId String?       @map("parent_comment_id") @db.Uuid
-  clientCommentId String?       @map("client_comment_id") @db.VarChar(120)
-  body            String        @db.VarChar(500)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  hiddenAt        DateTime?     @map("hidden_at") @db.Timestamptz(3)
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentComment   PostComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: SetNull)
-  replies         PostComment[] @relation("CommentReplies")
+  id              String            @id @default(uuid()) @db.Uuid
+  organizationId  String            @map("organization_id") @db.Uuid
+  postId          String            @map("post_id") @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  parentCommentId String?           @map("parent_comment_id") @db.Uuid
+  clientCommentId String?           @map("client_comment_id") @db.VarChar(120)
+  body            String            @db.VarChar(500)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  hiddenAt        DateTime?         @map("hidden_at") @db.Timestamptz(3)
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  post            Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment   PostComment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: SetNull)
+  replies         PostComment[]     @relation("CommentReplies")
   likes           PostCommentLike[]
 
   @@unique([userId, clientCommentId], map: "post_comments_user_id_client_comment_id_key")

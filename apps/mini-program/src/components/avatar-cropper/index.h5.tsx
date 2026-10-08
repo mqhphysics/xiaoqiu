@@ -1,11 +1,10 @@
-import { Button, Image, Slider, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useMemo, useState } from 'react'
-
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useOverlayFocus } from '../overlay-focus'
 import { IconButton } from '../icon-button'
-
 import './index.scss'
+import './native.h5.scss'
 
 export function AvatarCropper({
   onCancel,
@@ -14,27 +13,33 @@ export function AvatarCropper({
   onCancel: () => void
   onConfirm: (dataUrl: string) => Promise<void>
 }) {
-  const [source, setSource] = useState<string | null>(null)
-  const [dimensions, setDimensions] = useState({ width: 1, height: 1 })
-  const [zoom, setZoom] = useState(1)
-  const [offsetX, setOffsetX] = useState(0)
-  const [offsetY, setOffsetY] = useState(0)
-  const [saving, setSaving] = useState(false)
-  useOverlayFocus(true, '.avatar-cropper-panel', onCancel)
+  const [source, setSource] = useState<string | null>(null),
+    [dimensions, setDimensions] = useState({ width: 1, height: 1 })
+  const [zoom, setZoom] = useState(1),
+    [offsetX, setOffsetX] = useState(0),
+    [offsetY, setOffsetY] = useState(0),
+    [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  useOverlayFocus(true, '.avatar-cropper-panel', () => {
+    if (!saving) onCancel()
+  })
+  useEffect(() => () => inputRef.current?.remove(), [])
   const preview = useMemo(
     () => getPreviewStyle(dimensions.width, dimensions.height, zoom, offsetX, offsetY),
     [dimensions.height, dimensions.width, offsetX, offsetY, zoom],
   )
-
-  const choose = async () => {
+  const choose = async (file: File | undefined) => {
+    if (!file) return
     try {
-      const result = await Taro.chooseImage({
-        count: 1,
-        sizeType: ['compressed'],
-        sourceType: ['album'],
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+        throw new Error('请选择 JPEG、PNG 或 WebP 照片')
+      if (file.size > 12 * 1024 * 1024) throw new Error('请选择小于12 MiB的照片')
+      const path = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(new Error('无法读取照片'))
+        reader.readAsDataURL(file)
       })
-      const path = result.tempFilePaths[0]
-      if (!path) return
       const image = await loadImage(path)
       setSource(path)
       setDimensions({ width: image.naturalWidth, height: image.naturalHeight })
@@ -42,21 +47,42 @@ export function AvatarCropper({
       setOffsetX(0)
       setOffsetY(0)
     } catch (error) {
-      await Taro.showToast({
+      void Taro.showToast({
         title: error instanceof Error ? error.message : '照片读取失败',
         icon: 'none',
       })
     }
   }
-
+  const chooseFile = () => {
+    inputRef.current?.remove()
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/jpeg,image/png,image/webp'
+    input.style.setProperty('display', 'none', 'important')
+    inputRef.current = input
+    const clean = () => {
+      input.remove()
+      if (inputRef.current === input) inputRef.current = null
+    }
+    input.addEventListener(
+      'change',
+      () => {
+        void choose(input.files?.[0])
+        clean()
+      },
+      { once: true },
+    )
+    input.addEventListener('cancel', clean, { once: true })
+    document.body.append(input)
+    input.click()
+  }
   const save = async () => {
     if (!source || saving) return
     setSaving(true)
     try {
-      const dataUrl = await cropAndCompress(source, dimensions, zoom, offsetX, offsetY)
-      await onConfirm(dataUrl)
+      await onConfirm(await cropAndCompress(source, dimensions, zoom, offsetX, offsetY))
     } catch (error) {
-      await Taro.showToast({
+      void Taro.showToast({
         title: error instanceof Error ? error.message : '头像保存失败',
         icon: 'none',
       })
@@ -64,41 +90,49 @@ export function AvatarCropper({
       setSaving(false)
     }
   }
-
-  return (
-    <View aria-modal role="dialog" aria-label="裁剪头像" className="avatar-cropper-modal">
-      <View className="avatar-cropper-backdrop" onClick={onCancel} />
-      <View className="avatar-cropper-panel">
-        <View className="avatar-cropper-heading">
-          <View>
-            <Text className="avatar-cropper-kicker">AVATAR</Text>
-            <Text className="avatar-cropper-title">裁剪并压缩头像</Text>
-          </View>
-          <IconButton icon="close" aria-label="关闭头像裁剪" className="avatar-cropper-close" onClick={onCancel}>
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="裁剪头像" className="avatar-cropper-modal">
+      <div
+        className="avatar-cropper-backdrop"
+        onClick={() => {
+          if (!saving) onCancel()
+        }}
+      />
+      <section className="avatar-cropper-panel">
+        <header className="avatar-cropper-heading">
+          <div>
+            <span className="avatar-cropper-kicker">AVATAR</span>
+            <h2 className="avatar-cropper-title">更换头像</h2>
+          </div>
+          <IconButton
+            icon="close"
+            aria-label="关闭头像裁剪"
+            className="avatar-cropper-close"
+            onClick={() => {
+              if (!saving) onCancel()
+            }}
+          >
             ×
           </IconButton>
-        </View>
-        <View className="avatar-cropper-stage">
+        </header>
+        <div className="avatar-cropper-stage">
           {source ? (
-            <Image
-              className="avatar-cropper-image"
-              mode="scaleToFill"
-              src={source}
-              style={preview}
-            />
+            <img className="avatar-cropper-image" src={source} alt="头像裁剪预览" style={preview} />
           ) : (
-            <Text className="avatar-cropper-placeholder">先选择一张照片</Text>
+            <span className="avatar-cropper-placeholder">选择一张喜欢的照片</span>
           )}
-          <View className="avatar-cropper-circle" />
-        </View>
-        <Button
+          <div className="avatar-cropper-circle" />
+        </div>
+        <button
+          type="button"
           className="button button--outline avatar-cropper-choose"
-          onClick={() => void choose()}
+          onClick={chooseFile}
+          disabled={saving}
         >
           {source ? '重新选择' : '选择照片'}
-        </Button>
+        </button>
         {source && (
-          <View className="avatar-cropper-controls">
+          <div className="avatar-cropper-controls">
             <CropSlider
               label="缩放"
               min={100}
@@ -108,29 +142,32 @@ export function AvatarCropper({
             />
             <CropSlider label="水平" min={-100} max={100} value={offsetX} onChange={setOffsetX} />
             <CropSlider label="垂直" min={-100} max={100} value={offsetY} onChange={setOffsetY} />
-          </View>
+          </div>
         )}
-        <Text className="avatar-cropper-note">
-          系统会输出正方形 WebP/JPEG，最长边不超过 512px，压缩后不超过 72 KiB。
-        </Text>
-        <View className="avatar-cropper-actions">
-          <Button className="button button--outline" disabled={saving} onClick={onCancel}>
+        <p className="avatar-cropper-note">调整照片位置，让头像出现在圆形区域内。</p>
+        <div className="avatar-cropper-actions">
+          <button
+            type="button"
+            className="button button--outline"
+            disabled={saving}
+            onClick={onCancel}
+          >
             取消
-          </Button>
-          <Button
+          </button>
+          <button
+            type="button"
             className="button button--primary"
             disabled={!source || saving}
-            loading={saving}
             onClick={() => void save()}
           >
-            保存头像
-          </Button>
-        </View>
-      </View>
-    </View>
+            {saving ? '保存中…' : '保存头像'}
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body,
   )
 }
-
 function CropSlider({
   label,
   min,
@@ -145,16 +182,19 @@ function CropSlider({
   onChange: (value: number) => void
 }) {
   return (
-    <View className="avatar-cropper-control">
-      <Text>{label}</Text>
-      <Slider
+    <label className="avatar-cropper-control">
+      <span className="avatar-cropper-control-label">{label}</span>
+      <input
+        type="range"
+        className="avatar-cropper-slider"
+        aria-label={label}
         min={min}
         max={max}
         value={value}
-        activeColor="#1f6b45"
-        onChange={(event) => onChange(event.detail.value)}
+        step={1}
+        onChange={(event) => onChange(Number(event.target.value))}
       />
-    </View>
+    </label>
   )
 }
 

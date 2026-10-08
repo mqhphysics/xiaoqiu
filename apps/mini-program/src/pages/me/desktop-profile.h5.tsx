@@ -12,7 +12,6 @@ import { DesktopPostComposer } from '../../components/post-composer'
 import { openMessaging } from '../../components/messaging-drawer/index.h5'
 import { TeamCrest, TeamName, UserAvatar } from '../../components/product-ui'
 import { PostTags } from '../../components/post-tags'
-import { openPlayer } from '../../features/product/player-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
 import { VerificationBadge } from '../../components/verification-badge'
 import { BadgeManager } from '../../components/badge-manager/index.h5'
@@ -57,7 +56,7 @@ import './desktop-profile.h5.scss'
 import './identity-manager.h5.scss'
 import { TeamRelationsDialog } from './team-relations.h5'
 import { IdentityMatchDialog } from './identity-match.h5'
-import { openPerson } from '../../features/product/person-navigation.h5'
+import { MyIdentitiesDialog } from './my-identities.h5'
 import { InformationEntryDialog } from '../../features/match-report/information-entry-dialog.h5'
 
 type Tab = 'posts' | 'matches' | 'bookmarks'
@@ -267,20 +266,28 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
     }
   }, [load])
   useEffect(() => {
+    if (linkedProfileModal() === 'badge') {
+      setModal(null)
+      setMatching('manage')
+    }
     const closeOverlays = () => {
-      setModal(linkedProfileModal())
+      const requested = linkedProfileModal()
+      setModal(requested === 'badge' ? null : requested)
       setReminder(null)
       setAvatar(false)
       setFeedback(false)
       setComposer(false)
       setSettings(false)
-      setMatching(null)
+      setMatching(requested === 'badge' ? 'manage' : null)
       setInformation(false)
     }
     const openLinkedPanel = (event: Event) => {
       const panel = (event as CustomEvent<string>).detail
-      if (panel === 'reports' || panel === 'identity')
-        setModal(panel === 'reports' ? 'reports' : 'badge')
+      if (panel === 'reports') setModal('reports')
+      if (panel === 'identity') {
+        setModal(null)
+        setMatching('manage')
+      }
     }
     window.addEventListener('hashchange', closeOverlays)
     window.addEventListener('xiaoqiu:profile-panel', openLinkedPanel)
@@ -570,7 +577,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 icon="exchange"
                 title="身份管理"
                 note="认证申请 · 展示身份"
-                onClick={() => openModal('badge')}
+                onClick={() => setMatching('manage')}
               />
               <Shortcut
                 icon="settings"
@@ -591,22 +598,16 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                 onClick={() => openModal('logout')}
               />
             </div>
-            <div className="profile-function-links">
-              <button data-profile-button onClick={() => openModal('reports')}>
-                反馈记录 <ProfileIcon name="right" />
-              </button>
-              <button data-profile-button onClick={() => openMessaging({ category: 'system' })}>
-                通知记录 <ProfileIcon name="right" />
-              </button>
-              {isAdmin && (
+            {isAdmin && (
+              <div className="profile-function-links">
                 <button
                   data-profile-button
                   onClick={() => void identityEntryActions.administrationEntry()}
                 >
                   管理中心 <ProfileIcon name="right" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </section>
         </aside>
         <section className="profile-stream profile-surface" id="profile-stream">
@@ -972,56 +973,26 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
         </ProfileDialog>
       )}
       {modal === 'identity' && (
-        <ProfileDialog title="我的身份" note="查看当前身份与对应的功能。" onClose={closeModal}>
-          <div className="profile-current-identity">
-            <VerificationBadge
-              level={user.verificationLevel}
-              roles={user.roles}
-              displayedKind={badgeKind}
-            />
-            <strong>{badgeKind ? identityLabels[badgeKind] : '学生'}</strong>
-          </div>
-          {user.roles.some((role) => role.role === 'MATCH_REPORTER') && (
-            <div className="profile-identity-work">
-              <p>管理已授权比赛的信息与报告记录。</p>
-              <button
-                data-profile-button
-                className="profile-button profile-button--primary"
-                onClick={() => {
-                  setModal(null)
-                  setInformation(true)
-                }}
-              >
-                编辑比赛信息与查看记录 <ProfileIcon name="arrow" />
-              </button>
-            </div>
-          )}
-          {user.linkedPlayer && (
-            <button
-              data-profile-button=""
-              className="profile-button profile-button--primary"
-              onClick={() => {
-                setModal(null)
-                void openPlayer(user.linkedPlayer!.id, home.tournament.id).catch(toastError)
-              }}
-            >
-              查看球员档案
-              <ProfileIcon name="arrow" />
-            </button>
-          )}
-          <div className="profile-identity-refresh">
-            <button
-              data-profile-button
-              className="profile-button profile-button--outline"
-              onClick={() => {
-                setModal(null)
-                setMatching('identity')
-              }}
-            >
-              自动匹配 <ProfileIcon name="reset" />
-            </button>
-          </div>
-        </ProfileDialog>
+        <MyIdentitiesDialog
+          user={user}
+          tournamentId={home.tournament.id}
+          onUserChange={onUserChange}
+          onClose={closeModal}
+          onPersonal={() => setModal('edit')}
+          onInformation={() => {
+            setModal(null)
+            setInformation(true)
+          }}
+          onTeam={() => openModal('relationship')}
+          onMatch={() => {
+            setModal(null)
+            setMatching('identity')
+          }}
+          onManage={() => {
+            setModal(null)
+            setMatching('manage')
+          }}
+        />
       )}
       {modal === 'badge' && (
         <ProfileDialog
@@ -1067,15 +1038,11 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             setMatching(null)
             void identityEntryActions.identity()
           }}
-          onResolved={(current, kind) => {
+          onResolved={(current) => {
             const origin = matching
             setMatching(null)
             onUserChange(current)
             if (origin === 'manage') setModal('badge')
-            else if (kind === 'coach')
-              void openPerson(current.id, home.tournament.id, 'coach').catch(toastError)
-            else if (current.linkedPlayer && kind !== 'reporter')
-              void openPlayer(current.linkedPlayer.id, home.tournament.id).catch(toastError)
             else setModal('identity')
           }}
         />

@@ -35,6 +35,7 @@ export class EmailCodeService implements OnModuleDestroy {
     organizationId: string,
     request: EmailRequestContext,
     ownerId?: string,
+    contextId?: string,
   ) {
     const secret = this.mail.requireConfigured()
     const normalized = normalizeEmail(email)
@@ -86,12 +87,27 @@ export class EmailCodeService implements OnModuleDestroy {
         where: { emailNormalized: normalized },
         select: { id: true },
       })
+      const changeOwner =
+        purpose === 'CHANGE_EMAIL_NEW' && ownerId
+          ? await tx.user.findFirst({
+              where: {
+                id: ownerId,
+                status: 'ACTIVE',
+                memberships: {
+                  some: { organizationId, status: 'ACTIVE', organization: { status: 'ACTIVE' } },
+                },
+              },
+              select: { id: true },
+            })
+          : null
       const eligible =
         purpose === 'REGISTER'
           ? !exists
-          : purpose === 'VERIFY_EMAIL'
-            ? Boolean(user && user.id === ownerId)
-            : Boolean(user?.emailVerifiedAt)
+          : purpose === 'CHANGE_EMAIL_NEW'
+            ? Boolean(changeOwner && (!exists || exists.id === ownerId))
+            : purpose === 'VERIFY_EMAIL' || purpose === 'CHANGE_EMAIL_OLD'
+              ? Boolean(user && user.id === ownerId)
+              : Boolean(user?.emailVerifiedAt)
       await tx.emailAuthCode.updateMany({
         where: { organizationId, emailNormalized: normalized, purpose, consumedAt: null },
         data: { consumedAt: now },
@@ -102,7 +118,8 @@ export class EmailCodeService implements OnModuleDestroy {
           organizationId,
           emailNormalized: normalized,
           purpose,
-          userId: purpose === 'REGISTER' ? null : (user?.id ?? null),
+          contextId: contextId ?? null,
+          userId: purpose === 'REGISTER' ? null : (changeOwner?.id ?? user?.id ?? null),
           codeDigest: digest(secret, id, normalized, purpose, organizationId, code),
           expiresAt: new Date(now.getTime() + 300_000),
           ipAddress: request.ip ?? null,
@@ -183,6 +200,7 @@ export class EmailCodeService implements OnModuleDestroy {
     code: string | undefined,
     ownerId: string | undefined,
     operation: (tx: Prisma.TransactionClient, userId: string | null) => Promise<T>,
+    contextId?: string,
   ): Promise<T> {
     const secret = this.mail.requireConfigured()
     if (!code || !/^\d{6}$/.test(code)) throw invalidCode()
@@ -190,7 +208,13 @@ export class EmailCodeService implements OnModuleDestroy {
     const result = await this.prisma.$transaction(async (tx) => {
       await lockMailbox(tx, normalized)
       const row = await tx.emailAuthCode.findFirst({
-        where: { organizationId, emailNormalized: normalized, purpose, consumedAt: null },
+        where: {
+          organizationId,
+          emailNormalized: normalized,
+          purpose,
+          contextId: contextId ?? null,
+          consumedAt: null,
+        },
         orderBy: { createdAt: 'desc' },
       })
       if (

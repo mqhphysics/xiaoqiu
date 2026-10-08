@@ -1,4 +1,3 @@
-import Taro from '@tarojs/taro'
 import { useRef, useState } from 'react'
 import { UserAvatar } from '../../components/product-ui'
 import { AvatarCropper } from '../../components/avatar-cropper'
@@ -9,8 +8,12 @@ import {
 } from '../../features/managed-media/index.h5'
 import { ReportModal } from '../../components/report-modal'
 import { productRepository } from '../../features/product/product.repository'
+import { updatePublicProfile } from '../../features/product/email-change.repository.h5'
 import type { DesktopProfileProps } from './desktop-profile'
 import { ProfileDialog } from './profile-dialog.h5'
+import { EmailChangeDialog } from './email-change-dialog.h5'
+import './personal-information.h5.scss'
+
 export function ProfileInformation({
   user,
   onUserChange,
@@ -20,9 +23,10 @@ export function ProfileInformation({
   onClose: () => void
   onAvatar?: () => void
 }) {
-  const [editing, setEditing] = useState<'name' | 'email' | 'bio' | null>(null)
-  const [correction, setCorrection] = useState(false)
-  const [avatar, setAvatar] = useState(false)
+  const [editing, setEditing] = useState<'name' | 'bio' | null>(null)
+  const [correction, setCorrection] = useState(false),
+    [avatar, setAvatar] = useState(false),
+    [email, setEmail] = useState(false)
   const background = usePersonalBackground(user.id)
   return (
     <ProfileDialog title="个人信息" note="公开资料与仅本人可见的账户信息。" onClose={onClose}>
@@ -34,13 +38,23 @@ export function ProfileInformation({
             更换
           </button>
         </div>
-        <div className="profile-info-row">
-          <span>昵称</span>
-          <strong>{user.displayName}</strong>
-          <button data-profile-button onClick={() => setEditing('name')}>
-            更改
-          </button>
-        </div>
+        {editing === 'name' ? (
+          <InlineProfileField
+            key="name"
+            user={user}
+            field="name"
+            onUserChange={onUserChange}
+            onClose={() => setEditing(null)}
+          />
+        ) : (
+          <div className="profile-info-row">
+            <span>昵称</span>
+            <strong>{user.displayName}</strong>
+            <button data-profile-button onClick={() => setEditing('name')}>
+              更改
+            </button>
+          </div>
+        )}
         <div className="profile-info-row">
           <span>个人背景</span>
           <span>
@@ -52,13 +66,23 @@ export function ProfileInformation({
           </span>
           <MediaUploadButton purpose="USER_BACKGROUND" targetId={user.id} label="更换" />
         </div>
-        <div className="profile-info-row">
-          <span>个人简介</span>
-          <span>{user.bio || '还没有填写简介'}</span>
-          <button data-profile-button onClick={() => setEditing('bio')}>
-            更改
-          </button>
-        </div>
+        {editing === 'bio' ? (
+          <InlineProfileField
+            key="bio"
+            user={user}
+            field="bio"
+            onUserChange={onUserChange}
+            onClose={() => setEditing(null)}
+          />
+        ) : (
+          <div className="profile-info-row">
+            <span>个人简介</span>
+            <span>{user.bio || '还没有填写简介'}</span>
+            <button data-profile-button onClick={() => setEditing('bio')}>
+              更改
+            </button>
+          </div>
+        )}
         <p className="profile-info-private">以下信息仅本人可见</p>
         <div className="profile-info-row">
           <span>姓名</span>
@@ -77,23 +101,17 @@ export function ProfileInformation({
         <div className="profile-info-row">
           <span>绑定邮箱</span>
           <span>{user.email || '未绑定'}</span>
-          <button data-profile-button onClick={() => setEditing('email')}>
-            {user.email ? '更换' : '绑定'}
+          <button data-profile-button onClick={() => setEmail(true)}>
+            {user.email ? '换绑' : '绑定'}
           </button>
         </div>
       </div>
-      {editing && (
-        <ProfileEditor
-          key={editing}
-          user={user}
-          field={editing}
-          onUserChange={onUserChange}
-          onClose={() => setEditing(null)}
-        />
-      )}
       <div className="profile-info-media">
         <MediaAccountEntry includeBackground={false} />
       </div>
+      {email && (
+        <EmailChangeDialog user={user} onChanged={onUserChange} onClose={() => setEmail(false)} />
+      )}
       {correction && (
         <ReportModal
           targetType="FEEDBACK"
@@ -115,118 +133,101 @@ export function ProfileInformation({
   )
 }
 
-function ProfileEditor({
+function InlineProfileField({
   user,
   onUserChange,
   onClose,
   field,
 }: Pick<DesktopProfileProps, 'user' | 'onUserChange'> & {
   onClose: () => void
-  field: 'name' | 'email' | 'bio'
+  field: 'name' | 'bio'
 }) {
-  const [name, setName] = useState(user.displayName)
-  const [email, setEmail] = useState(user.email ?? '')
-  const [bio, setBio] = useState(user.bio ?? '')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const busy = useRef(false)
-  const close = () => {
-    if (!busy.current) onClose()
-  }
+  const [value, setValue] = useState(field === 'name' ? user.displayName : (user.bio ?? ''))
+  const [error, setError] = useState(''),
+    [saving, setSaving] = useState(false)
+  const lock = useRef(false)
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (busy.current) return
-    if (name.trim().length < 2) {
-      setError('昵称至少需要 2 个字。')
+    if (lock.current) return
+    if (field === 'name' && value.trim().length < 2) {
+      setError('昵称至少需要2个字')
       return
     }
-    if (field === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('请输入有效的邮箱地址。')
-      return
-    }
-    busy.current = true
+    lock.current = true
     setSaving(true)
     setError('')
     try {
-      onUserChange(await productRepository.updateProfile(name.trim(), email.trim(), bio.trim()))
+      onUserChange(
+        await updatePublicProfile(
+          field === 'name' ? { displayName: value.trim() } : { bio: value.trim() },
+        ),
+      )
       onClose()
-      void Taro.showToast({ title: '资料已保存', icon: 'success' })
     } catch (issue) {
-      setError(issue instanceof Error ? issue.message : '保存失败，请重试')
+      setError(issue instanceof Error ? issue.message : '保存未完成，请重试')
     } finally {
-      busy.current = false
+      lock.current = false
       setSaving(false)
     }
   }
   return (
     <form
-      className="profile-edit-form profile-edit-form--inline"
+      className={`profile-info-row profile-info-row--editing profile-info-row--${field}`}
+      aria-label={field === 'name' ? '编辑昵称' : '编辑个人简介'}
       onSubmit={(event) => void save(event)}
     >
-      {field === 'name' && (
-        <label data-profile-field="">
-          昵称
+      <span>{field === 'name' ? '昵称' : '个人简介'}</span>
+      <div
+        className={`profile-info-edit-area ${field === 'bio' ? 'profile-info-edit-area--bio' : ''}`}
+      >
+        {field === 'name' ? (
           <input
-            data-profile-input=""
+            className="profile-info-inline-input"
+            aria-label="昵称"
             autoComplete="nickname"
-            value={name}
+            autoFocus
+            value={value}
             maxLength={120}
+            style={{
+              width: `${Math.min(
+                220,
+                Math.max(
+                  88,
+                  Array.from(value).reduce(
+                    (width, char) => width + (char.charCodeAt(0) > 255 ? 13 : 7),
+                    16,
+                  ),
+                ),
+              )}px`,
+            }}
             required
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => setValue(event.target.value)}
           />
-        </label>
-      )}
-      {field === 'email' && (
-        <label data-profile-field="">
-          绑定邮箱
-          <input
-            data-profile-input=""
-            type="email"
-            autoComplete="email"
-            value={email}
-            maxLength={254}
-            required
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <small>用于账号联系与登录，当前未提供邮件验证码验证。</small>
-        </label>
-      )}
-      {field === 'bio' && (
-        <label data-profile-field="">
-          个人简介
+        ) : (
           <textarea
-            data-profile-textarea=""
-            value={bio}
+            className="profile-info-inline-bio"
+            aria-label="个人简介"
+            autoFocus
+            value={value}
+            rows={3}
             maxLength={280}
-            rows={4}
-            onChange={(event) => setBio(event.target.value)}
+            onChange={(event) => setValue(event.target.value)}
           />
-          <small>{bio.length}/280</small>
-        </label>
-      )}
+        )}
+        <div className="profile-info-inline-actions">
+          <button data-profile-button disabled={saving}>
+            {saving ? '保存中…' : '保存'}
+          </button>
+          <button data-profile-button type="button" disabled={saving} onClick={onClose}>
+            取消
+          </button>
+        </div>
+      </div>
       {error && (
-        <p role="alert" className="profile-error">
+        <p className="profile-info-inline-error" role="alert">
           {error}
         </p>
       )}
-      <div className="profile-dialog__actions">
-        <button
-          data-profile-button=""
-          type="button"
-          className="profile-button profile-button--outline"
-          disabled={saving}
-          onClick={close}
-        >
-          取消
-        </button>
-        <button
-          data-profile-button=""
-          className="profile-button profile-button--primary"
-          disabled={saving}
-        >
-          {saving ? '正在保存…' : '保存资料'}
-        </button>
-      </div>
     </form>
   )
 }

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
-import { IsEmail, IsOptional, IsString, Length, Matches } from 'class-validator'
+import { IsEmail, IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator'
 import { localDemoShortPasswordsEnabled } from './local-demo-password-policy'
 
 export class LoginDto {
@@ -163,15 +163,22 @@ export class ResetPasswordByIdentityDto {
 export class UpdateProfileDto {
   @ApiProperty({ type: String, description: '公开昵称' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @Length(2, 120)
-  displayName!: string
+  displayName?: string
 
-  @ApiProperty({ type: String, format: 'email', description: '绑定邮箱' })
+  @ApiProperty({
+    type: String,
+    format: 'email',
+    required: false,
+    description: '仅兼容提交当前邮箱；更换需专用验证流程',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsEmail()
   @Length(5, 254)
-  email!: string
+  email?: string
 
   @ApiProperty({ type: String, required: false, nullable: true, description: '公开简介' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

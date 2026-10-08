@@ -307,32 +307,43 @@ test(
           )
         },
       )
-      await t.test('password login verifies current email; changing it clears trust', async () => {
-        const logged = await post('login', {
-          username: legacy.loginNameNormalized,
-          password: 'Fictional-legacy-password!',
-        })
-        assert.equal(logged.status, 200)
-        const legacyToken: string = logged.body.accessToken
-        const code = await codeFor(legacyEmail, 'VERIFY_EMAIL', legacyToken)
-        assert.equal(
-          (await post('email/verify', { email: legacyEmail, emailCode: code }, token)).status,
-          400,
-        )
-        const result = await post(
-          'email/verify',
-          { email: legacyEmail, emailCode: code },
-          legacyToken,
-        )
-        assert.equal(result.status, 200, result.text)
-        assert.ok(result.body.emailVerifiedAt)
-        const update = await api
-          .patch('/api/auth/me')
-          .set('Authorization', `Bearer ${legacyToken}`)
-          .send({ displayName: '虚构旧账号', email: `replacement-${suffix}@example.test`, bio: '' })
-        assert.equal(update.status, 200)
-        assert.equal(update.body.emailVerifiedAt, null)
-      })
+      await t.test(
+        'password login verifies current email; profile PATCH cannot bypass email change verification',
+        async () => {
+          const logged = await post('login', {
+            username: legacy.loginNameNormalized,
+            password: 'Fictional-legacy-password!',
+          })
+          assert.equal(logged.status, 200)
+          const legacyToken: string = logged.body.accessToken
+          const code = await codeFor(legacyEmail, 'VERIFY_EMAIL', legacyToken)
+          assert.equal(
+            (await post('email/verify', { email: legacyEmail, emailCode: code }, token)).status,
+            400,
+          )
+          const result = await post(
+            'email/verify',
+            { email: legacyEmail, emailCode: code },
+            legacyToken,
+          )
+          assert.equal(result.status, 200, result.text)
+          assert.ok(result.body.emailVerifiedAt)
+          const update = await api
+            .patch('/api/auth/me')
+            .set('Authorization', `Bearer ${legacyToken}`)
+            .send({
+              displayName: '虚构旧账号',
+              email: `replacement-${suffix}@example.test`,
+              bio: '',
+            })
+          assert.equal(update.status, 409)
+          const unchanged = await api
+            .get('/api/auth/me')
+            .set('Authorization', `Bearer ${legacyToken}`)
+          assert.equal(unchanged.body.email, legacyEmail)
+          assert.ok(unchanged.body.emailVerifiedAt)
+        },
+      )
       await t.test(
         'send failure produces FAILED state and cannot register; missing configuration is 503',
         async () => {

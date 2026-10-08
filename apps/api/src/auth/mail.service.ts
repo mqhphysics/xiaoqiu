@@ -4,12 +4,20 @@ import { createTransport } from 'nodemailer'
 
 import { ApiHttpException } from '../common/api-http.exception'
 
-export type EmailPurpose = 'REGISTER' | 'RESET_PASSWORD' | 'LOGIN' | 'VERIFY_EMAIL'
+export type EmailPurpose =
+  | 'REGISTER'
+  | 'RESET_PASSWORD'
+  | 'LOGIN'
+  | 'VERIFY_EMAIL'
+  | 'CHANGE_EMAIL_OLD'
+  | 'CHANGE_EMAIL_NEW'
 const labels: Record<EmailPurpose, string> = {
   REGISTER: '注册验证',
   RESET_PASSWORD: '找回密码',
   LOGIN: '邮箱登录',
   VERIFY_EMAIL: '验证绑定邮箱',
+  CHANGE_EMAIL_OLD: '确认原邮箱',
+  CHANGE_EMAIL_NEW: '绑定新邮箱',
 }
 
 @Injectable()

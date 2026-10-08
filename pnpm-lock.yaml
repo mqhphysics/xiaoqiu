@@ -78,6 +78,9 @@ importers:
       class-validator:
         specifier: latest
         version: 0.15.1
+      nodemailer:
+        specifier: 10.0.16
+        version: 10.0.16
       reflect-metadata:
         specifier: latest
         version: 0.2.2
@@ -97,6 +100,9 @@ importers:
       '@types/node':
         specifier: latest
         version: 26.0.0
+      '@types/nodemailer':
+        specifier: 8.0.2
+        version: 8.0.2
       '@types/supertest':
         specifier: 7.2.0
         version: 7.2.0
@@ -6748,6 +6754,13 @@ packages:
       integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==
     engines:
       node: '>= 10.x'
+
+  '@types/nodemailer@8.0.2':
+    resolution: {integrity: sha512-c7M5ox8p0nEOfbJ2E9Qcmt8/QCu/VzsiAhzBiZbvky2PhKZDHpKB3sQHBM5MEZNkCfBOaS6S9//AGPRTNB7IaA==}
+
+  nodemailer@10.0.16:
+    resolution: {integrity: sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==}
+    engines: {node: '>=20.0.0'}
 
 snapshots:
 
@@ -13617,3 +13630,8 @@ snapshots:
     dependencies:
       xtend: 4.0.2
   split2@4.2.0: {}
+  '@types/nodemailer@8.0.2':
+    dependencies:
+      '@types/node': 26.0.0
+
+  nodemailer@10.0.16: {}

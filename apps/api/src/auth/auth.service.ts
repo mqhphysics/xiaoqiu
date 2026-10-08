@@ -502,18 +502,18 @@ export class AuthService {
     request: { ip?: string | undefined; requestId: string; userAgent?: string | undefined },
   ): Promise<AuthUserDto> {
     const session = await this.requireSession(authorization)
-    const email = body.email.trim()
-    const emailNormalized = normalizeIdentifier(email)
-    const duplicate = await this.prisma.user.findFirst({
-      where: { emailNormalized, id: { not: session.userId } },
-      select: { id: true },
-    })
-    if (duplicate) {
+    const email = body.email?.trim() ?? session.user.email
+    const emailNormalized = email ? normalizeIdentifier(email) : null
+    if (emailNormalized !== (session.user.email ? normalizeIdentifier(session.user.email) : null))
       throw new ApiHttpException(HttpStatus.CONFLICT, {
         code: ERROR_CODES.CONFLICT,
-        message: '该邮箱已被其他账号绑定',
+        message: '请通过邮箱换绑窗口验证原邮箱和新邮箱',
       })
-    }
+    if (body.displayName === undefined && body.bio === undefined)
+      throw new ApiHttpException(HttpStatus.BAD_REQUEST, {
+        code: ERROR_CODES.BAD_REQUEST,
+        message: '请选择要更改的公开资料',
+      })
 
     const before = {
       displayName: session.user.displayName,
@@ -525,13 +525,8 @@ export class AuthService {
         const updated = await tx.user.update({
           where: { id: session.userId },
           data: {
-            displayName: body.displayName.trim(),
-            email,
-            emailNormalized,
-            ...(normalizeEmail(session.user.email ?? '') === emailNormalized
-              ? {}
-              : { emailVerifiedAt: null }),
-            bio: body.bio?.trim() || null,
+            ...(body.displayName !== undefined ? { displayName: body.displayName.trim() } : {}),
+            ...(body.bio !== undefined ? { bio: body.bio?.trim() || null } : {}),
           },
           include: userInclude,
         })
