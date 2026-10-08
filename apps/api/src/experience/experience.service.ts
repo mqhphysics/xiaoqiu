@@ -2170,7 +2170,7 @@ function conflict(message: string): ApiHttpException {
   })
 }
 
-interface MappedPost {
+export interface MappedPost {
   id: string
   tournamentId?: string
   tags: ReturnType<typeof mapPostTags>
