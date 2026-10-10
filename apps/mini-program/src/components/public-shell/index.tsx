@@ -34,6 +34,7 @@ import {
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
+import { SplitSticky } from './split-sticky'
 
 import './index.scss'
 
@@ -439,6 +440,7 @@ export function PublicShell({
         />
       )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      <SplitSticky />
     </View>
   )
 }

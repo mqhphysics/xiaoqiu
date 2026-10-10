@@ -1,0 +1,18 @@
+/* Pin the shorter column of a desktop split when it fits. Mobile stays a normal page. */
+@media (min-width: 721px) {
+  .public-app--h5 .schedule-layout,
+  .public-app--h5 .th-columns,
+  .public-app--h5 .data-desktop__competition-panels,
+  .public-app--h5 .data-desktop__player-panels,
+  .public-app--h5 .tournament-columns,
+  .public-app--h5 .player-detail-grid {
+    align-items: start;
+  }
+
+  .public-app--h5 .is-split-sticky {
+    position: sticky;
+    top: var(--split-sticky-top, 92px);
+    align-self: start;
+    z-index: 2;
+  }
+}
