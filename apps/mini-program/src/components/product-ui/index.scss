@@ -47,8 +47,23 @@
 }
 
 .user-avatar {
+  position: relative;
+  overflow: hidden;
   object-fit: cover;
   border-radius: 50%;
+  background: #d7e0d8;
+}
+
+/* Taro aspectFill sizes the inner image only after load, which leaves a small
+   photo inside the circular host until a refresh. Fill the host immediately. */
+.user-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  transform: none;
 }
 
 .user-avatar--small {

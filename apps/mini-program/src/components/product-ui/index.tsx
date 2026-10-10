@@ -125,7 +125,7 @@ export function UserAvatar({
     <Image
       aria-label={`${name}的头像`}
       className={`user-avatar user-avatar--${size}`}
-      mode="aspectFill"
+      mode="scaleToFill"
       src={source}
     />
   ) : (

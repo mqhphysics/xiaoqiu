@@ -79,14 +79,28 @@ function Icon({ name }: { name: IconName }) {
 
 function dateKey(value: string | null): string {
   if (!value) return 'TBD'
-  const date = new Date(value)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value))
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
 }
 
 function shiftDate(value: string, days: number): string {
-  const date = new Date(`${value}T12:00:00`)
-  date.setDate(date.getDate() + days)
+  const date = new Date(`${value}T12:00:00+08:00`)
+  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000)
   return dateKey(date.toISOString())
+}
+
+function shanghaiCalendarLabel(date: string, options: Intl.DateTimeFormatOptions): string {
+  return new Date(`${date}T12:00:00+08:00`).toLocaleDateString('zh-CN', {
+    ...options,
+    timeZone: 'Asia/Shanghai',
+  })
 }
 
 function matchUrl(matchId: string, tournamentId: string) {
@@ -388,9 +402,7 @@ function ScheduleContent({
                 }}
               >
                 <span>{date.slice(5).replace('-', '/')}</span>
-                <span>
-                  {new Date(`${date}T12:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' })}
-                </span>
+                <span>{shanghaiCalendarLabel(date, { weekday: 'short' })}</span>
                 {data.schedule.some((match) => dateKey(match.scheduledStartAt) === date) && <i />}
               </button>
             ))}
@@ -539,7 +551,7 @@ function ScheduleContent({
                       <h3>
                         {date === 'TBD'
                           ? '时间待定'
-                          : new Date(`${date}T12:00:00`).toLocaleDateString('zh-CN', {
+                          : shanghaiCalendarLabel(date, {
                               month: '2-digit',
                               day: '2-digit',
                               weekday: 'short',

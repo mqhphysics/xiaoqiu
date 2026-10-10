@@ -7,7 +7,7 @@ import { ApiHttpException } from '../common/api-http.exception'
 import type { ExecutionContext } from '@nestjs/common'
 import type { ProductConfigService } from './product-config.service'
 
-test('anonymous configuration is fixed eight-a-side, exposes implemented modules and keeps guest closed', () => {
+test('anonymous configuration is fixed eight-a-side, exposes implemented modules and opens guest reads', () => {
   const config = buildProductConfiguration({
     XIAOQIU_FEATURE_GUEST: 'true',
     XIAOQIU_FEATURE_IDENTITY_APPLICATIONS: 'true',
@@ -16,9 +16,9 @@ test('anonymous configuration is fixed eight-a-side, exposes implemented modules
     DATABASE_URL: 'private-database',
   })
   assert.deepEqual(config.sport, { format: 'EIGHT_A_SIDE', playersPerSide: 8 })
-  assert.equal(config.accountRequired, true)
-  assert.equal(config.serverGuestAccess, false)
-  assert.deepEqual(config.guest, { visible: true, enabled: false, reason: '功能暂未开放' })
+  assert.equal(config.accountRequired, false)
+  assert.equal(config.serverGuestAccess, true)
+  assert.deepEqual(config.guest, { visible: true, enabled: true, reason: null })
   assert.equal(config.modules.identityApplications.enabled, true)
   assert.equal(config.modules.goalMedia.enabled, true)
   assert.equal(JSON.stringify(config).includes('private-'), false)

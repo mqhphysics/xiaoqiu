@@ -60,8 +60,10 @@ export class AuthContextGuard implements CanActivate {
     const admin = path.startsWith('admin/')
     if (!publicRead && !login && !admin) return true
 
+    // Public reads stay anonymous unless a bearer token is present. A presented
+    // token still has to be valid, so a revoked session cannot silently continue.
     const session =
-      !login && (admin || publicRead || request.headers.authorization !== undefined)
+      !login && (admin || (publicRead && request.headers.authorization !== undefined))
         ? await this.auth.requireSession(request.headers.authorization)
         : undefined
     const organizationId = resolveOrganizationSelector(request, session?.organizationId)

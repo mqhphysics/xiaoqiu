@@ -1749,6 +1749,41 @@
   }
 }
 
+@media (max-width: 420px) {
+  .experience-hero__copy {
+    padding: 16PX 16PX 18PX;
+  }
+
+  .experience-hero__title,
+  .experience-hero__title--long {
+    font-size: 24PX;
+  }
+
+  .experience-hero__action {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .home-search-entry {
+    min-height: 48PX;
+  }
+
+  .home-search-entry__input,
+  .home-search-entry--body .home-search-entry__input {
+    height: 46PX;
+    font-size: 15PX;
+  }
+
+  .compact-match {
+    min-height: 0;
+    padding: 12PX;
+  }
+
+  .product-section-heading__title {
+    font-size: 20PX;
+  }
+}
+
 @media (min-width: 721px) {
   .experience-hero,
   .experience-hero__media,

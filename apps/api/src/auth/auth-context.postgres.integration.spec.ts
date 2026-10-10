@@ -350,7 +350,7 @@ test(
             await request(server)
               .get('/api/public/home')
               .set('x-organization-id', emptyOrganization.id)
-              .expect(401)
+              .expect(404)
             const home = await request(server)
               .get('/api/public/home')
               .set('authorization', token)
@@ -383,7 +383,7 @@ test(
       )
 
       await t.test(
-        'account-only public reads reject guests, forged headers and revoked sessions',
+        'public reads allow guests while forged headers and revoked sessions stay closed',
         async () => {
           for (const url of [
             '/api/public/seasons',
@@ -395,13 +395,19 @@ test(
             `/api/public/matches/${match.id}/experience`,
             '/api/public/posts',
           ]) {
-            await request(server)
+            const guest = await request(server)
               .get(url)
               .set('x-organization-id', organization.id)
               .set('x-dev-role', 'ADMIN')
               .set('x-dev-user-id', admin.id)
-              .expect(401)
+            assert.notEqual(guest.status, 401)
+            assert.notEqual(guest.status, 403)
           }
+          const guestSeasons = await request(server)
+            .get('/api/public/seasons')
+            .set('x-organization-id', organization.id)
+            .expect(200)
+          assert.ok(Array.isArray(guestSeasons.body))
           await request(server)
             .get('/api/public/seasons')
             .set('authorization', 'Bearer fictional-forged-token')
@@ -836,11 +842,14 @@ test(
       )
 
       await t.test(
-        'production requires an account, accepts its organization and preserves explicit tournament context',
+        'production accepts a guest organization and preserves explicit tournament context',
         async () => {
           process.env.NODE_ENV = 'production'
           try {
-            await request(server).get('/api/public/seasons').expect(401)
+            await request(server).get('/api/public/seasons').expect(400)
+            process.env.DEFAULT_ORGANIZATION_ID = organization.id
+            await request(server).get('/api/public/seasons').expect(200)
+            delete process.env.DEFAULT_ORGANIZATION_ID
             await readPublic('/api/public/seasons').expect(200)
             await readPublic('/api/public/seasons')
               .set('x-dev-organization-id', organization.id)

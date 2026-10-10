@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import console from 'node:console'
 import { createRequire } from 'node:module'
 import net from 'node:net'
@@ -38,6 +38,18 @@ try {
       : '无法检查晓球网站端口3000，请检查本机网络配置。',
   )
   process.exit(1)
+}
+
+const repoRoot = resolve(appRoot, '../..')
+console.log('构建管理中心，供网站 /admin/ 使用')
+const adminBuild = spawnSync(
+  process.platform === 'win32' ? 'npm.cmd' : 'npm',
+  ['--prefix', resolve(repoRoot, 'apps/admin-web'), 'run', 'build', '--', '--base', '/admin/'],
+  { cwd: repoRoot, stdio: 'inherit' },
+)
+if (adminBuild.status !== 0) {
+  console.error('管理中心构建失败，已停止网站启动。')
+  process.exit(adminBuild.status ?? 1)
 }
 
 console.log('晓球日常网站：http://127.0.0.1:3000/（固定地址，不自动打开浏览器）')
