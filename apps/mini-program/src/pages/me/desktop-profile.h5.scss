@@ -1768,3 +1768,91 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Desktop 「我的」: the page frame stays put and the activity panel scrolls inside it. */
+@media (min-width: 901px) {
+  html:has(.public-app--h5.public-app--section-me),
+  body:has(.public-app--h5.public-app--section-me),
+  .taro_page:has(.public-app--h5.public-app--section-me) {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me .public-topbar,
+  .public-app--h5.public-app--section-me .public-footer,
+  .public-app--h5.public-app--section-me .mock-banner {
+    flex: 0 0 auto;
+  }
+
+  .public-app--h5.public-app--section-me .public-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding-bottom: 8px;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me .public-footer {
+    width: calc(100% - 64px);
+    max-width: 1332px;
+    margin: 0 auto;
+    padding: 8px 0 12px;
+  }
+
+  .public-app--h5.public-app--section-me .desktop-profile {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me .profile-top {
+    flex: 0 0 auto;
+  }
+
+  .public-app--h5.public-app--section-me .profile-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me .profile-functions {
+    align-self: stretch;
+    min-height: 0;
+    max-height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .public-app--h5.public-app--section-me .profile-stream {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .public-app--h5.public-app--section-me .profile-tabs {
+    flex: 0 0 auto;
+  }
+
+  .public-app--h5.public-app--section-me #profile-tabpanel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}

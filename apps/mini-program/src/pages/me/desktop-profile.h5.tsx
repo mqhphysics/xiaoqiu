@@ -385,10 +385,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   }
   const chooseTab = (value: Tab) => {
     setTab(value)
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'instant'
+      : 'smooth'
+    const panel = document.getElementById('profile-tabpanel')
+    const panelScrolls =
+      panel !== null && ['auto', 'scroll'].includes(getComputedStyle(panel).overflowY)
+    if (panel && panelScrolls) {
+      panel.scrollTo({ top: 0, behavior })
+      return
+    }
     document.getElementById('profile-stream')?.scrollIntoView({
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'instant'
-        : 'smooth',
+      behavior,
       block: 'start',
     })
   }
