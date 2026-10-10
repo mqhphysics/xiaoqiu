@@ -16,6 +16,11 @@ import type {
 } from '../../features/product/product.types'
 import ExistingDataPage from './data-center.shared'
 import { KnockoutPanel } from './knockout-tree.h5'
+import {
+  groupTableColumns,
+  leaderScrollAvailable,
+  visibleLeaderRows,
+} from './standings-layout.logic'
 
 import './index.h5.scss'
 
@@ -366,7 +371,33 @@ function StandingsCard({
   }, [data.groups, data.schedule])
   const groups =
     groupId === 'all' ? data.groups : data.groups.filter((group) => group.id === groupId)
+  const splitGroups = groupTableColumns(groups.length, expanded) === 2
   const demo = data.resultsMode === 'DEMO'
+  const standingHeaders = splitGroups
+    ? [
+        ['排名', '排名'],
+        ['球队', '球队'],
+        ['赛', '场次'],
+        ['胜', '胜'],
+        ['平', '平'],
+        ['负', '负'],
+        ['进', '进球'],
+        ['失', '失球'],
+        ['净', '净胜球'],
+        ['分', '积分'],
+      ]
+    : [
+        ['排名', '排名'],
+        ['球队', '球队'],
+        ['场次', '场次'],
+        ['胜', '胜'],
+        ['平', '平'],
+        ['负', '负'],
+        ['进球', '进球'],
+        ['失球', '失球'],
+        ['净胜球', '净胜球'],
+        ['积分', '积分'],
+      ]
   return (
     <section
       className={
@@ -403,7 +434,10 @@ function StandingsCard({
           </label>
         )}
       </div>
-      <div id="data-group-content">
+      <div
+        id="data-group-content"
+        className={'data-desktop__groups' + (splitGroups ? ' data-desktop__groups--split' : '')}
+      >
         {groups.length === 0 ? (
           <DataState
             kind="empty"
@@ -446,19 +480,8 @@ function StandingsCard({
                   </colgroup>
                   <thead>
                     <tr>
-                      {[
-                        '排名',
-                        '球队',
-                        '场次',
-                        '胜',
-                        '平',
-                        '负',
-                        '进球',
-                        '失球',
-                        '净胜球',
-                        '积分',
-                      ].map((label) => (
-                        <th key={label} scope="col">
+                      {standingHeaders.map(([label, title]) => (
+                        <th key={title} scope="col" title={title}>
                           {label}
                         </th>
                       ))}
@@ -555,7 +578,13 @@ function LeaderboardCard({
   compact?: boolean
   onExpand?: () => void
 }) {
-  const rows = compact ? data.leaders[mode].slice(0, 5) : data.leaders[mode]
+  const [scrollOpen, setScrollOpen] = useState(false)
+  const leaders = data.leaders[mode]
+  const canScroll = !compact && !onExpand && leaderScrollAvailable(leaders.length)
+  useEffect(() => {
+    setScrollOpen(false)
+  }, [data.tournament.id, mode])
+  const rows = compact ? leaders.slice(0, 5) : visibleLeaderRows(leaders, scrollOpen)
   const title = mode === 'scorers' ? '射手榜' : '助攻榜'
   return (
     <section
@@ -570,6 +599,16 @@ function LeaderboardCard({
           <button className="data-desktop__more" type="button" onClick={onExpand}>
             查看完整榜单 <span aria-hidden="true">→</span>
           </button>
+        ) : canScroll ? (
+          <button
+            className="data-desktop__more"
+            type="button"
+            aria-expanded={scrollOpen}
+            aria-controls={`data-leader-${mode}`}
+            onClick={() => setScrollOpen((open) => !open)}
+          >
+            {scrollOpen ? '收起' : '查看更多'}
+          </button>
         ) : (
           <span className="data-desktop__leader-note">
             {rows.length > 0 ? `前 ${rows.length} 名 · 点击球员查看档案` : '球员赛季数据'}
@@ -583,6 +622,14 @@ function LeaderboardCard({
           description="比赛产生统计后，球员将出现在这里。"
         />
       ) : (
+        <div
+          id={`data-leader-${mode}`}
+          className={
+            'data-desktop__leader-scroll' + (canScroll && scrollOpen ? ' is-open' : '')
+          }
+          tabIndex={canScroll && scrollOpen ? 0 : undefined}
+          aria-label={canScroll && scrollOpen ? `${title}，在榜单内滚动查看` : undefined}
+        >
         <table className="data-desktop__leader-table">
           <caption className="sr-only">
             {title}
@@ -610,6 +657,7 @@ function LeaderboardCard({
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {!compact && (
         <p className="data-desktop__table-note">
