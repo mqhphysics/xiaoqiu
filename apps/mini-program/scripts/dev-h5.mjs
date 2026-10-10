@@ -45,7 +45,18 @@ console.log('构建管理中心，供网站 /admin/ 使用')
 const adminBuild = spawnSync(
   process.platform === 'win32' ? 'npm.cmd' : 'npm',
   ['--prefix', resolve(repoRoot, 'apps/admin-web'), 'run', 'build', '--', '--base', '/admin/'],
-  { cwd: repoRoot, stdio: 'inherit' },
+  {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001',
+      VITE_ORGANIZATION_ID:
+        process.env.VITE_ORGANIZATION_ID || '00000000-0000-4000-8000-000000000001',
+      VITE_H5_SESSION_BRIDGE: process.env.VITE_H5_SESSION_BRIDGE || '1',
+      VITE_LOCAL_SHORT_PASSWORDS: process.env.VITE_LOCAL_SHORT_PASSWORDS || '0',
+    },
+  },
 )
 if (adminBuild.status !== 0) {
   console.error('管理中心构建失败，已停止网站启动。')
