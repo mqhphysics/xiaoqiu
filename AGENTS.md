@@ -55,6 +55,19 @@ packages/api-client/
 - 如需新增或升级依赖，可修改自己独占范围内的 `package.json`，并在完成报告中列出依赖变化；由集成负责人统一执行安装并更新锁文件。
 - 不合并其他并行分支，也不处理不属于本任务的冲突。
 
+## Cloud Agent 环境
+
+Cloud Agent 虚拟机已安装 PostgreSQL 17，日常库与测试库都在 `127.0.0.1:5432`。登录 shell 会读取 `/etc/profile.d/xiaoqiu.sh`；其它 shell 先执行 `source /etc/profile.d/xiaoqiu.sh`。
+
+- `DATABASE_URL`：`postgresql://xiaoqiu:xiaoqiu-local-only@127.0.0.1:5432/xiaoqiu`
+- `TEST_DATABASE_URL`：`postgresql://xiaoqiu:xiaoqiu-local-only@127.0.0.1:5432/roster_v2_test_ci`
+- 网站：`http://127.0.0.1:3000/`
+- API：`http://127.0.0.1:3001/`（就绪检查 `/api/health/ready`）
+
+启动脚本会拉起数据库、执行迁移，创建 `private-data/runtime`，并只在演示组织 `xiaoqiu-dev` 不存在时 seed。演示账号是 `student` / `Xiaoqiu2026!`。管理后台开发命令仍是 `pnpm dev:admin`（5173）。微信开发者工具未安装；普通网站任务继续只验证 H5。
+
+`pnpm test` 与 GitHub CI 使用同一个可弃库名 `roster_v2_test_ci`。邮箱认证两项测试另外要求库名以 `xiaoqiu_email_test` 开头，和名单测试不能共用一个 `TEST_DATABASE_URL`；这与当前 `main` 的 CI 失败一致，不要改日常库去迁就它们。
+
 ## 完成报告
 
 每个任务完成后必须列出：
