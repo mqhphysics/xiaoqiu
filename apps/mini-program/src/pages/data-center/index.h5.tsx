@@ -555,7 +555,9 @@ function LeaderboardCard({
   compact?: boolean
   onExpand?: () => void
 }) {
-  const rows = compact ? data.leaders[mode].slice(0, 5) : data.leaders[mode]
+  const allRows = data.leaders[mode]
+  const [expandedList, setExpandedList] = useState(false)
+  const rows = compact ? allRows.slice(0, 5) : expandedList ? allRows : allRows.slice(0, 6)
   const title = mode === 'scorers' ? '射手榜' : '助攻榜'
   return (
     <section
@@ -583,6 +585,7 @@ function LeaderboardCard({
           description="比赛产生统计后，球员将出现在这里。"
         />
       ) : (
+        <div className={expandedList ? 'data-desktop__leader-scroll is-open' : undefined}>
         <table className="data-desktop__leader-table">
           <caption className="sr-only">
             {title}
@@ -610,6 +613,12 @@ function LeaderboardCard({
             ))}
           </tbody>
         </table>
+        </div>
+      )}
+      {!compact && !expandedList && allRows.length > 6 && (
+        <button className="data-desktop__more" type="button" onClick={() => setExpandedList(true)}>
+          查看更多
+        </button>
       )}
       {!compact && (
         <p className="data-desktop__table-note">
@@ -701,5 +710,6 @@ function formatDataTimestamp(value: string) {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: 'Asia/Shanghai',
   })
 }

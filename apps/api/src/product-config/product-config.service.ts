@@ -47,9 +47,9 @@ export function buildProductConfiguration(
   ) as Record<ProductModuleId, FeatureAvailability>
   const content = {
     schemaVersion: 1 as const,
-    accountRequired: true as const,
-    serverGuestAccess: false as const,
-    guest: { visible: true, enabled: false, reason: UNAVAILABLE_FEATURE_REASON },
+    accountRequired: false as const,
+    serverGuestAccess: true as const,
+    guest: { visible: true, enabled: true, reason: null },
     sport: { format: 'EIGHT_A_SIDE' as const, playersPerSide: 8 as const },
     modules,
   }

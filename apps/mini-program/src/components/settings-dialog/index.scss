@@ -191,4 +191,10 @@
   .settings-dialog__footer {
     padding: 13PX 20PX max(13PX, env(safe-area-inset-bottom));
   }
+
+  .settings-dialog__close,
+  .settings-dialog__action {
+    min-width: 44PX;
+    min-height: 44PX;
+  }
 }

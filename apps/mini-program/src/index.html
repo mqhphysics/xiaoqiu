@@ -11,6 +11,20 @@
     <script>
       <%= htmlWebpackPlugin.options.script %>
     </script>
+    <script>
+      // Taro sizes the root from the shorter side of the document, so a short
+      // desktop window shrinks rem text while the PX chrome stays large.
+      // Desktop keeps a stable 40px root. Phones still follow the 750-wide scale.
+      ;(function (window) {
+        function fitRoot() {
+          var width = window.document.documentElement.clientWidth || window.innerWidth || 390
+          var size = width >= 721 ? 40 : Math.min(40, Math.max(20, (40 * width) / 750))
+          window.document.documentElement.style.fontSize = size + 'px'
+        }
+        window.addEventListener('resize', fitRoot)
+        fitRoot()
+      })(window)
+    </script>
   </head>
   <body>
     <div id="app"></div>

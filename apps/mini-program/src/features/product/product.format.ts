@@ -1,11 +1,15 @@
 import type { MatchStatus } from './product.types'
 
+/** Kickoff and schedule labels stay on the league clock, not the device clock. */
+export const MATCH_TIME_ZONE = 'Asia/Shanghai'
+
 export function formatDate(value: string | null): string {
   if (!value) return '时间待定'
   return new Date(value).toLocaleDateString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
     weekday: 'short',
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 export function formatLongDate(value: string | null): string {
@@ -15,6 +19,7 @@ export function formatLongDate(value: string | null): string {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 
@@ -24,6 +29,7 @@ export function formatTime(value: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 
@@ -31,7 +37,11 @@ export function formatRelativeTime(value: string): string {
   const diff = Date.now() - new Date(value).getTime()
   if (diff < 60 * 60 * 1000) return `${Math.max(1, Math.floor(diff / 60000))} 分钟前`
   if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / 3600000)} 小时前`
-  return new Date(value).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  return new Date(value).toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: MATCH_TIME_ZONE,
+  })
 }
 
 export function matchStatusLabel(status: MatchStatus): string {

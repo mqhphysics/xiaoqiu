@@ -794,14 +794,27 @@
     padding: 5px 6px;
   }
 
+  .followed-team-chip__remove,
+  .team-follow-bar__add {
+    min-width: 44PX;
+    min-height: 44PX;
+    font-size: 13PX;
+    line-height: 44PX;
+  }
+
+  .team-follow-bar__add {
+    width: 44PX;
+    height: 44PX;
+  }
+
   .followed-team-chip__copy text:first-child {
     max-width: 70px;
   }
 
   .team-follow-bar__add {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
+    width: 44PX;
+    min-width: 44PX;
+    height: 44PX;
   }
 
   .my-team-hero {
@@ -1080,5 +1093,14 @@
   }
   .captain-member__remove {
     grid-column: 3;
+  }
+
+  .followed-player-chip button,
+  .captain-application button,
+  .captain-member button,
+  .player-follow-panel__search input {
+    min-height: 44PX;
+    font-size: 13PX;
+    line-height: 44PX;
   }
 }

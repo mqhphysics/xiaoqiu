@@ -52,7 +52,12 @@ before(async () => {
       },
     })
     .overrideProvider(PrismaService)
-    .useValue({})
+    .useValue({
+      organization: {
+        findFirst: async ({ where }: { where: { id: string } }) =>
+          where.id === org ? { id: org } : null,
+      },
+    })
     .overrideProvider(ProductConfigService)
     .useValue({
       getConfiguration: () =>
@@ -85,16 +90,24 @@ test('anonymous product configuration and health return 200 without resolving an
     .set('x-dev-role', 'PLATFORM_ADMIN')
     .set('x-organization-id', 'invalid')
     .expect(200)
-  assert.equal(response.body.serverGuestAccess, false)
-  assert.equal(response.body.guest.enabled, false)
+  assert.equal(response.body.accountRequired, false)
+  assert.equal(response.body.serverGuestAccess, true)
+  assert.equal(response.body.guest.enabled, true)
   assert.equal(response.headers['cache-control'], 'no-store')
   await request(app.getHttpServer()).get('/api/health/live').expect(200)
   assert.equal(requireSessionCalls, beforeCalls)
 })
 
-test('anonymous/revoked capabilities and account-only business reads remain 401', async () => {
+test('anonymous public reads stay open while capabilities and revoked sessions stay 401', async () => {
+  await request(app.getHttpServer())
+    .get('/api/public/home')
+    .set('x-organization-id', org)
+    .expect(200)
+  await request(app.getHttpServer())
+    .get('/api/me/capabilities')
+    .set('x-organization-id', org)
+    .expect(401)
   for (const path of ['/api/me/capabilities', '/api/public/home']) {
-    await request(app.getHttpServer()).get(path).set('x-organization-id', org).expect(401)
     await request(app.getHttpServer())
       .get(path)
       .set('Authorization', 'Bearer revoked-test-session')

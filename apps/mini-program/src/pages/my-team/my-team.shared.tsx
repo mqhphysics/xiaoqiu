@@ -21,6 +21,7 @@ import {
 } from '../../features/product/product.format'
 import { ProductApiError, productRepository } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
+import { managedTeamIds } from '../me/profile.logic'
 import { openTeam } from '../../features/product/team-navigation'
 import { CaptainRosterWorkflow } from '../../features/captain-roster'
 import CaptainProfileEditor from '../../features/captain-roster/profile-editor'
@@ -61,6 +62,11 @@ const POSITION_GROUPS = [
   { key: 'DEFENDER', label: '后卫' },
   { key: 'GOALKEEPER', label: '门将' },
 ] as const
+
+function canManageTeam(teamId: string): boolean {
+  const user = readSession()?.user
+  return Boolean(user && managedTeamIds(user, [teamId]).includes(teamId))
+}
 
 export default function MyTeamPage() {
   const requestedTeamId = getCurrentInstance().router?.params?.teamId ?? ''
@@ -114,14 +120,12 @@ export default function MyTeamPage() {
         : null
       let captain: CaptainWorkspaceResponse | null = null
       let captainError: string | null = null
-      if (dashboardTeamId) {
+      if (dashboardTeamId && canManageTeam(dashboardTeamId)) {
         try {
           captain = await productRepository.getCaptainWorkspace(dashboardTeamId)
         } catch (error) {
           if (requestedTeamId) throw error
-          if (!(error instanceof ProductApiError && error.statusCode === 403)) {
-            captainError = error instanceof Error ? error.message : '球队管理加载失败'
-          }
+          captainError = error instanceof Error ? error.message : '球队管理加载失败'
         }
       }
       setPrimaryId(preferences.primaryTeam?.id ?? '')
@@ -183,10 +187,10 @@ export default function MyTeamPage() {
       )
       let captain: CaptainWorkspaceResponse | null = null
       let captainError: string | null = null
-      try {
-        captain = await productRepository.getCaptainWorkspace(primaryId)
-      } catch (error) {
-        if (!(error instanceof ProductApiError && error.statusCode === 403)) {
+      if (canManageTeam(primaryId)) {
+        try {
+          captain = await productRepository.getCaptainWorkspace(primaryId)
+        } catch (error) {
           captainError = error instanceof Error ? error.message : '球队管理加载失败'
         }
       }
@@ -276,7 +280,8 @@ export default function MyTeamPage() {
   }
 
   const retryCaptain = async () => {
-    if (state.phase !== 'ready' || !state.dashboard) return
+    if (state.phase !== 'ready' || !state.dashboard || !canManageTeam(state.dashboard.team.id))
+      return
     try {
       const captain = await productRepository.getCaptainWorkspace(state.dashboard.team.id)
       setState({ ...state, captain, captainError: null })
@@ -1064,7 +1069,10 @@ function CaptainWorkspace({
       )
     }
   }
-  const updatePosition = (member: CaptainWorkspaceResponse['members'][number], position: string) => {
+  const updatePosition = (
+    member: CaptainWorkspaceResponse['members'][number],
+    position: string,
+  ) => {
     const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
     const updatedAt = (member as { updatedAt?: string }).updatedAt
     if (h5 && (!updatedAt || memberReason.trim().length < 2)) {
@@ -1259,7 +1267,7 @@ function TeamFollowBar({
     <View className="team-follow-bar surface">
       <View className="team-follow-bar__label">
         <Text>我的关注</Text>
-        <Text>长按或右键可快捷取消</Text>
+        <Text>点按球队可查看，点「取消」可取消关注</Text>
       </View>
       <ScrollView className="team-follow-bar__scroll" scrollX>
         <View className="team-follow-bar__list">

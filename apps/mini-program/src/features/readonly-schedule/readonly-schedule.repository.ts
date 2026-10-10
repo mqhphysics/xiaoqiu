@@ -415,6 +415,7 @@ function formatDateRangePoint(value: string | undefined): string {
   return new Date(value).toLocaleDateString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
+    timeZone: 'Asia/Shanghai',
   })
 }
 

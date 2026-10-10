@@ -37,6 +37,12 @@ export interface StoredPostImage {
 // content-addressed filenames, keeping the local media adapter schema-compatible.
 export function postImageUrls(imageUrl: string | null): string[] {
   if (!imageUrl) return []
+  const demoAlbum = /^\/api\/media\/demo\/album:((?:0[2-9]|[1-9]\d)(?:,(?:0[2-9]|[1-9]\d))*)$/.exec(
+    imageUrl,
+  )
+  if (demoAlbum?.[1]) {
+    return demoAlbum[1].split(',').map((id) => `/api/media/demo/photos/${id}.webp`)
+  }
   const album =
     /^((?:https?:\/\/[^/]+)?\/api\/media\/posts\/[a-f0-9-]+\/[a-f0-9-]+\/[a-f0-9]{64})-([2-9])-0\.webp$/.exec(
       imageUrl,

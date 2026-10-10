@@ -297,14 +297,45 @@
     min-height: 44px;
     line-height: 44px;
   }
+  .match-dialog .rating-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .match-dialog .rating-overview__score,
+  .match-dialog .rating-form,
+  .match-dialog .rating-choice {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .match-dialog .rating-overview__score {
+    min-height: 112px;
+    padding: 16px;
+  }
+  .match-dialog .rating-choice {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .match-dialog .rating-form {
+    box-sizing: border-box;
+  }
+  .match-dialog .rating-form__submit {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
   .match-dialog .rating-star {
     width: 44px;
     height: 44px;
     line-height: 44px;
   }
-  .match-dialog .match-review__actions [type='button'] {
+  .match-dialog .match-review__actions button,
+  .match-dialog .match-review__actions taro-button-core {
     min-height: 44px;
-    font-size: 12px;
+    padding: 0 14px;
+    font-size: 13px;
+    line-height: 44px;
+  }
+  .match-dialog .lineup-tabs button {
+    min-height: 44px;
     line-height: 44px;
   }
 }

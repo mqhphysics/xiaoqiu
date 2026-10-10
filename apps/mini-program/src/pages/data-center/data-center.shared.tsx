@@ -428,6 +428,13 @@ function Leaders({
   onChange: (value: 'scorers' | 'assists') => void
 }) {
   const rows = active === 'scorers' ? scorers : assists
+  const [showAll, setShowAll] = useState(false)
+  const [listKey, setListKey] = useState(active)
+  if (listKey !== active) {
+    setListKey(active)
+    setShowAll(false)
+  }
+  const visible = showAll ? rows : rows.slice(0, 8)
   return (
     <View className="leaders-page">
       <View className="leaders-heading">
@@ -454,7 +461,7 @@ function Leaders({
           description="已结束比赛产生统计后将在这里显示。"
         />
       ) : (
-        <View className="leader-table surface">
+        <View className={'leader-table surface' + (showAll ? ' leader-table--scroll' : '')}>
           <View className="leader-table__head">
             <Text>排名</Text>
             <Text>球员</Text>
@@ -462,7 +469,7 @@ function Leaders({
             <Text>出场</Text>
             <Text>{active === 'scorers' ? '进球' : '助攻'}</Text>
           </View>
-          {rows.map((player, index) => (
+          {visible.map((player, index) => (
             <View
               className="leader-table__row"
               key={player.id}
@@ -484,6 +491,11 @@ function Leaders({
           ))}
         </View>
       )}
+      {!showAll && rows.length > 8 && (
+        <Button className="leader-more" onClick={() => setShowAll(true)}>
+          查看更多
+        </Button>
+      )}
     </View>
   )
 }
@@ -495,5 +507,6 @@ function formatDataTimestamp(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: 'Asia/Shanghai',
   })
 }

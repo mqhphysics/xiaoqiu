@@ -130,12 +130,15 @@ export function getMatchStatusTone(status: MatchStatus): 'normal' | 'muted' | 'd
   }
 }
 
+const MATCH_TIME_ZONE = 'Asia/Shanghai'
+
 export function formatMatchTime(value: string): string {
   const date = new Date(value)
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 
@@ -145,6 +148,7 @@ export function formatDateLabel(value: string): string {
     month: 'long',
     day: 'numeric',
     weekday: 'short',
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 
@@ -152,6 +156,7 @@ export function formatCompactDate(value: string): string {
   return new Date(value).toLocaleDateString('zh-CN', {
     month: 'numeric',
     day: 'numeric',
+    timeZone: MATCH_TIME_ZONE,
   })
 }
 

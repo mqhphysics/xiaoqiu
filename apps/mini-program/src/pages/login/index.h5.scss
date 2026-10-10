@@ -531,6 +531,58 @@
   }
 }
 
+@media (max-width: 720px) {
+  .art-login {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .art-login__left {
+    flex: 0 0 148px;
+    height: 148px;
+  }
+
+  .art-login__brand {
+    top: 14px;
+    left: 16px;
+  }
+
+  .art-login__brand-caption,
+  .art-login__story,
+  .art-login__handwriting,
+  .art-login__values {
+    display: none;
+  }
+
+  .art-login__scene {
+    inset: 0;
+  }
+
+  .art-login__panel {
+    width: 100%;
+    margin: 0;
+    padding: 22px 18px 32px;
+    border-left: 0;
+    border-top: 1px solid #d2ddd4;
+  }
+
+  .art-login__form-title {
+    font-size: 28px;
+  }
+
+  .art-login__form-subtitle {
+    font-size: 14px;
+  }
+
+  .art-login__primary,
+  .art-login__guest {
+    width: 100%;
+  }
+}
+
 @media (max-width: 1240px) {
   .art-login {
     grid-template-columns: minmax(0, 1fr) 390px;
@@ -756,5 +808,19 @@
   .art-login--register .art-login__register-grid .art-login__label {
     margin-bottom: 4px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .art-login__panel {
+    width: 100%;
+    margin: 0;
+    padding: 22px 18px 32px;
+    border-left: 0;
+    border-top: 1px solid #d2ddd4;
+  }
+
+  .art-login__form-title {
+    font-size: 28px;
   }
 }
