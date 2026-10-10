@@ -760,6 +760,50 @@
   }
 }
 
+@media (min-width: 721px) and (max-width: 1280px) {
+  .public-topbar__inner {
+    min-height: 64PX;
+    padding: 0 12PX;
+  }
+
+  .public-brand__mark {
+    width: 40PX;
+    height: 40PX;
+  }
+
+  .public-brand__name {
+    font-size: 20PX;
+  }
+
+  .public-nav__item {
+    min-height: 44PX;
+    padding: 0 8PX;
+    font-size: 15PX;
+    line-height: 44PX;
+  }
+
+  .public-app--h5 .public-nav {
+    --nav-slot: 56PX;
+    --nav-team-slot: 88PX;
+    --nav-gap: 6PX;
+  }
+
+  .public-team-nav {
+    width: 58PX;
+    height: 58PX;
+  }
+
+  .public-team-nav > .team-crest {
+    width: 50PX;
+    height: 50PX;
+  }
+
+  .public-app--h5 .public-content {
+    padding-top: 16PX;
+    padding-bottom: 20PX;
+  }
+}
+
 @media (max-width: 1040px) {
   .public-topbar__inner {
     grid-template-columns: minmax(145PX, 1fr) auto minmax(75PX, 1fr);
@@ -873,6 +917,13 @@
   .public-app--h5 {
     overflow-x: clip;
     background: #f8f7f2;
+
+    .public-topbar__inner,
+    .public-content,
+    .public-footer {
+      width: min(1520PX, calc(100% - 48PX));
+      max-width: none;
+    }
 
     .public-topbar {
       background: #faf9f5;
@@ -1152,8 +1203,8 @@
 }
 
 .public-app--home .public-content {
-  width: calc(100% - 112PX);
-  max-width: 1280PX;
+  width: min(1520PX, calc(100% - 48PX));
+  max-width: none;
   padding-top: 16PX;
   padding-bottom: 26PX;
 }

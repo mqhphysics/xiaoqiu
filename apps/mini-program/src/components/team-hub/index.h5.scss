@@ -2,9 +2,9 @@
   .public-app--h5:has(.th-page) {
     background: #f6f8f5;
     .public-content {
-      width: calc(100% - 80px);
-      max-width: 1360px;
-      padding: 24px 0 32px;
+      width: min(1520px, calc(100% - 48px));
+      max-width: none;
+      padding: 16px 0 20px;
     }
     .public-footer {
       display: none;
@@ -269,6 +269,10 @@
   .th-follow-chip:hover strong {
     color: #537c60;
   }
+  .th-follow-chip--player {
+    min-width: 168px;
+    min-height: 62px;
+  }
   .th-follow-chip--player small {
     display: block;
     color: #78858c;
@@ -287,24 +291,32 @@
   .th-tabs {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1px;
-    padding: 2px;
-    margin: 12px 0;
+    gap: 4px;
+    padding: 4px;
+    margin: 10px 0 12px;
     border: 1px solid #e3e9e3;
-    border-radius: 6px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.65);
   }
   .th-tabs [role='tab'] {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    height: 45px;
-    padding: 8px;
+    gap: 8px;
+    width: 100%;
+    height: 40px;
+    padding: 0 8px;
     border: 0;
+    border-radius: 5px;
     color: #65736e;
     background: transparent;
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .th-tabs [role='tab'] .th-icon {
+    width: 16px;
+    height: 16px;
   }
   .th-tabs [role='tab']:hover {
     color: #3e6850;
@@ -323,6 +335,13 @@
     grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
     gap: 14px;
     align-items: start;
+  }
+  .th-columns > .th-surface {
+    position: sticky;
+    top: 84px;
+    align-self: start;
+    max-height: calc(100dvh - 100px);
+    overflow: auto;
   }
   .th-columns--feed {
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);

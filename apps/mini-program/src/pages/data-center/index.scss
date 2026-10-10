@@ -690,3 +690,22 @@
     font-size: 16PX;
   }
 }
+
+.leader-table--scroll {
+  max-height: 420PX;
+  overflow: auto;
+}
+
+.leader-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44PX;
+  margin-top: 8PX;
+  border: 1PX solid #d5e0d6;
+  border-radius: 8PX;
+  background: #fff;
+  color: #1d4a32;
+  font-size: 14PX;
+}

@@ -222,7 +222,13 @@ export function PostCard({
   }
   const [imageFailed, setImageFailed] = useState(false)
   const likePending = useRef(false)
-  const imageUrl = variant === 'home' && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
+  const images =
+    variant === 'home' && !imageFailed
+      ? (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
+          .filter((url) => !url.includes('/demo/album:'))
+          .map((url) => resolveMediaUrl(url))
+          .filter((url): url is string => Boolean(url))
+      : []
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
     if (Taro.getEnv() !== Taro.ENV_TYPE.WEB || !window.matchMedia('(min-width: 721px)').matches) {
@@ -258,7 +264,7 @@ export function PostCard({
   if (post.deleted) return null
   return (
     <View
-      className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${imageUrl ? 'post-card--with-image' : ''}`}
+      className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${images.length > 0 ? 'post-card--with-image' : ''}`}
       onClick={open}
     >
       <View className="post-card__author">
@@ -302,26 +308,29 @@ export function PostCard({
             </Button>
           )}
       </View>
-      {imageUrl && (
-        <Image
-          aria-label={post.title ?? '动态配图'}
-          className="post-card__image"
-          mode="aspectFill"
-          src={imageUrl}
-          onError={() => setImageFailed(true)}
-          onClick={(event) => {
-            event.stopPropagation()
-            if (
-              Taro.getEnv() === Taro.ENV_TYPE.WEB &&
-              window.matchMedia('(min-width: 721px)').matches
-            )
-              open()
-            else void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
-          }}
-        />
-      )}
-      {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && (
-        <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>
+      {images.length > 0 && (
+        <View className={`post-card__collage post-card__collage--${Math.min(images.length, 4)}`}>
+          {images.slice(0, 4).map((url) => (
+            <Image
+              key={url}
+              aria-label={post.title ?? '动态配图'}
+              className="post-card__image"
+              mode="aspectFill"
+              src={url}
+              onError={() => setImageFailed(true)}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (
+                  Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+                  window.matchMedia('(min-width: 721px)').matches
+                )
+                  open()
+                else void Taro.previewImage({ urls: images, current: url })
+              }}
+            />
+          ))}
+          {images.length > 1 && <Text className="post-card__album-count">{images.length} 张</Text>}
+        </View>
       )}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
