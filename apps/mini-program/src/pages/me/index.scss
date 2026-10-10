@@ -634,15 +634,17 @@
   }
 
   .profile-header__logout {
-    min-width: 38px;
-    width: 38px;
+    min-width: 44PX;
+    width: auto;
+    min-height: 44PX;
     overflow: hidden;
-    padding: 0 6px;
+    padding: 0 12PX;
     font-size: 0;
+    line-height: 44PX;
   }
 
   .profile-header__logout::before {
-    font-size: 9px;
+    font-size: 13PX;
     content: '退出';
   }
 
@@ -650,10 +652,10 @@
     flex-direction: column;
   }
   .profile-header__edit {
-    min-height: 34px;
-    padding: 0 8px;
-    font-size: 9px;
-    line-height: 34px;
+    min-height: 44PX;
+    padding: 0 12PX;
+    font-size: 13PX;
+    line-height: 44PX;
   }
   .profile-editor {
     grid-template-columns: 1fr;

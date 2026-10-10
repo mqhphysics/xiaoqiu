@@ -592,10 +592,10 @@
 
   .data-view-tab {
     min-width: 0;
-    min-height: 32px;
-    padding: 0 3px;
-    font-size: 10px;
-    line-height: 32px;
+    min-height: 44PX;
+    padding: 0 3PX;
+    font-size: 13PX;
+    line-height: 44PX;
   }
 
   .data-view-tabs {
@@ -640,12 +640,27 @@
 
   .standing-table,
   .leader-table {
+    min-width: 0;
     overflow-x: auto;
   }
 
   .standing-table__head,
   .standing-table__row {
-    min-width: 470px;
+    min-width: 0;
+    min-height: 44PX;
+    grid-template-columns: 28PX minmax(0, 1fr) 32PX 40PX 36PX;
+    padding: 0 8PX;
+    font-size: 12PX;
+  }
+
+  .standing-table__team {
+    overflow-wrap: anywhere;
+  }
+
+  .leader-toggle button {
+    min-height: 44PX;
+    line-height: 44PX;
+    font-size: 13PX;
   }
 
   .leaders-heading {
@@ -659,6 +674,19 @@
 
   .leader-table__head,
   .leader-table__row {
-    min-width: 620px;
+    min-width: 0;
+    min-height: 48PX;
+    grid-template-columns: 28PX minmax(0, 1.45fr) minmax(0, 0.8fr) 36PX 36PX;
+    padding: 0 8PX;
+    font-size: 12PX;
+  }
+
+  .leader-table__player {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .leader-table__value {
+    font-size: 16PX;
   }
 }

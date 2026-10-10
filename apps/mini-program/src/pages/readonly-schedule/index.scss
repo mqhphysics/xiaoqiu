@@ -284,6 +284,13 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .schedule-filter-button,
+  .schedule-order button {
+    min-height: 44PX;
+    font-size: 13PX;
+    line-height: 44PX;
+  }
+
   .schedule-filter-button {
     width: 100%;
     min-width: 0;
@@ -291,8 +298,8 @@
   }
 
   .schedule-order button {
-    min-width: 42px;
-    padding: 0 6px;
+    min-width: 44PX;
+    padding: 0 8PX;
   }
 
   .schedule-day {

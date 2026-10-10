@@ -291,7 +291,16 @@
 
   .public-roster__head,
   .public-roster__row {
-    min-width: 680px;
+    min-width: 0;
+    grid-template-columns: 28px minmax(0, 1.45fr) minmax(0, 0.85fr) 32px 32px 32px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .public-roster__player,
+  .public-roster__row > :nth-child(3) {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 .team-join-action {
@@ -340,10 +349,16 @@
   .public-team-posts {
     grid-template-columns: 1fr;
   }
-  .team-join-action input {
-    min-width: 0;
-    flex: 1;
-    width: 130px;
+  .team-join-action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-join-action input,
+  .team-join-action button {
+    width: 100%;
+    min-height: 44PX;
+    font-size: 13PX;
+    line-height: 44PX;
   }
 }
 /* postcss-pxtransform disable */

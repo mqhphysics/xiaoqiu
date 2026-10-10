@@ -756,12 +756,26 @@
   }
 
   .composer-dialog {
+    box-sizing: border-box;
     width: 100%;
+    max-width: 100%;
     max-height: calc(100vh - 8px);
     max-height: calc(100dvh - 8px);
     padding: 20px 16px max(20px, env(safe-area-inset-bottom));
     border-radius: 12px 12px 0 0;
     animation-name: composer-sheet-in;
+  }
+
+  .composer-dialog__close {
+    width: 44PX;
+    min-width: 44PX;
+    height: 44PX;
+  }
+
+  .composer-dialog__submit,
+  .composer-dialog__cancel {
+    min-height: 44PX;
+    line-height: 44PX;
   }
 
   .composer-dialog__title {

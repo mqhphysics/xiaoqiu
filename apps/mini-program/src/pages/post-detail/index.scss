@@ -352,3 +352,24 @@
   font-size: 8px;
   line-height: 28px;
 }
+
+@media (max-width: 720px) {
+  .post-detail__secondary-action,
+  .comment-composer__cancel-reply,
+  .comment-item__actions button {
+    min-height: 44PX;
+    padding: 0 12PX;
+    font-size: 13PX;
+    line-height: 44PX;
+  }
+
+  .comment-composer__submit {
+    min-height: 44PX;
+    font-size: 14PX;
+    line-height: 44PX;
+  }
+
+  .comment-item__copy > view text:last-child {
+    font-size: 11PX;
+  }
+}

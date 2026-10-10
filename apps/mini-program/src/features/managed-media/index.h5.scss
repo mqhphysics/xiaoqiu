@@ -175,6 +175,30 @@
   }
 }
 
+@media (max-width: 720px) {
+  .managed-media-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+  .managed-media-dialog {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: 90dvh;
+    padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+  }
+  .managed-media-dialog > header [data-media-control] {
+    width: 44PX;
+    height: 44PX;
+  }
+  .managed-media-button,
+  .media-account-entry button {
+    min-height: 44PX;
+    font-size: 13PX;
+    padding: 8PX 12PX;
+  }
+}
+
 /* Native H5 controls need attribute selectors; Taro rewrites tag selectors. */
 @media (min-width: 721px) {
   .managed-media-dialog {

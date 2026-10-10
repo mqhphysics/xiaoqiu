@@ -786,6 +786,11 @@
     gap: 8PX;
   }
 
+  .public-back {
+    width: 44PX;
+    height: 44PX;
+  }
+
   .public-brand__mark {
     width: 40PX;
     height: 40PX;
@@ -798,6 +803,13 @@
   .public-account {
     min-height: 44PX;
     padding-left: 10PX;
+  }
+
+  .public-account-menu__item {
+    height: 44PX;
+    min-height: 44PX;
+    font-size: 14PX;
+    line-height: 44PX;
   }
 
   .public-account__avatar {
