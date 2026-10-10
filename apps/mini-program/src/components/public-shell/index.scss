@@ -592,8 +592,8 @@
 
 .public-topbar__inner {
   grid-template-columns: minmax(230PX, 1fr) auto minmax(230PX, 1fr);
-  width: calc(100% - 48PX);
-  max-width: 1360PX;
+  width: min(1680PX, calc(100% - 40PX));
+  max-width: none;
   min-height: 80PX;
   padding: 0 24PX;
 }
@@ -727,14 +727,14 @@
 }
 
 .public-app--home .public-content {
-  width: calc(100% - 48PX);
-  max-width: 1320PX;
+  width: min(1680PX, calc(100% - 40PX));
+  max-width: none;
   padding: 24PX 0 34PX;
 }
 
 .public-app--home .public-footer {
-  width: calc(100% - 48PX);
-  max-width: 1320PX;
+  width: min(1680PX, calc(100% - 40PX));
+  max-width: none;
 }
 
 .public-brand:focus-visible,
@@ -1139,9 +1139,20 @@
   overflow-x: clip;
 }
 
+@media (min-width: 721px) {
+  .public-app--home .public-content,
+  .public-app--h5 .public-content,
+  .public-app--h5 .public-footer,
+  .public-app--h5:has(.th-page) .public-content,
+  .public-app--h5:has(.schedule-desktop) .public-content,
+  .public-app--section-data:has(.data-desktop) .public-content,
+  .public-app--h5.public-app--section-me .public-content {
+    width: min(1680PX, calc(100% - 40PX));
+    max-width: none;
+  }
+}
+
 .public-app--home .public-content {
-  width: calc(100% - 112PX);
-  max-width: 1280PX;
   padding-top: 16PX;
   padding-bottom: 26PX;
 }

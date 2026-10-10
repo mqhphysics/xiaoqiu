@@ -73,13 +73,15 @@
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  width: 40px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   justify-content: center;
   padding: 0;
   color: #344f3c;
-  background: #eaeee5;
-  border: 1px solid #d5decd;
-  border-radius: 5px;
+  background: #f1f5ef;
+  border: 0;
+  border-radius: 50%;
   font-size: 12px;
   cursor: pointer;
   span {
@@ -176,7 +178,10 @@
     padding: 9px 15px;
   }
   .match-dialog__close {
+    width: 44px;
+    height: 44px;
     min-height: 44px;
+    border-radius: 50%;
   }
   .match-dialog__body {
     padding: 0 14px calc(24px + env(safe-area-inset-bottom));

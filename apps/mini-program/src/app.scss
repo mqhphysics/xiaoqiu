@@ -152,6 +152,16 @@ button {
   cursor: pointer;
 }
 
+/* Taro's H5 script sets the root font from min(viewport width, height) and caps it at 40px.
+   A short window shrinks rem layouts while PX chrome stays large; a wide window then keeps
+   a ~1280px column, so the outer margin looks much bigger than a cloud screenshot.
+   Lock the 1:1 root once the window is a real desktop. PX is not converted to rem. */
+@media (min-width: 1024px) and (min-height: 640px) {
+  html {
+    font-size: 40PX !important;
+  }
+}
+
 @media (max-width: 720px) {
   .public-content {
     width: calc(100% - 28px);

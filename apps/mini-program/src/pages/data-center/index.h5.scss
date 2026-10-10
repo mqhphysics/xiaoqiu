@@ -6,8 +6,8 @@
 
     .public-content {
       position: relative;
-      width: calc(100% - 112px);
-      max-width: 1380px;
+      width: min(1680PX, calc(100% - 40PX));
+      max-width: none;
       padding: 28px 0 20px;
     }
 
@@ -1147,7 +1147,7 @@
 
 @media (min-width: 1024px) and (max-width: 1150px) {
   .public-app--section-data:has(.data-desktop) .public-content {
-    width: calc(100% - 64px);
+    width: min(1680PX, calc(100% - 40PX));
   }
   .data-desktop h1 {
     font-size: 35px;

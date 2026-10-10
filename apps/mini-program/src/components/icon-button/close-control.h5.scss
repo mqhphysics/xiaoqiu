@@ -35,6 +35,20 @@
     outline: 2px solid #315b3d;
     outline-offset: 3px;
   }
+  .match-dialog__bar,
+  .information-entry-header,
+  .desktop-settings__header,
+  .profile-dialog > header,
+  .auth-recovery__header,
+  .post-composer__header,
+  .dm-head,
+  .th-modal-top,
+  .identity-dialog > header,
+  .test-role-dialog > header,
+  .composer-dialog__head,
+  .th-picker > .th-heading {
+    align-items: center;
+  }
   .profile-dialog-backdrop {
     z-index: 2600 !important;
   }

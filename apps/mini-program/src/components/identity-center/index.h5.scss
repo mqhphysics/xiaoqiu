@@ -67,6 +67,21 @@
   justify-content: space-between;
   gap: 16px;
 }
+.identity-dialog > header [data-identity-button] {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5ef;
+  font-size: 22px;
+  line-height: 1;
+}
 .identity-dialog h2 {
   margin: 6px 0 14px;
   font-size: 24px;

@@ -40,8 +40,17 @@
   cursor: pointer;
 }
 .test-role-dialog header button {
-  width: 44px;
-  font-size: 25px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5ef;
+  font-size: 22px;
+  line-height: 1;
 }
 .test-role-options {
   display: grid;

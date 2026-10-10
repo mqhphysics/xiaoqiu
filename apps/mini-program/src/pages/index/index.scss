@@ -1918,7 +1918,7 @@
 .post-card--home.post-card--with-image .post-card__action { min-width: 30PX; }
 
 @media (min-width: 1101px) {
-  .home-product-section { margin-right: 44PX; margin-left: 44PX; }
+  .home-product-section { margin-right: 0; margin-left: 0; }
   .match-ornament { display: block; }
   .match-ornament--floodlight { top: -49PX; left: -205PX; width: 225PX; height: 365PX; background-image: url('../../assets/home-visual/match-floodlight.png'); clip-path: polygon(0 0, 45% 0, 45% 100%, 0 100%); }
   .match-ornament--goal { top: 1PX; right: -254PX; width: 340PX; height: 250PX; background-image: url('../../assets/home-visual/match-goal.png'); }
@@ -1982,8 +1982,8 @@
     height: 42PX;
     min-width: 0;
     min-height: 0;
-    border: 1PX solid #d9e2d9;
-    border-radius: 12PX;
+    border: 0;
+    border-radius: 50%;
     background: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     transition:
