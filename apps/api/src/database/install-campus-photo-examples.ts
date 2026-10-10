@@ -1,7 +1,7 @@
 import { AuditActorType, PostStatus, PrismaClient } from '../generated/prisma/client'
 import { DEMO_ORGANIZATION_ID, DEMO_POSTS, fixtureId } from './demo-fixture'
 
-/** Adds only the five explicitly requested photo examples; existing posts and interactions stay intact. */
+/** Adds the demo photo posts; existing non-photo posts and interactions stay intact. */
 export async function installCampusPhotoExamples(prisma: PrismaClient): Promise<number> {
   const definitions = DEMO_POSTS.filter((post) => post.key.startsWith('photo-'))
   return prisma.$transaction(async (tx) => {
@@ -67,7 +67,7 @@ if (require.main === module) {
   void installCampusPhotoExamples(prisma)
     .then((count) =>
       console.log(
-        `Photo examples ready: ${count} added; only five named demo photo posts were updated.`,
+        `Photo examples ready: ${count} added; named demo photo posts were updated.`,
       ),
     )
     .catch((error: unknown) => {

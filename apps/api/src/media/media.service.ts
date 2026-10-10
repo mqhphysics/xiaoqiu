@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { PrismaService } from '../database/prisma.service'
 import { AuditActorType } from '../generated/prisma/client'
+import { demoPhotoAlbumUrls } from './demo-photo-albums'
 import { assertMediaReadable } from './media-access-policy'
 
 const MAX_AVATAR_BYTES = 72 * 1024
@@ -33,20 +34,21 @@ export interface StoredPostImage {
   height: number
 }
 
-// The existing imageUrl remains a renderable cover. Album membership is encoded in
-// content-addressed filenames, keeping the local media adapter schema-compatible.
+// The existing imageUrl remains a renderable cover. Uploaded albums encode membership
+// in content-addressed filenames. Demo albums expand from a readable demo-photo cover.
 export function postImageUrls(imageUrl: string | null): string[] {
   if (!imageUrl) return []
   const album =
     /^((?:https?:\/\/[^/]+)?\/api\/media\/posts\/[a-f0-9-]+\/[a-f0-9-]+\/[a-f0-9]{64})-([2-9])-0\.webp$/.exec(
       imageUrl,
     )
-  return album
-    ? Array.from(
-        { length: Number(album[2]) },
-        (_, index) => `${album[1]}-${album[2]}-${index}.webp`,
-      )
-    : [imageUrl]
+  if (album) {
+    return Array.from(
+      { length: Number(album[2]) },
+      (_, index) => `${album[1]}-${album[2]}-${index}.webp`,
+    )
+  }
+  return demoPhotoAlbumUrls(imageUrl) ?? [imageUrl]
 }
 
 export interface StoredAvatar {

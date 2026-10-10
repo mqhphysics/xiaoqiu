@@ -201,6 +201,25 @@ export function MatchCard({ match, onClick }: { match: MatchSummary; onClick?: (
   )
 }
 
+const HOME_PHOTO_FRAMES: Record<string, 'portrait' | 'square' | 'wide' | 'landscape'> = {
+  '01': 'wide',
+  '07': 'portrait',
+  '08': 'square',
+  '09': 'square',
+  '10': 'wide',
+  '11': 'square',
+  '12': 'portrait',
+  '13': 'square',
+  '14': 'wide',
+  '15': 'portrait',
+  '16': 'wide',
+}
+
+function homeImageFrame(imageUrl: string | null): 'portrait' | 'square' | 'wide' | 'landscape' {
+  const id = /\/(\d{2})\.webp(?:$|\?)/.exec(imageUrl ?? '')?.[1]
+  return (id && HOME_PHOTO_FRAMES[id]) || 'landscape'
+}
+
 export function PostCard({
   post: originalPost,
   onOpen,
@@ -221,8 +240,35 @@ export function PostCard({
     else onOpen()
   }
   const [imageFailed, setImageFailed] = useState(false)
+  const [failedSrcs, setFailedSrcs] = useState<string[]>([])
   const likePending = useRef(false)
-  const imageUrl = variant === 'home' && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
+  const webHome = variant === 'home' && Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const imageUrl = variant === 'home' && !webHome && !imageFailed ? resolveMediaUrl(post.imageUrl) : undefined
+  const gallery = webHome
+    ? (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : []).flatMap(
+        (item) => {
+          const resolved = resolveMediaUrl(item)
+          return resolved && !failedSrcs.includes(resolved) ? [resolved] : []
+        },
+      )
+    : []
+  const collage = gallery.slice(0, 4)
+  const showCollage = collage.length > 1
+  const frame = homeImageFrame(post.imageUrl)
+  const hasImage = webHome ? collage.length > 0 : Boolean(imageUrl)
+  const markFailed = (src: string) =>
+    setFailedSrcs((current) => (current.includes(src) ? current : [...current, src]))
+  const openImage = (event: BaseEventOrig, current: string) => {
+    event.stopPropagation()
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && window.matchMedia('(min-width: 721px)').matches) {
+      open()
+      return
+    }
+    const urls = (post.imageUrls?.length ? post.imageUrls : [post.imageUrl ?? current])
+      .map((item) => resolveMediaUrl(item))
+      .filter((item): item is string => Boolean(item))
+    void Taro.previewImage({ urls: urls.length > 0 ? urls : [current], current })
+  }
   const stopAndLike = (event: BaseEventOrig) => {
     event.stopPropagation()
     if (Taro.getEnv() !== Taro.ENV_TYPE.WEB || !window.matchMedia('(min-width: 721px)').matches) {
@@ -258,7 +304,7 @@ export function PostCard({
   if (post.deleted) return null
   return (
     <View
-      className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${imageUrl ? 'post-card--with-image' : ''}`}
+      className={`post-card ${variant === 'home' ? 'post-card--home' : ''} ${hasImage ? 'post-card--with-image' : ''} ${webHome && hasImage && !showCollage ? `post-card--frame-${frame}` : ''} ${showCollage ? 'post-card--collage' : ''}`}
       onClick={open}
     >
       <View className="post-card__author">
@@ -302,27 +348,59 @@ export function PostCard({
             </Button>
           )}
       </View>
-      {imageUrl && (
-        <Image
-          aria-label={post.title ?? '动态配图'}
-          className="post-card__image"
-          mode="aspectFill"
-          src={imageUrl}
-          onError={() => setImageFailed(true)}
-          onClick={(event) => {
-            event.stopPropagation()
-            if (
-              Taro.getEnv() === Taro.ENV_TYPE.WEB &&
-              window.matchMedia('(min-width: 721px)').matches
-            )
-              open()
-            else void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
-          }}
-        />
+      {showCollage ? (
+        <View className={`post-card__collage post-card__collage--${collage.length}`}>
+          {collage.map((src, index) => (
+            <Image
+              aria-label={`${post.title ?? '动态配图'} ${index + 1}`}
+              className="post-card__image"
+              key={src}
+              mode="aspectFill"
+              src={src}
+              onError={() => markFailed(src)}
+              onClick={(event) => openImage(event, src)}
+            />
+          ))}
+          {(post.imageUrls?.length ?? 0) > 1 && (
+            <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>
+          )}
+        </View>
+      ) : webHome && collage[0] ? (
+        <View className={`post-card__media post-card__media--${frame}`}>
+          <Image
+            aria-label={post.title ?? '动态配图'}
+            className="post-card__image"
+            mode="aspectFill"
+            src={collage[0]}
+            onError={() => markFailed(collage[0]!)}
+            onClick={(event) => openImage(event, collage[0]!)}
+          />
+        </View>
+      ) : (
+        imageUrl && (
+          <Image
+            aria-label={post.title ?? '动态配图'}
+            className="post-card__image"
+            mode="aspectFill"
+            src={imageUrl}
+            onError={() => setImageFailed(true)}
+            onClick={(event) => {
+              event.stopPropagation()
+              if (
+                Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+                window.matchMedia('(min-width: 721px)').matches
+              )
+                open()
+              else void Taro.previewImage({ urls: [imageUrl], current: imageUrl })
+            }}
+          />
+        )
       )}
-      {Taro.getEnv() === Taro.ENV_TYPE.WEB && (post.imageUrls?.length ?? 0) > 1 && (
-        <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>
-      )}
+      {!showCollage &&
+        Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+        (post.imageUrls?.length ?? 0) > 1 && (
+          <Text className="post-card__album-count">{post.imageUrls!.length} 张</Text>
+        )}
       {post.title && <Text className="post-card__title">{post.title}</Text>}
       <Text className="post-card__body">{post.body}</Text>
       <PostTags tags={post.tags} tournamentId={post.tournamentId} />

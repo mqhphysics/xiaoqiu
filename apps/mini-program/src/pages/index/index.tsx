@@ -15,16 +15,15 @@ import { openPlayer } from '../../features/product/player-navigation'
 import { openMatch } from '../../features/product/match-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
 import { useOverlayFocus } from '../../components/overlay-focus'
-import { openMessaging } from '../../components/messaging-drawer'
 import { DataState } from '../../components/public-ui'
 import {
   MatchStatus,
-  PostCard,
   ProductSection,
   TeamCrest,
   TeamName,
   UserAvatar,
 } from '../../components/product-ui'
+import { CommunityFeed } from './community-feed'
 import { formatDate, formatTime } from '../../features/product/product.format'
 import {
   createClientActionId,
@@ -582,35 +581,11 @@ function HomeContent({
           <Text className="composer-entry__placeholder">说点什么，记录此刻的校园足球</Text>
           <Text className="composer-entry__action">发布</Text>
         </Button>
-        <View className="community-feed">
-          {data.posts.length > 0 ? (
-            data.posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                variant="home"
-                onLike={() => onLike(post)}
-                onOpen={() => void goToPost(post.id)}
-                {...(post.author.messageable && readSession()
-                  ? {
-                      onMessageAuthor: () =>
-                        openMessaging({
-                          id: post.author.id,
-                          displayName: post.author.displayName,
-                          avatarUrl: post.author.avatarUrl,
-                        }),
-                    }
-                  : {})}
-              />
-            ))
-          ) : (
-            <DataState
-              kind="empty"
-              title="还没有绿茵动态"
-              description="登录后可以发布第一条动态。"
-            />
-          )}
-        </View>
+        <CommunityFeed
+          posts={data.posts}
+          onLike={onLike}
+          onOpen={(postId) => void goToPost(postId)}
+        />
       </View>
 
       {composerOpen &&
