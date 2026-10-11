@@ -183,6 +183,7 @@ export interface HomeResponse {
     matchCount: number
   }
   announcements: PostSummary[]
+  platformAnnouncements?: PostSummary[]
   focusMatches: MatchSummary[]
   teams: TeamSummary[]
   posts: PostSummary[]

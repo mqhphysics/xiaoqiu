@@ -1,5 +1,11 @@
 import { AuditActorType, PostStatus, PrismaClient } from '../generated/prisma/client'
-import { DEMO_ORGANIZATION_ID, DEMO_POSTS, DEMO_TEAMS, fixtureId } from './demo-fixture'
+import {
+  DEMO_ORGANIZATION_ID,
+  DEMO_POSTS,
+  DEMO_TEAMS,
+  fixtureId,
+  isPlatformDemoPost,
+} from './demo-fixture'
 import { DEMO_TEAM_POST_INDEXES } from './seed-demo-social'
 
 const MASONRY_POST_KEYS = [
@@ -52,7 +58,7 @@ export async function installMasonryDemoPosts(prisma: PrismaClient): Promise<num
         throw new Error('动态示例 ID 与其他组织记录冲突')
       const data = {
         organizationId: DEMO_ORGANIZATION_ID,
-        tournamentId: tournament.id,
+        tournamentId: isPlatformDemoPost(definition) ? null : tournament.id,
         authorUserId,
         teamId: team ? fixtureId(`team:${team.code}`) : null,
         type: definition.type,

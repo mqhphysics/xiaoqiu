@@ -167,10 +167,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   color: #ffffff;
   background: #9b4034;
   font-size: 11px;
   font-weight: 900;
+}
+
+.notice-rail__label-note {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.92;
 }
 
 .notice-rail__items {
@@ -1133,9 +1141,16 @@
 }
 
 .notice-rail__label {
+  flex-direction: column;
+  gap: 4PX;
   min-height: 72PX;
   background: #bd6142;
   font-size: 17PX;
+}
+
+.notice-rail__label-note {
+  font-size: 11PX;
+  letter-spacing: 0.14em;
 }
 
 .notice-rail__item {
@@ -1431,6 +1446,8 @@
   }
 
   .notice-rail__label {
+    flex-direction: row;
+    gap: 8PX;
     min-height: 42PX;
     padding: 0 15PX;
     font-size: 15PX;

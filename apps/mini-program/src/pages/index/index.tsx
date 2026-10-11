@@ -6,7 +6,7 @@ import { PublicShell } from '../../components/public-shell'
 import { PersistentHeaderSearch } from '../../components/public-shell/persistent-header-search'
 import { openSearchPage } from '../../components/public-shell/search-transition'
 import { IconButton } from '../../components/icon-button'
-import { HeroCarousel } from '../../components/hero-carousel'
+import { HeroCarousel, type HeroPhoto } from '../../components/hero-carousel'
 import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
@@ -33,6 +33,7 @@ import {
 } from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { loadHomeWithEmptyState, type HomeLoadState } from '../../features/product/home-loading'
+import { tournamentHeroSlides } from './home-announcements'
 import type {
   HomeResponse,
   MatchSummary,
@@ -484,8 +485,22 @@ function HomeContent({
   onSearchTextChange: (value: string) => void
 }) {
   const focusMatches = selectFocusMatches(data.focusMatches)
-  const featuredAnnouncement = data.announcements[0]
-  const otherAnnouncements = data.announcements.slice(1)
+  const heroAnnouncements = tournamentHeroSlides(data.announcements)
+  const platformAnnouncements = data.platformAnnouncements ?? []
+  const [heroIndex, setHeroIndex] = useState(0)
+  const heroAnnouncement =
+    heroAnnouncements[heroAnnouncements.length > 0 ? heroIndex % heroAnnouncements.length : 0]
+  const heroPhotos: HeroPhoto[] = heroAnnouncements.flatMap((announcement) => {
+    const src = resolveMediaUrl(announcement.imageUrl)
+    if (!src) return []
+    return [{ src, alt: announcement.title?.trim() || '赛事公告' }]
+  })
+  const linkedHero = heroPhotos.length > 0 && heroPhotos.length === heroAnnouncements.length
+  const openHeroAnnouncement = (index = heroIndex) => {
+    const announcement =
+      heroAnnouncements[heroAnnouncements.length > 0 ? index % heroAnnouncements.length : 0]
+    if (announcement) void goToPost(announcement.id)
+  }
   return (
     <View className="home-page">
       <View className="experience-hero">
@@ -493,31 +508,38 @@ function HomeContent({
           <Text className="experience-hero__eyebrow">
             {data.tournament.name} · {data.tournament.seasonName}
           </Text>
-          {featuredAnnouncement && <Text className="experience-hero__badge">官方公告</Text>}
+          {heroAnnouncement && <Text className="experience-hero__badge">赛事主办</Text>}
           <Text
             className={`experience-hero__title ${
-              (featuredAnnouncement?.title?.length ?? data.tournament.name.length) > 20
+              (heroAnnouncement?.title?.length ?? data.tournament.name.length) > 20
                 ? 'experience-hero__title--long'
                 : ''
             }`}
           >
-            {featuredAnnouncement?.title ?? data.tournament.name}
+            {heroAnnouncement?.title ?? data.tournament.name}
           </Text>
           <Text className="experience-hero__summary">
-            {featuredAnnouncement?.body ?? '校园赛事、球队和绿茵动态，都在这里。'}
+            {heroAnnouncement?.body ?? '校园赛事、球队和绿茵动态，都在这里。'}
           </Text>
           <Button
             className="experience-hero__action"
             onClick={() =>
-              void (featuredAnnouncement
-                ? goToPost(featuredAnnouncement.id)
-                : goToSchedule(data.tournament.id))
+              heroAnnouncement ? openHeroAnnouncement() : void goToSchedule(data.tournament.id)
             }
           >
-            {featuredAnnouncement ? '查看公告' : '查看赛程'} <Text>→</Text>
+            {heroAnnouncement ? '查看公告' : '查看赛程'} <Text>→</Text>
           </Button>
         </View>
-        <HeroCarousel />
+        <HeroCarousel
+          key={heroAnnouncements.map((announcement) => announcement.id).join(':')}
+          {...(linkedHero
+            ? {
+                photos: heroPhotos,
+                onActiveChange: setHeroIndex,
+                onSelect: openHeroAnnouncement,
+              }
+            : {})}
+        />
       </View>
 
       <HomeSearch
@@ -545,11 +567,14 @@ function HomeContent({
         )}
       </View>
 
-      {otherAnnouncements.length > 0 && (
+      {platformAnnouncements.length > 0 && (
         <View className="notice-rail">
-          <Text className="notice-rail__label">官方公告</Text>
+          <View className="notice-rail__label">
+            <Text>官方公告</Text>
+            <Text className="notice-rail__label-note">平台</Text>
+          </View>
           <View className="notice-rail__items">
-            {otherAnnouncements.map((announcement) => (
+            {platformAnnouncements.map((announcement) => (
               <Button
                 className={`notice-rail__item ${announcement.imageUrl ? 'notice-rail__item--photo' : ''}`}
                 key={announcement.id}

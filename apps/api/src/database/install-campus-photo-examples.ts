@@ -1,5 +1,5 @@
 import { AuditActorType, PostStatus, PrismaClient } from '../generated/prisma/client'
-import { DEMO_ORGANIZATION_ID, DEMO_POSTS, fixtureId } from './demo-fixture'
+import { DEMO_ORGANIZATION_ID, DEMO_POSTS, fixtureId, isPlatformDemoPost } from './demo-fixture'
 
 /** Adds only the five explicitly requested photo examples; existing posts and interactions stay intact. */
 export async function installCampusPhotoExamples(prisma: PrismaClient): Promise<number> {
@@ -32,7 +32,7 @@ export async function installCampusPhotoExamples(prisma: PrismaClient): Promise<
         throw new Error('照片示例 ID 与其他组织记录冲突')
       const data = {
         organizationId: DEMO_ORGANIZATION_ID,
-        tournamentId: tournament.id,
+        tournamentId: isPlatformDemoPost(definition) ? null : tournament.id,
         authorUserId,
         type: definition.type,
         status: PostStatus.PUBLISHED,

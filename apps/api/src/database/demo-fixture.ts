@@ -89,14 +89,22 @@ export interface DemoAccountDefinition {
   bio: string
 }
 
+export type DemoPostAudience = 'TOURNAMENT' | 'PLATFORM'
+
 export interface DemoPostDefinition {
   key: string
   type: PostType
+  /** Official posts only. Platform notices are organization-wide and omit the tournament. */
+  audience?: DemoPostAudience
   authorUsername?: string
   title?: string
   body: string
   imageUrl?: string
   publishedAt: string
+}
+
+export function isPlatformDemoPost(post: DemoPostDefinition): boolean {
+  return post.type === PostType.OFFICIAL && post.audience === 'PLATFORM'
 }
 
 export const DEMO_TEAMS: DemoTeamDefinition[] = [
@@ -1002,18 +1010,20 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
   {
     key: 'photo-official-trophy',
     type: PostType.OFFICIAL,
-    title: '校园足球影像：举杯时刻',
-    body: '【校园影像示例】2025 年“新生杯”合影：一起举起奖杯，留下属于校园足球的记忆。',
+    audience: 'TOURNAMENT',
+    title: '绿茵杯进行中',
+    body: '绿茵杯是校园各学院之间的足球赛事。2026 赛季自 3 月 1 日开赛，16 支球队完成小组赛和八强后，目前处于半决赛：首场已经结束，另一场半决赛和决赛都还没踢。',
     imageUrl: '/api/media/demo/photos/02.webp',
-    publishedAt: '2026-09-01T20:00:00+08:00',
+    publishedAt: '2026-09-02T08:00:00+08:00',
   },
   {
     key: 'photo-official-awards',
     type: PostType.OFFICIAL,
-    title: '校园足球影像：赛场之外的荣誉',
-    body: '【校园影像示例】2025 年“计科杯”颁奖现场，记录努力获得回响的瞬间。',
+    audience: 'TOURNAMENT',
+    title: '半决赛还差一场',
+    body: '首场半决赛已经结束，物院一队 2:1 战胜生科青藤，先拿到一个决赛席位。另一场半决赛定于 9 月 2 日 19:00，胜者将和物院一队踢决赛。',
     imageUrl: '/api/media/demo/photos/06.webp',
-    publishedAt: '2026-09-01T19:00:00+08:00',
+    publishedAt: '2026-09-01T21:40:00+08:00',
   },
   {
     key: 'photo-community-huddle',
@@ -1042,16 +1052,26 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
   {
     key: 'official-round-two',
     type: PostType.OFFICIAL,
-    title: '16 队参赛，8 队晋级淘汰赛',
-    body: '16 支演示球队分为 A/B/C/D 四组，每组 4 队进行单循环，小组前两名晋级八强。八强签位为 A1-B1、B2-D1、C1-D2、A2-C2；冠军主线为八强、半决赛与决赛，三四名赛独立展示。这是演示赛制，不替代真实赛事规程。',
-    publishedAt: '2026-08-30T21:30:00+08:00',
+    audience: 'PLATFORM',
+    title: '招募信息管理员',
+    body: '晓球正在招募信息管理员，负责核对比赛事件、名单和页面上的公开信息。这是平台招募，不是某一届赛事的主办通知。',
+    publishedAt: '2026-10-06T09:00:00+08:00',
   },
   {
     key: 'official-venue',
     type: PostType.OFFICIAL,
-    title: '物院一队率先晋级决赛',
-    body: '首场半决赛已经结束，物院一队 2:1 战胜生科青藤。另一场半决赛将于 9 月 2 日晚进行。',
-    publishedAt: '2026-09-01T21:30:00+08:00',
+    audience: 'PLATFORM',
+    title: '赛程和数据页已更新',
+    body: '平台近期上线了更紧凑的赛程浏览和数据页。比赛对阵和比分仍以赛事主办方公布的内容为准。',
+    publishedAt: '2026-10-04T09:00:00+08:00',
+  },
+  {
+    key: 'platform-suggestions',
+    type: PostType.OFFICIAL,
+    audience: 'PLATFORM',
+    title: '欢迎提出使用建议',
+    body: '如果比分看不清、球员找不到，或你希望晓球多一个功能，可以通过站内反馈告诉平台。建议只用于改进产品，不会改写比赛记录。',
+    publishedAt: '2026-10-02T09:00:00+08:00',
   },
   {
     key: 'community-derby',
@@ -1084,10 +1104,11 @@ export const DEMO_POSTS: DemoPostDefinition[] = [
   {
     key: 'official-photo-note',
     type: PostType.OFFICIAL,
-    title: '影像示例仍在更新',
-    body: '官方资讯继续使用校园影像示例。这些照片只作版式演示，不改写 2026 年比赛记录。',
+    audience: 'TOURNAMENT',
+    title: '决赛档期已排定',
+    body: '绿茵杯决赛和三四名赛都安排在 9 月 14 日。四强还没有全部产生，决赛对阵会在第二场半决赛结束后确定。',
     imageUrl: '/api/media/demo/photos/07.webp',
-    publishedAt: '2026-10-09T09:00:00+08:00',
+    publishedAt: '2026-08-28T10:00:00+08:00',
   },
   {
     key: 'community-night-album',

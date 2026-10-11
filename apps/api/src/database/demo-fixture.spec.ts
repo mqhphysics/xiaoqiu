@@ -8,6 +8,7 @@ import {
   DEMO_POSTS,
   DEMO_TEAMS,
   DEMO_TOURNAMENT_TEAMS,
+  isPlatformDemoPost,
   type DemoMatchDefinition,
 } from './demo-fixture'
 import { calculateStandings } from '../experience/ranking'
@@ -17,7 +18,7 @@ import {
   getDemoMinutesPlayed,
   isDemoMatchStarter,
 } from './seed-demo-competition'
-import { DEMO_MATCH_REVIEWS } from './seed-demo-social'
+import { DEMO_MATCH_REVIEWS, DEMO_TEAM_POST_INDEXES } from './seed-demo-social'
 import { parseResultsRules } from '../results/parse-rules'
 import { parseRosterPolicy } from '../roster/roster-workflow.rules'
 
@@ -196,6 +197,39 @@ test('SF-01 community facts are published after the rescheduled semifinal', () =
   const reviews = DEMO_MATCH_REVIEWS.filter((review) => review.matchCode === semifinal.code)
   assert.equal(reviews.length, 3)
   assert.ok(reviews.every((review) => Date.parse(review.createdAt) > fullTime))
+})
+
+test('official posts split tournament organizer notices from platform notices', () => {
+  const official = DEMO_POSTS.filter((post) => post.type === 'OFFICIAL')
+  const tournament = official.filter((post) => !isPlatformDemoPost(post))
+  const platform = official.filter((post) => isPlatformDemoPost(post))
+
+  assert.deepEqual(
+    tournament.map((post) => post.title),
+    ['绿茵杯进行中', '半决赛还差一场', '决赛档期已排定'],
+  )
+  assert.ok(tournament.every((post) => post.imageUrl && post.audience === 'TOURNAMENT'))
+  assert.ok(tournament.every((post) => /绿茵杯|半决赛|决赛/.test(`${post.title}${post.body}`)))
+  assert.equal(
+    tournament.find((post) => post.title === '绿茵杯进行中')?.body.includes('3 月 1 日'),
+    true,
+  )
+  assert.equal(
+    [...tournament].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0]?.title,
+    '绿茵杯进行中',
+  )
+
+  assert.deepEqual(
+    platform.map((post) => post.title),
+    ['招募信息管理员', '赛程和数据页已更新', '欢迎提出使用建议'],
+  )
+  assert.ok(platform.every((post) => !post.imageUrl))
+  assert.ok(
+    platform.every(
+      (post) => !/半决赛|决赛|晋级|绿茵杯进行中/.test(`${post.title ?? ''}${post.body}`),
+    ),
+  )
+  assert.ok(platform.every((post) => DEMO_TEAM_POST_INDEXES[post.key] === undefined))
 })
 
 function assertProgression(

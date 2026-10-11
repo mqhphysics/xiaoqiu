@@ -60,7 +60,7 @@ export class ExperienceService {
   async getHome(organizationId: string, authorization?: string, tournamentId?: string) {
     const session = await this.authService.getSession(authorization)
     const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
-    const [matches, registrations, posts, directoryTeams] = await Promise.all([
+    const [matches, registrations, posts, directoryTeams, platformPosts] = await Promise.all([
       this.prisma.match.findMany({
         where: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
         include: matchSummaryInclude,
@@ -78,6 +78,17 @@ export class ExperienceService {
         take: 20,
       }),
       this.prisma.team.findMany({ where: { organizationId }, orderBy: { name: 'asc' } }),
+      this.prisma.post.findMany({
+        where: {
+          organizationId,
+          tournamentId: null,
+          type: PostType.OFFICIAL,
+          status: PostStatus.PUBLISHED,
+        },
+        include: postSummaryInclude(session?.userId),
+        orderBy: { publishedAt: 'desc' },
+        take: 6,
+      }),
     ])
 
     const live = matches.filter((match) => match.status === MatchStatus.LIVE)
@@ -100,6 +111,7 @@ export class ExperienceService {
         .filter((post) => post.type === PostType.OFFICIAL)
         .slice(0, 3)
         .map((post) => mapPost(post, session?.userId)),
+      platformAnnouncements: platformPosts.map((post) => mapPost(post, session?.userId)),
       focusMatches: [...live, ...upcoming, ...finished].slice(0, 5).map(mapMatch),
       teams: directoryTeams.map((team) => ({
         ...mapTeam(team),
