@@ -25,6 +25,8 @@ interface Props {
   captain: CaptainWorkspaceResponse
   roster: TeamDashboardResponse['roster']
   matches: MatchSummary[]
+  landscape?: boolean
+  compact?: boolean
 }
 const statuses: Record<string, string> = {
   DRAFT: '草稿',
@@ -35,7 +37,15 @@ const statuses: Record<string, string> = {
   REOPENED: '已开放补报',
 }
 
-export function CaptainRosterWorkflow({ teamId, tournamentId, captain, roster, matches }: Props) {
+export function CaptainRosterWorkflow({
+  teamId,
+  tournamentId,
+  captain,
+  roster,
+  matches,
+  landscape = false,
+  compact = false,
+}: Props) {
   const session = readSession()
   const players = captain.members.flatMap((member) => {
     if (!member.playerId) return []
@@ -70,6 +80,8 @@ export function CaptainRosterWorkflow({ teamId, tournamentId, captain, roster, m
         teamId={teamId}
         tournamentId={tournamentId}
         teamName={captain.team.name}
+        landscape={landscape}
+        compact={compact}
       />
       <RegistrationEditor
         key={`${session?.user.id}:${tournamentId}:${teamId}`}

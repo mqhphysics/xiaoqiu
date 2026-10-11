@@ -9,6 +9,9 @@ export interface LineupBoardProps {
   teamName: string
   tournamentId: string
   teamId: string
+  /** Modal: landscape pitch (attack to the right) + compact chrome. */
+  landscape?: boolean
+  compact?: boolean
 }
 export default function LineupBoard(_props: LineupBoardProps) {
   return (

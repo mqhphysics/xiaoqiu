@@ -208,6 +208,7 @@ export default function CaptainProfileEditor({ teamId, onChange, defaultExpanded
                   <span>{field.label}</span>
                   {'multiline' in field ? (
                     <textarea
+                      className="captain-profile__textarea"
                       value={values[field.key]}
                       maxLength={field.max}
                       onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}

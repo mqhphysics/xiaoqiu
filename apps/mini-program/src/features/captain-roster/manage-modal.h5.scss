@@ -67,8 +67,9 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 18px 24px 28px;
+  padding: 18px 24px 48px;
   background: #f7faf6;
+  scroll-padding-bottom: 32px;
 }
 .cm-stack {
   display: flex;
@@ -193,23 +194,136 @@
   padding: 8px 0;
 }
 
-/* Landscape pitch inside the management modal so the whole field fits. */
-.lineup-workbench--modal .lineup-pitch {
-  max-width: none;
-  aspect-ratio: 1.55 / 1;
-  max-height: 360px;
-}
-.lineup-workbench--modal .lineup-layout {
-  grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.9fr);
-}
-.lineup-workbench--modal .lineup-workbench {
-  padding: 18px;
-}
 @media (max-width: 900px) {
   .cm-members__grid {
     grid-template-columns: 1fr;
   }
-  .lineup-workbench--modal .lineup-layout {
+  .lineup-workbench--landscape .lineup-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* Profile fields must not clip at the modal scroll edge */
+.cm-stack .captain-profile {
+  overflow: visible;
+  padding-bottom: 20px;
+}
+.cm-stack .captain-profile__fields {
+  overflow: visible;
+}
+.cm-stack .captain-profile .captain-profile__textarea,
+.cm-stack .captain-profile textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 96px;
+  max-height: 140px;
+  overflow: auto;
+  resize: vertical;
+  scroll-margin-bottom: 40px;
+  background: #fff;
+}
+.cm-stack .captain-profile__wide {
+  min-width: 0;
+}
+
+/* Prefer the lineup board early; keep pitch fully visible */
+.cm-stack .lineup-workbench--compact.lineup-workbench--landscape .lineup-pitch--landscape {
+  max-height: 300px;
+  min-height: 220px;
+}
+
+.cm-invite {
+  padding: 18px 20px;
+  border: 1px solid #e3ebe4;
+  border-radius: 14px;
+  background: #fff;
+}
+.cm-invite__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cm-invite__head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.cm-invite__search {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+  justify-content: flex-end;
+}
+.cm-invite__search input {
+  flex: 1;
+  max-width: 280px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #d7e1d9;
+  border-radius: 8px;
+  font: inherit;
+}
+.cm-invite__search button,
+.cm-invite__row button {
+  font: inherit;
+  border: 1px solid #d7e1d9;
+  border-radius: 8px;
+  background: #edf6ef;
+  color: #2f5b3f;
+  min-height: 36px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-invite__search button:disabled,
+.cm-invite__row button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cm-invite__notice {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eef6f0;
+  color: #355b42;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.cm-invite__list {
+  display: flex;
+  flex-direction: column;
+}
+.cm-invite__row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #edf2ec;
+}
+.cm-invite__row:first-child {
+  border-top: 0;
+}
+.cm-invite__row strong {
+  display: block;
+  font-size: 14px;
+}
+.cm-invite__row small {
+  color: #718275;
+  font-size: 12px;
+}
+
+/* Empty applications card should not look like a missing pitch */
+.cm-card .cm-empty {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  color: #8a968c;
+  background: #f3f6f3;
+  border-radius: 8px;
+  padding: 10px 12px;
 }

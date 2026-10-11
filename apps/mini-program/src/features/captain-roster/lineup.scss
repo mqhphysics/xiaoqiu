@@ -690,3 +690,121 @@
   padding: 0;
   border: 0;
 }
+
+/* Compact chrome for the captain management modal */
+.lineup-workbench--compact {
+  padding: 14px 16px 16px;
+  margin: 0;
+  .lineup-heading {
+    margin-bottom: 10px;
+    h2 {
+      font-size: 18px;
+      margin: 2px 0;
+    }
+    p {
+      font-size: 11px;
+    }
+  }
+  .lineup-cloud {
+    padding: 6px 0 8px;
+  }
+  .lineup-toolbar {
+    padding: 8px 0;
+  }
+  .lineup-layout {
+    gap: 12px;
+  }
+  .lineup-pitch-panel {
+    padding: 10px;
+  }
+  .lineup-bench__list {
+    max-height: 220px;
+  }
+}
+
+/* Landscape pitch: attack to the right, markings remapped */
+.lineup-pitch--landscape {
+  max-width: none;
+  width: 100%;
+  aspect-ratio: 1.65 / 1;
+  max-height: 320px;
+  background: repeating-linear-gradient(
+    90deg,
+    #306c52 0,
+    #306c52 10%,
+    #347359 10%,
+    #347359 20%
+  );
+  .lineup-pitch__half {
+    top: 0;
+    left: 50%;
+    width: 0;
+    height: 100%;
+    border-top: 0;
+    border-left: 1.5px solid #ffffff60;
+  }
+  .lineup-pitch__box {
+    top: 23%;
+    left: auto;
+    width: 16%;
+    height: 54%;
+    &::after {
+      top: 25%;
+      left: auto;
+      width: 35%;
+      height: 50%;
+    }
+  }
+  .lineup-pitch__box--top {
+    /* attack end (right) */
+    top: 23%;
+    right: -1px;
+    left: auto;
+    &::after {
+      right: -1px;
+      left: auto;
+      top: 25%;
+    }
+  }
+  .lineup-pitch__box--bottom {
+    /* goalkeeper end (left) */
+    top: 23%;
+    left: -1px;
+    right: auto;
+    &::after {
+      left: -1px;
+      right: auto;
+      top: 25%;
+    }
+  }
+  .lineup-pitch__goal {
+    top: 41%;
+    left: auto;
+    width: 2.5%;
+    height: 18%;
+  }
+  .lineup-pitch__goal--top {
+    top: 41%;
+    right: -2.5%;
+    left: auto;
+  }
+  .lineup-pitch__goal--bottom {
+    top: 41%;
+    left: -2.5%;
+    right: auto;
+    bottom: auto;
+  }
+}
+.lineup-workbench--landscape .lineup-layout {
+  grid-template-columns: minmax(0, 1.75fr) minmax(210px, 0.85fr);
+  align-items: start;
+}
+.lineup-workbench--landscape .lineup-slot {
+  width: 64px;
+  height: 70px;
+}
+.lineup-workbench--landscape .lineup-shirt {
+  width: 40px;
+  height: 36px;
+  font-size: 14px;
+}

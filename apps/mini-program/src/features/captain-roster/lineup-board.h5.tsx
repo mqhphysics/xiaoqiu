@@ -51,7 +51,14 @@ export default function LineupBoard({
   teamName,
   tournamentId,
   teamId,
+  landscape = false,
+  compact = false,
 }: LineupBoardProps) {
+  const slotStyle = (slot: { x: number; y: number }) =>
+    landscape
+      ? { left: `${100 - slot.y}%`, top: `${slot.x}%` }
+      : { left: `${slot.x}%`, top: `${slot.y}%` }
+
   const session = readSession()
   const owner = useRef({ userId: session?.user.id, organizationId: session?.user.organizationId })
   const [ownerInvalid, setOwnerInvalid] = useState(false)
@@ -376,15 +383,19 @@ export default function LineupBoard({
         event.clientY >= rect.top &&
         event.clientY <= rect.bottom
       ) {
-        change(
-          moveSlot(
-            draft,
-            current.slotId,
-            ((event.clientX - rect.left) / rect.width) * 100,
-            ((event.clientY - rect.top) / rect.height) * 100,
-          ),
-          '站位已调整，可保存为自定义战术。',
-        )
+        {
+          const px = ((event.clientX - rect.left) / rect.width) * 100
+          const py = ((event.clientY - rect.top) / rect.height) * 100
+          change(
+            moveSlot(
+              draft,
+              current.slotId,
+              landscape ? py : px,
+              landscape ? 100 - px : py,
+            ),
+            '站位已调整，可保存为自定义战术。',
+          )
+        }
       } else if (target?.dataset.lineupSlot && current.playerId) {
         change(
           assignPlayer(draft, current.playerId, target.dataset.lineupSlot),
@@ -796,7 +807,10 @@ export default function LineupBoard({
       </section>
     )
   return (
-    <section className="lineup-workbench" aria-label="队长与教练八人制排阵">
+    <section
+      className={`lineup-workbench${compact ? ' lineup-workbench--compact' : ''}${landscape ? ' lineup-workbench--landscape' : ''}`}
+      aria-label="队长与教练八人制排阵"
+    >
       <div className="lineup-heading">
         <div>
           <span className="lineup-eyebrow">TACTICS ROOM</span>
@@ -1117,7 +1131,7 @@ export default function LineupBoard({
                 {kind === 'MATCH_LINEUP' && boundSnapshotVersion
                   ? `名单 v${boundSnapshotVersion} · `
                   : ''}
-                拟首发 {starters.size}/8 · 进攻方向 ↑
+                拟首发 {starters.size}/8 · 进攻方向 {landscape ? '→' : '↑'}
               </span>
             </div>
             <p className="lineup-local-note">
@@ -1127,7 +1141,10 @@ export default function LineupBoard({
                 ? ' · 请补齐首发后保存'
                 : ''}
             </p>
-            <div ref={pitch} className={`lineup-pitch ${freeMove ? 'lineup-pitch--free' : ''}`}>
+            <div
+              ref={pitch}
+              className={`lineup-pitch${landscape ? ' lineup-pitch--landscape' : ''}${freeMove ? ' lineup-pitch--free' : ''}`}
+            >
               <div className="lineup-pitch__boundary" aria-hidden="true">
                 <div className="lineup-pitch__half" />
                 <div className="lineup-pitch__circle" />
@@ -1145,7 +1162,7 @@ export default function LineupBoard({
                     data-lineup-slot={slot.id}
                     data-lineup-key={slot.playerId ?? `empty:${slot.id}`}
                     className={`lineup-button lineup-slot ${player ? 'lineup-slot--filled' : ''} ${selected && selected === slot.playerId ? 'is-selected' : ''}`}
-                    style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                    style={slotStyle(slot)}
                     aria-label={`${slot.label} ${player?.displayName ?? '空位'}`}
                     aria-pressed={selected !== null && selected === slot.playerId}
                     onPointerDown={(event) => startDrag(event, slot.playerId, slot.id)}

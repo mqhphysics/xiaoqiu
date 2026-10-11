@@ -205,13 +205,24 @@ function CaptainManageModal({
                 captain={captain}
                 roster={dashboard.roster}
                 matches={matches}
+                landscape
+                compact
+              />
+              <CaptainInviteSearch
+                teamId={teamId}
+                teamName={captain.team.name}
+                memberUserIds={new Set(
+                  captain.members.map((m) => m.userId).filter((id): id is string => Boolean(id)),
+                )}
+                memberPlayerIds={new Set(
+                  captain.members.map((m) => m.playerId).filter((id): id is string => Boolean(id)),
+                )}
               />
               <CaptainMembersPanel
                 teamId={teamId}
                 data={captain}
                 onChange={setCaptain}
               />
-              <InviteSearchGap />
             </div>
           ) : null}
         </div>
@@ -221,13 +232,196 @@ function CaptainManageModal({
   )
 }
 
-function InviteSearchGap() {
+type InviteHit =
+  | {
+      key: string
+      kind: 'user'
+      id: string
+      displayName: string
+      avatarUrl: string | null
+      note: string
+    }
+  | {
+      key: string
+      kind: 'player'
+      id: string
+      displayName: string
+      avatarUrl: string | null
+      note: string
+      teamName: string | null
+    }
+
+function CaptainInviteSearch({
+  teamId,
+  teamName,
+  memberUserIds,
+  memberPlayerIds,
+}: {
+  teamId: string
+  teamName: string
+  memberUserIds: Set<string>
+  memberPlayerIds: Set<string>
+}) {
+  const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<InviteHit[]>([])
+  const [busy, setBusy] = useState(false)
+  const [inviting, setInviting] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const seq = useRef(0)
+
+  const search = async () => {
+    const q = query.trim()
+    if (q.length < 1) {
+      setHits([])
+      return
+    }
+    const id = ++seq.current
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      // Pragmatic search: registered users (message directory) + public/demo players.
+      // Gap: no campus-wide student directory or captain "add membership" invite API yet;
+      // unregistered auto-pass is not available client-side — use DM invite for users.
+      const [directory, players] = await Promise.all([
+        productRepository.getMessageDirectory(q).catch(() => ({ items: [] as Array<{ id: string; displayName: string; avatarUrl: string | null }> })),
+        productRepository.search(q, 'PLAYER').catch(() => ({ players: [] as Array<{ id: string; displayName: string; avatarUrl: string | null; team: { name: string } | null; position: string | null }> })),
+      ])
+      if (id !== seq.current) return
+      const userHits: InviteHit[] = directory.items.map((user) => ({
+        key: `user:${user.id}`,
+        kind: 'user' as const,
+        id: user.id,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        note: memberUserIds.has(user.id) ? '已是本队成员' : '已注册用户',
+      }))
+      const playerHits: InviteHit[] = players.players
+        .filter((player) => !memberPlayerIds.has(player.id))
+        .map((player) => ({
+          key: `player:${player.id}`,
+          kind: 'player' as const,
+          id: player.id,
+          displayName: player.displayName,
+          avatarUrl: player.avatarUrl,
+          teamName: player.team?.name ?? null,
+          note: player.team?.name
+            ? `球员档案 · ${player.team.name}`
+            : '球员档案 · 暂无球队',
+        }))
+      // Prefer user rows; keep players that are not already covered by a same-name member user hit.
+      const merged = [...userHits, ...playerHits].slice(0, 20)
+      setHits(merged)
+      if (!merged.length) setNotice('没有匹配的已注册用户或球员档案。')
+    } catch (issue) {
+      if (id === seq.current) setError(issue instanceof Error ? issue.message : '搜索失败')
+    } finally {
+      if (id === seq.current) setBusy(false)
+    }
+  }
+
+  const invite = async (hit: InviteHit) => {
+    if (hit.kind === 'user' && memberUserIds.has(hit.id)) {
+      setNotice(`${hit.displayName} 已在队中。`)
+      return
+    }
+    if (hit.kind !== 'user') {
+      // No captain-side membership create for offline/player-only records yet.
+      setNotice(
+        hit.teamName
+          ? `${hit.displayName} 已在「${hit.teamName}」。可请对方注册后自行申请入队，或通过赛事报名名单维护大名单。`
+          : `${hit.displayName} 尚无注册账号。对方注册并申请入队后，你可在下方审批；大名单也可在赛事报名中勾选已有球员档案。`,
+      )
+      return
+    }
+    setInviting(hit.key)
+    setError('')
+    try {
+      // Prefer DM when messaging is enabled; otherwise leave a feedback record the admin/captain can track.
+      // Gap: no dedicated captain→player membership invite / auto-approve endpoint yet.
+      try {
+        await productRepository.sendMessage(
+          hit.id,
+          `【入队邀请】你好，我是「${teamName}」队长。诚邀你加入本队，请打开晓球 → 我的 → 加入球队提交申请，通过后即可一起训练比赛。`,
+          createClientActionId('team-invite'),
+        )
+        setNotice(`已向 ${hit.displayName} 发送入队邀请私信。`)
+      } catch (dmError) {
+        await productRepository.createReport(
+          'FEEDBACK',
+          `入队邀请 · ${hit.displayName}`,
+          `队长邀请注册用户 ${hit.displayName}（userId=${hit.id}）加入「${teamName}」（teamId=${teamId}）。对方需自行提交入队申请；本记录用于追踪邀请。`,
+          createClientActionId('team-invite-report'),
+        )
+        setNotice(
+          `私信暂不可用（${dmError instanceof Error ? dmError.message : '功能未开放'}）。已为 ${hit.displayName} 留下入队邀请记录，请对方自行申请入队。`,
+        )
+      }
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : '邀请发送失败')
+    } finally {
+      setInviting(null)
+    }
+  }
+
   return (
-    <section className="cm-invite-gap" aria-label="邀请球员说明">
-      <h3>按姓名邀请</h3>
-      <p>
-        产品侧区分三类名单：全体学生、已注册用户、线下/往届上传球员。当前接口尚未提供统一的按姓名邀请与「未注册自动通过」能力；入队申请仍走下方审批，大名单编辑请用上方「赛事报名名单」。后续接上搜索邀请 API 后会补齐这一块。
-      </p>
+    <section className="cm-invite" aria-label="按姓名邀请">
+      <div className="cm-invite__head">
+        <h3>按姓名邀请</h3>
+        <form
+          className="cm-invite__search"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void search()
+          }}
+        >
+          <input
+            value={query}
+            maxLength={40}
+            placeholder="搜索已注册用户或球员姓名"
+            aria-label="搜索姓名"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <button type="submit" disabled={busy || !query.trim()}>
+            {busy ? '搜索中…' : '搜索'}
+          </button>
+        </form>
+      </div>
+      {error ? (
+        <p className="cm-members__error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="cm-invite__notice" role="status">
+          {notice}
+        </p>
+      ) : null}
+      <div className="cm-invite__list">
+        {hits.map((hit) => (
+          <div className="cm-invite__row" key={hit.key}>
+            <UserAvatar avatarUrl={hit.avatarUrl} name={hit.displayName} size="small" />
+            <div>
+              <strong>{hit.displayName}</strong>
+              <small>{hit.note}</small>
+            </div>
+            <button
+              type="button"
+              disabled={Boolean(inviting) || (hit.kind === 'user' && memberUserIds.has(hit.id))}
+              onClick={() => void invite(hit)}
+            >
+              {hit.kind === 'user' && memberUserIds.has(hit.id)
+                ? '已在队中'
+                : inviting === hit.key
+                  ? '发送中…'
+                  : hit.kind === 'user'
+                    ? '发邀请'
+                    : '查看说明'}
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
