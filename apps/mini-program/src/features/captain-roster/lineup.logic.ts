@@ -57,6 +57,16 @@ export const FORMATIONS: Formation[] = [
     ],
   },
   {
+    name: '2-4-1',
+    format: 8,
+    rows: [
+      { labels: ['ST'], y: 20 },
+      { labels: ['LM', 'LCM', 'RCM', 'RM'], y: 44 },
+      { labels: ['LCB', 'RCB'], y: 69 },
+      { labels: ['GK'], y: 88 },
+    ],
+  },
+  {
     name: '2-2-3',
     format: 8,
     rows: [
