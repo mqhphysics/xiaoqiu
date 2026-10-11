@@ -16,6 +16,15 @@ type Props = {
   onExpand: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
+export function scrollPanelColumn(event: React.WheelEvent<HTMLElement>) {
+  const scroller = event.currentTarget.parentElement?.querySelector<HTMLElement>(
+    '.data-desktop__panel-scroll',
+  )
+  if (!scroller) return
+  scroller.scrollTop += event.deltaY
+  scroller.scrollLeft += event.deltaX
+}
+
 export function KnockoutPanel({ data, expanded, onExpand }: Props) {
   const { rounds, thirdPlace, eightTeam } = knockoutRounds(data)
   return (
@@ -41,7 +50,7 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
           {eightTeam ? '八强晋级图' : '晋级图'}
         </span>
       </div>
-      <div id="data-knockout-content">
+      <div id="data-knockout-content" className="data-desktop__panel-scroll">
         {rounds.length === 0 ? (
           <DataState kind="empty" title="暂无淘汰赛对阵" description="对阵确认后将在这里显示。" />
         ) : eightTeam ? (
@@ -113,17 +122,17 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
             ))}
           </div>
         )}
+        {thirdPlace && (
+          <section className="data-desktop__third-place" aria-label="季军赛">
+            <h3>季军赛</h3>
+            <TreeMatch
+              match={thirdPlace}
+              expanded={expanded}
+              className="data-desktop__tree-match--third"
+            />
+          </section>
+        )}
       </div>
-      {thirdPlace && (
-        <section className="data-desktop__third-place" aria-label="季军赛">
-          <h3>季军赛</h3>
-          <TreeMatch
-            match={thirdPlace}
-            expanded={expanded}
-            className="data-desktop__tree-match--third"
-          />
-        </section>
-      )}
       <div className="data-desktop__knockout-foot">
         <span>{eightTeam ? '八强 → 半决赛 → 决赛' : '淘汰赛晋级路线'}</span>
         {data.resultsMode === 'DEMO' && <span>演示赛季 · 对阵来自比赛记录</span>}
@@ -134,6 +143,7 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
           className="data-desktop__panel-cover"
           aria-label="展开淘汰赛"
           onClick={onExpand}
+          onWheel={scrollPanelColumn}
         >
           <span className="sr-only">展开淘汰赛</span>
         </button>

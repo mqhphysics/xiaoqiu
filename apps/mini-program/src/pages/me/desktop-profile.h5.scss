@@ -1795,12 +1795,25 @@
   }
   .profile-body {
     flex: 1 1 auto;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start;
     min-height: 0;
     overflow: hidden;
-    align-items: stretch;
   }
-  .profile-stream,
   .profile-functions {
+    align-self: start;
+    height: fit-content;
+    max-height: 100%;
+    min-height: 0;
+    overflow: auto;
+  }
+  .profile-function-card {
+    height: auto;
+    min-height: 0;
+  }
+  .profile-stream {
+    align-self: stretch;
+    height: 100%;
     min-height: 0;
     max-height: none;
     overflow-y: auto;
@@ -1809,6 +1822,10 @@
 @media (min-width: 721px) and (max-width: 900px) {
   .profile-body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .profile-stream {
+    height: auto;
   }
   .profile-function-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
