@@ -11,6 +11,7 @@ test('desktop dialogs share a fixed landscape frame', () => {
   assert.match(chrome, /width:\s*min\(1120px,\s*calc\(100vw - 48px\)\)/)
   assert.match(chrome, /height:\s*min\(640px,\s*calc\(100dvh - 72px\)\)/)
   assert.match(chrome, /overflow:\s*hidden/)
+  assert.match(chrome, /\.cm-dialog\.xq-dialog/)
 })
 
 test('dialog headers stay outside the scrolling body', () => {

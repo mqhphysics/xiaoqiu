@@ -60,8 +60,8 @@ export function CaptainManageHost() {
           if (event.target === event.currentTarget) setPicker(null)
         }}
       >
-        <section className="cm-picker" role="dialog" aria-modal="true" aria-label="选择要管理的球队">
-          <header className="cm-header">
+        <section className="cm-picker xq-dialog" role="dialog" aria-modal="true" aria-label="选择要管理的球队">
+          <header className="cm-header xq-dialog__header">
             <div>
               <h2>选择球队</h2>
               <p>你可管理多支球队，请选择要打开的管理面板。</p>
@@ -70,7 +70,7 @@ export function CaptainManageHost() {
               ×
             </button>
           </header>
-          <div className="cm-picker__list">
+          <div className="cm-picker__list xq-dialog__body">
             {picker.teams.map((team) => (
               <button
                 type="button"
@@ -170,8 +170,8 @@ function CaptainManageModal({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <section className="cm-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
-        <header className="cm-header">
+      <section className="cm-dialog xq-dialog xq-dialog--wide" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+        <header className="cm-header xq-dialog__header">
           <div>
             <h2>{title}</h2>
             <p>资料、阵容与大名单。弹窗尺寸固定，内容在下方区域滚动。</p>
@@ -180,7 +180,7 @@ function CaptainManageModal({
             ×
           </button>
         </header>
-        <div className="cm-body">
+        <div className="cm-body xq-dialog__body">
           {loading ? (
             <DataState kind="loading" title="正在打开球队管理" />
           ) : error ? (

@@ -12,8 +12,6 @@
 .cm-dialog,
 .cm-picker {
   box-sizing: border-box;
-  width: min(1120px, 96vw);
-  height: min(760px, 90dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -23,11 +21,23 @@
   box-shadow: 0 28px 90px rgba(20, 40, 25, 0.28);
   font-size: 14px;
   line-height: 1.5;
+  /* Desktop size/header/body chrome: dialog-chrome (.xq-dialog). */
+  width: min(1120px, 96vw);
+  height: min(760px, 90dvh);
 }
 .cm-picker {
   width: min(440px, 92vw);
   height: auto;
   max-height: min(520px, 86dvh);
+}
+@media (min-width: 721px) {
+  .cm-dialog.xq-dialog,
+  .cm-picker.xq-dialog {
+    /* Let shared dialog-chrome own the landscape frame. */
+    width: unset;
+    height: unset;
+    max-height: unset;
+  }
 }
 .cm-header {
   flex-shrink: 0;
@@ -38,6 +48,10 @@
   padding: 22px 28px 18px;
   border-bottom: 1px solid #e7eee6;
   background: #fff;
+}
+.cm-dialog.xq-dialog > .cm-header.xq-dialog__header,
+.cm-picker.xq-dialog > .cm-header.xq-dialog__header {
+  padding: 16px 20px;
 }
 .cm-header h2 {
   margin: 0;

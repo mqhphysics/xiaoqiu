@@ -13,7 +13,9 @@
   .test-role-dialog.xq-dialog,
   .managed-media-dialog.xq-dialog,
   .information-entry-dialog.xq-dialog,
-  .th-detail-modal.xq-dialog {
+  .th-detail-modal.xq-dialog,
+  .cm-dialog.xq-dialog,
+  .cm-picker.xq-dialog {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -30,7 +32,8 @@
   .post-detail-modal.xq-dialog--wide,
   .profile-dialog.xq-dialog--wide,
   .player-dialog.xq-dialog--wide,
-  .th-detail-modal.xq-dialog--wide {
+  .th-detail-modal.xq-dialog--wide,
+  .cm-dialog.xq-dialog--wide {
     width: min(1120px, calc(100vw - 48px));
     height: min(640px, calc(100dvh - 72px));
     max-height: min(640px, calc(100dvh - 72px));
@@ -170,6 +173,25 @@
 
   .th-detail-modal.xq-dialog {
     background: #f7f9f5;
+  }
+
+  .cm-dialog.xq-dialog,
+  .cm-picker.xq-dialog {
+    background: #fff;
+    color: #20332a;
+    box-shadow: 0 28px 90px rgba(20, 40, 25, 0.28);
+  }
+
+  .cm-dialog.xq-dialog > .xq-dialog__body {
+    padding: 18px 24px 48px;
+    background: #f7faf6;
+    scroll-padding-bottom: 32px;
+  }
+
+  .cm-picker.xq-dialog {
+    width: min(440px, 92vw);
+    height: auto;
+    max-height: min(520px, 86dvh);
   }
 
   .th-picker.xq-dialog > .th-search {
