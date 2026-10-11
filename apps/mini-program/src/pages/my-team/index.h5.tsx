@@ -1,5 +1,6 @@
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react'
+import { openCaptainManage } from '../../features/captain-roster/captain-manage-navigation.h5'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { TeamCrest, UserAvatar } from '../../components/product-ui'
@@ -27,8 +28,16 @@ import './index.h5.scss'
 export default function H5MyTeamPage() {
   const desktop = useDesktopTeamView()
   const params = getCurrentInstance().router?.params
-  // Team management and roster review retain their existing dedicated workflows.
-  return desktop && !params?.teamId && params?.review !== 'roster' ? (
+  // Desktop captain management opens as a modal; keep the dedicated page for phone / roster review.
+  useEffect(() => {
+    if (desktop && params?.teamId && params?.review !== 'roster') {
+      openCaptainManage({
+        teamId: params.teamId,
+        ...(params.tournamentId ? { tournamentId: params.tournamentId } : {}),
+      })
+    }
+  }, [desktop, params?.teamId, params?.tournamentId, params?.review])
+  return desktop && params?.review !== 'roster' ? (
     <DesktopMyTeamPage />
   ) : (
     <ExistingMyTeamPage />

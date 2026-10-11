@@ -37,12 +37,52 @@ export const FORMATIONS: Formation[] = [
     ],
   },
   {
+    name: '3-2-2',
+    format: 8,
+    rows: [
+      { labels: ['LS', 'RS'], y: 18 },
+      { labels: ['LCM', 'RCM'], y: 42 },
+      { labels: ['LCB', 'CB', 'RCB'], y: 68 },
+      { labels: ['GK'], y: 88 },
+    ],
+  },
+  {
     name: '2-3-2',
     format: 8,
     rows: [
       { labels: ['LS', 'RS'], y: 20 },
       { labels: ['LM', 'CM', 'RM'], y: 44 },
       { labels: ['LCB', 'RCB'], y: 69 },
+      { labels: ['GK'], y: 88 },
+    ],
+  },
+  {
+    name: '2-2-3',
+    format: 8,
+    rows: [
+      { labels: ['LW', 'ST', 'RW'], y: 18 },
+      { labels: ['LCM', 'RCM'], y: 44 },
+      { labels: ['LCB', 'RCB'], y: 69 },
+      { labels: ['GK'], y: 88 },
+    ],
+  },
+  {
+    name: '3-1-3',
+    format: 8,
+    rows: [
+      { labels: ['LW', 'ST', 'RW'], y: 18 },
+      { labels: ['CM'], y: 44 },
+      { labels: ['LCB', 'CB', 'RCB'], y: 68 },
+      { labels: ['GK'], y: 88 },
+    ],
+  },
+  {
+    name: '4-2-1',
+    format: 8,
+    rows: [
+      { labels: ['ST'], y: 18 },
+      { labels: ['LCM', 'RCM'], y: 42 },
+      { labels: ['LB', 'LCB', 'RCB', 'RB'], y: 68 },
       { labels: ['GK'], y: 88 },
     ],
   },

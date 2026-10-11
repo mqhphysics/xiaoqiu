@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { openCaptainManage } from '../../features/captain-roster/captain-manage-navigation.h5'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DataState } from '../public-ui'
 import { TeamContent, TeamHero } from './content.h5'
@@ -220,11 +221,7 @@ function TeamActions({ teamId, tournamentId }: { teamId: string; tournamentId: s
           data-team-control
           type="button"
           className="th-text-button"
-          onClick={() =>
-            void Taro.navigateTo({
-              url: `/pages/my-team/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-            })
-          }
+          onClick={() => openCaptainManage({ teamId, tournamentId })}
         >
           进入球队管理
           <TeamIcon name="arrow" />

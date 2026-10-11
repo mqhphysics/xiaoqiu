@@ -20,17 +20,26 @@ const fields = [
   { key: 'secondaryColor', label: '球队辅色（#RRGGBB）', max: 7, color: true },
   { key: 'description', label: '球队简介', max: 600, multiline: true },
 ] as const
+
+const splitMottos = (value: string) =>
+  value
+    .split(/[·|,，\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+const joinMottos = (tags: string[]) => tags.join(' · ')
+
 type FieldKey = (typeof fields)[number]['key']
 const valuesFrom = (team: CaptainTeamProfile): Record<FieldKey, string> =>
   Object.fromEntries(
     fields.map(({ key }) => [key, team[key] == null ? '' : String(team[key])]),
   ) as Record<FieldKey, string>
 
-export default function CaptainProfileEditor({ teamId, onChange }: CaptainProfileEditorProps) {
+export default function CaptainProfileEditor({ teamId, onChange, defaultExpanded = false }: CaptainProfileEditorProps) {
   const [team, setTeam] = useState<CaptainTeamProfile | null>(null)
   const [values, setValues] = useState<Record<FieldKey, string> | null>(null)
   const [reason, setReason] = useState('')
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -183,33 +192,42 @@ export default function CaptainProfileEditor({ teamId, onChange }: CaptainProfil
             disabled={busy || loading || Boolean(pending)}
             className="captain-profile__fields"
           >
-            {fields.map((field) => (
-              <label
-                key={field.key}
-                className={'multiline' in field ? 'captain-profile__wide' : ''}
-              >
-                <span>{field.label}</span>
-                {'multiline' in field ? (
-                  <textarea
-                    value={values[field.key]}
-                    maxLength={field.max}
-                    onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
-                  />
-                ) : (
-                  <input
-                    value={values[field.key]}
-                    required={'required' in field && field.required}
-                    maxLength={'max' in field ? field.max : undefined}
-                    type={'number' in field ? 'number' : 'text'}
-                    min={'number' in field ? 1800 : undefined}
-                    max={'number' in field ? 2200 : undefined}
-                    step={'number' in field ? 1 : undefined}
-                    pattern={'color' in field ? '#[0-9a-fA-F]{6}' : undefined}
-                    onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
-                  />
-                )}
-              </label>
-            ))}
+            {fields.map((field) =>
+              field.key === 'motto' ? (
+                <MottoTags
+                  key={field.key}
+                  value={values.motto}
+                  disabled={busy || loading || Boolean(pending)}
+                  onChange={(next) => setValues({ ...values, motto: next })}
+                />
+              ) : (
+                <label
+                  key={field.key}
+                  className={'multiline' in field ? 'captain-profile__wide' : ''}
+                >
+                  <span>{field.label}</span>
+                  {'multiline' in field ? (
+                    <textarea
+                      value={values[field.key]}
+                      maxLength={field.max}
+                      onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
+                    />
+                  ) : (
+                    <input
+                      value={values[field.key]}
+                      required={'required' in field && field.required}
+                      maxLength={'max' in field ? field.max : undefined}
+                      type={'number' in field ? 'number' : 'text'}
+                      min={'number' in field ? 1800 : undefined}
+                      max={'number' in field ? 2200 : undefined}
+                      step={'number' in field ? 1 : undefined}
+                      pattern={'color' in field ? '#[0-9a-fA-F]{6}' : undefined}
+                      onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
+                    />
+                  )}
+                </label>
+              ),
+            )}
             <label className="captain-profile__wide">
               <span>修改原因</span>
               <input
@@ -253,5 +271,58 @@ export default function CaptainProfileEditor({ teamId, onChange }: CaptainProfil
         重新读取资料
       </button>
     </section>
+  )
+}
+
+function MottoTags({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  const tags = splitMottos(value)
+  const [draft, setDraft] = useState('')
+  const add = () => {
+    const next = draft.trim()
+    if (!next || tags.includes(next) || tags.length >= 8) return
+    onChange(joinMottos([...tags, next]))
+    setDraft('')
+  }
+  return (
+    <label className="captain-profile__wide captain-profile__motto-tags">
+      <span>球队口号（可添加多条）</span>
+      <div className="captain-profile__tag-row">
+        {tags.map((tag) => (
+          <button
+            type="button"
+            key={tag}
+            className="captain-profile__tag"
+            disabled={disabled}
+            onClick={() => onChange(joinMottos(tags.filter((item) => item !== tag)))}
+          >
+            {tag} ×
+          </button>
+        ))}
+        <input
+          value={draft}
+          disabled={disabled || tags.length >= 8}
+          maxLength={24}
+          placeholder={tags.length >= 8 ? '最多 8 条' : '输入后回车添加'}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              add()
+            }
+          }}
+        />
+        <button type="button" disabled={disabled || !draft.trim() || tags.length >= 8} onClick={add}>
+          添加
+        </button>
+      </div>
+    </label>
   )
 }

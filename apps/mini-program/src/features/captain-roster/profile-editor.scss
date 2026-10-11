@@ -92,3 +92,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+.captain-profile__motto-tags .captain-profile__tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.captain-profile__tag {
+  border: 1px solid #cfe0d4;
+  background: #eef7f0;
+  color: #2f5b3f;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+.captain-profile__motto-tags input {
+  min-width: 140px;
+  flex: 1;
+}

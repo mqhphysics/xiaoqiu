@@ -55,6 +55,7 @@ import type { DesktopProfileProps, ProfileService } from './desktop-profile'
 import './desktop-profile.h5.scss'
 import './identity-manager.h5.scss'
 import { TeamRelationsDialog } from './team-relations.h5'
+import { openCaptainManageChooser } from '../../features/captain-roster/captain-manage-navigation.h5'
 import { IdentityMatchDialog } from './identity-match.h5'
 import { MyIdentitiesDialog } from './my-identities.h5'
 import { InformationEntryDialog } from '../../features/match-report/information-entry-dialog.h5'
@@ -565,7 +566,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                       ? '查看球队与球员'
                       : '发现球队，申请加入'
                 }
-                onClick={() => openModal('relationship')}
+                onClick={() => {
+                  if (authorizedIds.length) {
+                    openCaptainManageChooser({
+                      teams: teams
+                        .filter((team) => authorizedIds.includes(team.id))
+                        .map((team) => ({ id: team.id, name: team.name })),
+                      tournamentId: home.tournament.id,
+                    })
+                    return
+                  }
+                  openModal('relationship')
+                }}
               />
               <Shortcut
                 icon="comment"
@@ -983,7 +995,18 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             setModal(null)
             setInformation(true)
           }}
-          onTeam={() => openModal('relationship')}
+          onTeam={() => {
+            if (authorizedIds.length) {
+              openCaptainManageChooser({
+                teams: teams
+                  .filter((team) => authorizedIds.includes(team.id))
+                  .map((team) => ({ id: team.id, name: team.name })),
+                tournamentId: home.tournament.id,
+              })
+              return
+            }
+            openModal('relationship')
+          }}
           onMatch={() => {
             setModal(null)
             setMatching('identity')

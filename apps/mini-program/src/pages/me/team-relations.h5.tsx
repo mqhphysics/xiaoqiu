@@ -1,4 +1,3 @@
-import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useOverlayFocus } from '../../components/overlay-focus'
@@ -7,6 +6,7 @@ import { productRepository, createClientActionId } from '../../features/product/
 import { readSession, subscribeToSessionChanges } from '../../features/product/session.h5'
 import { productConfigRepository } from '../../features/product-config/product-config.repository'
 import { openTeam } from '../../features/product/team-navigation'
+import { openCaptainManage } from '../../features/captain-roster/captain-manage-navigation.h5'
 import type { TeamRelationshipResponse, TeamSummary } from '../../features/product/product.types'
 import { ProfileIcon } from './profile-icons.h5'
 
@@ -166,9 +166,7 @@ export function TeamRelationsDialog({
         )
       )
         throw new Error('当前账号没有该球队的管理权限')
-      await Taro.navigateTo({
-        url: `/pages/my-team/index?teamId=${encodeURIComponent(teamId)}&tournamentId=${encodeURIComponent(tournamentId)}`,
-      })
+      openCaptainManage({ teamId, tournamentId })
       onClose()
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : '球队管理暂时不可用')

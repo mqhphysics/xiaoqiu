@@ -9,6 +9,7 @@ import { TeamOverlayHost } from './components/team-hub'
 import { PlayerOverlayHost } from './components/player-overlay'
 import { MatchOverlayHost } from './components/match-overlay'
 import { MessagingOverlayHost } from './components/messaging-drawer/host'
+import { CaptainManageHost } from './features/captain-roster/manage-modal'
 
 import './app.scss'
 import './app-box-sizing'
@@ -37,6 +38,7 @@ export default function App({ children }: PropsWithChildren) {
           <PlayerOverlayHost />
           <MatchOverlayHost />
           <MessagingOverlayHost />
+          <CaptainManageHost />
         </>
       }
     >

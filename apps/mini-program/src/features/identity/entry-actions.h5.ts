@@ -11,6 +11,7 @@ import { readSession } from '../product/session'
 import { readonlyScheduleRepository } from '../readonly-schedule/readonly-schedule.repository'
 import { openIdentity } from './identity.repository.h5'
 import { canReportMatch, managedTeamIds } from './entry-scope'
+import { openCaptainManage } from '../captain-roster/captain-manage-navigation.h5'
 
 const notify = (title: string) => Taro.showToast({ title, icon: 'none' })
 const actionModules: Partial<Record<ProductActionId, ProductModuleId>> = {
@@ -111,9 +112,7 @@ export const identityEntryActions = {
       const latest = await refresh()
       if (!managedTeamIds(latest.actions['teams.manage']).includes(selected.team.id))
         throw new Error('当前账号已失去该球队的管理权限')
-      await Taro.navigateTo({
-        url: `/pages/my-team/index?teamId=${encodeURIComponent(selected.team.id)}`,
-      })
+      openCaptainManage({ teamId: selected.team.id, teamName: selected.team.name })
     }),
   informationEntry: () =>
     accountAction('matchReports.write', async (caps, refresh) => {

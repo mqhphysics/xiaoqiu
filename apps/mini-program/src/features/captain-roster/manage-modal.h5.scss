@@ -1,0 +1,215 @@
+/* postcss-pxtransform disable */
+.cm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 380;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 34, 23, 0.46);
+  backdrop-filter: blur(4px);
+}
+.cm-dialog,
+.cm-picker {
+  box-sizing: border-box;
+  width: min(1120px, 96vw);
+  height: min(760px, 90dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+  color: #20332a;
+  box-shadow: 0 28px 90px rgba(20, 40, 25, 0.28);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cm-picker {
+  width: min(440px, 92vw);
+  height: auto;
+  max-height: min(520px, 86dvh);
+}
+.cm-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid #e7eee6;
+  background: #fff;
+}
+.cm-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 750;
+}
+.cm-header p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #7a877c;
+}
+.cm-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f6ef;
+  color: #536659;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cm-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 24px 28px;
+  background: #f7faf6;
+}
+.cm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cm-stack .captain-profile,
+.cm-stack .captain-registration,
+.cm-stack .lineup-workbench,
+.cm-stack .my-team-section {
+  margin: 0;
+  background: #fff;
+  border: 1px solid #e3ebe4;
+  border-radius: 14px;
+}
+.cm-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 22px 24px;
+}
+.cm-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #dde6df;
+  border-radius: 12px;
+  background: #f8fbf7;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.cm-picker__item:hover {
+  border-color: #2f6b49;
+  background: #eef7f0;
+}
+.cm-members,
+.cm-invite-gap {
+  padding: 18px 20px;
+  border: 1px solid #e3ebe4;
+  border-radius: 14px;
+  background: #fff;
+}
+.cm-members__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.cm-members__head h3,
+.cm-invite-gap h3,
+.cm-card h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.cm-members__head label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #6d7d70;
+}
+.cm-members__head input,
+.cm-member select,
+.cm-application__actions button,
+.cm-member button {
+  font: inherit;
+  border: 1px solid #d7e1d9;
+  border-radius: 8px;
+  background: #fff;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+.cm-members__error {
+  color: #9a4a2c;
+  background: #fff4ec;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.cm-members__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.cm-card {
+  padding: 14px;
+  border: 1px solid #e8eee7;
+  border-radius: 12px;
+  background: #fbfdfb;
+}
+.cm-application,
+.cm-member {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #edf2ec;
+}
+.cm-application:first-of-type,
+.cm-member:first-of-type {
+  border-top: 0;
+}
+.cm-application__actions {
+  display: flex;
+  gap: 6px;
+}
+.cm-hint,
+.cm-invite-gap p,
+.cm-empty {
+  margin: 0;
+  color: #718275;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cm-empty {
+  padding: 8px 0;
+}
+
+/* Landscape pitch inside the management modal so the whole field fits. */
+.lineup-workbench--modal .lineup-pitch {
+  max-width: none;
+  aspect-ratio: 1.55 / 1;
+  max-height: 360px;
+}
+.lineup-workbench--modal .lineup-layout {
+  grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.9fr);
+}
+.lineup-workbench--modal .lineup-workbench {
+  padding: 18px;
+}
+@media (max-width: 900px) {
+  .cm-members__grid {
+    grid-template-columns: 1fr;
+  }
+  .lineup-workbench--modal .lineup-layout {
+    grid-template-columns: 1fr;
+  }
+}

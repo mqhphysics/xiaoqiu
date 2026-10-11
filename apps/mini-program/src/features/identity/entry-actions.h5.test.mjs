@@ -65,6 +65,7 @@ function fixture() {
     routes: [],
     assignments: [],
     events: [],
+    captainOpens: [],
     choices: [],
     actionSheets: [],
     fetchRequests: [],
@@ -183,8 +184,10 @@ function fixture() {
     },
   }
   const windowStub = {
+    matchMedia: () => ({ matches: true, media: '', addEventListener() {}, removeEventListener() {} }),
     dispatchEvent: (event) => {
       state.events.push(event.type)
+      if (event.type === 'xiaoqiu:open-captain-manage') state.captainOpens.push(event.detail)
     },
     location: {
       assign: (url) => {
@@ -321,7 +324,7 @@ test('actual team button reads only explicit TEAM workspace grants, deduplicates
     '/me/capabilities',
   ])
   assert.deepEqual(state.actionSheets, [['虚构team-a', '虚构team-b']])
-  assert.deepEqual(state.routes, ['/pages/my-team/index?teamId=team-b'])
+  assert.deepEqual(state.captainOpens, [{ teamId: 'team-b', teamName: '虚构team-b' }])
 })
 
 test('organization grant alone enters its admin portal without becoming a team workspace; invalid coach scope shows no team button', async () => {
@@ -469,7 +472,7 @@ test('selection pagination still chooses an explicitly granted TEAM and organiza
   await team.actions.teamManagement()
   assert.equal(team.state.actionSheets[0].at(-1), '下一页')
   assert.deepEqual(team.state.actionSheets[1], ['虚构team-6', '虚构team-7', '返回第一页'])
-  assert.deepEqual(team.state.routes, ['/pages/my-team/index?teamId=team-7'])
+  assert.deepEqual(team.state.captainOpens, [{ teamId: 'team-7', teamName: '虚构team-7' }])
   const organization = fixture()
   organization.state.capabilities.actions['teams.manage'].scopes = [
     { type: 'ORGANIZATION', id: organizationId },
