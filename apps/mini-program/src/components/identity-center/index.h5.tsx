@@ -242,14 +242,14 @@ export function IdentityCenterHost() {
   return createPortal(
     <div className="identity-backdrop" onClick={close}>
       <section
-        className="identity-dialog"
+        className="identity-dialog xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="identity-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <header>
+        <header className="xq-dialog__header">
           <div>
             <small>身份与认证</small>
             <h2 id="identity-title">申请身份认证</h2>
@@ -258,110 +258,112 @@ export function IdentityCenterHost() {
             ×
           </button>
         </header>
-        <p>选择要申请的身份并说明原因。申请结果会通过系统消息通知你。</p>
-        {error && (
-          <p className="identity-error" role="alert">
-            {error}
-          </p>
-        )}
-        {loading && <p role="status">正在读取认证记录…</p>}
-        {!loading && !data && (
-          <button data-identity-button type="button" onClick={() => void load()}>
-            重试连接
-          </button>
-        )}
-        {data && (
-          <>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                void submit()
-              }}
-            >
-              {data.hasMoreCandidates && <p>同名候选较多，请主动申请并向管理员提供核实说明。</p>}
-              {
-                <label data-identity-field>
-                  申请身份
-                  <select
-                    data-identity-control
-                    value={kind}
-                    onChange={(e) => {
-                      setKind(e.target.value as IdentityKind)
-                      setTeamId('')
-                    }}
-                  >
-                    <option value="">请选择要申请的身份</option>
-                    {Object.entries(identityLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              }
-              {['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) && (
-                <label data-identity-field>
-                  所属球队
-                  <select
-                    data-identity-control
-                    required
-                    value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
-                  >
-                    <option value="">请选择球队</option>
-                    {data.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <label data-identity-field>
-                申请原因
-                <textarea
-                  data-identity-control="textarea"
-                  required
-                  minLength={8}
-                  maxLength={1000}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="说明申请身份和所属球队，提供方便管理员核实的线索。"
-                />
-              </label>
-              <button
-                data-identity-button
-                className="identity-submit"
-                type="submit"
-                disabled={saving}
+        <div className="xq-dialog__body">
+          <p>选择要申请的身份并说明原因。申请结果会通过系统消息通知你。</p>
+          {error && (
+            <p className="identity-error" role="alert">
+              {error}
+            </p>
+          )}
+          {loading && <p role="status">正在读取认证记录…</p>}
+          {!loading && !data && (
+            <button data-identity-button type="button" onClick={() => void load()}>
+              重试连接
+            </button>
+          )}
+          {data && (
+            <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void submit()
+                }}
               >
-                {saving ? '正在提交…' : '提交认证申请'}
-              </button>
-            </form>
-            <div className="identity-history">
-              <h3>我的申请</h3>
-              <button data-identity-button type="button" onClick={() => void load()}>
-                刷新状态
-              </button>
-              {data.applications.length ? (
-                data.applications.map((a) => (
-                  <article key={a.id}>
-                    <strong>
-                      {identityLabels[a.kind]}
-                      {a.team ? ` · ${a.team.name}` : ''}
-                    </strong>
-                    <span>
-                      {{ PENDING: '待审核', APPROVED: '已批准', REJECTED: '未通过' }[a.status]}
-                    </span>
-                    {a.decisionNote && <p>{a.decisionNote}</p>}
-                  </article>
-                ))
-              ) : (
-                <p>还没有申请。未匹配到名单也可以主动申请。</p>
-              )}
-            </div>
-          </>
-        )}
+                {data.hasMoreCandidates && <p>同名候选较多，请主动申请并向管理员提供核实说明。</p>}
+                {
+                  <label data-identity-field>
+                    申请身份
+                    <select
+                      data-identity-control
+                      value={kind}
+                      onChange={(e) => {
+                        setKind(e.target.value as IdentityKind)
+                        setTeamId('')
+                      }}
+                    >
+                      <option value="">请选择要申请的身份</option>
+                      {Object.entries(identityLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                }
+                {['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) && (
+                  <label data-identity-field>
+                    所属球队
+                    <select
+                      data-identity-control
+                      required
+                      value={teamId}
+                      onChange={(e) => setTeamId(e.target.value)}
+                    >
+                      <option value="">请选择球队</option>
+                      {data.teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label data-identity-field>
+                  申请原因
+                  <textarea
+                    data-identity-control="textarea"
+                    required
+                    minLength={8}
+                    maxLength={1000}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="说明申请身份和所属球队，提供方便管理员核实的线索。"
+                  />
+                </label>
+                <button
+                  data-identity-button
+                  className="identity-submit"
+                  type="submit"
+                  disabled={saving}
+                >
+                  {saving ? '正在提交…' : '提交认证申请'}
+                </button>
+              </form>
+              <div className="identity-history">
+                <h3>我的申请</h3>
+                <button data-identity-button type="button" onClick={() => void load()}>
+                  刷新状态
+                </button>
+                {data.applications.length ? (
+                  data.applications.map((a) => (
+                    <article key={a.id}>
+                      <strong>
+                        {identityLabels[a.kind]}
+                        {a.team ? ` · ${a.team.name}` : ''}
+                      </strong>
+                      <span>
+                        {{ PENDING: '待审核', APPROVED: '已批准', REJECTED: '未通过' }[a.status]}
+                      </span>
+                      {a.decisionNote && <p>{a.decisionNote}</p>}
+                    </article>
+                  ))
+                ) : (
+                  <p>还没有申请。未匹配到名单也可以主动申请。</p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </section>
     </div>,
     document.body,

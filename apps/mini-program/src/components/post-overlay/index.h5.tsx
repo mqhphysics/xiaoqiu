@@ -472,286 +472,296 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
       }}
     >
       <section
-        className={`post-detail-modal ${post && images.length === 0 ? 'post-detail-modal--text' : ''}`}
+        className={`post-detail-modal xq-dialog xq-dialog--wide xq-dialog--stage ${post && images.length === 0 ? 'post-detail-modal--text' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="post-detail-title"
       >
-        <button
-          type="button"
-          className="post-detail-modal__close post-tool"
-          aria-label="关闭动态详情"
-          disabled={sending}
-          onClick={close}
-        >
-          <PostIcon name="close" />
-        </button>
-        {!post ? (
-          <div className="post-detail-modal__state" role="status">
-            <h2 id="post-detail-title">{loadError ? '动态暂时无法读取' : '正在读取动态…'}</h2>
-            {loadError && (
-              <>
-                <p>{loadError}</p>
-                <button
-                  type="button"
-                  className="post-submit"
-                  onClick={() => setReload((current) => current + 1)}
-                >
-                  重试
-                </button>
-              </>
-            )}
+        <header className="xq-dialog__header">
+          <div>
+            <p>绿茵动态</p>
+            <h2 id="post-detail-title">动态详情</h2>
           </div>
-        ) : (
-          <>
-            {images.length > 0 && (
-              <div className="post-detail-modal__media">
-                <PostGallery images={images} />
-              </div>
-            )}
-            <div className="post-detail-modal__discussion">
-              <div className="post-detail-modal__scroll">
-                <header className="post-detail-modal__author">
-                  <UserAvatar
-                    avatarUrl={post.author.avatarUrl}
-                    name={post.author.displayName}
-                    userId={post.author.id}
-                    tournamentId={post.tournamentId}
-                    size="small"
-                  />
-                  <div>
-                    <PersonTrigger
+          <button
+            type="button"
+            className="post-detail-modal__close post-tool"
+            aria-label="关闭动态详情"
+            disabled={sending}
+            onClick={close}
+          >
+            <PostIcon name="close" />
+          </button>
+        </header>
+        <div className="post-detail-modal__stage xq-dialog__body">
+          {!post ? (
+            <div className="post-detail-modal__state" role="status">
+              <h2>{loadError ? '动态暂时无法读取' : '正在读取动态…'}</h2>
+              {loadError && (
+                <>
+                  <p>{loadError}</p>
+                  <button
+                    type="button"
+                    className="post-submit"
+                    onClick={() => setReload((current) => current + 1)}
+                  >
+                    重试
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              {images.length > 0 && (
+                <div className="post-detail-modal__media">
+                  <PostGallery images={images} />
+                </div>
+              )}
+              <div className="post-detail-modal__discussion">
+                <div className="post-detail-modal__scroll">
+                  <header className="post-detail-modal__author">
+                    <UserAvatar
+                      avatarUrl={post.author.avatarUrl}
+                      name={post.author.displayName}
                       userId={post.author.id}
                       tournamentId={post.tournamentId}
-                      name={post.author.displayName}
-                    >
-                      <strong>{post.author.displayName}</strong>
-                    </PersonTrigger>
-                    <VerificationBadge
-                      level={post.author.verificationLevel}
-                      roles={post.author.roles}
-                      official={post.author.official}
-                      displayedKind={post.author.displayedBadgeKind}
-                      userId={post.author.id}
+                      size="small"
                     />
-                  </div>
-                </header>
-                <div className="post-detail-modal__body">
-                  {post.title && <h2 id="post-detail-title">{post.title}</h2>}
-                  {!post.title && (
-                    <h2 id="post-detail-title" className="post-sr-only">
-                      绿茵动态详情
-                    </h2>
-                  )}
-                  <p>
-                    <EmojiText>{post.body}</EmojiText>
-                  </p>
-                  <PostTags tags={post.tags} tournamentId={post.tournamentId} />
-                  <PostQuote post={post.quotedPost ?? null} sourceId={post.quotedPostId} />
-                  <div className="post-detail-modal__meta">
-                    <time>{formatRelativeTime(post.publishedAt)}</time>
-                    {post.type === 'OFFICIAL' && <span>官方发布</span>}
-                    {signedIn && (
-                      <PostActions
-                        label="动态操作"
-                        actions={
-                          post.author.id === currentUserId
-                            ? [
-                                {
-                                  label: '编辑',
-                                  disabled: sending,
-                                  run: () => setComposer('edit'),
-                                },
-                                {
-                                  label: '删除',
-                                  disabled: sending,
-                                  run: () => {
-                                    void removeContent()
-                                  },
-                                },
-                              ]
-                            : [
-                                {
-                                  label: '投诉',
-                                  run: () =>
-                                    setReport({ type: 'POST', id: post.id, title: '投诉这条动态' }),
-                                },
-                              ]
-                        }
+                    <div>
+                      <PersonTrigger
+                        userId={post.author.id}
+                        tournamentId={post.tournamentId}
+                        name={post.author.displayName}
+                      >
+                        <strong>{post.author.displayName}</strong>
+                      </PersonTrigger>
+                      <VerificationBadge
+                        level={post.author.verificationLevel}
+                        roles={post.author.roles}
+                        official={post.author.official}
+                        displayedKind={post.author.displayedBadgeKind}
+                        userId={post.author.id}
                       />
-                    )}
-                  </div>
-                </div>
-                <div className="post-detail-modal__comments-heading">
-                  全部评论 <span>{post.commentCount}</span>
-                </div>
-                <div className="post-comment-list">
-                  {threads.length === 0 && (
-                    <div className="post-comment-list__empty">
-                      <PostIcon name="comment" />
-                      <p>还没有评论，来聊聊这场球吧</p>
                     </div>
-                  )}
-                  {threads.map((thread) => (
-                    <div className="post-comment-thread" key={thread.root.id}>
-                      {renderComment(thread.root, false)}
-                      {(expanded.has(thread.root.id)
-                        ? thread.replies
-                        : thread.replies.slice(0, 2)
-                      ).map((comment) => renderComment(comment, true))}
-                      {thread.replies.length > 2 && (
-                        <button
-                          type="button"
-                          className="post-comment-thread__expand"
-                          onClick={() =>
-                            setExpanded((current) => {
-                              const next = new Set(current)
-                              if (next.has(thread.root.id)) next.delete(thread.root.id)
-                              else next.add(thread.root.id)
-                              return next
-                            })
+                  </header>
+                  <div className="post-detail-modal__body">
+                    {post.title && <h2>{post.title}</h2>}
+                    <p>
+                      <EmojiText>{post.body}</EmojiText>
+                    </p>
+                    <PostTags tags={post.tags} tournamentId={post.tournamentId} />
+                    <PostQuote post={post.quotedPost ?? null} sourceId={post.quotedPostId} />
+                    <div className="post-detail-modal__meta">
+                      <time>{formatRelativeTime(post.publishedAt)}</time>
+                      {post.type === 'OFFICIAL' && <span>官方发布</span>}
+                      {signedIn && (
+                        <PostActions
+                          label="动态操作"
+                          actions={
+                            post.author.id === currentUserId
+                              ? [
+                                  {
+                                    label: '编辑',
+                                    disabled: sending,
+                                    run: () => setComposer('edit'),
+                                  },
+                                  {
+                                    label: '删除',
+                                    disabled: sending,
+                                    run: () => {
+                                      void removeContent()
+                                    },
+                                  },
+                                ]
+                              : [
+                                  {
+                                    label: '投诉',
+                                    run: () =>
+                                      setReport({
+                                        type: 'POST',
+                                        id: post.id,
+                                        title: '投诉这条动态',
+                                      }),
+                                  },
+                                ]
                           }
-                        >
-                          {expanded.has(thread.root.id)
-                            ? '收起回复'
-                            : `展开 ${thread.replies.length - 2} 条回复`}
-                          <PostIcon name={expanded.has(thread.root.id) ? 'left' : 'right'} />
-                        </button>
+                        />
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
-              <footer className="post-detail-modal__footer">
-                <div className="post-detail-modal__interactions">
-                  <button
-                    type="button"
-                    className={`post-detail-modal__like ${post.likedByMe ? 'is-active' : ''}`}
-                    aria-label={post.likedByMe ? '取消点赞' : '点赞'}
-                    aria-pressed={post.likedByMe}
-                    disabled={liking}
-                    onClick={() => void toggleLike()}
-                  >
-                    <ReactionHeart active={post.likedByMe} />
-                    <span>{post.likeCount} 赞</span>
-                  </button>
-                  <span>
-                    <PostIcon name="comment" />
-                    {post.commentCount}
-                  </span>
-                  <button
-                    type="button"
-                    className={`post-detail-modal__favorite ${post.favoritedByMe ? 'is-active' : ''}`}
-                    aria-label={post.favoritedByMe ? '取消收藏' : '收藏帖子'}
-                    aria-pressed={Boolean(post.favoritedByMe)}
-                    disabled={!signedIn || favoriting}
-                    onClick={() => void toggleFavorite()}
-                  >
-                    <PostIcon name="bookmark" />
-                    <span>{post.favoritedByMe ? '已收藏' : '收藏'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="post-detail-modal__repost"
-                    title="转发到动态"
-                    disabled={!signedIn || sending}
-                    onClick={() => setComposer('quote')}
-                  >
-                    <PostIcon name="repost" />
-                    <span>转发</span>
-                  </button>
-                </div>
-                {error && (
-                  <p className="post-error" role="alert">
-                    {error}
-                  </p>
-                )}
-                {signedIn ? (
-                  <div className="post-comment-composer">
-                    {replyTo && (
-                      <div className="post-comment-composer__reply">
-                        回复{' '}
-                        <PersonTrigger userId={replyTo.author.id} name={replyTo.author.displayName}>
-                          {replyTo.author.displayName}
-                        </PersonTrigger>
-                        <button
-                          type="button"
-                          aria-label="取消回复"
-                          disabled={sending}
-                          onClick={() => setReplyTo(null)}
-                        >
-                          <PostIcon name="close" />
-                        </button>
+                  </div>
+                  <div className="post-detail-modal__comments-heading">
+                    全部评论 <span>{post.commentCount}</span>
+                  </div>
+                  <div className="post-comment-list">
+                    {threads.length === 0 && (
+                      <div className="post-comment-list__empty">
+                        <PostIcon name="comment" />
+                        <p>还没有评论，来聊聊这场球吧</p>
                       </div>
                     )}
-                    <textarea
-                      data-post-input
-                      ref={textarea}
-                      aria-label={replyTo ? `回复 ${replyTo.author.displayName}` : '评论内容'}
-                      placeholder={
-                        replyTo ? `回复 ${replyTo.author.displayName}…` : '聊聊你的看法…'
-                      }
-                      title="Enter 发送，Shift+Enter 换行"
-                      maxLength={300}
-                      value={body}
-                      disabled={sending}
-                      onChange={(event) => setBody(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (
-                          event.key === 'Enter' &&
-                          !event.shiftKey &&
-                          !event.nativeEvent.isComposing &&
-                          event.nativeEvent.keyCode !== 229
-                        ) {
-                          event.preventDefault()
-                          void sendComment()
-                        }
-                      }}
-                    />
-                    <div className="post-comment-composer__tools">
-                      <EmojiPicker
-                        disabled={sending}
-                        onSelect={(emoji) =>
-                          insertAtCursor(textarea.current, body, emoji, 300, setBody)
-                        }
-                      />
-                      <label className="post-comment-composer__repost">
-                        <input
-                          type="checkbox"
-                          checked={repostComment}
-                          disabled={sending}
-                          onChange={(event) => setRepostComment(event.target.checked)}
-                        />
-                        <span>评论同步转发到动态</span>
-                      </label>
-                      <span>{body.length ? `${body.length}/300` : ''}</span>
-                      <button
-                        type="button"
-                        className="post-submit"
-                        disabled={!body.trim() || sending}
-                        onClick={() => void sendComment()}
-                      >
-                        {sending ? '发送中…' : replyTo ? '回复' : '发送'}
-                        <PostIcon name="send" />
-                      </button>
-                    </div>
+                    {threads.map((thread) => (
+                      <div className="post-comment-thread" key={thread.root.id}>
+                        {renderComment(thread.root, false)}
+                        {(expanded.has(thread.root.id)
+                          ? thread.replies
+                          : thread.replies.slice(0, 2)
+                        ).map((comment) => renderComment(comment, true))}
+                        {thread.replies.length > 2 && (
+                          <button
+                            type="button"
+                            className="post-comment-thread__expand"
+                            onClick={() =>
+                              setExpanded((current) => {
+                                const next = new Set(current)
+                                if (next.has(thread.root.id)) next.delete(thread.root.id)
+                                else next.add(thread.root.id)
+                                return next
+                              })
+                            }
+                          >
+                            {expanded.has(thread.root.id)
+                              ? '收起回复'
+                              : `展开 ${thread.replies.length - 2} 条回复`}
+                            <PostIcon name={expanded.has(thread.root.id) ? 'left' : 'right'} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="post-detail-modal__login"
-                    onClick={() => {
-                      onClose()
-                      void Taro.reLaunch({ url: '/pages/login/index' })
-                    }}
-                  >
-                    登录后参与评论
-                  </button>
-                )}
-              </footer>
-            </div>
-          </>
-        )}
+                </div>
+                <footer className="post-detail-modal__footer">
+                  <div className="post-detail-modal__interactions">
+                    <button
+                      type="button"
+                      className={`post-detail-modal__like ${post.likedByMe ? 'is-active' : ''}`}
+                      aria-label={post.likedByMe ? '取消点赞' : '点赞'}
+                      aria-pressed={post.likedByMe}
+                      disabled={liking}
+                      onClick={() => void toggleLike()}
+                    >
+                      <ReactionHeart active={post.likedByMe} />
+                      <span>{post.likeCount} 赞</span>
+                    </button>
+                    <span>
+                      <PostIcon name="comment" />
+                      {post.commentCount}
+                    </span>
+                    <button
+                      type="button"
+                      className={`post-detail-modal__favorite ${post.favoritedByMe ? 'is-active' : ''}`}
+                      aria-label={post.favoritedByMe ? '取消收藏' : '收藏帖子'}
+                      aria-pressed={Boolean(post.favoritedByMe)}
+                      disabled={!signedIn || favoriting}
+                      onClick={() => void toggleFavorite()}
+                    >
+                      <PostIcon name="bookmark" />
+                      <span>{post.favoritedByMe ? '已收藏' : '收藏'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="post-detail-modal__repost"
+                      title="转发到动态"
+                      disabled={!signedIn || sending}
+                      onClick={() => setComposer('quote')}
+                    >
+                      <PostIcon name="repost" />
+                      <span>转发</span>
+                    </button>
+                  </div>
+                  {error && (
+                    <p className="post-error" role="alert">
+                      {error}
+                    </p>
+                  )}
+                  {signedIn ? (
+                    <div className="post-comment-composer">
+                      {replyTo && (
+                        <div className="post-comment-composer__reply">
+                          回复{' '}
+                          <PersonTrigger
+                            userId={replyTo.author.id}
+                            name={replyTo.author.displayName}
+                          >
+                            {replyTo.author.displayName}
+                          </PersonTrigger>
+                          <button
+                            type="button"
+                            aria-label="取消回复"
+                            disabled={sending}
+                            onClick={() => setReplyTo(null)}
+                          >
+                            <PostIcon name="close" />
+                          </button>
+                        </div>
+                      )}
+                      <textarea
+                        data-post-input
+                        ref={textarea}
+                        aria-label={replyTo ? `回复 ${replyTo.author.displayName}` : '评论内容'}
+                        placeholder={
+                          replyTo ? `回复 ${replyTo.author.displayName}…` : '聊聊你的看法…'
+                        }
+                        title="Enter 发送，Shift+Enter 换行"
+                        maxLength={300}
+                        value={body}
+                        disabled={sending}
+                        onChange={(event) => setBody(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === 'Enter' &&
+                            !event.shiftKey &&
+                            !event.nativeEvent.isComposing &&
+                            event.nativeEvent.keyCode !== 229
+                          ) {
+                            event.preventDefault()
+                            void sendComment()
+                          }
+                        }}
+                      />
+                      <div className="post-comment-composer__tools">
+                        <EmojiPicker
+                          disabled={sending}
+                          onSelect={(emoji) =>
+                            insertAtCursor(textarea.current, body, emoji, 300, setBody)
+                          }
+                        />
+                        <label className="post-comment-composer__repost">
+                          <input
+                            type="checkbox"
+                            checked={repostComment}
+                            disabled={sending}
+                            onChange={(event) => setRepostComment(event.target.checked)}
+                          />
+                          <span>评论同步转发到动态</span>
+                        </label>
+                        <span>{body.length ? `${body.length}/300` : ''}</span>
+                        <button
+                          type="button"
+                          className="post-submit"
+                          disabled={!body.trim() || sending}
+                          onClick={() => void sendComment()}
+                        >
+                          {sending ? '发送中…' : replyTo ? '回复' : '发送'}
+                          <PostIcon name="send" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="post-detail-modal__login"
+                      onClick={() => {
+                        onClose()
+                        void Taro.reLaunch({ url: '/pages/login/index' })
+                      }}
+                    >
+                      登录后参与评论
+                    </button>
+                  )}
+                </footer>
+              </div>
+            </>
+          )}
+        </div>
       </section>
       {report && (
         <ReportModal

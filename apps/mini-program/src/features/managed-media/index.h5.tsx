@@ -46,19 +46,19 @@ function MediaDialog({
     >
       <section
         id={id}
-        className="managed-media-dialog"
+        className="managed-media-dialog xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
       >
-        <header>
+        <header className="xq-dialog__header">
           <h2>{title}</h2>
           <button data-media-control type="button" onClick={onClose} aria-label="关闭">
             ×
           </button>
         </header>
-        {children}
+        <div className="xq-dialog__body">{children}</div>
       </section>
     </div>,
     document.body,
