@@ -15,7 +15,7 @@ import type {
   TeamSummary,
 } from '../../features/product/product.types'
 import ExistingDataPage from './data-center.shared'
-import { KnockoutPanel } from './knockout-tree.h5'
+import { KnockoutPanel, scrollPanelColumn } from './knockout-tree.h5'
 
 import './index.h5.scss'
 
@@ -114,7 +114,7 @@ function DesktopDataPage() {
     panel: 'groups' | 'knockout',
     event: React.MouseEvent<HTMLButtonElement>,
   ) => {
-    setInstantSwitch(event.detail === 0)
+    setInstantSwitch(event.type === 'click' && event.detail === 0)
     setExpandedPanel(panel)
   }
   return (
@@ -367,6 +367,26 @@ function StandingsCard({
   const groups =
     groupId === 'all' ? data.groups : data.groups.filter((group) => group.id === groupId)
   const demo = data.resultsMode === 'DEMO'
+  const expandedRef = useRef(expanded)
+  const hoverTimer = useRef<number | null>(null)
+  const suppressHover = useRef(false)
+  expandedRef.current = expanded
+  const clearHover = () => {
+    if (hoverTimer.current !== null) {
+      window.clearTimeout(hoverTimer.current)
+      hoverTimer.current = null
+    }
+  }
+  useEffect(() => clearHover, [])
+  const scheduleHoverExpand = () => {
+    if (expandedRef.current || suppressHover.current) return
+    clearHover()
+    hoverTimer.current = window.setTimeout(() => {
+      hoverTimer.current = null
+      if (expandedRef.current || suppressHover.current) return
+      onExpand({ type: 'mouseenter', detail: 1 } as React.MouseEvent<HTMLButtonElement>)
+    }, 360)
+  }
   return (
     <section
       className={
@@ -374,6 +394,16 @@ function StandingsCard({
         (expanded ? 'is-expanded' : 'is-collapsed')
       }
       aria-label="小组赛面板"
+      onMouseEnter={scheduleHoverExpand}
+      onMouseLeave={() => {
+        suppressHover.current = false
+        clearHover()
+      }}
+      onWheel={() => {
+        if (expandedRef.current) return
+        suppressHover.current = true
+        clearHover()
+      }}
     >
       <div className="data-desktop__card-head">
         <div className="data-desktop__heading">
@@ -403,7 +433,7 @@ function StandingsCard({
           </label>
         )}
       </div>
-      <div id="data-group-content">
+      <div id="data-group-content" className="data-desktop__panel-scroll">
         {groups.length === 0 ? (
           <DataState
             kind="empty"
@@ -536,6 +566,7 @@ function StandingsCard({
           className="data-desktop__panel-cover"
           aria-label="展开小组赛"
           onClick={onExpand}
+          onWheel={scrollPanelColumn}
         >
           <span className="sr-only">展开小组赛</span>
         </button>
