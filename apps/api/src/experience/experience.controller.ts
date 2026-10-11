@@ -46,7 +46,9 @@ export class ExperienceController {
   @Get('public/home')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取五入口产品首页聚合数据' })
-  @ApiOkResponse({ description: '赛事、公告、焦点比赛、球队和社区动态' })
+  @ApiOkResponse({
+    description: '赛事、赛事主办公告、平台官方公告、焦点比赛、球队和社区动态',
+  })
   home(
     @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,

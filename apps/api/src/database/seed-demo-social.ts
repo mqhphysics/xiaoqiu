@@ -21,6 +21,7 @@ import {
   DEMO_POSTS,
   DEMO_TEAMS,
   fixtureId,
+  isPlatformDemoPost,
 } from './demo-fixture'
 
 export const DEMO_MATCH_REVIEWS = [
@@ -55,7 +56,6 @@ export const DEMO_MATCH_REVIEWS = [
 ] as const
 
 export const DEMO_TEAM_POST_INDEXES: Readonly<Record<string, number>> = {
-  'official-venue': 0,
   'community-derby': 0,
   'community-training': 0,
   'community-reporter': 0,
@@ -338,9 +338,9 @@ export async function seedDemoAccountsAndCommunity(
       data: {
         id: postId,
         organizationId,
-        tournamentId,
+        tournamentId: isPlatformDemoPost(post) ? null : tournamentId,
         authorUserId: authorUserId ?? null,
-        teamId: teamIndex === undefined ? null : teams[teamIndex]!.id,
+        teamId: isPlatformDemoPost(post) || teamIndex === undefined ? null : teams[teamIndex]!.id,
         type: post.type,
         status: PostStatus.PUBLISHED,
         title: post.title ?? null,
@@ -376,8 +376,9 @@ export async function seedDemoAccountsAndCommunity(
         organizationId,
         postId,
         userId: usersByUsername.get(commenter)!,
-        body:
-          post.type === 'OFFICIAL'
+        body: isPlatformDemoPost(post)
+          ? '已看到，这条是平台通知。'
+          : post.type === 'OFFICIAL'
             ? '收到，赛程和数据页都已经同步更新。'
             : '现场确实很有气氛，下一场继续加油！',
         createdAt: new Date(new Date(post.publishedAt).getTime() + 45 * 60 * 1000),
