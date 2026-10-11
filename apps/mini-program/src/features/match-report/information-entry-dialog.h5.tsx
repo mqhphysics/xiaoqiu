@@ -145,13 +145,13 @@ export function InformationEntryDialog({ onClose }: { onClose: () => void }) {
       }}
     >
       <section
-        className="information-entry-dialog"
+        className="information-entry-dialog xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="information-entry-title"
         tabIndex={-1}
       >
-        <header className="information-entry-header">
+        <header className="information-entry-header xq-dialog__header">
           <div>
             <h2 id="information-entry-title">选择比赛 · 信息录入</h2>
             <p>选择你有权限的已结束比赛，填写比赛报告。</p>
@@ -224,7 +224,7 @@ export function InformationEntryDialog({ onClose }: { onClose: () => void }) {
               </button>
             ))}
         </div>
-        <footer className="information-entry-footer">
+        <footer className="information-entry-footer xq-dialog__footer">
           {matches.length} 场已结束比赛 · 比赛权限由当前账号授权范围决定
         </footer>
       </section>

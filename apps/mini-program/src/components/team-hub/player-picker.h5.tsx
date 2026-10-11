@@ -83,12 +83,12 @@ export function PlayerPicker({
       }}
     >
       <section
-        className="th-picker th-player-picker th-root"
+        className="th-picker th-player-picker th-root xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="th-player-picker-title"
       >
-        <div className="th-heading">
+        <div className="th-heading xq-dialog__header">
           <h2 id="th-player-picker-title">关注校园球员</h2>
           <button
             data-team-control

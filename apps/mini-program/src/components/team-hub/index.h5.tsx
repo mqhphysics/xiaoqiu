@@ -133,14 +133,16 @@ function TeamOverlay({ target, onClose }: { target: TeamTarget; onClose: () => v
       }}
     >
       <section
-        className="th-root th-detail-modal"
+        className="th-root th-detail-modal xq-dialog xq-dialog--wide"
         role="dialog"
         aria-modal="true"
         aria-label="球队详情"
         tabIndex={-1}
       >
-        <div className="th-modal-top">
-          <span>球队档案</span>
+        <div className="th-modal-top xq-dialog__header">
+          <div>
+            <h2>球队详情</h2>
+          </div>
           <button
             data-team-control
             type="button"
@@ -151,7 +153,7 @@ function TeamOverlay({ target, onClose }: { target: TeamTarget; onClose: () => v
             <TeamIcon name="close" />
           </button>
         </div>
-        <div className="th-detail-modal__content">
+        <div className="th-detail-modal__content xq-dialog__body">
           <TeamDetailView teamId={target.teamId} tournamentId={target.tournamentId} />
         </div>
       </section>

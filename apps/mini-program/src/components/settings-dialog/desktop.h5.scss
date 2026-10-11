@@ -10,10 +10,13 @@
 }
 .desktop-settings {
   box-sizing: border-box;
-  width: min(600px, 100%);
-  max-height: 88dvh;
-  overflow: auto;
-  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  width: min(920px, calc(100vw - 64px));
+  height: min(540px, calc(100dvh - 80px));
+  max-height: min(540px, calc(100dvh - 80px));
+  overflow: hidden;
+  border-radius: 16px;
   background: #fff;
   color: #263a2d;
   box-shadow: 0 24px 80px rgba(20, 40, 25, 0.2);
@@ -22,11 +25,13 @@
 }
 .desktop-settings__header {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 25px 28px 22px;
-  border-bottom: 1px solid #e9eee6;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e6ece4;
+  background: #fff;
 }
 .desktop-settings__header h2 {
   margin: 0;
@@ -55,6 +60,11 @@
   font-size: 23px;
 }
 .desktop-settings__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 22px 28px 18px;
 }
 .desktop-settings__body h3 {
@@ -135,10 +145,12 @@
 }
 .desktop-settings__footer {
   display: flex;
+  flex: 0 0 auto;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 28px;
-  border-top: 1px solid #e9eee6;
+  padding: 14px 20px;
+  border-top: 1px solid #e6ece4;
+  background: #fff;
   font-size: 11px;
   color: #8a9588;
 }

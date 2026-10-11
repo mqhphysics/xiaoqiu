@@ -82,12 +82,12 @@ export function TeamPicker({
       }}
     >
       <section
-        className="th-picker th-root"
+        className="th-picker th-root xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="th-picker-title"
       >
-        <div className="th-heading">
+        <div className="th-heading xq-dialog__header">
           <div>
             <h2 id="th-picker-title">{mode === 'primary' ? '选择我的主队' : '关注更多球队'}</h2>
             <p className="th-small-note">
@@ -178,7 +178,7 @@ export function TeamPicker({
             {error}
           </p>
         ) : null}
-        <footer className="th-picker__footer">
+        <footer className="th-picker__footer xq-dialog__footer">
           <span className="th-muted">
             {preferences
               ? mode === 'primary'

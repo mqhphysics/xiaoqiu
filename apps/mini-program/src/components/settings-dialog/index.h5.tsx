@@ -76,13 +76,13 @@ function DesktopSettings({
       }}
     >
       <section
-        className="desktop-settings"
+        className="desktop-settings xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="desktop-settings-title"
         tabIndex={-1}
       >
-        <header className="desktop-settings__header">
+        <header className="desktop-settings__header xq-dialog__header">
           <div>
             <h2 id="desktop-settings-title">{section === 'messages' ? '消息设置' : '设置'}</h2>
             <p>让晓球更适合你的浏览习惯。</p>
@@ -91,7 +91,7 @@ function DesktopSettings({
             ×
           </button>
         </header>
-        <div className="desktop-settings__body">
+        <div className="desktop-settings__body xq-dialog__body">
           {section === 'messages' ? (
             <MessageSettings />
           ) : (
@@ -155,7 +155,7 @@ function DesktopSettings({
             </>
           )}
         </div>
-        <footer className="desktop-settings__footer">
+        <footer className="desktop-settings__footer xq-dialog__footer">
           <span>晓球 V1.0.0</span>
           <span>把校园比赛认真记录下来</span>
         </footer>

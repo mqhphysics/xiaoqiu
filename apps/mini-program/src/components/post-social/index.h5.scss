@@ -148,7 +148,7 @@
     object-fit: cover;
     border-radius: 6px;
   }
-  .post-composer > .post-quote {
+  .post-composer .post-quote {
     margin: 0 26px 18px;
   }
   .post-card > .post-quote {
@@ -338,9 +338,6 @@
     height: 26px;
   }
   .post-composer {
-    width: 620px;
-    max-height: calc(100dvh - 64px);
-    overflow-y: auto;
     border-radius: 16px;
     background: white;
     box-shadow: 0 24px 70px rgba(17, 39, 24, 0.2);
@@ -460,7 +457,7 @@
     color: #7a8b75;
     font-size: 12px !important;
   }
-  .post-composer > .post-error {
+  .post-composer .xq-dialog__body > .post-error {
     margin: 0 26px 12px !important;
   }
   .post-composer__toolbar {
@@ -498,29 +495,24 @@
   }
   .post-detail-modal {
     position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 404px;
-    width: min(1160px, calc(100vw - 64px));
-    height: min(780px, calc(100dvh - 64px));
-    border-radius: 18px;
     overflow: hidden;
     background: white;
     box-shadow: 0 24px 70px rgba(17, 39, 24, 0.22);
   }
-  .post-detail-modal--text {
-    grid-template-columns: 1fr;
-    width: min(680px, calc(100vw - 64px));
-    height: min(720px, calc(100dvh - 64px));
+  .post-detail-modal__stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 404px;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .post-detail-modal--text .post-detail-modal__stage {
+    grid-template-columns: minmax(0, 1fr);
   }
   .post-detail-modal__close {
-    position: absolute;
-    top: 13px;
-    right: 13px;
+    position: static;
     z-index: 4;
     color: #6b766c;
     background: #f3f5f0;
-    width: 32px;
-    height: 32px;
   }
   .post-detail-modal__media {
     min-width: 0;
@@ -550,7 +542,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-right: 26px;
+    padding-right: 0;
     margin-bottom: 23px;
     min-height: 36px;
   }
@@ -1045,16 +1037,14 @@
   }
 }
 @media (min-width: 721px) and (max-width: 1000px) {
-  .post-detail-modal {
-    grid-template-columns: minmax(0, 1fr) 360px;
-    width: calc(100vw - 40px);
+  .post-detail-modal__stage {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
   .post-scrim {
     padding: 20px;
   }
-  .post-detail-modal--text {
-    grid-template-columns: 1fr;
-    width: min(680px, calc(100vw - 40px));
+  .post-detail-modal--text .post-detail-modal__stage {
+    grid-template-columns: minmax(0, 1fr);
   }
   .post-detail-modal__scroll {
     padding: 23px 20px 16px;

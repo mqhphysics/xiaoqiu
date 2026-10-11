@@ -42,27 +42,29 @@ export function TestRoleDialog({ onClose }: { onClose: () => void }) {
       }}
     >
       <section
-        className="test-role-dialog"
+        className="test-role-dialog xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="test-role-title"
         aria-busy={busy}
       >
-        <header>
+        <header className="xq-dialog__header">
           <h2 id="test-role-title">切换测试角色</h2>
           <button aria-label="关闭角色选择" disabled={busy} onClick={onClose}>
             ×
           </button>
         </header>
-        <p>切换后以所选身份操作模拟赛事，修改会保存。</p>
-        {error && <p role="alert">{error}</p>}
-        {!items.length && !error && <p role="status">正在读取角色…</p>}
-        <div className="test-role-options">
-          {items.map((item) => (
-            <button key={item.id} disabled={busy} onClick={() => void choose(item.id)}>
-              {item.label}
-            </button>
-          ))}
+        <div className="xq-dialog__body">
+          <p>切换后以所选身份操作模拟赛事，修改会保存。</p>
+          {error && <p role="alert">{error}</p>}
+          {!items.length && !error && <p role="status">正在读取角色…</p>}
+          <div className="test-role-options">
+            {items.map((item) => (
+              <button key={item.id} disabled={busy} onClick={() => void choose(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
     </div>,

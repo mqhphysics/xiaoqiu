@@ -30,13 +30,13 @@ export function ProfileDialog({
     >
       <section
         id={dialogId}
-        className={`profile-dialog ${wide ? 'profile-dialog--wide' : ''}`}
+        className={`profile-dialog xq-dialog ${wide ? 'profile-dialog--wide xq-dialog--wide' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
       >
-        <header>
+        <header className="xq-dialog__header">
           <div>
             <h2 id={titleId}>{title}</h2>
             {note && <p>{note}</p>}
@@ -45,8 +45,8 @@ export function ProfileDialog({
             <ProfileIcon name="close" />
           </button>
         </header>
-        <div className="profile-dialog__body">{children}</div>
-        {footer && <footer>{footer}</footer>}
+        <div className="profile-dialog__body xq-dialog__body">{children}</div>
+        {footer && <footer className="xq-dialog__footer">{footer}</footer>}
       </section>
     </div>,
     document.body,

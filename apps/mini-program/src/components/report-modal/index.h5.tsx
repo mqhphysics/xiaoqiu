@@ -57,7 +57,7 @@ export function ReportModal(props: {
       }}
     >
       <form
-        className="report-panel-h5"
+        className="report-panel-h5 xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={props.title}
@@ -66,7 +66,7 @@ export function ReportModal(props: {
           void submit()
         }}
       >
-        <header>
+        <header className="xq-dialog__header">
           <div>
             <span>REPORT & FEEDBACK</span>
             <h2>{props.title}</h2>
@@ -75,29 +75,31 @@ export function ReportModal(props: {
             <PostIcon name="close" />
           </button>
         </header>
-        <label htmlFor="report-reason-h5">问题概括</label>
-        <input
-          data-report-field
-          id="report-reason-h5"
-          aria-label="问题概括"
-          maxLength={120}
-          placeholder="例如：辱骂、人身攻击、错误数据"
-          value={reason}
-          disabled={saving}
-          onChange={(event) => setReason(event.target.value)}
-        />
-        <label htmlFor="report-details-h5">补充说明（选填）</label>
-        <textarea
-          data-report-field
-          id="report-details-h5"
-          aria-label="补充说明"
-          maxLength={1000}
-          placeholder="请说明具体位置和希望如何处理"
-          value={details}
-          disabled={saving}
-          onChange={(event) => setDetails(event.target.value)}
-        />
-        <footer>
+        <div className="xq-dialog__body">
+          <label htmlFor="report-reason-h5">问题概括</label>
+          <input
+            data-report-field
+            id="report-reason-h5"
+            aria-label="问题概括"
+            maxLength={120}
+            placeholder="例如：辱骂、人身攻击、错误数据"
+            value={reason}
+            disabled={saving}
+            onChange={(event) => setReason(event.target.value)}
+          />
+          <label htmlFor="report-details-h5">补充说明（选填）</label>
+          <textarea
+            data-report-field
+            id="report-details-h5"
+            aria-label="补充说明"
+            maxLength={1000}
+            placeholder="请说明具体位置和希望如何处理"
+            value={details}
+            disabled={saving}
+            onChange={(event) => setDetails(event.target.value)}
+          />
+        </div>
+        <footer className="xq-dialog__footer">
           <button type="button" disabled={saving} onClick={close}>
             取消
           </button>

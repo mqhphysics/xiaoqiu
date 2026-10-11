@@ -104,7 +104,7 @@ export function DesktopPostComposer({
       }}
     >
       <section
-        className="post-composer"
+        className="post-composer xq-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="post-composer-title"
@@ -120,7 +120,7 @@ export function DesktopPostComposer({
           }
         }}
       >
-        <header className="post-composer__header">
+        <header className="post-composer__header xq-dialog__header">
           <h2 id="post-composer-title">
             {editPost ? '编辑动态' : quotePost ? '转发到动态' : '发布动态'}
           </h2>
@@ -134,149 +134,151 @@ export function DesktopPostComposer({
             <PostIcon name="close" />
           </button>
         </header>
-        <div className="post-composer__identity">
-          <UserAvatar
-            avatarUrl={session?.user.avatarUrl ?? null}
-            name={session?.user.displayName ?? '我'}
-            userId={session?.user.id}
-            size="small"
-          />
-          <div>
-            <strong>{session?.user.displayName ?? '我'}</strong>
-            <span>分享你的绿茵时刻</span>
+        <div className="xq-dialog__body">
+          <div className="post-composer__identity">
+            <UserAvatar
+              avatarUrl={session?.user.avatarUrl ?? null}
+              name={session?.user.displayName ?? '我'}
+              userId={session?.user.id}
+              size="small"
+            />
+            <div>
+              <strong>{session?.user.displayName ?? '我'}</strong>
+              <span>分享你的绿茵时刻</span>
+            </div>
           </div>
-        </div>
-        <textarea
-          data-post-input
-          ref={textarea}
-          className="post-composer__input"
-          aria-label="动态正文"
-          placeholder={quotePost ? '说说你的想法（选填）…' : '今天的球场，有什么想分享的？'}
-          maxLength={editPost ? 1000 : 500}
-          value={body}
-          disabled={publishing}
-          onChange={(event) => setBody(event.target.value)}
-        />
-        {quotePost && <PostQuote post={quotePost} interactive={false} />}
-        {editPost?.quotedPostId && (
-          <PostQuote
-            post={editPost.quotedPost ?? null}
-            sourceId={editPost.quotedPostId}
-            interactive={false}
+          <textarea
+            data-post-input
+            ref={textarea}
+            className="post-composer__input"
+            aria-label="动态正文"
+            placeholder={quotePost ? '说说你的想法（选填）…' : '今天的球场，有什么想分享的？'}
+            maxLength={editPost ? 1000 : 500}
+            value={body}
+            disabled={publishing}
+            onChange={(event) => setBody(event.target.value)}
           />
-        )}
-        {images.length > 0 && (
-          <div className="post-composer__previews" aria-label="待发布图片">
-            {images.map((source, index) => (
-              <div className="post-composer__preview" key={index}>
-                <img src={source} alt={`待发布图片 ${index + 1}`} />
-                {source.startsWith('data:image/gif') && (
-                  <span className="post-composer__gif">GIF</span>
-                )}
+          {quotePost && <PostQuote post={quotePost} interactive={false} />}
+          {editPost?.quotedPostId && (
+            <PostQuote
+              post={editPost.quotedPost ?? null}
+              sourceId={editPost.quotedPostId}
+              interactive={false}
+            />
+          )}
+          {images.length > 0 && (
+            <div className="post-composer__previews" aria-label="待发布图片">
+              {images.map((source, index) => (
+                <div className="post-composer__preview" key={index}>
+                  <img src={source} alt={`待发布图片 ${index + 1}`} />
+                  {source.startsWith('data:image/gif') && (
+                    <span className="post-composer__gif">GIF</span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`删除第 ${index + 1} 张图片`}
+                    disabled={publishing || processing}
+                    onClick={() =>
+                      setImages((current) => current.filter((_, item) => item !== index))
+                    }
+                  >
+                    <PostIcon name="close" />
+                  </button>
+                </div>
+              ))}
+              {images.length < MAX_POST_IMAGES && (
                 <button
                   type="button"
-                  aria-label={`删除第 ${index + 1} 张图片`}
+                  className="post-composer__add"
+                  aria-label="继续添加图片"
                   disabled={publishing || processing}
-                  onClick={() =>
-                    setImages((current) => current.filter((_, item) => item !== index))
-                  }
+                  onClick={() => input.current?.click()}
                 >
-                  <PostIcon name="close" />
+                  <PostIcon name="plus" />
+                  <span>添加</span>
                 </button>
-              </div>
-            ))}
-            {images.length < MAX_POST_IMAGES && (
-              <button
-                type="button"
-                className="post-composer__add"
-                aria-label="继续添加图片"
-                disabled={publishing || processing}
-                onClick={() => input.current?.click()}
-              >
-                <PostIcon name="plus" />
-                <span>添加</span>
-              </button>
-            )}
-          </div>
-        )}
-        <input
-          className="post-file-input"
-          ref={input}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          multiple
-          aria-label="选择动态图片"
-          disabled={publishing || processing}
-          onChange={async (event) => {
-            const files = Array.from(event.currentTarget.files ?? [])
-            event.currentTarget.value = ''
-            if (!files.length) return
-            if (images.length + files.length > MAX_POST_IMAGES) {
-              setError('每条动态最多 9 张图片，请重新选择')
-              return
-            }
-            setProcessing(true)
-            setError('')
-            const next: string[] = []
-            const failures: string[] = []
-            for (const file of files) {
-              try {
-                next.push(await prepareDesktopPostImage(file))
-              } catch (issue) {
-                failures.push(
-                  `${file.name}：${issue instanceof Error ? issue.message : '读取失败'}`,
-                )
-              }
-            }
-            if (
-              [...images, ...next].reduce((sum, source) => sum + source.length, 0) >
-              MAX_POST_DATA_LENGTH
-            ) {
-              setError('图片总大小过大，请减少图片或选择较小的 GIF')
-            } else {
-              setImages((current) => [...current, ...next])
-              setError(failures.join('；'))
-            }
-            setProcessing(false)
-          }}
-        />
-        {error && (
-          <p className="post-error" role="alert">
-            {error}
-          </p>
-        )}
-        {!editPost && (
-          <div className="post-composer__toolbar">
-            <div className="post-composer__tools">
-              <EmojiPicker
-                disabled={publishing}
-                onSelect={(emoji) => insertAtCursor(textarea.current, body, emoji, 500, setBody)}
-              />
-              <button
-                type="button"
-                className="post-tool"
-                title="图片 / GIF"
-                aria-label="添加图片或 GIF"
-                disabled={publishing || processing || images.length >= MAX_POST_IMAGES}
-                onClick={() => input.current?.click()}
-              >
-                <PostIcon name="photo" />
-              </button>
-              <span>{processing ? '正在处理图片…' : `图片 / GIF · ${images.length}/9`}</span>
+              )}
             </div>
-            <span className="post-composer__counter">{body.length}/500</span>
-          </div>
-        )}
-        {!editPost && (
-          <PostTagPicker
-            tags={tags}
-            onChange={setTags}
+          )}
+          <input
+            className="post-file-input"
+            ref={input}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            aria-label="选择动态图片"
             disabled={publishing || processing}
-            tournamentId={tournamentId}
-            onPendingChange={setTagResolving}
+            onChange={async (event) => {
+              const files = Array.from(event.currentTarget.files ?? [])
+              event.currentTarget.value = ''
+              if (!files.length) return
+              if (images.length + files.length > MAX_POST_IMAGES) {
+                setError('每条动态最多 9 张图片，请重新选择')
+                return
+              }
+              setProcessing(true)
+              setError('')
+              const next: string[] = []
+              const failures: string[] = []
+              for (const file of files) {
+                try {
+                  next.push(await prepareDesktopPostImage(file))
+                } catch (issue) {
+                  failures.push(
+                    `${file.name}：${issue instanceof Error ? issue.message : '读取失败'}`,
+                  )
+                }
+              }
+              if (
+                [...images, ...next].reduce((sum, source) => sum + source.length, 0) >
+                MAX_POST_DATA_LENGTH
+              ) {
+                setError('图片总大小过大，请减少图片或选择较小的 GIF')
+              } else {
+                setImages((current) => [...current, ...next])
+                setError(failures.join('；'))
+              }
+              setProcessing(false)
+            }}
           />
-        )}
-        <footer className="post-composer__footer">
+          {error && (
+            <p className="post-error" role="alert">
+              {error}
+            </p>
+          )}
+          {!editPost && (
+            <div className="post-composer__toolbar">
+              <div className="post-composer__tools">
+                <EmojiPicker
+                  disabled={publishing}
+                  onSelect={(emoji) => insertAtCursor(textarea.current, body, emoji, 500, setBody)}
+                />
+                <button
+                  type="button"
+                  className="post-tool"
+                  title="图片 / GIF"
+                  aria-label="添加图片或 GIF"
+                  disabled={publishing || processing || images.length >= MAX_POST_IMAGES}
+                  onClick={() => input.current?.click()}
+                >
+                  <PostIcon name="photo" />
+                </button>
+                <span>{processing ? '正在处理图片…' : `图片 / GIF · ${images.length}/9`}</span>
+              </div>
+              <span className="post-composer__counter">{body.length}/500</span>
+            </div>
+          )}
+          {!editPost && (
+            <PostTagPicker
+              tags={tags}
+              onChange={setTags}
+              disabled={publishing || processing}
+              tournamentId={tournamentId}
+              onPendingChange={setTagResolving}
+            />
+          )}
+        </div>
+        <footer className="post-composer__footer xq-dialog__footer">
           <span>让每一个绿茵时刻被看见</span>
           <button
             type="button"

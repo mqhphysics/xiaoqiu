@@ -338,25 +338,32 @@ export function PlayerDialog({
       }}
     >
       <section
-        className="player-dialog"
+        className="player-dialog xq-dialog xq-dialog--wide"
         role="dialog"
         aria-modal="true"
         aria-label="球员资料"
         tabIndex={-1}
       >
-        <button
-          type="button"
-          className="player-dialog__close"
-          aria-label="关闭球员资料"
-          onClick={onClose}
-        >
-          <PostIcon name="close" />
-        </button>
-        {state.phase === 'ready' ? (
-          <PlayerProfile player={state.player} tournamentId={request.tournamentId} />
-        ) : (
-          <PlayerReadState state={state} retry={retry} />
-        )}
+        <header className="xq-dialog__header">
+          <div>
+            <h2>球员资料</h2>
+          </div>
+          <button
+            type="button"
+            className="player-dialog__close"
+            aria-label="关闭球员资料"
+            onClick={onClose}
+          >
+            <PostIcon name="close" />
+          </button>
+        </header>
+        <div className="xq-dialog__body">
+          {state.phase === 'ready' ? (
+            <PlayerProfile player={state.player} tournamentId={request.tournamentId} />
+          ) : (
+            <PlayerReadState state={state} retry={retry} />
+          )}
+        </div>
       </section>
     </div>,
     document.body,

@@ -195,7 +195,7 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
     >
       <section
         id={`match-dialog-${panelId}`}
-        className="match-dialog"
+        className="match-dialog xq-dialog xq-dialog--wide"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -223,7 +223,7 @@ export function MatchDialog({ request, onClose }: { request: MatchRequest; onClo
             <span aria-hidden="true">×</span>
           </button>
         </header>
-        <div className="match-dialog__body">
+        <div className="match-dialog__body xq-dialog__body">
           {state.phase === 'ready' ? (
             <state.Content match={state.match} editor={editor} onMatchUpdated={updateMatch} />
           ) : (

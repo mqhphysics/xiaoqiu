@@ -106,116 +106,123 @@ export function PersonDialog({
       }}
     >
       <section
-        className="player-dialog person-dialog"
+        className="player-dialog person-dialog xq-dialog xq-dialog--wide"
         role="dialog"
         aria-modal="true"
         aria-label="人物资料"
         tabIndex={-1}
       >
-        <button
-          type="button"
-          className="player-dialog__close"
-          aria-label="关闭人物资料"
-          onClick={onClose}
-        >
-          <PostIcon name="close" />
-        </button>
-        {person ? (
-          person.player && request.mode !== 'coach' ? (
-            <PlayerProfile
-              player={{ ...person.player, displayName: person.displayName }}
-              tournamentId={person.tournamentId}
-              presentation={{
-                verificationLevel: person.verificationLevel,
-                roles: person.roles,
-                official: person.official,
-                messageUser: person.messageable ? person : null,
-                posts: person.posts,
-              }}
-            />
-          ) : (
-            <>
-              <header className="person-hero">
-                <UserAvatar name={person.displayName} avatarUrl={person.avatarUrl} size="large" />
-                <div>
-                  <div className="person-hero__name">
-                    <h1>{person.displayName}</h1>
-                    <VerificationBadge
-                      level={person.verificationLevel}
-                      roles={person.roles}
-                      official={person.official}
-                      displayedKind={person.displayedBadgeKind}
-                      userId={person.id}
-                    />
+        <header className="xq-dialog__header">
+          <div>
+            <h2>人物资料</h2>
+          </div>
+          <button
+            type="button"
+            className="player-dialog__close"
+            aria-label="关闭人物资料"
+            onClick={onClose}
+          >
+            <PostIcon name="close" />
+          </button>
+        </header>
+        <div className="xq-dialog__body">
+          {person ? (
+            person.player && request.mode !== 'coach' ? (
+              <PlayerProfile
+                player={{ ...person.player, displayName: person.displayName }}
+                tournamentId={person.tournamentId}
+                presentation={{
+                  verificationLevel: person.verificationLevel,
+                  roles: person.roles,
+                  official: person.official,
+                  messageUser: person.messageable ? person : null,
+                  posts: person.posts,
+                }}
+              />
+            ) : (
+              <>
+                <header className="person-hero">
+                  <UserAvatar name={person.displayName} avatarUrl={person.avatarUrl} size="large" />
+                  <div>
+                    <div className="person-hero__name">
+                      <h1>{person.displayName}</h1>
+                      <VerificationBadge
+                        level={person.verificationLevel}
+                        roles={person.roles}
+                        official={person.official}
+                        displayedKind={person.displayedBadgeKind}
+                        userId={person.id}
+                      />
+                    </div>
+                    <p>{person.bio || '还没有填写个人简介。'}</p>
+                    {person.organizationName && <span>{person.organizationName}</span>}
                   </div>
-                  <p>{person.bio || '还没有填写个人简介。'}</p>
-                  {person.organizationName && <span>{person.organizationName}</span>}
+                  <MessageAction person={person} />
+                </header>
+                {readSession()?.user.id === person.id && (
+                  <button
+                    type="button"
+                    className="own-profile-edit-button"
+                    onClick={() => setEditing(true)}
+                  >
+                    编辑个人信息
+                  </button>
+                )}
+                <div className="person-content">
+                  <div className="person-selection">动态与资料</div>
+                  <div className="player-profile-grid">
+                    <section className="player-panel">
+                      <div className="player-panel__head">
+                        <h2>公开动态</h2>
+                        <span>{person.tournamentName}</span>
+                      </div>
+                      {person.posts.length ? (
+                        person.posts.map((post) => (
+                          <PostCard
+                            key={post.id}
+                            post={post}
+                            onOpen={() => {}}
+                            onLike={() => void productRepository.setLike(post.id, !post.likedByMe)}
+                          />
+                        ))
+                      ) : (
+                        <div className="player-section-empty">
+                          <strong>当前赛事还没有公开动态</strong>
+                        </div>
+                      )}
+                    </section>
+                    <section className="player-panel">
+                      <div className="player-panel__head">
+                        <h2>个人资料</h2>
+                      </div>
+                      <dl className="player-facts">
+                        <div>
+                          <dt>昵称</dt>
+                          <dd>{person.displayName}</dd>
+                        </div>
+                        <div>
+                          <dt>身份</dt>
+                          <dd>
+                            {identityBadgeKinds(
+                              person.verificationLevel,
+                              person.roles,
+                              person.official,
+                            )
+                              .map((kind) => identityLabels[kind])
+                              .join('、') || '普通用户'}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="person-bio">{person.bio || '还没有填写个人简介。'}</p>
+                    </section>
+                  </div>
                 </div>
-                <MessageAction person={person} />
-              </header>
-              {readSession()?.user.id === person.id && (
-                <button
-                  type="button"
-                  className="own-profile-edit-button"
-                  onClick={() => setEditing(true)}
-                >
-                  编辑个人信息
-                </button>
-              )}
-              <div className="person-content">
-                <div className="person-selection">动态与资料</div>
-                <div className="player-profile-grid">
-                  <section className="player-panel">
-                    <div className="player-panel__head">
-                      <h2>公开动态</h2>
-                      <span>{person.tournamentName}</span>
-                    </div>
-                    {person.posts.length ? (
-                      person.posts.map((post) => (
-                        <PostCard
-                          key={post.id}
-                          post={post}
-                          onOpen={() => {}}
-                          onLike={() => void productRepository.setLike(post.id, !post.likedByMe)}
-                        />
-                      ))
-                    ) : (
-                      <div className="player-section-empty">
-                        <strong>当前赛事还没有公开动态</strong>
-                      </div>
-                    )}
-                  </section>
-                  <section className="player-panel">
-                    <div className="player-panel__head">
-                      <h2>个人资料</h2>
-                    </div>
-                    <dl className="player-facts">
-                      <div>
-                        <dt>昵称</dt>
-                        <dd>{person.displayName}</dd>
-                      </div>
-                      <div>
-                        <dt>身份</dt>
-                        <dd>
-                          {identityBadgeKinds(
-                            person.verificationLevel,
-                            person.roles,
-                            person.official,
-                          )
-                            .map((kind) => identityLabels[kind])
-                            .join('、') || '普通用户'}
-                        </dd>
-                      </div>
-                    </dl>
-                    <p className="person-bio">{person.bio || '还没有填写个人简介。'}</p>
-                  </section>
-                </div>
-              </div>
-            </>
-          )
-        ) : (
-          <ReadState error={error} retry={retry} />
-        )}
+              </>
+            )
+          ) : (
+            <ReadState error={error} retry={retry} />
+          )}
+        </div>
       </section>
       {editing && (
         <SelfPersonEditor onClose={() => setEditing(false)} onChanged={() => void retry()} />
