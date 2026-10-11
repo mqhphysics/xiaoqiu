@@ -499,7 +499,7 @@ function HomeContent({
   const openHeroAnnouncement = (index = heroIndex) => {
     const announcement =
       heroAnnouncements[heroAnnouncements.length > 0 ? index % heroAnnouncements.length : 0]
-    if (announcement) void goToPost(announcement.id)
+    if (announcement) openAnnouncement(announcement.id)
   }
   return (
     <View className="home-page">
@@ -578,7 +578,7 @@ function HomeContent({
               <Button
                 className={`notice-rail__item ${announcement.imageUrl ? 'notice-rail__item--photo' : ''}`}
                 key={announcement.id}
-                onClick={() => void goToPost(announcement.id)}
+                onClick={() => openAnnouncement(announcement.id)}
               >
                 {announcement.imageUrl && (
                   <Image
@@ -978,4 +978,14 @@ async function goToPlayer(playerId: string, tournamentId: string) {
 
 async function goToPost(postId: string) {
   await openPost(postId)
+}
+
+function openAnnouncement(postId: string) {
+  if (!readSession()) {
+    void Taro.navigateTo({
+      url: `/pages/post-detail/index?postId=${encodeURIComponent(postId)}`,
+    })
+    return
+  }
+  void goToPost(postId)
 }
