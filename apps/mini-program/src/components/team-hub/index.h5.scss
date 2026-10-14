@@ -1236,7 +1236,9 @@
     display: block;
     color: #82908a;
   }
-  .th-hub-dialog {
+  &.th-hub-dialog {
+    width: min(540px, calc(100vw - 48px));
+    max-width: 560px;
     background: #f7fbf6;
   }
   .th-hub-search {
@@ -1290,9 +1292,11 @@
   }
   .th-hub-row {
     display: flex;
+    box-sizing: border-box;
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
+    width: 100%;
     min-height: 56px;
     padding: 8px 10px;
     margin-bottom: 8px;
@@ -1337,6 +1341,11 @@
   .th-hub-followed {
     display: flex;
     flex-direction: column;
+    width: 100%;
+  }
+  .th-hub-row .th-text-button,
+  .th-hub-row .th-icon-button {
+    flex: 0 0 auto;
   }
   .th-hub-row--pinned {
     cursor: default;
@@ -1363,8 +1372,9 @@
     background: #dceee1;
   }
   .th-hub-sort {
+    width: 100%;
     margin: 0;
-    padding: 0 4px 0;
+    padding: 0;
     list-style: none;
     user-select: none;
   }

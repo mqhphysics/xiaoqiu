@@ -173,8 +173,17 @@
   }
 
   .th-picker.th-hub-dialog.xq-dialog {
+    width: min(540px, calc(100vw - 48px));
+    max-width: 560px;
     height: auto;
-    max-height: min(540px, calc(100dvh - 80px));
+    max-height: min(70vh, calc(100dvh - 80px));
+  }
+
+  .th-picker.th-hub-dialog.xq-dialog > .th-hub-dialog__body.xq-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .th-detail-modal.xq-dialog {
