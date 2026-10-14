@@ -315,6 +315,7 @@ model Organization {
   importBatches        ImportBatch[]
   teamPreferences      UserTeamPreference[]
   badgePreferences     UserBadgePreference[]
+  hubStripOrders       UserHubStripOrder[]
   matchEvents          MatchEvent[]
   matchAppearances     MatchAppearance[]
   matchReviews         MatchReview[]
@@ -379,6 +380,7 @@ model User {
   playerProfile                PlayerProfile?           @relation("UserLinkedPlayer", fields: [playerProfileId], references: [id], onDelete: SetNull)
   teamPreferences              UserTeamPreference[]
   badgePreferences             UserBadgePreference[]
+  hubStripOrders               UserHubStripOrder[]
   posts                        Post[]                   @relation("PostAuthor")
   postLikes                    PostLike[]
   postFavorites                PostFavorite[]
@@ -1021,6 +1023,20 @@ model UserBadgePreference {
 
   @@id([organizationId, userId], map: "user_badge_preferences_pkey")
   @@map("user_badge_preferences")
+}
+
+model UserHubStripOrder {
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  items          Json         @default("[]") @db.JsonB
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId], map: "user_hub_strip_orders_pkey")
+  @@map("user_hub_strip_orders")
 }
 
 model UserPlayerFollow {

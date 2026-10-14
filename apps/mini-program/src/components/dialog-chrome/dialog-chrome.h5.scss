@@ -172,6 +172,11 @@
     box-shadow: 0 16px 80px rgba(20, 42, 26, 0.18);
   }
 
+  .th-picker.th-hub-dialog.xq-dialog {
+    height: auto;
+    max-height: min(540px, calc(100dvh - 80px));
+  }
+
   .th-detail-modal.xq-dialog {
     background: #f7f9f5;
   }

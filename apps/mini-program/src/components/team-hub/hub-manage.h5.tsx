@@ -257,7 +257,7 @@ export function HubManageDialog({
           ) : (
             <FollowedList
               rows={followed}
-              primaryId={preferences?.primaryTeam?.id ?? ''}
+              primary={preferences?.primaryTeam ?? null}
               busy={Boolean(busy)}
               onReorder={(next) =>
                 onOrderChange(next.map((row) => ({ kind: row.kind, id: row.item.id })))
@@ -316,10 +316,11 @@ function DiscoverList({
             return (
               <div className="th-hub-row" key={`team:${team.id}`}>
                 <TeamCrest team={team} interactive={false} />
-                <span>
-                  <strong>{team.name}</strong>
-                  <small>{team.collegeName ?? '校园球队'}</small>
-                </span>
+                <HubRowCopy
+                  name={team.name}
+                  subtitle={team.collegeName ?? '校园球队'}
+                  kind={isPrimary ? 'home' : 'team'}
+                />
                 <button
                   data-team-control
                   type="button"
@@ -349,12 +350,11 @@ function DiscoverList({
             return (
               <div className="th-hub-row" key={`player:${player.id}`}>
                 <UserAvatar name={player.displayName} avatarUrl={player.avatarUrl} />
-                <span>
-                  <strong>{player.displayName}</strong>
-                  <small>
-                    {positionLabel(player.position)} · {player.team?.name ?? '球队未登记'}
-                  </small>
-                </span>
+                <HubRowCopy
+                  name={player.displayName}
+                  subtitle={`${positionLabel(player.position)} · ${player.team?.name ?? '球队未登记'}`}
+                  kind="player"
+                />
                 <button
                   data-team-control
                   type="button"
@@ -374,9 +374,32 @@ function DiscoverList({
   )
 }
 
+function HubRowCopy({
+  name,
+  subtitle,
+  kind,
+}: {
+  name: string
+  subtitle: string
+  kind: 'home' | 'team' | 'player'
+}) {
+  const label = kind === 'home' ? '主队' : kind === 'team' ? '球队' : '球员'
+  return (
+    <span className="th-hub-row__copy">
+      <strong>
+        {name}
+        <em className={`th-hub-row__kind ${kind === 'home' ? 'th-hub-row__kind--home' : ''}`}>
+          {label}
+        </em>
+      </strong>
+      <small>{subtitle}</small>
+    </span>
+  )
+}
+
 function FollowedList({
   rows,
-  primaryId,
+  primary,
   busy,
   onReorder,
   onUnfollowTeam,
@@ -384,7 +407,7 @@ function FollowedList({
   onSetPrimary,
 }: {
   rows: FollowedRow[]
-  primaryId: string
+  primary: TeamSummary | null
   busy: boolean
   onReorder: (rows: FollowedRow[]) => void
   onUnfollowTeam: (team: TeamSummary) => void
@@ -418,7 +441,7 @@ function FollowedList({
     },
     [],
   )
-  if (!rows.length)
+  if (!primary && !rows.length)
     return (
       <Empty title="还没有关注球队或球员" copy="点上方搜索框，从推荐里关注你想放进主队条的对象。" />
     )
@@ -489,81 +512,98 @@ function FollowedList({
     beginDrag(index, event.clientY)
   }
   return (
-    <ul ref={listRef} className={`th-hub-sort ${drag ? 'is-dragging' : ''}`}>
-      {rows.map((row, index) => {
-        const token = hubToken({ kind: row.kind, id: row.item.id })
-        const isActive = drag?.from === index
-        const shift =
-          drag && !isActive
-            ? drag.from < drag.over && index > drag.from && index <= drag.over
-              ? -drag.height
-              : drag.from > drag.over && index >= drag.over && index < drag.from
-                ? drag.height
+    <div className="th-hub-followed">
+      {primary ? (
+        <div className="th-hub-row th-hub-row--pinned">
+          <TeamCrest team={primary} interactive={false} />
+          <HubRowCopy
+            name={primary.name}
+            subtitle={primary.collegeName ?? '当前主队'}
+            kind="home"
+          />
+        </div>
+      ) : null}
+      {rows.length ? (
+        <ul ref={listRef} className={`th-hub-sort ${drag ? 'is-dragging' : ''}`}>
+          {rows.map((row, index) => {
+            const token = hubToken({ kind: row.kind, id: row.item.id })
+            const isActive = drag?.from === index
+            const shift =
+              drag && !isActive
+                ? drag.from < drag.over && index > drag.from && index <= drag.over
+                  ? -drag.height
+                  : drag.from > drag.over && index >= drag.over && index < drag.from
+                    ? drag.height
+                    : 0
                 : 0
-            : 0
-        const lift = isActive && drag ? drag.pointerY - drag.originY - drag.offsetY : 0
-        return (
-          <li
-            key={token}
-            ref={(node) => {
-              rowRefs.current[index] = node
-            }}
-            className={`th-hub-row th-hub-row--sort ${isActive ? 'is-lifted' : ''}`}
-            style={{
-              transform: isActive
-                ? `translate3d(0, ${lift}px, 0) scale(1.03)`
-                : shift
-                  ? `translate3d(0, ${shift}px, 0)`
-                  : undefined,
-              zIndex: isActive ? 3 : 1,
-            }}
-            onPointerDown={(event) => onPointerDown(index, event)}
-          >
-            <span className="th-hub-row__grip" aria-hidden="true">
-              <TeamIcon name="grip" />
-            </span>
-            {row.kind === 'team' ? (
-              <TeamCrest team={row.item} interactive={false} />
-            ) : (
-              <UserAvatar name={row.item.displayName} avatarUrl={row.item.avatarUrl} />
-            )}
-            <span>
-              <strong>{row.kind === 'team' ? row.item.name : row.item.displayName}</strong>
-              <small>
-                {row.kind === 'team'
-                  ? (row.item.collegeName ?? '已关注球队')
-                  : `${positionLabel(row.item.position)} · ${row.item.team?.name ?? '已关注球员'}`}
-              </small>
-            </span>
-            {row.kind === 'team' && row.item.id !== primaryId ? (
-              <button
-                data-team-control
-                type="button"
-                className="th-text-button"
-                disabled={busy}
-                onClick={() => onSetPrimary(row.item.id)}
+            const lift = isActive && drag ? drag.pointerY - drag.originY - drag.offsetY : 0
+            return (
+              <li
+                key={token}
+                ref={(node) => {
+                  rowRefs.current[index] = node
+                }}
+                className={`th-hub-row th-hub-row--sort ${isActive ? 'is-lifted' : ''}`}
+                style={{
+                  transform: isActive
+                    ? `translate3d(0, ${lift}px, 0) scale(1.03)`
+                    : shift
+                      ? `translate3d(0, ${shift}px, 0)`
+                      : undefined,
+                  zIndex: isActive ? 3 : 1,
+                }}
+                onPointerDown={(event) => onPointerDown(index, event)}
               >
-                设为主队
-              </button>
-            ) : null}
-            <button
-              data-team-control
-              type="button"
-              className="th-icon-button"
-              aria-label={
-                row.kind === 'team' ? `取消关注${row.item.name}` : `取消关注${row.item.displayName}`
-              }
-              disabled={busy}
-              onClick={() =>
-                row.kind === 'team' ? onUnfollowTeam(row.item) : onUnfollowPlayer(row.item.id)
-              }
-            >
-              <TeamIcon name="close" />
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+                <span className="th-hub-row__grip" aria-hidden="true">
+                  <TeamIcon name="grip" />
+                </span>
+                {row.kind === 'team' ? (
+                  <TeamCrest team={row.item} interactive={false} />
+                ) : (
+                  <UserAvatar name={row.item.displayName} avatarUrl={row.item.avatarUrl} />
+                )}
+                <HubRowCopy
+                  name={row.kind === 'team' ? row.item.name : row.item.displayName}
+                  subtitle={
+                    row.kind === 'team'
+                      ? (row.item.collegeName ?? '已关注球队')
+                      : `${positionLabel(row.item.position)} · ${row.item.team?.name ?? '已关注球员'}`
+                  }
+                  kind={row.kind}
+                />
+                {row.kind === 'team' ? (
+                  <button
+                    data-team-control
+                    type="button"
+                    className="th-text-button"
+                    disabled={busy}
+                    onClick={() => onSetPrimary(row.item.id)}
+                  >
+                    设为主队
+                  </button>
+                ) : null}
+                <button
+                  data-team-control
+                  type="button"
+                  className="th-icon-button"
+                  aria-label={
+                    row.kind === 'team'
+                      ? `取消关注${row.item.name}`
+                      : `取消关注${row.item.displayName}`
+                  }
+                  disabled={busy}
+                  onClick={() =>
+                    row.kind === 'team' ? onUnfollowTeam(row.item) : onUnfollowPlayer(row.item.id)
+                  }
+                >
+                  <TeamIcon name="close" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 

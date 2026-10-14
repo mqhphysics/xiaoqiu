@@ -1267,7 +1267,10 @@
     margin: 8px 20px 0;
   }
   .th-hub-dialog__body {
-    padding: 10px 16px 16px;
+    padding: 8px 16px 10px;
+  }
+  .th-hub-dialog__body > :last-child {
+    margin-bottom: 0;
   }
   .th-hub-hint {
     margin: 24px 0;
@@ -1288,6 +1291,7 @@
   .th-hub-row {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
     min-height: 56px;
     padding: 8px 10px;
@@ -1296,25 +1300,56 @@
     border-radius: 10px;
     background: #fff;
     color: #24362c;
+    text-align: left;
   }
-  .th-hub-row > span {
+  .th-hub-row__copy {
     min-width: 0;
     flex: 1 1 auto;
+    text-align: left;
   }
   .th-hub-row strong,
   .th-hub-row small {
     display: block;
+    text-align: left;
   }
   .th-hub-row small {
     margin-top: 2px;
     color: #7d8c80;
     font-size: 11px;
   }
+  .th-hub-row__kind {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #e8f2ea;
+    color: #3a6b4c;
+    font-size: 10px;
+    font-weight: 650;
+    font-style: normal;
+    letter-spacing: 0.02em;
+    vertical-align: 1px;
+  }
+  .th-hub-row__kind--home {
+    background: #cfe8d4;
+    color: #24563a;
+  }
+  .th-hub-followed {
+    display: flex;
+    flex-direction: column;
+  }
+  .th-hub-row--pinned {
+    cursor: default;
+    background: #f3faf4;
+    border-color: #d5ead8;
+  }
   .th-hub-row .team-crest {
+    flex: 0 0 auto;
     width: 32px;
     height: 38px;
   }
   .th-hub-row .user-avatar {
+    flex: 0 0 auto;
     width: 36px;
     height: 36px;
   }
@@ -1329,9 +1364,13 @@
   }
   .th-hub-sort {
     margin: 0;
-    padding: 2px 4px 8px;
+    padding: 0 4px 0;
     list-style: none;
     user-select: none;
+  }
+  .th-hub-sort .th-hub-row:last-child,
+  .th-hub-followed > :last-child {
+    margin-bottom: 0;
   }
   .th-hub-sort.is-dragging {
     touch-action: none;
@@ -1352,6 +1391,7 @@
   }
   .th-hub-row__grip {
     display: inline-flex;
+    flex: 0 0 28px;
     align-items: center;
     justify-content: center;
     width: 28px;

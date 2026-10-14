@@ -36,6 +36,13 @@ export async function loadHubStripOrder(): Promise<HubOrderKey[]> {
       writeLocalOrder(parsed)
       return parsed
     }
+    if (local.length) {
+      try {
+        await request('/me/hub-strip-order', { method: 'PUT', data: { items: local } })
+      } catch (error) {
+        if (error instanceof ProductApiError && error.statusCode === 404) remoteOrderEnabled = false
+      }
+    }
   } catch (error) {
     if (error instanceof ProductApiError && error.statusCode === 404) remoteOrderEnabled = false
   }
