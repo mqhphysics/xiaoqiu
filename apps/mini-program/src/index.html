@@ -117,6 +117,9 @@
           root.style.setProperty('--xq-vh', realHeight() / zoom / 100 + 'px')
           root.style.setProperty('--xq-vw', realWidth() / zoom / 100 + 'px')
           root.setAttribute('data-xq-zoom', zoom.toFixed(4))
+          // Viewport-fit pages fall back to normal page scroll when the effective height is short.
+          if (realWidth() >= 1024 && realHeight() / zoom < 600) root.setAttribute('data-xq-short', '')
+          else root.removeAttribute('data-xq-short')
           translateSheets()
         }
 

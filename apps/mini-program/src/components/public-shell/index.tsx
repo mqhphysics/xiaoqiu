@@ -100,6 +100,22 @@ export function PublicShell({
     return animateNavigationEntrance(shellRef.current, normalizedActive)
   }, [normalizedActive])
 
+  // Shared viewport-fit primitive: publish the sticky header height so pages can use
+  // --xq-vh-avail (effective viewport height after scale C minus the header).
+  useEffect(() => {
+    const topbar = shellRef.current?.querySelector('.public-topbar')
+    if (!topbar || typeof ResizeObserver === 'undefined') return
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        '--xq-header-h',
+        `${topbar.getBoundingClientRect().height}px`,
+      )
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(topbar)
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     let mounted = true
     if (!session) {

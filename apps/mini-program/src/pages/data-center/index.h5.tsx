@@ -119,7 +119,7 @@ function DesktopDataPage() {
   }
   return (
     <PublicShell active="data" tournamentId={tournamentId}>
-      <div className="data-desktop">
+      <div className="data-desktop xq-viewport-page">
         <div className="data-desktop__art" aria-hidden="true">
           <div className="data-desktop__stadium" />
           <div className="data-desktop__floodlight" />
@@ -433,7 +433,16 @@ function StandingsCard({
           </label>
         )}
       </div>
-      <div id="data-group-content" className="data-desktop__panel-scroll">
+      <div
+        id="data-group-content"
+        className="data-desktop__panel-scroll"
+        style={
+          {
+            '--group-cols': groups.length > 1 ? 2 : 1,
+            '--group-rows': Math.max(1, Math.ceil(groups.length / 2)),
+          } as React.CSSProperties
+        }
+      >
         {groups.length === 0 ? (
           <DataState
             kind="empty"

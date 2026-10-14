@@ -13,6 +13,7 @@ import { CaptainManageHost } from './features/captain-roster/manage-modal'
 
 import './app.scss'
 import './app-box-sizing'
+import './components/viewport-page'
 
 export default function App({ children }: PropsWithChildren) {
   useEffect(() => mountCursorSkin(), [])
