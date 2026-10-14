@@ -482,6 +482,9 @@ $header-h: 64px;
 }
 .cmx-profile__cover {
   position: relative;
+  background-color: #1d4f33;
+  background-size: cover;
+  background-position: center 38%;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -495,9 +498,7 @@ $header-h: 64px;
     border-radius: inherit;
     content: '';
     pointer-events: none;
-    background:
-      radial-gradient(circle at 82% 140%, rgba(255, 255, 255, 0.16) 0 30%, transparent 30.5%),
-      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 48px, transparent 48px 96px);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.12) 100%);
   }
   > * {
     position: relative;
@@ -1656,5 +1657,55 @@ $header-h: 64px;
   &:hover {
     border-color: #b9c9bd;
     background: #f6faf6;
+  }
+}
+
+/* Round 5 — round pen button that grows into a labelled pill on hover (same as 我的 个人资料). */
+.cmx-profile__edit {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #2f5d3e;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition:
+    width 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 160ms ease;
+  > span {
+    opacity: 0;
+    font-size: 12px;
+    font-weight: 600;
+    transition: opacity 140ms ease;
+  }
+  svg {
+    flex: 0 0 15px;
+  }
+  &:hover,
+  &:focus-visible {
+    width: 104px;
+    background: #fff;
+    > span {
+      opacity: 1;
+      transition-delay: 60ms;
+    }
+  }
+  &:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmx-profile__edit,
+  .cmx-profile__edit > span {
+    transition: none;
   }
 }

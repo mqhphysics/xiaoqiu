@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import teamCoverImage from '../../assets/home-visual/home-campus-football.webp'
 import Taro from '@tarojs/taro'
 import { TeamCrest } from '../../components/product-ui'
 import { createClientActionId } from '../product/product.repository'
@@ -172,8 +173,9 @@ export function ManageProfileSection({
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }))
 
+  // The team's own cover photo (same one as the 我的 主队 card), tinted from the left for legibility.
   const coverStyle = {
-    background: `linear-gradient(120deg, ${shade(view.primaryColor, -0.25)} 0%, ${view.primaryColor} 55%, ${shade(view.primaryColor, 0.18)} 100%)`,
+    backgroundImage: `linear-gradient(90deg, ${withAlpha(shade(view.primaryColor, -0.35), 0.82)} 0%, ${withAlpha(shade(view.primaryColor, -0.25), 0.35)} 45%, rgba(0, 0, 0, 0.05) 100%), url(${teamCoverImage})`,
   }
   const facts = [
     { label: '球队成员', value: dashboard ? String(dashboard.roster.length) : '—' },
@@ -185,7 +187,6 @@ export function ManageProfileSection({
   return (
     <div className={`cmx-profile ${editing ? 'is-editing' : ''}`}>
       <div className="cmx-profile__cover" style={coverStyle}>
-        <span className="cmx-profile__stripe" style={{ background: view.secondaryColor }} />
         {editing ? (
           <div className="cmx-profile__colors">
             <ColorSwatch
@@ -200,9 +201,14 @@ export function ManageProfileSection({
             />
           </div>
         ) : (
-          <button type="button" className="cmx-btn cmx-btn--glass" onClick={() => setEditing(true)}>
-            <Icon name="edit" size={14} />
-            编辑资料
+          <button
+            type="button"
+            className="cmx-profile__edit"
+            aria-label="编辑资料"
+            onClick={() => setEditing(true)}
+          >
+            <span>编辑资料</span>
+            <Icon name="edit" size={15} />
           </button>
         )}
       </div>
@@ -498,4 +504,14 @@ function ColorSwatch({
       ) : null}
     </div>
   )
+}
+
+function withAlpha(color: string, alpha: number) {
+  const rgb = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(color)
+  if (rgb) return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`
+  const value = color.replace('#', '')
+  const full = value.length === 3 ? value.replace(/./g, (c) => c + c) : value
+  const n = Number.parseInt(full.slice(0, 6), 16)
+  if (Number.isNaN(n)) return `rgba(20, 60, 40, ${alpha})`
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
 }
