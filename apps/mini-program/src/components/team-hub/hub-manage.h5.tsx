@@ -398,68 +398,95 @@ function FollowedList({
     originY: number
     offsetY: number
     pointerY: number
+    mids: number[]
   } | null>(null)
   const dragRef = useRef(drag)
   const rowsRef = useRef(rows)
   const onReorderRef = useRef(onReorder)
   const listRef = useRef<HTMLUListElement>(null)
   const rowRefs = useRef<(HTMLLIElement | null)[]>([])
-  const dragging = drag !== null
+  const stopRef = useRef<(() => void) | null>(null)
   dragRef.current = drag
   rowsRef.current = rows
   onReorderRef.current = onReorder
   useEffect(() => {
     rowRefs.current = rowRefs.current.slice(0, rows.length)
   }, [rows.length])
-  useEffect(() => {
-    if (!dragging) return
-    const move = (event: PointerEvent) => {
-      const current = dragRef.current
-      const list = listRef.current
-      if (!current || !list) return
-      const listRect = list.getBoundingClientRect()
-      const y = event.clientY - listRect.top + list.scrollTop
-      const over = Math.max(
-        0,
-        Math.min(rowsRef.current.length - 1, Math.floor(y / Math.max(current.height, 1))),
-      )
-      setDrag({ ...current, over, pointerY: event.clientY })
-    }
-    const finish = () => {
-      const current = dragRef.current
-      if (current && current.from !== current.over)
-        onReorderRef.current(moveItem(rowsRef.current, current.from, current.over))
-      setDrag(null)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-    return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-    }
-  }, [dragging])
+  useEffect(
+    () => () => {
+      stopRef.current?.()
+    },
+    [],
+  )
   if (!rows.length)
     return (
       <Empty title="还没有关注球队或球员" copy="点上方搜索框，从推荐里关注你想放进主队条的对象。" />
     )
-  const onPointerDown = (index: number, event: ReactPointerEvent<HTMLLIElement>) => {
-    if (busy || event.button !== 0) return
-    if ((event.target as HTMLElement).closest('button')) return
+  const beginDrag = (index: number, clientY: number) => {
     const row = rowRefs.current[index]
     if (!row) return
-    event.preventDefault()
-    row.setPointerCapture(event.pointerId)
     const rect = row.getBoundingClientRect()
-    setDrag({
+    const mids = rowRefs.current.map((node) => {
+      const box = node?.getBoundingClientRect()
+      return box ? box.top + box.height / 2 : 0
+    })
+    const next = {
       from: index,
       over: index,
       height: rect.height,
       originY: rect.top,
-      offsetY: event.clientY - rect.top,
-      pointerY: event.clientY,
-    })
+      offsetY: clientY - rect.top,
+      pointerY: clientY,
+      mids,
+    }
+    dragRef.current = next
+    setDrag(next)
+    const move = (event: PointerEvent | MouseEvent) => {
+      event.preventDefault()
+      const current = dragRef.current
+      if (!current) return
+      let over = current.from
+      for (let i = 0; i < current.mids.length; i += 1) {
+        if (event.clientY >= current.mids[i]!) over = i
+      }
+      const following = { ...current, over, pointerY: event.clientY }
+      dragRef.current = following
+      setDrag(following)
+    }
+    const finish = () => {
+      stopRef.current?.()
+      stopRef.current = null
+      const current = dragRef.current
+      dragRef.current = null
+      setDrag(null)
+      if (current && current.from !== current.over)
+        onReorderRef.current(moveItem(rowsRef.current, current.from, current.over))
+    }
+    stopRef.current?.()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', finish)
+    stopRef.current = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', finish)
+    }
+  }
+  const onPointerDown = (index: number, event: ReactPointerEvent<HTMLLIElement>) => {
+    if (busy || event.button > 0) return
+    if ((event.target as HTMLElement).closest('button')) return
+    event.preventDefault()
+    event.stopPropagation()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* capture is optional */
+    }
+    beginDrag(index, event.clientY)
   }
   return (
     <ul ref={listRef} className={`th-hub-sort ${drag ? 'is-dragging' : ''}`}>

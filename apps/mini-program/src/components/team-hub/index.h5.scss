@@ -1340,6 +1340,7 @@
   .th-hub-row--sort {
     position: relative;
     cursor: grab;
+    touch-action: none;
     transition: transform 420ms cubic-bezier(0.22, 1.18, 0.36, 1);
   }
   .th-hub-row--sort.is-lifted {
@@ -1351,7 +1352,12 @@
   }
   .th-hub-row__grip {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 36px;
     color: #8aa392;
+    pointer-events: none;
   }
   .th-spotlight {
     display: grid;
@@ -1389,25 +1395,27 @@
     font-size: 12px;
   }
   .th-spotlight__teams {
-    display: flex;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto minmax(0, 1fr) 28px;
     align-items: center;
-    justify-content: space-between;
     gap: 6px;
     min-width: 0;
   }
   .th-spotlight__teams strong {
     min-width: 0;
-    flex: 1;
     font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .th-spotlight__teams strong:last-of-type {
+    text-align: right;
+  }
   .th-spotlight__teams em {
-    flex: 0 0 auto;
     font-style: normal;
     font-weight: 750;
     color: #163d28;
+    white-space: nowrap;
   }
   .th-spotlight__teams .team-crest {
     width: 26px;
