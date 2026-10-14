@@ -161,7 +161,7 @@ export function TeamPicker({
                 <span>
                   <strong>{team.name}</strong>
                   <small>
-                    {team.teamCode.startsWith('DEMO') ? '演示球队 · ' : ''}
+                    
                     {team.collegeName ?? '校园球队'}
                   </small>
                 </span>

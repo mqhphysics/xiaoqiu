@@ -346,7 +346,6 @@ function ScheduleContent({
     setOnlyPrimary(false)
     setSelectedDate(null)
   }
-  const isDemo = data.tournament.name.includes('演示')
   const showBracket = () => setView('bracket')
   const dates = Array.from({ length: 7 }, (_, index) => shiftDate(weekStart, index))
 
@@ -357,12 +356,10 @@ function ScheduleContent({
         <div className="schedule-hero__copy">
           <div>
             <h2>{data.tournament.name.replace(/\s*·\s*演示赛季$/, '')}</h2>
-            {isDemo && <span className="schedule-demo">演示赛季</span>}
+            
           </div>
           <p>
-            {isDemo
-              ? '演示数据 · 以下为示例内容，仅用于产品功能展示'
-              : `${data.tournament.seasonName} · 关注每一场校园比赛`}
+            {`${data.tournament.seasonName.replace(/\s*·?\s*演示赛季/, '')} · 关注每一场校园比赛`}
           </p>
         </div>
         <div className="schedule-hero__actions">
@@ -709,13 +706,11 @@ function ScheduleContent({
             <div>
               <Icon name="cup" />
               <h3>{data.tournament.name.replace(/\s*·\s*演示赛季$/, '')}</h3>
-              {isDemo && <span className="schedule-demo">演示赛季</span>}
+              
             </div>
             <p>在校园的绿茵场上，记录每一份热爱。</p>
             <p>
-              {isDemo
-                ? '本页面为演示数据，仅用于产品功能展示。'
-                : `${data.schedule.length} 场比赛 · ${teams.length} 支球队`}
+              {`${data.schedule.length} 场比赛 · ${teams.length} 支球队`}
             </p>
           </section>
         </aside>

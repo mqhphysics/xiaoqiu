@@ -138,7 +138,7 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
       </div>
       <div className="data-desktop__knockout-foot">
         <span>{eightTeam ? '八强 → 半决赛 → 决赛' : '淘汰赛晋级路线'}</span>
-        {data.resultsMode === 'DEMO' && <span>演示赛季 · 对阵来自比赛记录</span>}
+        
       </div>
       {!expanded && (
         <button

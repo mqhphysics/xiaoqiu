@@ -255,9 +255,6 @@ function DataHero({
               )}
             </select>
           </label>
-          {data.resultsMode === 'DEMO' && selectedTournamentId === data.tournament.id && (
-            <span className="data-desktop__demo">演示赛季</span>
-          )}
           {data.resultsMode === 'PENDING' && (
             <span className="data-desktop__demo">赛事筹备中 · 数据待上传</span>
           )}
@@ -417,7 +414,7 @@ function StandingsCard({
             <h2>小组赛积分</h2>
             <span aria-hidden="true">{expanded ? '详细积分' : '展开 ↗'}</span>
           </button>
-          {demo && expanded && <span>* 以下为演示数据</span>}
+          
         </div>
         {expanded && data.groups.length > 0 && (
           <label className="data-desktop__select data-desktop__select--group">
@@ -663,7 +660,7 @@ function LeaderboardCard({
       {!compact && (
         <p className="data-desktop__table-note">
           显示赛事接口返回的球员榜单 · 数据来自比赛事件与出场记录
-          {data.resultsMode === 'DEMO' ? ' · 当前为演示赛季' : ''}
+          
         </p>
       )}
     </section>

@@ -85,9 +85,6 @@ export function TeamHero({
         <div>
           <div className="th-hero__title">
             <h1>{data.team.name}</h1>
-            {data.team.teamCode.startsWith('DEMO') ? (
-              <span className="th-badge">演示球队</span>
-            ) : null}
           </div>
           <p>{data.team.collegeName ?? '校园足球球队'}</p>
           <p className="th-hero__motto">
@@ -202,9 +199,6 @@ export function TeamContent({
               <div className="th-heading">
                 <h2>
                   球队动态
-                  {data.team.teamCode.startsWith('DEMO') ? (
-                    <span className="th-badge th-source-badge">演示内容</span>
-                  ) : null}
                 </h2>
                 <button
                   data-team-control
@@ -365,7 +359,7 @@ export function TeamContent({
                 {season}
               </div>
               <p className="th-small-note">
-                {data.team.teamCode.startsWith('DEMO') ? '当前为演示球队。' : ''}
+                
                 以下统计来自当前赛事的比赛记录。
               </p>
               <div className="th-stat-grid">

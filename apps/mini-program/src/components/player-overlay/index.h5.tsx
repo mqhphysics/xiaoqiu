@@ -467,7 +467,7 @@ export function PlayerProfile({
               displayedKind={presentation.displayedKind}
               userId={presentation.userId}
             />
-            {player.isDemo && <span className="player-demo-label">演示档案</span>}
+            
           </div>
           <div className="player-profile-hero__facts">
             <div>

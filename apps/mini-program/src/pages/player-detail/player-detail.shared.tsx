@@ -95,7 +95,7 @@ function PlayerContent({
           <View className="player-hero__copy">
             <Text className="player-hero__eyebrow">PLAYER PROFILE</Text>
             <Text className="player-hero__name">{player.displayName}</Text>
-            {player.isDemo && <Text className="player-hero__demo">演示档案 · 照片为示意素材</Text>}
+            
             <Text className="player-hero__meta">
               #{player.shirtNumber ?? '-'} · {positionLabel(player.position)}
               {player.secondaryPosition ? ' / ' + positionLabel(player.secondaryPosition) : ''}
@@ -214,7 +214,7 @@ function PlayerAbilities({
           <Text className="player-abilities__eyebrow">PLAYER ATTRIBUTES</Text>
           <Text className="player-abilities__title">五维能力</Text>
         </View>
-        {isDemo && <Text className="player-abilities__note">演示生成值，非实际测评</Text>}
+        
       </View>
       <View className="player-abilities__content">
         <View className="player-radar" aria-label="射门、速度、盘带、传球、防守五维图">
