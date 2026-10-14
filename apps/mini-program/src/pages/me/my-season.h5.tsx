@@ -7,7 +7,23 @@ import type { MatchSummary, PlayerStats, TeamSummary } from '../../features/prod
 import { isPendingMatch } from './profile.logic'
 import { ProfileIcon } from './profile-icons.h5'
 
+export type SeasonRole = 'captain' | 'player' | 'reporter' | 'student'
+
+export interface SeasonContribution {
+  role: SeasonRole
+  posts: number | null
+  followedMatches: number | null
+  likesReceived: number | null
+  commentsReceived: number | null
+  rosterCount: number | null
+  finishedMatches: number
+  pendingMatches: number
+  onOpenEntry?: () => void
+  onOpenRoster?: () => void
+}
+
 interface MySeasonProps {
+  contribution: SeasonContribution
   linkedPlayerId: string | null
   tournamentId: string
   seasonName: string
@@ -18,7 +34,12 @@ interface MySeasonProps {
 type SeasonState =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; stats: PlayerStats; team: TeamSummary | null }
+  | {
+      kind: 'ready'
+      stats: PlayerStats
+      team: TeamSummary | null
+      recent: Array<MatchSummary & { starter: boolean; minutesPlayed: number }>
+    }
 
 /** Next pending fixture of the player's team, earliest kickoff first (TBD times last). */
 export function nextTeamMatch(schedule: MatchSummary[], teamId: string | undefined) {
@@ -38,6 +59,7 @@ export function nextTeamMatch(schedule: MatchSummary[], teamId: string | undefin
 }
 
 export function MySeasonCard({
+  contribution,
   linkedPlayerId,
   tournamentId,
   seasonName,
@@ -52,7 +74,14 @@ export function MySeasonCard({
     void productRepository
       .getPlayer(linkedPlayerId, tournamentId)
       .then((player) => {
-        if (active) setState({ kind: 'ready', stats: player.stats, team: player.team })
+        if (active) setState({
+            kind: 'ready',
+            stats: player.stats,
+            team: player.team,
+            recent: (player.recentMatches ?? [])
+              .filter((match) => match.homeScore !== null && match.awayScore !== null)
+              .slice(0, 3),
+          })
       })
       .catch(() => {
         if (active) setState({ kind: 'error' })
@@ -62,9 +91,9 @@ export function MySeasonCard({
     }
   }, [linkedPlayerId, tournamentId])
 
-  const heading = (more: boolean) => (
+  const heading = (more: boolean, title = '我的赛季') => (
     <div className="profile-season__heading">
-      <h2>我的赛季</h2>
+      <h2>{title}</h2>
       <span>{seasonName}</span>
       {more ? (
         <span className="profile-season__more">
@@ -74,16 +103,57 @@ export function MySeasonCard({
       ) : null}
     </div>
   )
-  if (!linkedPlayerId)
+  const count = (n: number | null) => (n === null ? '—' : String(n))
+  if (contribution.role === 'reporter' || (!linkedPlayerId && contribution.role !== 'captain'))
     return (
-      <section className="profile-season profile-surface" aria-label="我的赛季">
-        {heading(false)}
-        <div className="profile-season__empty">
-          <ProfileIcon name="trophy" />
-          <p>关联球员身份后，这里会显示你的出场、进球和下一场比赛。</p>
+      <section className="profile-season profile-surface" aria-label="我的贡献">
+        <div className="profile-season__card profile-season__card--static">
+          {heading(false, contribution.role === 'reporter' ? '我的录入' : '我的贡献')}
+          <div className="profile-season__stats profile-season__stats--4">
+            {(contribution.role === 'reporter'
+              ? [
+                  ['已完赛', String(contribution.finishedMatches)],
+                  ['待进行', String(contribution.pendingMatches)],
+                  ['我的动态', count(contribution.posts)],
+                  ['关注比赛', count(contribution.followedMatches)],
+                ]
+              : [
+                  ['关注比赛', count(contribution.followedMatches)],
+                  ['我的动态', count(contribution.posts)],
+                  ['获赞', count(contribution.likesReceived)],
+                  ['收到评论', count(contribution.commentsReceived)],
+                ]
+            ).map(([label, value]) => (
+              <div key={label}>
+                <strong>{value}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="profile-season__next profile-season__next--line">
+            {contribution.role === 'reporter' ? (
+              <>
+                <p className="profile-season__note">本赛季比赛进度，赛后事件在比赛详情或信息录入中补录。</p>
+                {contribution.onOpenEntry ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="profile-season__more"
+                    onClick={contribution.onOpenEntry}
+                  >
+                    信息录入
+                    <ProfileIcon name="arrow" />
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <p className="profile-season__note">关联球员身份后，这里会显示你的出场、进球和下一场比赛。</p>
+            )}
+          </div>
         </div>
       </section>
     )
+  if (!linkedPlayerId) return null
 
   const open = () => void openPlayer(linkedPlayerId, tournamentId)
   const team = state.kind === 'ready' ? state.team : null
@@ -104,22 +174,27 @@ export function MySeasonCard({
         aria-label="查看我的完整球员数据"
       >
         {heading(true)}
-        <div className="profile-season__stats">
+        <div
+          className={`profile-season__stats ${contribution.role === 'captain' ? 'profile-season__stats--4' : ''}`}
+        >
           {(
             [
-              ['出场', stats?.appearances],
-              ['进球', stats?.goals],
-              ['助攻', stats?.assists],
+              ['出场', value(stats?.appearances)],
+              ['进球', value(stats?.goals)],
+              ['助攻', value(stats?.assists)],
+              ...(contribution.role === 'captain'
+                ? ([['大名单', count(contribution.rosterCount)]] as const)
+                : []),
             ] as const
-          ).map(([label, count]) => (
+          ).map(([label, shown]) => (
             <div key={label}>
-              <strong>{value(count)}</strong>
+              <strong>{shown}</strong>
               <span>{label}</span>
             </div>
           ))}
         </div>
         <div className="profile-season__next">
-          <small>下一场比赛</small>
+          <small>下一场</small>
           {state.kind === 'error' ? (
             <p className="profile-season__note">赛季数据暂不可用，点击查看球员详情。</p>
           ) : state.kind === 'loading' || !scheduleReady ? (

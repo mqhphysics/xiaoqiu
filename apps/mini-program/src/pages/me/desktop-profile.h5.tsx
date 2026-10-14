@@ -623,6 +623,28 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             )}
           </section>
           <MySeasonCard
+            contribution={{
+              role: user.roles.some((role) => role.role === 'TEAM_CAPTAIN')
+                ? 'captain'
+                : user.roles.some((role) =>
+                      ['MATCH_REPORTER', 'TOURNAMENT_ADMIN'].includes(role.role),
+                    )
+                  ? 'reporter'
+                  : user.linkedPlayer
+                    ? 'player'
+                    : 'student',
+              posts: errors.posts ? null : ownPosts.length,
+              followedMatches: errors.matches ? null : followedMatches.length,
+              likesReceived: errors.posts
+                ? null
+                : ownPosts.reduce((sum, post) => sum + (post.likeCount ?? 0), 0),
+              commentsReceived: errors.posts
+                ? null
+                : ownPosts.reduce((sum, post) => sum + (post.commentCount ?? 0), 0),
+              rosterCount: dashboard ? dashboard.roster.length : null,
+              finishedMatches: schedule.filter((match) => match.homeScore !== null).length,
+              pendingMatches: schedule.filter((match) => match.homeScore === null).length,
+            }}
             linkedPlayerId={user.linkedPlayer?.id ?? null}
             tournamentId={home.tournament.id}
             seasonName={home.tournament.seasonName}
