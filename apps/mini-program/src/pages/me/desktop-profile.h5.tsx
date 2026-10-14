@@ -623,11 +623,19 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
             )}
           </section>
           <MySeasonCard
-            linkedPlayerId={user.linkedPlayer?.id ?? null}
+            user={user}
+            displayedKind={badgeKind}
             tournamentId={home.tournament.id}
             seasonName={home.tournament.seasonName}
             schedule={schedule}
             scheduleReady={!loading}
+            followedMatchIds={followedMatches.map((match) => match.id)}
+            posts={posts}
+            managedTeamIds={authorizedIds}
+            teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+            onOpenInformation={() => setInformation(true)}
+            onOpenMatches={() => chooseTab('matches')}
+            onOpenPosts={() => chooseTab('posts')}
           />
         </aside>
         <section className="profile-stream profile-surface" id="profile-stream">

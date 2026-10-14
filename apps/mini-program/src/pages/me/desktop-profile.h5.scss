@@ -1899,7 +1899,7 @@
     }
     .profile-season {
       flex: 1 1 auto;
-      min-height: 150px;
+      min-height: 0;
     }
   }
 }
@@ -1914,9 +1914,10 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 8px;
   min-width: 0;
-  padding: 18px 24px;
+  padding: 14px 20px 12px;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 160ms ease;
@@ -1954,21 +1955,24 @@
 .profile-season__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
+}
+.profile-season__stats--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .profile-season__stats > div {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0 6px;
+  padding: 6px 0 4px;
   border-radius: 8px;
   background: #f3f7f2;
 }
 .profile-season__stats strong {
   color: #1d4f33;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 .profile-season__stats span {
@@ -1977,10 +1981,10 @@
 }
 .profile-season__next {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 4px;
   min-height: 0;
 }
 .profile-season__next > small {
@@ -2109,11 +2113,11 @@
     margin-bottom: 10px;
   }
   .profile-season__card {
-    gap: 8px;
-    padding: 14px 22px;
+    gap: 6px;
+    padding: 12px 18px 10px;
   }
   .profile-season__stats strong {
-    font-size: 20px;
+    font-size: 18px;
   }
 }
 
@@ -2145,39 +2149,41 @@
   flex: 0 0 auto;
 }
 
-/* Round 5 — 我的 header: narrow profile card (cover as a 2.80:1 top banner, info below) beside a
-   wider team card that is itself 2.80:1. The body below keeps a 1:1 split so the two gutters
-   are staggered instead of forming one long seam. */
+/* Round 6 — keep 2:3 profile/team columns and 2.80:1 cover crops, but cap the row so the
+   team card is no longer a full-width 2.80:1 slab. Functions return to two tile rows. */
 @media (min-width: 1024px) {
   .profile-top {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     align-items: stretch;
   }
-  .profile-team {
-    aspect-ratio: 2.8;
-    height: auto !important;
-  }
+  .profile-team,
   html[data-xq-short] .profile-team,
   html:not([data-xq-short]) .profile-team {
-    aspect-ratio: 2.8;
+    aspect-ratio: auto;
     height: auto;
+  }
+  html:not([data-xq-short]) .profile-top .profile-person,
+  html:not([data-xq-short]) .profile-top .profile-team {
+    height: clamp(148px, calc(var(--xq-vh-avail) * 0.2), 176px) !important;
+    min-height: 0 !important;
+    max-height: 176px;
   }
   .profile-top .profile-person {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: 72px minmax(0, 1fr);
     align-items: start;
-    height: auto !important;
     padding: 0 !important;
-    container-type: inline-size !important;
+    container-type: size !important;
     background: #fff;
   }
-  /* Banner: the personal cover keeps the same 2.80:1 frame as the upload crop. */
+  /* Cover asset stays the 2.80:1 crop; the banner box is shorter than the full ratio. */
   .profile-top .profile-person::before {
     content: '';
     grid-area: 1 / 1 / 2 / 3;
     width: 100%;
-    aspect-ratio: 2.8;
+    height: 72px;
+    aspect-ratio: auto;
     background:
       radial-gradient(circle at 78% 30%, rgba(255, 255, 255, 0.16), transparent 42%),
       linear-gradient(120deg, #1d4f33 0%, #2f7a4b 60%, #5d9b62 100%);
@@ -2187,14 +2193,14 @@
     inset: 0 0 auto 0;
     z-index: 0;
     width: 100%;
-    height: auto;
-    aspect-ratio: 2.8;
+    height: 72px;
+    aspect-ratio: auto;
     object-fit: cover;
   }
   .profile-top .profile-person:has(.profile-personal-background)::after {
     inset: 0 0 auto 0;
-    height: auto;
-    aspect-ratio: 2.8;
+    height: 72px;
+    aspect-ratio: auto;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(10, 30, 18, 0.28) 100%);
     pointer-events: none;
   }
@@ -2205,14 +2211,14 @@
   .profile-top .profile-person__main {
     grid-area: 2 / 1 / 3 / 2;
     align-items: flex-end;
-    gap: 16px;
+    gap: 12px;
     min-width: 0;
-    margin-top: -44px;
-    padding: 0 0 14px 22px;
+    margin-top: -28px;
+    padding: 0 0 10px 18px;
   }
   .profile-top .profile-person__avatar {
-    width: 92px;
-    height: 92px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: #fff;
     box-shadow:
@@ -2239,11 +2245,11 @@
     min-height: 30px;
   }
   .profile-top .profile-person__copy {
-    padding-top: 50px;
+    padding-top: 32px;
   }
   .profile-top .profile-person h1 {
-    margin: 0 0 4px;
-    font-size: 20px;
+    margin: 0 0 2px;
+    font-size: 18px;
   }
   .profile-top .profile-person__meta {
     margin: 0 0 4px;
@@ -2261,7 +2267,7 @@
     grid-template-columns: repeat(3, auto);
     gap: 0;
     margin: 0 !important;
-    padding: 0 18px 16px 8px;
+    padding: 0 14px 10px 8px;
   }
   .profile-top .profile-person__stats [data-profile-button] {
     gap: 2px;
@@ -2281,24 +2287,79 @@
     white-space: nowrap;
   }
 }
-/* The taller 2.80:1 team card leaves less height below: functions become one row of eight. */
+/* Two rows of four tiles again; keep them compact so 我的赛季 still fits one screen. */
 @media (min-width: 1024px) {
   .profile-function-card .profile-function-grid {
-    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     gap: 8px !important;
   }
-  .profile-function-card .profile-shortcut {
-    padding: 12px 2px 10px !important;
+  .profile-function-card {
+    padding: 14px 18px 12px !important;
   }
-  .profile-function-card .profile-shortcut small {
-    display: none !important;
+  .profile-function-card .profile-function-heading {
+    margin-bottom: 8px !important;
+  }
+  .profile-function-card .profile-function-heading h2 {
+    font-size: 16px;
+  }
+  .profile-function-card .profile-shortcut {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 8px 6px 6px !important;
+    gap: 4px !important;
   }
   .profile-function-card .profile-shortcut strong,
   .profile-function-card .profile-shortcut > span {
-    font-size: 12px;
+    font-size: 13px;
     white-space: nowrap;
   }
-  .profile-function-card .profile-function-heading {
-    margin-bottom: 12px !important;
+  html:not([data-xq-short]) .profile-top .profile-team {
+    padding: 12px 22px 12px;
   }
+  html:not([data-xq-short]) .profile-top .profile-team__main {
+    margin-top: 6px;
+    gap: 14px;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team__crest,
+  html:not([data-xq-short]) .profile-top .profile-team__crest .team-crest {
+    width: 64px;
+    height: 72px;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team h2 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team__main p {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team__tags {
+    display: none;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team__actions {
+    margin-top: 8px;
+  }
+  html:not([data-xq-short]) .profile-top .profile-team__slogan {
+    top: 12px;
+    right: 22px;
+    font-size: 16px;
+  }
+}
+
+.profile-season__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #2f6b45;
+  font-size: 12px;
+  font-weight: 650;
+}
+.profile-season__roles span {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #e7f1e9;
 }

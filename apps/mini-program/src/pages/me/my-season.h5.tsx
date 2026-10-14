@@ -1,129 +1,339 @@
 import { useEffect, useState } from 'react'
 import { TeamCrest } from '../../components/product-ui'
 import { productRepository } from '../../features/product/product.repository'
+import { productConfigRepository } from '../../features/product-config/product-config.repository'
+import { canReportMatch } from '../../features/identity/entry-scope'
 import { formatDate, formatTime } from '../../features/product/product.format'
 import { openPlayer } from '../../features/product/player-navigation'
-import type { MatchSummary, PlayerStats, TeamSummary } from '../../features/product/product.types'
-import { isPendingMatch } from './profile.logic'
+import { matchReportGateway } from '../../features/match-report/repository'
+import { rosterRepository } from '../../features/captain-roster/roster.repository'
+import { lineupPlanRepository } from '../../features/captain-roster/lineup-plan.repository'
+import { openCaptainManageChooser } from '../../features/captain-roster/captain-manage-navigation.h5'
+import type { IdentityBadgeKind } from '../../features/product/identity-badges'
+import type {
+  AuthUser,
+  MatchSummary,
+  PostSummary,
+  TeamSummary,
+} from '../../features/product/product.types'
+import type { ReportRevision } from '../../features/match-report/types'
 import { ProfileIcon } from './profile-icons.h5'
+import {
+  formatCount,
+  lineupStatusLabel,
+  nextFollowedMatch,
+  nextTeamMatch,
+  rosterStatusLabel,
+  seasonCardTitle,
+  seasonPersona,
+  studentActivity,
+  summarizeReporter,
+  type ReporterRevisionView,
+  type SeasonPersona,
+} from './my-season.logic'
 
 interface MySeasonProps {
-  linkedPlayerId: string | null
+  user: AuthUser
+  displayedKind: IdentityBadgeKind | null
   tournamentId: string
   seasonName: string
   schedule: MatchSummary[]
   scheduleReady: boolean
+  followedMatchIds: string[]
+  posts: PostSummary[]
+  managedTeamIds: string[]
+  teams: Array<{ id: string; name: string }>
+  onOpenInformation: () => void
+  onOpenMatches: () => void
+  onOpenPosts: () => void
 }
 
-type SeasonState =
+type LoadState =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; stats: PlayerStats; team: TeamSummary | null }
+  | {
+      kind: 'ready'
+      persona: SeasonPersona
+      stats: Array<[string, number | undefined]>
+      team: TeamSummary | null
+      rosterLabel: string | null
+      lineupLabel: string | null
+    }
 
-/** Next pending fixture of the player's team, earliest kickoff first (TBD times last). */
-export function nextTeamMatch(schedule: MatchSummary[], teamId: string | undefined) {
-  if (!teamId) return null
-  return (
-    schedule
-      .filter(
-        (match) =>
-          isPendingMatch(match) && (match.homeTeam?.id === teamId || match.awayTeam?.id === teamId),
-      )
-      .sort(
-        (a, b) =>
-          (a.scheduledStartAt ? Date.parse(a.scheduledStartAt) : Infinity) -
-          (b.scheduledStartAt ? Date.parse(b.scheduledStartAt) : Infinity),
-      )[0] ?? null
-  )
+type RevisionWire = ReportRevision & { action?: string }
+
+function revisionView(item: RevisionWire): ReporterRevisionView {
+  return {
+    savedBy: item.savedBy,
+    ...(item.action ? { action: item.action } : {}),
+    status: item.status,
+    reason: item.reason,
+    eventCount: item.fields.events.length,
+  }
 }
 
 export function MySeasonCard({
-  linkedPlayerId,
+  user,
+  displayedKind,
   tournamentId,
   seasonName,
   schedule,
   scheduleReady,
+  followedMatchIds,
+  posts,
+  managedTeamIds,
+  teams,
+  onOpenInformation,
+  onOpenMatches,
+  onOpenPosts,
 }: MySeasonProps) {
-  const [state, setState] = useState<SeasonState>({ kind: 'loading' })
+  const persona = seasonPersona({
+    displayedKind,
+    linkedPlayerId: user.linkedPlayer?.id ?? null,
+    roles: user.roles,
+  })
+  const title = seasonCardTitle(persona)
+  const [state, setState] = useState<LoadState>({ kind: 'loading' })
+
   useEffect(() => {
-    if (!linkedPlayerId) return
     let active = true
     setState({ kind: 'loading' })
-    void productRepository
-      .getPlayer(linkedPlayerId, tournamentId)
-      .then((player) => {
-        if (active) setState({ kind: 'ready', stats: player.stats, team: player.team })
-      })
-      .catch(() => {
+    const linkedPlayerId = user.linkedPlayer?.id ?? null
+    const teamId = managedTeamIds[0]
+    const run = async () => {
+      try {
+        if (persona === 'reporter') {
+          const caps = await productConfigRepository.getCapabilities()
+          const write = caps.actions['matchReports.write']
+          const eligible = schedule.filter(
+            (match) =>
+              ['FINISHED', 'CONFIRMED'].includes(match.status) &&
+              canReportMatch(write, caps.organizationId, match),
+          )
+          const workspaces = await Promise.all(
+            eligible.map(async (match) => {
+              try {
+                const workspace = await matchReportGateway.load(match.id)
+                const latest = workspace.latest ? revisionView(workspace.latest) : null
+                let history: ReporterRevisionView[] = []
+                if (
+                  latest &&
+                  (workspace.confirmedReportVersion != null || (workspace.reportVersion ?? 0) > 1)
+                ) {
+                  try {
+                    const page = await matchReportGateway.history(match.id)
+                    history = page.items.map((item) => revisionView(item))
+                  } catch {
+                    history = []
+                  }
+                }
+                return {
+                  matchId: match.id,
+                  confirmedReportVersion: workspace.confirmedReportVersion ?? null,
+                  latest,
+                  history,
+                }
+              } catch {
+                return {
+                  matchId: match.id,
+                  confirmedReportVersion: null,
+                  latest: null,
+                  history: [],
+                }
+              }
+            }),
+          )
+          if (!active) return
+          const summary = summarizeReporter(workspaces, user)
+          setState({
+            kind: 'ready',
+            persona,
+            stats: [
+              ['录入场次', summary.matches],
+              ['录入事件', summary.events],
+              ['更正', summary.corrections],
+            ],
+            team: null,
+            rosterLabel: null,
+            lineupLabel: null,
+          })
+          return
+        }
+
+        if (persona === 'student') {
+          const commented = posts.filter((post) => post.commentCount > 0).slice(0, 16)
+          const details = await Promise.allSettled(
+            commented.map((post) => productRepository.getPost(post.id)),
+          )
+          if (!active) return
+          const found = details.flatMap((item) =>
+            item.status === 'fulfilled' ? item.value.comments : [],
+          )
+          const activity = studentActivity({
+            followedMatchCount: followedMatchIds.length,
+            posts,
+            userId: user.id,
+            comments: found,
+          })
+          setState({
+            kind: 'ready',
+            persona,
+            stats: [
+              ['关注比赛', activity.followed],
+              ['评论', activity.comments],
+              ['点赞', activity.likes],
+              ['动态', activity.posts],
+            ],
+            team: null,
+            rosterLabel: null,
+            lineupLabel: null,
+          })
+          return
+        }
+
+        const [player, roster, lineups] = await Promise.allSettled([
+          linkedPlayerId
+            ? productRepository.getPlayer(linkedPlayerId, tournamentId)
+            : Promise.resolve(null),
+          persona === 'captain' && teamId
+            ? rosterRepository.read(tournamentId, teamId)
+            : Promise.resolve(null),
+          persona === 'captain' && teamId
+            ? lineupPlanRepository.list(teamId)
+            : Promise.resolve({ items: [] }),
+        ])
+        if (!active) return
+        if (linkedPlayerId && player.status === 'rejected' && persona === 'player') {
+          setState({ kind: 'error' })
+          return
+        }
+        const readyPlayer = player.status === 'fulfilled' ? player.value : null
+        setState({
+          kind: 'ready',
+          persona,
+          stats: [
+            ['出场', readyPlayer?.stats.appearances],
+            ['进球', readyPlayer?.stats.goals],
+            ['助攻', readyPlayer?.stats.assists],
+          ],
+          team: readyPlayer?.team ?? null,
+          rosterLabel:
+            persona === 'captain'
+              ? rosterStatusLabel(
+                  roster.status === 'fulfilled' ? (roster.value?.status ?? null) : null,
+                )
+              : null,
+          lineupLabel:
+            persona === 'captain'
+              ? lineupStatusLabel(
+                  lineups.status === 'fulfilled' ? (lineups.value?.items ?? []) : [],
+                )
+              : null,
+        })
+      } catch {
         if (active) setState({ kind: 'error' })
-      })
+      }
+    }
+    void run()
     return () => {
       active = false
     }
-  }, [linkedPlayerId, tournamentId])
+  }, [
+    persona,
+    user.id,
+    user.displayName,
+    user.username,
+    user.linkedPlayer?.id,
+    tournamentId,
+    schedule,
+    followedMatchIds,
+    posts,
+    managedTeamIds,
+  ])
 
-  const heading = (more: boolean) => (
-    <div className="profile-season__heading">
-      <h2>我的赛季</h2>
-      <span>{seasonName}</span>
-      {more ? (
-        <span className="profile-season__more">
-          查看完整数据
-          <ProfileIcon name="arrow" />
-        </span>
-      ) : null}
-    </div>
-  )
-  if (!linkedPlayerId)
-    return (
-      <section className="profile-season profile-surface" aria-label="我的赛季">
-        {heading(false)}
-        <div className="profile-season__empty">
-          <ProfileIcon name="trophy" />
-          <p>关联球员身份后，这里会显示你的出场、进球和下一场比赛。</p>
-        </div>
-      </section>
-    )
-
-  const open = () => void openPlayer(linkedPlayerId, tournamentId)
-  const team = state.kind === 'ready' ? state.team : null
-  const next = state.kind === 'ready' ? nextTeamMatch(schedule, team?.id) : null
-  const home = next?.homeTeam?.id === team?.id
+  const ready = state.kind === 'ready'
+  const stats = ready ? state.stats : personaStatsPlaceholder(persona)
+  const team = ready ? state.team : null
+  const next =
+    persona === 'student'
+      ? nextFollowedMatch(schedule, followedMatchIds)
+      : nextTeamMatch(schedule, team?.id)
+  const home = Boolean(next && team && next.homeTeam?.id === team.id)
   const opponent = next ? (home ? next.awayTeam : next.homeTeam) : null
   const opponentLabel =
     opponent?.name ?? (next ? (home ? next.awayPlaceholder : next.homePlaceholder) : null) ?? '待定'
-  const stats = state.kind === 'ready' ? state.stats : null
-  const value = (n: number | undefined) => (stats ? String(n ?? 0) : '—')
+  const value = (count: number | undefined) => formatCount(count, ready && scheduleReady)
+  const moreLabel =
+    persona === 'reporter'
+      ? '去录入比赛'
+      : persona === 'student'
+        ? '查看关注比赛'
+        : persona === 'captain'
+          ? '管理名单与阵容'
+          : '查看完整数据'
+
+  const open = () => {
+    if (persona === 'reporter') {
+      onOpenInformation()
+      return
+    }
+    if (persona === 'student') {
+      onOpenMatches()
+      return
+    }
+    if (persona === 'captain' && managedTeamIds.length) {
+      openCaptainManageChooser({
+        teams: teams.filter((item) => managedTeamIds.includes(item.id)),
+        tournamentId,
+      })
+      return
+    }
+    if (user.linkedPlayer) void openPlayer(user.linkedPlayer.id, tournamentId)
+    else onOpenPosts()
+  }
 
   return (
-    <section className="profile-season profile-surface" aria-label="我的赛季">
+    <section className="profile-season profile-surface" aria-label={title}>
       <button
         data-profile-button=""
         className="profile-season__card"
         onClick={open}
-        aria-label="查看我的完整球员数据"
+        aria-label={title}
       >
-        {heading(true)}
-        <div className="profile-season__stats">
-          {(
-            [
-              ['出场', stats?.appearances],
-              ['进球', stats?.goals],
-              ['助攻', stats?.assists],
-            ] as const
-          ).map(([label, count]) => (
+        <div className="profile-season__heading">
+          <h2>{title}</h2>
+          <span>{seasonName}</span>
+          <span className="profile-season__more">
+            {moreLabel}
+            <ProfileIcon name="arrow" />
+          </span>
+        </div>
+        <div
+          className={`profile-season__stats${stats.length > 3 ? ' profile-season__stats--four' : ''}`}
+        >
+          {stats.map(([label, count]) => (
             <div key={label}>
-              <strong>{value(count)}</strong>
+              <strong>{state.kind === 'error' ? '—' : value(count)}</strong>
               <span>{label}</span>
             </div>
           ))}
         </div>
         <div className="profile-season__next">
-          <small>下一场比赛</small>
+          {persona === 'captain' && ready ? (
+            <div className="profile-season__roles">
+              <span>名单 · {state.rosterLabel}</span>
+              <span>阵容 · {state.lineupLabel}</span>
+            </div>
+          ) : null}
+          {persona !== 'reporter' ? (
+            <small>{persona === 'student' ? '下一场关注' : '下一场比赛'}</small>
+          ) : null}
           {state.kind === 'error' ? (
-            <p className="profile-season__note">赛季数据暂不可用，点击查看球员详情。</p>
+            <p className="profile-season__note">数据暂不可用，点击打开对应入口。</p>
           ) : state.kind === 'loading' || !scheduleReady ? (
             <p className="profile-season__note">正在读取…</p>
+          ) : persona === 'reporter' ? (
+            <p className="profile-season__note">授权完赛中由你保存的报告场次、事件与更正。</p>
           ) : next ? (
             <div className="profile-season__match">
               <span className="profile-season__opponent">
@@ -133,7 +343,7 @@ export function MySeasonCard({
                   <i aria-hidden="true">?</i>
                 )}
                 <strong>{opponentLabel}</strong>
-                <em>{home ? '主场' : '客场'}</em>
+                {team ? <em>{home ? '主场' : '客场'}</em> : <em>关注</em>}
               </span>
               {next.roundName || next.stageName ? (
                 <span className="profile-season__meta">
@@ -153,10 +363,33 @@ export function MySeasonCard({
               </span>
             </div>
           ) : (
-            <p className="profile-season__note">本赛季暂无待进行的比赛。</p>
+            <p className="profile-season__note">
+              {persona === 'student' ? '暂时没有待进行的关注比赛。' : '本赛季暂无待进行的比赛。'}
+            </p>
           )}
         </div>
       </button>
     </section>
   )
+}
+
+function personaStatsPlaceholder(persona: SeasonPersona): Array<[string, number | undefined]> {
+  if (persona === 'reporter')
+    return [
+      ['录入场次', undefined],
+      ['录入事件', undefined],
+      ['更正', undefined],
+    ]
+  if (persona === 'student')
+    return [
+      ['关注比赛', undefined],
+      ['评论', undefined],
+      ['点赞', undefined],
+      ['动态', undefined],
+    ]
+  return [
+    ['出场', undefined],
+    ['进球', undefined],
+    ['助攻', undefined],
+  ]
 }
