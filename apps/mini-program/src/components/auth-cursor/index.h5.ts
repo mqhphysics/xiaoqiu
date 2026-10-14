@@ -1,22 +1,71 @@
-import arrowUrl from '../../assets/login-art/cursors/default-32.png'
-import ballUrl from '../../assets/login-art/cursors/football-28.svg'
-import handUrl from '../../assets/login-art/cursors/hand-32.svg'
-import textUrl from '../../assets/login-art/cursors/text-32.svg'
-import disabledUrl from '../../assets/login-art/cursors/disabled-32.svg'
-import busyUrl from '../../assets/login-art/cursors/busy-32.svg'
-import progressUrl from '../../assets/login-art/cursors/progress-32.svg'
-import moveUrl from '../../assets/login-art/cursors/move-32.svg'
-import grabUrl from '../../assets/login-art/cursors/grab-32.svg'
-import grabbingUrl from '../../assets/login-art/cursors/grabbing-32.svg'
-import precisionUrl from '../../assets/login-art/cursors/precision-32.svg'
-import resizeEwUrl from '../../assets/login-art/cursors/resize-ew-32.svg'
-import resizeNsUrl from '../../assets/login-art/cursors/resize-ns-32.svg'
-import resizeNwseUrl from '../../assets/login-art/cursors/resize-nwse-32.svg'
-import resizeNeswUrl from '../../assets/login-art/cursors/resize-nesw-32.svg'
-import helpUrl from '../../assets/login-art/cursors/help-32.svg'
-import zoomInUrl from '../../assets/login-art/cursors/zoom-in-32.svg'
-import zoomOutUrl from '../../assets/login-art/cursors/zoom-out-32.svg'
+import arrowUrl1 from '../../assets/login-art/cursors/default-32.png'
+import arrowUrl2 from '../../assets/login-art/cursors/default-32@2x.png'
+import ballUrl1 from '../../assets/login-art/cursors/football-28.png'
+import ballUrl2 from '../../assets/login-art/cursors/football-28@2x.png'
+import handUrl1 from '../../assets/login-art/cursors/hand-32.png'
+import handUrl2 from '../../assets/login-art/cursors/hand-32@2x.png'
+import textUrl1 from '../../assets/login-art/cursors/text-32.png'
+import textUrl2 from '../../assets/login-art/cursors/text-32@2x.png'
+import disabledUrl1 from '../../assets/login-art/cursors/disabled-32.png'
+import disabledUrl2 from '../../assets/login-art/cursors/disabled-32@2x.png'
+import busyUrl1 from '../../assets/login-art/cursors/busy-32.png'
+import busyUrl2 from '../../assets/login-art/cursors/busy-32@2x.png'
+import progressUrl1 from '../../assets/login-art/cursors/progress-32.png'
+import progressUrl2 from '../../assets/login-art/cursors/progress-32@2x.png'
+import moveUrl1 from '../../assets/login-art/cursors/move-32.png'
+import moveUrl2 from '../../assets/login-art/cursors/move-32@2x.png'
+import grabUrl1 from '../../assets/login-art/cursors/grab-32.png'
+import grabUrl2 from '../../assets/login-art/cursors/grab-32@2x.png'
+import grabbingUrl1 from '../../assets/login-art/cursors/grabbing-32.png'
+import grabbingUrl2 from '../../assets/login-art/cursors/grabbing-32@2x.png'
+import precisionUrl1 from '../../assets/login-art/cursors/precision-32.png'
+import precisionUrl2 from '../../assets/login-art/cursors/precision-32@2x.png'
+import resizeEwUrl1 from '../../assets/login-art/cursors/resize-ew-32.png'
+import resizeEwUrl2 from '../../assets/login-art/cursors/resize-ew-32@2x.png'
+import resizeNsUrl1 from '../../assets/login-art/cursors/resize-ns-32.png'
+import resizeNsUrl2 from '../../assets/login-art/cursors/resize-ns-32@2x.png'
+import resizeNwseUrl1 from '../../assets/login-art/cursors/resize-nwse-32.png'
+import resizeNwseUrl2 from '../../assets/login-art/cursors/resize-nwse-32@2x.png'
+import resizeNeswUrl1 from '../../assets/login-art/cursors/resize-nesw-32.png'
+import resizeNeswUrl2 from '../../assets/login-art/cursors/resize-nesw-32@2x.png'
+import helpUrl1 from '../../assets/login-art/cursors/help-32.png'
+import helpUrl2 from '../../assets/login-art/cursors/help-32@2x.png'
+import zoomInUrl1 from '../../assets/login-art/cursors/zoom-in-32.png'
+import zoomInUrl2 from '../../assets/login-art/cursors/zoom-in-32@2x.png'
+import zoomOutUrl1 from '../../assets/login-art/cursors/zoom-out-32.png'
+import zoomOutUrl2 from '../../assets/login-art/cursors/zoom-out-32@2x.png'
 import { cursorMorphPath } from './morph.h5'
+
+/**
+ * Cursor images are pre-rasterised PNGs (4× supersampled, 1× and 2×) so Chrome never
+ * nearest-neighbour scales an SVG cursor; that scaling caused the jagged edges on HiDPI screens.
+ */
+function art(one: string, two: string) {
+  return { one, two }
+}
+const arrowUrl = art(arrowUrl1, arrowUrl2)
+const ballUrl = art(ballUrl1, ballUrl2)
+const handUrl = art(handUrl1, handUrl2)
+const textUrl = art(textUrl1, textUrl2)
+const disabledUrl = art(disabledUrl1, disabledUrl2)
+const busyUrl = art(busyUrl1, busyUrl2)
+const progressUrl = art(progressUrl1, progressUrl2)
+const moveUrl = art(moveUrl1, moveUrl2)
+const grabUrl = art(grabUrl1, grabUrl2)
+const grabbingUrl = art(grabbingUrl1, grabbingUrl2)
+const precisionUrl = art(precisionUrl1, precisionUrl2)
+const resizeEwUrl = art(resizeEwUrl1, resizeEwUrl2)
+const resizeNsUrl = art(resizeNsUrl1, resizeNsUrl2)
+const resizeNwseUrl = art(resizeNwseUrl1, resizeNwseUrl2)
+const resizeNeswUrl = art(resizeNeswUrl1, resizeNeswUrl2)
+const helpUrl = art(helpUrl1, helpUrl2)
+const zoomInUrl = art(zoomInUrl1, zoomInUrl2)
+const zoomOutUrl = art(zoomOutUrl1, zoomOutUrl2)
+
+/** Plain url() first for older engines, then a resolution-aware image-set that wins where supported. */
+function cursorRule(selector: string, image: { one: string; two: string }, hotspot: string, fallback: string, important = '') {
+  return `${selector} { cursor: url("${image.one}") ${hotspot}, ${fallback}${important}; cursor: -webkit-image-set(url("${image.one}") 1x, url("${image.two}") 2x) ${hotspot}, ${fallback}${important}; cursor: image-set(url("${image.one}") 1x, url("${image.two}") 2x) ${hotspot}, ${fallback}${important}; }`
+}
 
 const skins = {
   default: { url: arrowUrl, hotspot: '2 2', fallback: 'default' },
@@ -82,14 +131,13 @@ export function mountCursorSkin(): () => void {
   style.dataset.xqCursorStyles = ''
   // Raw H5 CSS keeps native element names out of Taro's stylesheet transform.
   style.textContent = `
-    html.xq-cursor-skin { cursor: url("${arrowUrl}") 2 2, default; }
+    ${cursorRule('html.xq-cursor-skin', arrowUrl, '2 2', 'default')}
     ${Object.entries(skins)
-      .map(
-        ([name, skin]) =>
-          `html.xq-cursor-skin [${ATTRIBUTE}="${name}"] { cursor: url("${skin.url}") ${skin.hotspot}, ${skin.fallback} !important; }`,
+      .map(([name, skin]) =>
+        cursorRule(`html.xq-cursor-skin [${ATTRIBUTE}="${name}"]`, skin.url, skin.hotspot, skin.fallback, ' !important'),
       )
       .join('\n')}
-    html.xq-cursor-skin :disabled { cursor: url("${disabledUrl}") 16 16, not-allowed !important; }
+    ${cursorRule('html.xq-cursor-skin :disabled', disabledUrl, '16 16', 'not-allowed', ' !important')}
     html.xq-cursor-skin.xq-cursor-morphing,
     html.xq-cursor-skin.xq-cursor-morphing * { cursor: none !important; }
     #xq-cursor-morph { position: fixed; left: 0; top: 0; width: 72px; height: 72px;

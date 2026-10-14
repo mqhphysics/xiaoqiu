@@ -10,7 +10,7 @@
   .art-login .art-login__left,
   .art-login .art-login__scene {
     cursor:
-      url('../../assets/login-art/cursors/football-28.svg') 14 14,
+      url('../../assets/login-art/cursors/football-28.png') 14 14,
       default;
   }
 
@@ -23,19 +23,19 @@
   // Class selectors survive the Taro H5 stylesheet element-name transform.
   .art-login .art-login__control:not(:disabled) {
     cursor:
-      url('../../assets/login-art/cursors/hand-32.svg') 12 4,
+      url('../../assets/login-art/cursors/hand-32.png') 12 4,
       pointer;
   }
 
   .art-login .art-login__input {
     cursor:
-      url('../../assets/login-art/cursors/text-32.svg') 16 16,
+      url('../../assets/login-art/cursors/text-32.png') 16 16,
       text;
   }
 
   .art-login .art-login__control:disabled {
     cursor:
-      url('../../assets/login-art/cursors/disabled-32.svg') 16 16,
+      url('../../assets/login-art/cursors/disabled-32.png') 16 16,
       not-allowed;
   }
 }
