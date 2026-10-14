@@ -1503,3 +1503,44 @@
     transition: none !important;
   }
 }
+
+/* Round 4 — viewport-fit hub: follow strip + tabs fixed, columns scroll inside and reach the bottom. */
+@media (min-width: 1024px) {
+  html:not([data-xq-short]) {
+    .th-page.xq-viewport-page {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .th-page > .th-follow-strip {
+      flex: 0 0 auto;
+    }
+    .th-page > .th-page__body {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .th-page__body > .th-tabs {
+      flex: 0 0 auto;
+    }
+    .th-page__body > .th-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .th-page__body > .th-panel > .th-columns {
+      height: 100%;
+      grid-template-rows: minmax(0, 1fr);
+      align-items: stretch;
+    }
+    .th-page__body > .th-panel > .th-columns > .th-surface {
+      position: static;
+      align-self: stretch;
+      max-height: none;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+}

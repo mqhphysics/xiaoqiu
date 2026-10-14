@@ -37,11 +37,7 @@ export default function H5MyTeamPage() {
       })
     }
   }, [desktop, params?.teamId, params?.tournamentId, params?.review])
-  return desktop && params?.review !== 'roster' ? (
-    <DesktopMyTeamPage />
-  ) : (
-    <ExistingMyTeamPage />
-  )
+  return desktop && params?.review !== 'roster' ? <DesktopMyTeamPage /> : <ExistingMyTeamPage />
 }
 
 function DesktopMyTeamPage() {
@@ -126,7 +122,7 @@ function DesktopMyTeamPage() {
   }
   return (
     <PublicShell active="team" tournamentId={tournamentId}>
-      <div className="th-root th-page">
+      <div className="th-root th-page xq-viewport-page">
         {loading ? (
           <DataState kind="loading" title="正在加载主队空间" />
         ) : error ? (
@@ -463,7 +459,11 @@ function SelectedTeam({
   return (
     <>
       {state.loading ? <DataState kind="loading" title="正在读取赛事数据" /> : null}
-      <div style={{ display: state.loading ? 'none' : undefined }} aria-busy={state.loading}>
+      <div
+        className="th-page__body"
+        style={{ display: state.loading ? 'none' : undefined }}
+        aria-busy={state.loading}
+      >
         <TeamContent
           data={state.data}
           competition={state.competition}
