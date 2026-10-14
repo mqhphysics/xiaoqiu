@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { TeamCrest } from '../../components/product-ui'
+import { TeamCrest, UserAvatar } from '../../components/product-ui'
 import { eventLabel, positionLabel } from '../product/product.format'
 import { openPlayer } from '../product/player-navigation'
 import type { MatchExperienceResponse } from '../product/product.types'
@@ -129,34 +129,19 @@ function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
                 display.players.map(({ player, point }) => (
                   <div
                     key={player.id}
-                    className={`match-horizontal-player ${player.position === 'GOALKEEPER' ? 'match-horizontal-player--goalkeeper' : ''}`}
+                    className={`match-horizontal-player ${display.source === 'DEFAULT' ? (point.y === 8 ? 'match-horizontal-player--goalkeeper' : '') : player.position === 'GOALKEEPER' ? 'match-horizontal-player--goalkeeper' : ''}`}
                     style={{
                       left: `${side === 0 ? 8 + point.y * 0.84 : 92 - point.y * 0.84}%`,
                       top: `${10 + point.x * 0.8}%`,
                     }}
                   >
-                    <button
-                      type="button"
-                      className="match-horizontal-player__number"
-                      aria-pressed={selected === player.id}
-                      aria-label={`${player.displayName}，${player.shirtNumber ?? '无'}号，${positionLabel(player.position)}，查看本场事件`}
-                      onClick={() => setSelected(selected === player.id ? null : player.id)}
-                    >
-                      {player.shirtNumber ?? '—'}
-                    </button>
-                    {player.position === 'GOALKEEPER' && (
-                      <span className="match-horizontal-player__keeper" title="门将">
-                        GK
-                      </span>
-                    )}
-                    <PlayerTrigger
-                      playerId={player.id}
+                    <PitchPlayer
+                      player={player}
                       tournamentId={match.tournamentId}
-                      name={player.displayName}
-                    >
-                      <span className="match-horizontal-player__name">{player.displayName}</span>
-                    </PlayerTrigger>
-                    <EventBadges events={events.get(lineup.team.id)?.get(player.id)} compact />
+                      events={events.get(lineup.team.id)?.get(player.id)}
+                      selected={selected === player.id}
+                      onSelect={() => setSelected(selected === player.id ? null : player.id)}
+                    />
                   </div>
                 ))
               ) : (
@@ -194,24 +179,130 @@ function DesktopLineups({ match }: { match: MatchExperienceResponse }) {
           </button>
         </div>
       )}
-      <div className="match-horizontal-lineups__bench">
-        {lineups.map((lineup) => (
-          <details key={lineup.team.id} open>
-            <summary>
-              {lineup.team.shortName} · 替补 {lineupGroups(lineup).substitutes.length} 人
-            </summary>
-            <PlayerList
-              title="替补名单"
-              players={lineupGroups(lineup).substitutes}
-              events={events.get(lineup.team.id)!}
-              onSelect={setSelected}
-              selectedId={selected}
-              appearances={lineupHasAppearances(lineup)}
-            />
-          </details>
-        ))}
+      <div className="match-bench">
+        {lineups.map((lineup) => {
+          const teamEvents = events.get(lineup.team.id)
+          const bench = lineupGroups(lineup).substitutes
+          return (
+            <section key={lineup.team.id} className="match-bench__team" aria-label={`${lineup.team.name}替补`}>
+              <header>
+                <TeamCrest team={lineup.team} size="small" />
+                <strong>{lineup.team.shortName}</strong>
+                <span>替补 {bench.length}</span>
+              </header>
+              {bench.length ? (
+                <ul>
+                  {bench.map((player) => {
+                    const playerEvents = teamEvents?.get(player.id)
+                    return (
+                      <li key={player.id}>
+                        <UserAvatar
+                          avatarUrl={player.avatarUrl ?? null}
+                          name={player.displayName}
+                          size="small"
+                        />
+                        <span className="match-bench__number">{player.shirtNumber ?? '—'}</span>
+                        <PlayerTrigger
+                          playerId={player.id}
+                          tournamentId={match.tournamentId}
+                          name={player.displayName}
+                        >
+                          <span className="match-bench__name">{player.displayName}</span>
+                        </PlayerTrigger>
+                        <span className="match-bench__pos">{positionLabel(player.position)}</span>
+                        <span className="match-bench__events">
+                          {playerEvents?.on.map((minute) => (
+                            <span key={`on${minute}`} className="match-sub match-sub--on">
+                              <MatchIcon kind="ON" />
+                              {minute}
+                            </span>
+                          ))}
+                          {playerEvents?.goals.map((minute) => (
+                            <MatchIcon key={`g${minute}`} kind="GOAL" />
+                          ))}
+                          {playerEvents?.assists.map((minute) => (
+                            <MatchIcon key={`a${minute}`} kind="ASSIST" />
+                          ))}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="match-bench__empty">未登记替补</p>
+              )}
+            </section>
+          )
+        })}
       </div>
+      <section className="match-bench match-bench--absent" aria-label="伤停信息">
+        <h3>伤停信息</h3>
+        {lineups.map((lineup) => (
+          <div key={lineup.team.id} className="match-bench__team">
+            <header>
+              <TeamCrest team={lineup.team} size="small" />
+              <strong>{lineup.team.shortName}</strong>
+            </header>
+            <p className="match-bench__empty">暂无伤停记录</p>
+          </div>
+        ))}
+      </section>
     </div>
+  )
+}
+
+function PitchPlayer({
+  player,
+  tournamentId,
+  events,
+  selected,
+  onSelect,
+}: {
+  player: MatchLineup['players'][number] & { avatarUrl?: string | null }
+  tournamentId: string
+  events: PlayerMatchEvents | undefined
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="match-pitch-avatar"
+        aria-pressed={selected}
+        aria-label={`${player.displayName}，${player.shirtNumber ?? '无'}号，${positionLabel(player.position)}，查看本场事件`}
+        onClick={onSelect}
+      >
+        <UserAvatar avatarUrl={player.avatarUrl ?? null} name={player.displayName} size="medium" />
+        {events?.off.length || events?.on.length ? (
+          <span className="match-pitch-avatar__sub">
+            <MatchIcon kind={events.off.length ? 'OFF' : 'ON'} />
+            {(events.off[0] ?? events.on[0])!}
+          </span>
+        ) : null}
+        {events?.yellowCards.length ? <i className="match-pitch-avatar__card is-yellow" /> : null}
+        {events?.redCards.length ? <i className="match-pitch-avatar__card is-red" /> : null}
+      </button>
+      <PlayerTrigger playerId={player.id} tournamentId={tournamentId} name={player.displayName}>
+        <span className="match-horizontal-player__name">
+          <b>{player.shirtNumber ?? '—'}</b>
+          {player.displayName}
+        </span>
+      </PlayerTrigger>
+      {events && (events.goals.length || events.assists.length || events.ownGoals.length) ? (
+        <span className="match-pitch-avatar__events">
+          {events.goals.map((minute) => (
+            <MatchIcon key={`g${minute}`} kind="GOAL" />
+          ))}
+          {events.ownGoals.map((minute) => (
+            <MatchIcon key={`o${minute}`} kind="OWN_GOAL" />
+          ))}
+          {events.assists.map((minute) => (
+            <MatchIcon key={`a${minute}`} kind="ASSIST" />
+          ))}
+        </span>
+      ) : null}
+    </>
   )
 }
 
@@ -457,57 +548,53 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
   const goalMedia = new Map<string, (typeof media.items)[number]>()
   for (const item of media.items)
     if (!goalMedia.has(item.targetId)) goalMedia.set(item.targetId, item)
+  const homeId = match.homeTeam?.id
   return (
     <section className="match-tab-content match-events" aria-label="比赛事件">
       <div className="match-events__tools">
         <MediaLibraryButton />
       </div>
       {match.events.length ? (
-        <ol className="match-events__list">
-          {orderedEvents(match.events).map((event) => (
-            <li
-              key={event.id}
-              className="match-event"
-              data-event-type={event.type}
-              title={event.description ?? event.team.name}
-            >
-              <time>{minuteLabel(event)}</time>
-              <span className="match-events__type" title={eventLabel(event.type)}>
-                <MatchIcon kind={event.type as MatchIconKind} />
-              </span>
-              <div className="match-event__copy">
-                <strong>
-                  <span className="match-event__team">
-                    <TeamCrest team={event.team} size="small" interactive={false} />
-                  </span>
-                  {event.type === 'SUBSTITUTION' && <MatchIcon kind="OFF" />}
-                  <EventPlayerLink player={event.player} tournamentId={match.tournamentId}>
-                    {event.player?.displayName ?? event.team.shortName}
-                  </EventPlayerLink>
-                </strong>
-                <span>
-                  {event.relatedPlayer &&
-                  (event.type === 'GOAL' || event.type === 'SUBSTITUTION') ? (
-                    <>
-                      <MatchIcon kind={event.type === 'SUBSTITUTION' ? 'ON' : 'ASSIST'} />
-                      <EventPlayerLink
-                        player={event.relatedPlayer}
-                        tournamentId={match.tournamentId}
-                      >
-                        {event.relatedPlayer.displayName}
-                      </EventPlayerLink>
-                    </>
+        <ol className="match-timeline" aria-label="比赛事件时间轴">
+          {orderedEvents(match.events).map((event) => {
+            const side = event.team.id === homeId ? 'home' : 'away'
+            const isGoal = ['GOAL', 'OWN_GOAL', 'PENALTY_SCORED'].includes(event.type)
+            const gif = goalMedia.get(event.id)
+            return (
+              <li
+                key={event.id}
+                className={`match-timeline__row match-timeline__row--${side}`}
+                data-event-type={event.type}
+              >
+                <div className="match-timeline__side match-timeline__side--home">
+                  {side === 'home' ? (
+                    <EventCard
+                      event={event}
+                      match={match}
+                      gif={gif}
+                      upload={isGoal}
+                    />
                   ) : null}
-                </span>
-              </div>
-              {['GOAL', 'OWN_GOAL', 'PENALTY_SCORED'].includes(event.type) ? (
-                <div className="match-event__media">
-                  {goalMedia.has(event.id) ? <GoalMedia asset={goalMedia.get(event.id)!} /> : null}
-                  <MediaUploadButton purpose="GOAL_GIF" targetId={event.id} label="+ GIF" />
                 </div>
-              ) : null}
-            </li>
-          ))}
+                <div className="match-timeline__axis">
+                  <time>{minuteLabel(event)}</time>
+                  <span className="match-timeline__dot" title={eventLabel(event.type)}>
+                    <MatchIcon kind={event.type as MatchIconKind} />
+                  </span>
+                </div>
+                <div className="match-timeline__side match-timeline__side--away">
+                  {side === 'away' ? (
+                    <EventCard
+                      event={event}
+                      match={match}
+                      gif={gif}
+                      upload={isGoal}
+                    />
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
         </ol>
       ) : (
         <p className="match-lineups__empty">暂无已公布比赛事件</p>
@@ -516,6 +603,44 @@ export function EventsPanel({ match }: { match: MatchExperienceResponse }) {
     </section>
   )
 }
+
+function EventCard({
+  event,
+  match,
+  gif,
+  upload,
+}: {
+  event: MatchExperienceResponse['events'][number]
+  match: MatchExperienceResponse
+  gif: ReturnType<typeof useMatchGoalMedia>['items'][number] | undefined
+  upload: boolean
+}) {
+  return (
+    <div className="match-timeline__card">
+      <div className="match-timeline__players">
+        {event.type === 'SUBSTITUTION' ? <MatchIcon kind="OFF" /> : null}
+        <EventPlayerLink player={event.player} tournamentId={match.tournamentId}>
+          {event.player?.displayName ?? event.team.shortName}
+        </EventPlayerLink>
+        {event.relatedPlayer && (event.type === 'GOAL' || event.type === 'SUBSTITUTION') ? (
+          <>
+            <MatchIcon kind={event.type === 'SUBSTITUTION' ? 'ON' : 'ASSIST'} />
+            <EventPlayerLink player={event.relatedPlayer} tournamentId={match.tournamentId}>
+              {event.relatedPlayer.displayName}
+            </EventPlayerLink>
+          </>
+        ) : null}
+      </div>
+      {upload ? (
+        <div className="match-timeline__media">
+          {gif ? <GoalMedia asset={gif} /> : null}
+          <MediaUploadButton purpose="GOAL_GIF" targetId={event.id} label="+ GIF" />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 
 function EventPlayerLink({
   player,

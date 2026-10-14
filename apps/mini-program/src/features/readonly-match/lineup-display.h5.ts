@@ -15,22 +15,33 @@ export function createLineupDisplay(starters: Player[]) {
       players: starters.map((player) => ({ player, point: player.pitchPosition! })),
     }
   }
+  // Default formation: one GK row + DF / MF / FW. Extra players labelled GOALKEEPER sit with the defenders.
+  const keepers = starters
+    .filter((player) => player.position === 'GOALKEEPER')
+    .sort((a, b) => Number(a.shirtNumber ?? 99) - Number(b.shirtNumber ?? 99))
+  const primaryKeeper = keepers[0]?.id
   const groups = new Map<string, Player[]>()
   for (const player of starters) {
-    const position = player.position ?? 'UNKNOWN'
+    const position =
+      player.position === 'GOALKEEPER' && player.id !== primaryKeeper
+        ? 'DEFENDER'
+        : (player.position ?? 'UNKNOWN')
     groups.set(position, [...(groups.get(position) ?? []), player])
   }
   return {
     source: 'DEFAULT' as const,
     players: starters.map((player) => {
-      const group = groups.get(player.position ?? 'UNKNOWN')!
+      const row =
+        player.position === 'GOALKEEPER' && player.id !== primaryKeeper
+          ? 'DEFENDER'
+          : (player.position ?? 'UNKNOWN')
+      const group = groups.get(row)!
       return {
         player,
         // Presentation only: x is across the field, y is distance from our goal.
-        // Keep every explicitly selected starter, including multiple goalkeeper profiles.
         point: {
           x: ((group.indexOf(player) + 1) * 100) / (group.length + 1),
-          y: positionDepth[player.position ?? 'UNKNOWN'] ?? 70,
+          y: positionDepth[row] ?? 70,
         },
       }
     }),

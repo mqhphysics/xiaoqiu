@@ -18,7 +18,7 @@ export interface ConfirmedLineupPlanSource {
         playerProfileId: string
         displayName: string
         shirtNumber: string | null
-        playerProfile: { position: string | null }
+        playerProfile: { position: string | null; avatarUrl?: string | null }
       }>
     } | null
   } | null
@@ -107,6 +107,7 @@ export function confirmedMatchLineup(
       displayName: entry.displayName,
       shirtNumber: entry.shirtNumber,
       position: entry.playerProfile.position,
+      avatarUrl: entry.playerProfile.avatarUrl ?? null,
       minutesPlayed: null,
     }
   }

@@ -355,6 +355,7 @@ export interface MatchExperienceResponse extends MatchSummary {
       displayName: string
       shirtNumber: string | null
       position: string | null
+      avatarUrl?: string | null
       starter: boolean
       minutesPlayed: number | null
       pitchPosition?: { x: number; y: number } | null
