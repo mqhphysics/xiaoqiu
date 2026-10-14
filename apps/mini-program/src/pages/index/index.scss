@@ -2237,3 +2237,48 @@
     padding: 12PX;
   }
 }
+
+/* Round 4: 官方公告 is one line on every platform (desktop H5 refines it in home-desktop.h5.scss). */
+.notice-rail.notice-rail--line {
+  display: flex;
+  align-items: center;
+  min-height: 0;
+}
+.notice-rail--line .notice-rail__label {
+  flex: 0 0 auto;
+}
+.notice-rail--line .notice-rail__headline {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8PX;
+  min-width: 0;
+  margin: 0;
+  padding: 0 12PX;
+  background: none;
+  border: 0;
+  text-align: left;
+}
+.notice-rail--line .notice-rail__headline::after,
+.notice-rail--line .notice-rail__more::after {
+  display: none;
+}
+.notice-rail--line .notice-rail__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notice-rail--line .notice-rail__count {
+  flex: none;
+  font-size: 11PX;
+}
+.notice-rail--line .notice-rail__more {
+  position: static;
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0 12PX;
+  background: none;
+  border: 0;
+  white-space: nowrap;
+}

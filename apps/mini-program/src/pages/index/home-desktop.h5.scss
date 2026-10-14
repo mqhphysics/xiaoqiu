@@ -1,0 +1,213 @@
+/* Round 4 — 首页 on desktop H5.
+   1) 官方公告 is a single line: label · rotating title · 查看详情 (opens the announcements dialog).
+   2) Viewport-fit: hero, 焦点赛事 and the strip stay put; 绿茵动态 fills the rest and scrolls inside. */
+@media (min-width: 721px) {
+  .home-page > .notice-rail.notice-rail--line {
+    display: flex;
+    align-items: stretch;
+    height: 44px;
+    min-height: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 6px;
+    background: #f9ede7;
+  }
+  .notice-rail--line .notice-rail__label {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 18px;
+    background: #c9653b;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .notice-rail--line .notice-rail__label-note {
+    margin: 0;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .notice-rail--line .notice-rail__headline,
+  .notice-rail--line .notice-rail__more {
+    display: flex;
+    align-items: center;
+    width: auto;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .notice-rail--line .notice-rail__headline::after,
+  .notice-rail--line .notice-rail__more::after {
+    display: none;
+  }
+  .notice-rail--line .notice-rail__headline {
+    flex: 1 1 auto;
+    gap: 10px;
+    min-width: 0;
+    animation: notice-line-in 360ms ease-out;
+  }
+  .notice-rail--line .notice-rail__title {
+    display: block;
+    overflow: hidden;
+    color: #3b2a22;
+    font-size: 14px;
+    font-weight: 650;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .notice-rail--line .notice-rail__count {
+    flex: none;
+    color: #a0745e;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .notice-rail--line .notice-rail__more {
+    position: static;
+    flex: 0 0 auto;
+    color: #b2552d;
+    font-size: 13px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .notice-rail--line .notice-rail__headline:hover .notice-rail__title,
+  .notice-rail--line .notice-rail__more:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .notice-rail--line .notice-rail__headline:focus-visible,
+  .notice-rail--line .notice-rail__more:focus-visible {
+    outline: 2px solid #b2552d;
+    outline-offset: -3px;
+  }
+}
+@keyframes notice-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-rail--line .notice-rail__headline {
+    animation: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  html:not([data-xq-short]) {
+    .home-page.xq-viewport-page {
+      overflow: visible;
+    }
+    .home-page.xq-viewport-page > .experience-hero {
+      flex: 0 0 auto;
+      height: clamp(212px, calc(var(--xq-vh-avail) * 0.27), 270px);
+      container-type: size;
+      min-height: 0;
+    }
+    .home-page.xq-viewport-page .experience-hero__copy,
+    .home-page.xq-viewport-page .experience-hero__media {
+      height: 100%;
+      min-height: 0;
+    }
+    .home-page.xq-viewport-page .experience-hero__copy {
+      justify-content: center;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .home-page.xq-viewport-page .experience-hero__title {
+      margin-top: 4px;
+      font-size: clamp(26px, calc(var(--xq-vh-avail) * 0.042), 34px);
+    }
+    .home-page.xq-viewport-page .experience-hero__summary {
+      -webkit-line-clamp: 2;
+    }
+    .home-page.xq-viewport-page .experience-hero__action {
+      margin-top: clamp(8px, calc(var(--xq-vh-avail) * 0.02), 18px);
+    }
+    .home-page.xq-viewport-page > .home-product-section .product-section-heading {
+      min-height: 0;
+    }
+    .home-page.xq-viewport-page .focus-match-grid .compact-match {
+      min-height: 0;
+      height: clamp(142px, calc(var(--xq-vh-avail) * 0.17), 152px);
+    }
+    .home-page.xq-viewport-page > .home-product-section,
+    .home-page.xq-viewport-page > .notice-rail {
+      flex: 0 0 auto;
+      margin-top: 14px;
+    }
+    .home-page.xq-viewport-page > .community-column {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-top: 14px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+    /* Heading and composer share one sticky row so the feed gets the height. */
+    .home-page.xq-viewport-page > .community-column {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      align-content: start;
+      column-gap: 24px;
+    }
+    .home-page.xq-viewport-page > .community-column > .product-section-heading {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      align-self: stretch;
+      margin: 0;
+      padding-bottom: 8px;
+      background: #f7f8f4;
+    }
+    .home-page.xq-viewport-page
+      > .community-column
+      > .product-section-heading
+      .product-section-heading__note {
+      display: none;
+    }
+    .home-page.xq-viewport-page > .community-column > .composer-entry {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      align-self: end;
+      min-height: 0;
+      height: 46px;
+      margin: 0 0 8px;
+      box-shadow: 0 0 0 8px #f7f8f4;
+    }
+    .home-page.xq-viewport-page > .community-column > .community-feed {
+      grid-column: 1 / -1;
+      margin-top: 4px;
+    }
+  }
+}
+
+@container (max-height: 250px) {
+  .home-page .experience-hero .experience-hero__badge {
+    display: none;
+  }
+  .home-page .experience-hero .experience-hero__summary {
+    -webkit-line-clamp: 1 !important;
+  }
+}

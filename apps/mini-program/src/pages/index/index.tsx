@@ -1,4 +1,4 @@
-import { Button, Image, Input, Text, Textarea, View } from '@tarojs/components'
+import { Button, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -34,6 +34,11 @@ import {
 import { readSession } from '../../features/product/session'
 import { loadHomeWithEmptyState, type HomeLoadState } from '../../features/product/home-loading'
 import { tournamentHeroSlides } from './home-announcements'
+import './home-desktop'
+import {
+  ANNOUNCEMENTS_DIALOG_SUPPORTED,
+  AnnouncementsDialog,
+} from '../../components/announcements-dialog'
 import type {
   HomeResponse,
   MatchSummary,
@@ -488,6 +493,20 @@ function HomeContent({
   const heroAnnouncements = tournamentHeroSlides(data.announcements)
   const platformAnnouncements = data.platformAnnouncements ?? []
   const [heroIndex, setHeroIndex] = useState(0)
+  // One-line platform strip: rotate titles every 6 s (paused while the dialog is open).
+  const [noticeIndex, setNoticeIndex] = useState(0)
+  const [announcementDialog, setAnnouncementDialog] = useState<string | null | undefined>()
+  const noticeAnnouncement =
+    platformAnnouncements[noticeIndex % Math.max(1, platformAnnouncements.length)]
+  useEffect(() => {
+    if (platformAnnouncements.length < 2 || announcementDialog !== undefined) return
+    const timer = setInterval(() => setNoticeIndex((value) => value + 1), 6000)
+    return () => clearInterval(timer)
+  }, [platformAnnouncements.length, announcementDialog])
+  const openAnnouncement = (id: string | null) => {
+    if (ANNOUNCEMENTS_DIALOG_SUPPORTED) setAnnouncementDialog(id)
+    else if (id) void goToPost(id)
+  }
   const heroAnnouncement =
     heroAnnouncements[heroAnnouncements.length > 0 ? heroIndex % heroAnnouncements.length : 0]
   const heroPhotos: HeroPhoto[] = heroAnnouncements.flatMap((announcement) => {
@@ -502,7 +521,7 @@ function HomeContent({
     if (announcement) void goToPost(announcement.id)
   }
   return (
-    <View className="home-page">
+    <View className="home-page xq-viewport-page">
       <View className="experience-hero">
         <View className="experience-hero__copy">
           <Text className="experience-hero__eyebrow">
@@ -568,32 +587,41 @@ function HomeContent({
       </View>
 
       {platformAnnouncements.length > 0 && (
-        <View className="notice-rail">
+        <View className="notice-rail notice-rail--line">
           <View className="notice-rail__label">
             <Text>官方公告</Text>
             <Text className="notice-rail__label-note">平台</Text>
           </View>
-          <View className="notice-rail__items">
-            {platformAnnouncements.map((announcement) => (
-              <Button
-                className={`notice-rail__item ${announcement.imageUrl ? 'notice-rail__item--photo' : ''}`}
-                key={announcement.id}
-                onClick={() => void goToPost(announcement.id)}
-              >
-                {announcement.imageUrl && (
-                  <Image
-                    className="notice-rail__photo"
-                    mode="aspectFill"
-                    src={resolveMediaUrl(announcement.imageUrl) ?? ''}
-                  />
-                )}
-                <Text className="notice-rail__title">{announcement.title}</Text>
-                <Text className="notice-rail__body">{announcement.body}</Text>
-                <Text className="notice-rail__more">查看详情 →</Text>
-              </Button>
-            ))}
-          </View>
+          <Button
+            className="notice-rail__headline"
+            key={noticeAnnouncement?.id ?? 'none'}
+            onClick={() => openAnnouncement(noticeAnnouncement?.id ?? null)}
+          >
+            <Text className="notice-rail__title">{noticeAnnouncement?.title || '平台公告'}</Text>
+            {platformAnnouncements.length > 1 && (
+              <Text className="notice-rail__count">
+                {(noticeIndex % platformAnnouncements.length) + 1}/{platformAnnouncements.length}
+              </Text>
+            )}
+          </Button>
+          <Button
+            className="notice-rail__more"
+            onClick={() => openAnnouncement(noticeAnnouncement?.id ?? null)}
+          >
+            查看详情 →
+          </Button>
         </View>
+      )}
+      {announcementDialog !== undefined && (
+        <AnnouncementsDialog
+          announcements={platformAnnouncements}
+          initialId={announcementDialog}
+          onClose={() => setAnnouncementDialog(undefined)}
+          onOpenPost={(postId) => {
+            setAnnouncementDialog(undefined)
+            void goToPost(postId)
+          }}
+        />
       )}
 
       <View className="community-column">

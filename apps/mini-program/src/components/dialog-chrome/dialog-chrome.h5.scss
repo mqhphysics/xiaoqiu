@@ -15,7 +15,8 @@
   .information-entry-dialog.xq-dialog,
   .th-detail-modal.xq-dialog,
   .cm-dialog.xq-dialog,
-  .cm-picker.xq-dialog {
+  .cm-picker.xq-dialog,
+  .announcements-dialog.xq-dialog {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -176,7 +177,8 @@
   }
 
   .cm-dialog.xq-dialog,
-  .cm-picker.xq-dialog {
+  .cm-picker.xq-dialog,
+  .announcements-dialog.xq-dialog {
     background: #fff;
     color: #20332a;
     box-shadow: 0 28px 90px rgba(20, 40, 25, 0.28);
