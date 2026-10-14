@@ -58,6 +58,7 @@ import { TeamRelationsDialog } from './team-relations.h5'
 import { openCaptainManageChooser } from '../../features/captain-roster/captain-manage-navigation.h5'
 import { IdentityMatchDialog } from './identity-match.h5'
 import { MyIdentitiesDialog } from './my-identities.h5'
+import { MySeasonCard } from './my-season.h5'
 import { InformationEntryDialog } from '../../features/match-report/information-entry-dialog.h5'
 
 type Tab = 'posts' | 'matches' | 'bookmarks'
@@ -395,7 +396,7 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
   }
 
   return (
-    <div className="desktop-profile">
+    <div className="desktop-profile xq-viewport-page">
       <div className="profile-backdrop" aria-hidden="true">
         <div className="profile-backdrop__stadium" />
         <span>
@@ -621,6 +622,13 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
               </div>
             )}
           </section>
+          <MySeasonCard
+            linkedPlayerId={user.linkedPlayer?.id ?? null}
+            tournamentId={home.tournament.id}
+            seasonName={home.tournament.seasonName}
+            schedule={schedule}
+            scheduleReady={!loading}
+          />
         </aside>
         <section className="profile-stream profile-surface" id="profile-stream">
           <div className="profile-tabs" role="tablist" aria-label="个人内容">

@@ -1604,9 +1604,9 @@
     inset: 0;
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.24),
-      rgba(255, 255, 255, 0.86) 46%,
-      rgba(255, 255, 255, 0.96)
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(255, 255, 255, 0.92) 48%,
+      rgba(255, 255, 255, 0.62) 100%
     );
   }
   .profile-person__main,
@@ -1829,5 +1829,290 @@
   }
   .profile-function-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Round 4 — 我的 viewport-fit: one shared two-column grid (equal profile/team cards),
+   left column = profile functions + 我的赛季 filling the height, stream scrolls inside. */
+@media (min-width: 1024px) {
+  .profile-top,
+  .profile-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+  }
+  .profile-body {
+    margin-top: 16px;
+  }
+  html:not([data-xq-short]) {
+    /* Both header cards share one grid row and equal columns, so their aspect ratios match. */
+    .profile-person,
+    .profile-team {
+      display: flex;
+      flex-direction: column;
+      height: clamp(196px, calc(var(--xq-vh-avail) * 0.3), 250px);
+      min-height: 0;
+      container-type: size;
+    }
+    .profile-person {
+      padding: 18px 24px 14px;
+    }
+    .profile-person__stats {
+      margin-top: auto;
+    }
+    .profile-team {
+      padding: 18px 28px 16px;
+    }
+    .profile-team__main {
+      margin-top: 10px;
+    }
+    .profile-team__actions {
+      margin-top: auto;
+    }
+    .profile-backdrop > span {
+      display: none;
+    }
+    .profile-functions {
+      container-type: size;
+    }
+    .profile-function-card {
+      padding: 18px 22px;
+    }
+    .profile-function-card .profile-function-heading {
+      margin-bottom: 14px;
+    }
+    .profile-function-card .profile-shortcut {
+      height: auto;
+      min-height: 0;
+      padding: 12px 6px 10px;
+      gap: 6px;
+    }
+    .profile-functions {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-self: stretch;
+      height: 100%;
+      max-height: none;
+    }
+    .profile-function-card {
+      flex: 0 0 auto;
+    }
+    .profile-season {
+      flex: 1 1 auto;
+      min-height: 150px;
+    }
+  }
+}
+.profile-season {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.profile-season__card {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.profile-season__card:hover {
+  background: #f7faf6;
+}
+.profile-season__card:focus-visible {
+  outline: 2px solid #2f7a4b;
+  outline-offset: -2px;
+}
+.profile-season > .profile-season__heading,
+.profile-season > .profile-season__empty {
+  padding: 18px 24px 0;
+}
+.profile-season {
+  flex-direction: column;
+}
+.profile-season__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.profile-season__heading h2 {
+  margin: 0;
+  color: #16262b;
+  font-size: 18px;
+  font-weight: 750;
+}
+.profile-season__heading > span:not(.profile-season__more) {
+  margin-right: auto;
+  color: #78837c;
+  font-size: 12px;
+}
+.profile-season__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.profile-season__stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 6px;
+  border-radius: 8px;
+  background: #f3f7f2;
+}
+.profile-season__stats strong {
+  color: #1d4f33;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.profile-season__stats span {
+  color: #66726b;
+  font-size: 12px;
+}
+.profile-season__next {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 0;
+}
+.profile-season__next > small {
+  color: #78837c;
+  font-size: 12px;
+}
+.profile-season__match {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+}
+.profile-season__opponent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: auto;
+}
+.profile-season__opponent .team-crest {
+  width: 28px;
+  height: 28px;
+}
+.profile-season__opponent > i {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px dashed #b7c2bb;
+  border-radius: 50%;
+  color: #8a958e;
+  font-size: 13px;
+  font-style: normal;
+}
+.profile-season__opponent strong {
+  overflow: hidden;
+  color: #16262b;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-season__opponent em {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #e7f1e9;
+  color: #2f6b45;
+  font-size: 11px;
+  font-style: normal;
+}
+.profile-season__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #4f5c55;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.profile-season__meta .profile-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+.profile-season__note {
+  margin: 0;
+  color: #66726b;
+  font-size: 13px;
+}
+.profile-season__more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: #2f6b45;
+  font-size: 12px;
+  font-weight: 650;
+}
+.profile-season__more .profile-icon {
+  width: 13px;
+  height: 13px;
+}
+.profile-season__empty {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px !important;
+  color: #66726b;
+  font-size: 13px;
+}
+.profile-season__empty p {
+  margin: 0;
+}
+.profile-season__empty .profile-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  opacity: 0.55;
+}
+
+@container (max-height: 232px) {
+  .profile-person__avatar .user-avatar {
+    width: 84px;
+    height: 84px;
+  }
+  .profile-person__main {
+    gap: 18px;
+  }
+  .profile-person__meta {
+    margin: 6px 0 6px;
+  }
+  .profile-team__crest .team-crest {
+    width: 64px;
+    height: 76px;
+  }
+}
+/* Short left column: drop the shortcut sub-lines so 我的赛季 keeps room for its content. */
+@container (max-height: 520px) {
+  .profile-function-card .profile-shortcut small {
+    display: none;
+  }
+  .profile-function-card .profile-function-heading p {
+    display: none;
+  }
+  .profile-function-card .profile-function-heading {
+    margin-bottom: 10px;
+  }
+  .profile-season__card {
+    gap: 8px;
+    padding: 14px 22px;
+  }
+  .profile-season__stats strong {
+    font-size: 20px;
   }
 }
