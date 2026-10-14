@@ -1,3 +1,4 @@
+import { matchReportTagKey } from './match-report-tag'
 import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 
@@ -981,9 +982,22 @@ export class ExperienceService {
       ? match.reviews.find((review) => review.userId === session.userId)
       : undefined
     const ratings = summarizeMatchRatings(match.reviews)
+    // 快报: published OFFICIAL posts tagged with this match (TOPIC key `match-report:<id>`).
+    const flashReports = await prisma.post.findMany({
+      where: {
+        organizationId,
+        type: PostType.OFFICIAL,
+        status: PostStatus.PUBLISHED,
+        tags: { some: { key: matchReportTagKey(match.id) } },
+      },
+      include: postSummaryInclude(session?.userId),
+      orderBy: { publishedAt: 'desc' },
+      take: 5,
+    })
 
     return {
       ...mapResultMatch(match, resultContext.official),
+      flashReports: flashReports.map((post) => mapPost(post, session?.userId)),
       resultsMode: resultContext.mode,
       summary: resultContext.mode === 'DEMO' ? match.summary : null,
       attendance: match.attendance,
@@ -2366,3 +2380,4 @@ async function contentAudit(
 function forbidden(message: string) {
   return new ApiHttpException(HttpStatus.FORBIDDEN, { code: ERROR_CODES.FORBIDDEN, message })
 }
+

@@ -8,8 +8,9 @@ import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../compon
 import { openMessaging } from '../../components/messaging-drawer'
 import { ReportModal } from '../../components/report-modal'
 import { formatLongDate, formatRelativeTime, formatTime } from '../product/product.format'
-import { productRepository } from '../product/product.repository'
+import { productRepository, resolveMediaUrl } from '../product/product.repository'
 import { readSession } from '../product/session'
+import { openPost } from '../product/post-navigation'
 import { InlineEventEditor, MatchChangeRequest } from '../match-report/inline-editor.h5'
 import type { InlineReportController } from '../match-report/use-inline-report.h5'
 import type { MatchExperienceResponse } from '../product/product.types'
@@ -238,6 +239,7 @@ function RatingsPanel({
   const distribution = match.reviews.ratingDistribution
   return (
     <View className="ratings-layout match-tab-content">
+      <MatchFlash match={match} />
       <View className="rating-overview surface">
         <View className="rating-overview__score">
           <Text>{match.reviews.averageRating?.toFixed(1) ?? '-'}</Text>
@@ -425,6 +427,45 @@ function RatingsPanel({
         />
       )}
     </View>
+  )
+}
+
+/** 快报 — official posts linked to this match. Renders nothing when the match has none. */
+function MatchFlash({ match }: { match: MatchExperienceResponse }) {
+  const reports = match.flashReports ?? []
+  if (reports.length === 0) return null
+  return (
+    <section className="match-flash surface" aria-label="比赛快报">
+      <header className="match-flash__head">
+        <span className="match-flash__badge">快报</span>
+        {reports.length > 1 && <span className="match-flash__count">{reports.length} 篇</span>}
+      </header>
+      {reports.map((report) => {
+        const image = resolveMediaUrl(report.imageUrls?.[0] ?? report.imageUrl)
+        return (
+          <button
+            key={report.id}
+            className="match-flash__item"
+            type="button"
+            onClick={() => void openPost(report.id)}
+          >
+            {image && (
+              <span className="match-flash__media">
+                <img src={image} alt="" loading="lazy" />
+                {/\/media-assets\//.test(image) && <span className="match-flash__gif">GIF</span>}
+              </span>
+            )}
+            <span className="match-flash__text">
+              <strong>{report.title ?? '比赛快报'}</strong>
+              <span className="match-flash__body">{report.body}</span>
+              <span className="match-flash__meta">
+                {report.author?.displayName ?? '官方'} · {formatRelativeTime(report.publishedAt)}
+              </span>
+            </span>
+          </button>
+        )
+      })}
+    </section>
   )
 }
 

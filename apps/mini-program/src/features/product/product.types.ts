@@ -332,6 +332,8 @@ export interface PlayerDetailResponse {
 
 export interface MatchExperienceResponse extends MatchSummary {
   summary: string | null
+  /** 快报: official posts linked to this match; empty when none. */
+  flashReports?: PostSummary[]
   attendance: number | null
   events: Array<{
     id: string
