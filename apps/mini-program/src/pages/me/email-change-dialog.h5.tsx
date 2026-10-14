@@ -104,11 +104,48 @@ export function EmailChangeDialog({
       setBusy(false)
     }
   }
+  const formId = 'email-change-form'
+  const twoStep = Boolean(flow?.currentEmail)
+  const submitDisabled =
+    busy || code.length !== 6 || (!old && requestedEmail !== email.trim().toLowerCase())
+  const steps = [
+    { label: '验证原邮箱', note: flow?.currentEmail ?? '' },
+    { label: initiallyBound ? '绑定新邮箱' : '绑定邮箱', note: '输入新邮箱并验证' },
+  ]
+  const current = old ? 0 : 1
   return (
     <ProfileDialog
+      className="email-change-dialog"
       title={initiallyBound ? '换绑邮箱' : '绑定邮箱'}
-      {...(success ? {} : { note: '验证邮箱归属后完成绑定。' })}
+      {...(success ? {} : { note: '验证邮箱归属后完成绑定，验证码 10 分钟内有效。' })}
       onClose={close}
+      {...(flow && !success
+        ? {
+            footer: (
+              <div className="email-change-footer">
+                <button
+                  data-profile-button
+                  type="button"
+                  className="profile-button profile-button--outline"
+                  disabled={busy}
+                  onClick={close}
+                >
+                  取消
+                </button>
+                <button
+                  data-profile-button
+                  data-email-submit
+                  type="submit"
+                  form={formId}
+                  className="profile-button profile-button--primary"
+                  disabled={submitDisabled}
+                >
+                  {busy ? '正在验证…' : old ? '验证并继续' : '验证并绑定'}
+                </button>
+              </div>
+            ),
+          }
+        : {})}
     >
       {success ? (
         <div className="email-change-success">
@@ -124,22 +161,47 @@ export function EmailChangeDialog({
         </div>
       ) : (
         <>
-          {!flow && !error && <p role="status">正在读取邮箱绑定…</p>}
+          {!flow && !error && (
+            <p className="email-change-loading" role="status">
+              正在读取邮箱绑定…
+            </p>
+          )}
           {flow && (
-            <form className="email-change-form" onSubmit={(event) => void submit(event)}>
-              {flow.currentEmail && (
-                <div className="email-change-steps">
-                  <span className={old ? 'is-current' : 'is-complete'}>1 验证原邮箱</span>
-                  <i />
-                  <span className={!old ? 'is-current' : ''}>2 绑定新邮箱</span>
-                </div>
+            <form
+              id={formId}
+              className="email-change-form"
+              onSubmit={(event) => void submit(event)}
+            >
+              {twoStep && (
+                <ol className="email-stepper" aria-label="换绑步骤">
+                  {steps.map((step, index) => (
+                    <li
+                      key={step.label}
+                      className={`email-stepper__step ${index < current ? 'is-done' : ''} ${index === current ? 'is-active' : ''}`}
+                      aria-current={index === current ? 'step' : undefined}
+                    >
+                      <span className="email-stepper__dot" aria-hidden="true">
+                        {index < current ? '✓' : index + 1}
+                      </span>
+                      <span className="email-stepper__text">
+                        <strong>{step.label}</strong>
+                        <small>{step.note}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
               )}
-              <label>
-                {old ? '原邮箱' : '新邮箱'}
+              <div className="email-field">
+                <label className="email-field__label" htmlFor="email-change-address">
+                  {old ? '原邮箱' : '新邮箱'}
+                </label>
                 <input
-                  aria-label={old ? '原邮箱' : '新邮箱'}
+                  id="email-change-address"
+                  data-email-input=""
+                  className="email-field__input"
                   type="email"
                   autoComplete="email"
+                  placeholder={old ? '' : 'name@example.edu.cn'}
                   value={old ? (flow.currentEmail ?? '') : email}
                   readOnly={old}
                   required
@@ -151,56 +213,54 @@ export function EmailChangeDialog({
                     setNotice('')
                   }}
                 />
-              </label>
-              <label>
-                邮箱验证码
-                <div className="email-change-code">
+              </div>
+              <div className="email-field">
+                <label className="email-field__label" htmlFor="email-change-code">
+                  邮箱验证码
+                </label>
+                <div className="email-field__row">
                   <input
+                    id="email-change-code"
+                    data-email-input=""
+                    className="email-field__input email-field__input--code"
                     aria-label="邮箱验证码"
                     autoComplete="one-time-code"
                     inputMode="numeric"
                     pattern="[0-9]{6}"
                     maxLength={6}
+                    placeholder="6 位数字"
                     value={code}
                     required
                     onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
                   />
                   <button
                     data-profile-button
+                    data-email-send
                     type="button"
+                    className={`email-field__send ${remaining ? 'is-counting' : ''}`}
                     disabled={busy || remaining > 0}
                     onClick={() => void send()}
                   >
-                    {remaining ? `${remaining}秒后重试` : busy ? '正在请求…' : '获取验证码'}
+                    {remaining
+                      ? `${remaining} 秒后重新获取`
+                      : busy
+                        ? '正在发送…'
+                        : requestedEmail
+                          ? '重新获取'
+                          : '获取验证码'}
                   </button>
                 </div>
-              </label>
-              {notice && (
-                <p className="email-change-notice" role="status">
-                  {notice}
-                </p>
-              )}
-              <div className="profile-dialog__actions">
-                <button
-                  data-profile-button
-                  type="button"
-                  className="profile-button profile-button--outline"
-                  disabled={busy}
-                  onClick={close}
-                >
-                  取消
-                </button>
-                <button
-                  data-profile-button
-                  className="profile-button profile-button--primary"
-                  disabled={
-                    busy ||
-                    code.length !== 6 ||
-                    (!old && requestedEmail !== email.trim().toLowerCase())
-                  }
-                >
-                  {busy ? '正在验证…' : old ? '验证原邮箱并继续' : '验证并绑定'}
-                </button>
+                {notice ? (
+                  <p className="email-field__hint is-notice" role="status">
+                    {notice}
+                  </p>
+                ) : (
+                  <p className="email-field__hint">
+                    {old
+                      ? '验证码将发送到原邮箱。'
+                      : '先填写新邮箱，再获取验证码；完成后将使用新邮箱登录和找回密码。'}
+                  </p>
+                )}
               </div>
             </form>
           )}
@@ -209,12 +269,14 @@ export function EmailChangeDialog({
               {error}
             </p>
           )}
-          <p className="email-change-manual">
-            原邮箱无法使用？
-            <button data-profile-button onClick={() => setManual(true)}>
-              向管理员申请
-            </button>
-          </p>
+          {(!flow || old) && (
+            <p className="email-change-manual">
+              原邮箱无法使用？
+              <button data-profile-button type="button" onClick={() => setManual(true)}>
+                向管理员申请
+              </button>
+            </p>
+          )}
           {manual && (
             <ReportModal
               targetType="FEEDBACK"

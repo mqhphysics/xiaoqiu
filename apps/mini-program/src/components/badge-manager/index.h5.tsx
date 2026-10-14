@@ -95,6 +95,7 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
             <label data-badge-choice className={choice === '' ? 'is-selected' : ''}>
               <input
                 type="radio"
+                data-xq-radio=""
                 name="display-badge"
                 value=""
                 checked={choice === ''}
@@ -108,6 +109,7 @@ export function BadgeManager({ user, onClose }: { user: AuthUser; onClose: () =>
               <label data-badge-choice key={kind} className={choice === kind ? 'is-selected' : ''}>
                 <input
                   type="radio"
+                  data-xq-radio=""
                   name="display-badge"
                   value={kind}
                   checked={choice === kind}

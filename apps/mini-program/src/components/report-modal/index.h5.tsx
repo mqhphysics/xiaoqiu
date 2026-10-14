@@ -76,7 +76,9 @@ export function ReportModal(props: {
           </button>
         </header>
         <div className="xq-dialog__body">
-          <label htmlFor="report-reason-h5">问题概括</label>
+          <label className="report-field-label" htmlFor="report-reason-h5">
+            问题概括
+          </label>
           <input
             data-report-field
             id="report-reason-h5"
@@ -87,7 +89,9 @@ export function ReportModal(props: {
             disabled={saving}
             onChange={(event) => setReason(event.target.value)}
           />
-          <label htmlFor="report-details-h5">补充说明（选填）</label>
+          <label className="report-field-label" htmlFor="report-details-h5">
+            补充说明（选填）
+          </label>
           <textarea
             data-report-field
             id="report-details-h5"

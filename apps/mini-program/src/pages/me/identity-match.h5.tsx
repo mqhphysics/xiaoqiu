@@ -152,6 +152,7 @@ export function IdentityMatchDialog({
                   <label key={item.id}>
                     <input
                       type="radio"
+                      data-xq-radio=""
                       name="verified-identity"
                       checked={choice === item.id}
                       disabled={saving}

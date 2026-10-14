@@ -349,3 +349,49 @@
     margin-bottom: 12px;
   }
 }
+
+/* Round 4: the shared email-code row matches the recovery fields (height, radius, colours). */
+.auth-recovery__dialog .email-code {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.auth-recovery__dialog .email-code__label {
+  margin-bottom: 7px;
+  font-weight: 500;
+}
+.auth-recovery__dialog .email-code__row {
+  align-items: stretch;
+  gap: 10px;
+}
+.auth-recovery__dialog .email-code__input,
+.auth-recovery__dialog .email-code__button {
+  height: 46px;
+  min-height: 46px;
+  border-radius: 7px;
+}
+.auth-recovery__dialog .email-code__input {
+  padding: 11px 13px;
+  border-color: #c4d2c6;
+  background: #ffffff48;
+  color: #183d30;
+}
+.auth-recovery__dialog .email-code__input:focus {
+  outline: 2px solid #86a59042;
+  outline-offset: 1px;
+  border-color: #739780;
+}
+.auth-recovery__dialog .email-code__button {
+  min-width: 128px;
+  padding: 0 14px;
+  border-color: #2f6b45;
+  background: #fff;
+  color: #2f6b45;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.auth-recovery__dialog .email-code__button:disabled {
+  border-color: #d3ddd5;
+  background: #f3f6f3;
+  color: #8a978c;
+  opacity: 1;
+}

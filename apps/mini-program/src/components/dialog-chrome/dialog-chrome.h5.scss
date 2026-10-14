@@ -249,6 +249,28 @@
     padding: 8px 22px 4px;
   }
 
+  /* Short forms (feedback / correction requests) get a compact frame instead of the 920×540 one. */
+  .report-panel-h5.xq-dialog {
+    width: min(560px, calc(100vw - 48px));
+    height: auto;
+    max-height: min(560px, calc(100dvh - 64px));
+  }
+  .report-panel-h5.xq-dialog > .xq-dialog__body .report-field-label {
+    display: block;
+    margin: 14px 0 7px;
+    color: #304739;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .report-panel-h5.xq-dialog [data-report-field] {
+    height: 42px;
+  }
+  .report-panel-h5.xq-dialog textarea[data-report-field],
+  .report-panel-h5.xq-dialog [data-report-field]#report-details-h5 {
+    height: 120px;
+    resize: vertical;
+  }
+
   .report-panel-h5.xq-dialog > .xq-dialog__footer {
     padding: 14px 22px 18px;
   }
@@ -283,4 +305,44 @@
   .post-detail-modal.post-detail-modal--text.xq-dialog > .post-detail-modal__stage {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Shared custom radio for account/settings dialogs (Taro ignores bare input selectors). */
+[data-xq-radio] {
+  appearance: none;
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid #b9c7bc;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+[data-xq-radio]::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f6b45;
+  transform: scale(0);
+  transition: transform 140ms ease;
+}
+[data-xq-radio]:checked {
+  border-color: #2f6b45;
+}
+[data-xq-radio]:checked::before {
+  transform: scale(1);
+}
+[data-xq-radio]:focus-visible {
+  outline: 2px solid #2f6b45;
+  outline-offset: 2px;
+}
+[data-xq-radio]:disabled {
+  cursor: default;
+  opacity: 0.6;
 }

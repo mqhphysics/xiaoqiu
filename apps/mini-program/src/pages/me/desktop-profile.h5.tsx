@@ -887,9 +887,11 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                   onClick={() => setSelectedTeam(team.id)}
                 >
                   <TeamCrest team={team} size="small" />
-                  <span>
-                    <strong>{team.name}</strong>
-                    <small>{team.collegeName || '校园球队'}</small>
+                  <span className="profile-team-option__text">
+                    <strong className="profile-team-option__name">{team.name}</strong>
+                    <small className="profile-team-option__college">
+                      {team.collegeName || '校园球队'}
+                    </small>
                   </span>
                   <ProfileIcon name={selectedTeam === team.id ? 'check' : 'right'} />
                 </button>

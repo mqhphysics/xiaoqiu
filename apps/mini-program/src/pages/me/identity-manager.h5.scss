@@ -30,10 +30,10 @@
 }
 .profile-current-identity {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  gap: 12px;
-  padding: 30px 0 24px;
+  gap: 10px;
+  padding: 22px 0 8px;
 }
 .profile-current-identity > strong {
   font-size: 22px;

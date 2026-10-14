@@ -2116,3 +2116,31 @@
     font-size: 20px;
   }
 }
+
+.profile-team-options .profile-team-option__text {
+  display: grid;
+  flex: 1 1 auto;
+  justify-items: start;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.4;
+}
+.profile-team-options .profile-team-option__name,
+.profile-team-options .profile-team-option__college {
+  display: block;
+  text-align: left;
+}
+.profile-team-options .profile-team-option__name {
+  overflow: hidden;
+  color: #1f3324;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-team-options .profile-team-option__college {
+  color: #7d8a7a;
+  font-size: 12px;
+}
+.profile-team-options .team-trigger {
+  flex: 0 0 auto;
+}

@@ -10,6 +10,7 @@ export function ProfileDialog({
   children,
   footer,
   wide,
+  className,
 }: {
   title: string
   note?: string
@@ -17,6 +18,7 @@ export function ProfileDialog({
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  className?: string
 }) {
   const dialogId = `profile-dialog-${useId().replaceAll(':', '')}`
   const titleId = `${dialogId}-title`
@@ -30,7 +32,7 @@ export function ProfileDialog({
     >
       <section
         id={dialogId}
-        className={`profile-dialog xq-dialog ${wide ? 'profile-dialog--wide xq-dialog--wide' : ''}`}
+        className={`profile-dialog xq-dialog ${wide ? 'profile-dialog--wide xq-dialog--wide' : ''} ${className ?? ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
