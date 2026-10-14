@@ -142,6 +142,18 @@
   .email-stepper__step.is-done {
     color: #1f4a30;
   }
+  .email-stepper__step + .email-stepper__step::before {
+    transform-origin: left center;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .email-stepper__step.is-active .email-stepper__dot {
+      animation: email-step-settle 280ms cubic-bezier(0.34, 1.45, 0.64, 1);
+    }
+    .email-stepper__step.is-active::before,
+    .email-stepper__step.is-done + .email-stepper__step::before {
+      animation: email-step-fill 280ms cubic-bezier(0.34, 1.35, 0.64, 1);
+    }
+  }
   .email-field {
     display: grid;
     gap: 7px;
@@ -278,5 +290,36 @@
     background: #ebf4e4;
     color: #577a4a;
     font-size: 30px;
+  }
+}
+
+@keyframes email-step-settle {
+  0% {
+    transform: scale(0.82);
+  }
+  55% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes email-step-fill {
+  0% {
+    transform: scaleX(0.15);
+  }
+  70% {
+    transform: scaleX(1.08);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .email-stepper__dot,
+  .email-stepper__step + .email-stepper__step::before {
+    animation: none;
   }
 }

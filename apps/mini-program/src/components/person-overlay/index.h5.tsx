@@ -15,6 +15,7 @@ import {
   CompactStats,
   PersonHoverPreview,
 } from '../player-overlay/index.h5'
+import { TextDisclosure } from '../interactions/text-disclosure.h5'
 import { VerificationBadge } from '../verification-badge/index.h5'
 import { useOverlayFocus } from '../overlay-focus'
 import { openMessaging } from '../messaging-drawer/index.h5'
@@ -154,7 +155,9 @@ export function PersonDialog({
                         userId={person.id}
                       />
                     </div>
-                    <p>{person.bio || '还没有填写个人简介。'}</p>
+                    <TextDisclosure className="person-bio" lines={3}>
+                      {person.bio || '还没有填写个人简介。'}
+                    </TextDisclosure>
                     {person.organizationName && <span>{person.organizationName}</span>}
                   </div>
                   <MessageAction person={person} />

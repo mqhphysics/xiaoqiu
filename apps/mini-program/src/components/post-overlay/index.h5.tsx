@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { playCurvedLeave } from '../interactions/curved-leave.h5'
 import { createPortal } from 'react-dom'
 import {
   OPEN_POST_EVENT,
@@ -302,6 +303,8 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
     try {
       if (comment) {
         await productRepository.deleteComment(post.id, comment.id, comment.updatedAt!)
+        const row = document.getElementById('post-comment-' + comment.id)
+        if (row) await playCurvedLeave(row)
         setPost((current) =>
           current
             ? {
@@ -315,6 +318,8 @@ function PostOverlay({ postId, onClose }: { postId: string; onClose: () => void 
         if (editingComment?.id === comment.id) setEditingComment(null)
       } else {
         await productRepository.deletePost(post.id, post.updatedAt!)
+        const dialog = document.querySelector<HTMLElement>('.post-detail-modal')
+        if (dialog) await playCurvedLeave(dialog, { collapse: false })
         updatePostInteraction({ ...post, deleted: true })
         onClose()
       }

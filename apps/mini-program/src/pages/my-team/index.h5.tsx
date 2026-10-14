@@ -7,7 +7,8 @@ import { TeamCrest, UserAvatar } from '../../components/product-ui'
 import { TeamContent, Empty } from '../../components/team-hub/content.h5'
 import { PlayerProfile } from '../../components/player-overlay/index.h5'
 import { TeamPicker } from '../../components/team-hub/picker.h5'
-import { PlayerPicker } from '../../components/team-hub/player-picker.h5'
+import { FollowBoard } from '../../components/team-hub/follow-board.h5'
+import { applyOrder, readFollowOrder } from '../../components/interactions/follow-order.h5'
 import { useDesktopTeamView, useTeamData } from '../../components/team-hub/data.h5'
 import { TeamIcon } from '../../components/team-hub/icons.h5'
 import { productRepository } from '../../features/product/product.repository'
@@ -24,6 +25,22 @@ import type {
 import ExistingMyTeamPage from './my-team.shared'
 import '../../components/team-hub/index.h5.scss'
 import './index.h5.scss'
+
+function orderPreferences(
+  prefs: TeamPreferencesResponse | null,
+): TeamPreferencesResponse | null {
+  if (!prefs) return prefs
+  const id = readSession()?.user.id ?? ''
+  return {
+    ...prefs,
+    followedTeams: applyOrder(prefs.followedTeams, readFollowOrder(id).teams),
+  }
+}
+
+function orderPlayers(follows: PlayerFollowsResponse): PlayerFollowsResponse {
+  const id = readSession()?.user.id ?? ''
+  return { items: applyOrder(follows.items, readFollowOrder(id).players) }
+}
 
 export default function H5MyTeamPage() {
   const desktop = useDesktopTeamView()
@@ -50,7 +67,8 @@ function DesktopMyTeamPage() {
   const [error, setError] = useState('')
   const [selectedTeam, setSelectedTeam] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState('')
-  const [picker, setPicker] = useState<'primary' | 'follow' | 'player' | null>(null)
+  const [picker, setPicker] = useState<'primary' | null>(null)
+  const [board, setBoard] = useState<'order' | 'add' | null>(null)
   const sequence = useRef(0)
   const currentPrimary = useRef('')
   const load = useCallback(async () => {
@@ -76,9 +94,9 @@ function DesktopMyTeamPage() {
       ])
       if (request !== sequence.current) return
       setHome(homeData)
-      setPreferences(prefs)
+      setPreferences(orderPreferences(prefs))
       currentPrimary.current = prefs?.primaryTeam?.id ?? ''
-      setPlayers(follows.value)
+      setPlayers(orderPlayers(follows.value))
       setPlayerError(follows.error)
       setSelectedTeam(prefs?.primaryTeam?.id ?? '')
       setSelectedPlayer('')
@@ -103,22 +121,22 @@ function DesktopMyTeamPage() {
         setSelectedPlayer('')
       }
       currentPrimary.current = next.primaryTeam?.id ?? ''
-      setPreferences(next)
+      setPreferences(orderPreferences(next))
     }
     window.addEventListener(TEAM_PREFERENCES_EVENT, changed)
     return () => window.removeEventListener(TEAM_PREFERENCES_EVENT, changed)
   }, [])
   const tournamentId = routeTournamentId || home?.tournament.id || ''
-  const openPicker = (mode: 'primary' | 'follow' | 'player') => {
-    if (mode !== 'primary' && !readSession()) {
+  const openBoard = (phase: 'order' | 'add') => {
+    if (!readSession()) {
       void Taro.showToast({ title: '登录后可以关注球队和球员', icon: 'none' })
       return
     }
-    if (mode === 'follow' && !preferences?.primaryTeam) {
+    if (!preferences?.primaryTeam && phase === 'add') {
       setPicker('primary')
       return
     }
-    setPicker(mode)
+    setBoard(phase)
   }
   return (
     <PublicShell active="team" tournamentId={tournamentId}>
@@ -143,7 +161,7 @@ function DesktopMyTeamPage() {
                     type="button"
                     className="th-icon-button th-switch"
                     aria-label="切换主队"
-                    onClick={() => openPicker('primary')}
+                    onClick={() => setPicker('primary')}
                   >
                     <TeamIcon name="switch" />
                     <span role="tooltip">切换主队</span>
@@ -164,7 +182,7 @@ function DesktopMyTeamPage() {
                     data-team-control
                     type="button"
                     className="th-follow-chip"
-                    onClick={() => openPicker('primary')}
+                    onClick={() => setPicker('primary')}
                   >
                     <TeamIcon name="plus" />
                     选择我的主队
@@ -174,16 +192,28 @@ function DesktopMyTeamPage() {
               <section className="th-follow-strip__teams">
                 <div className="th-follow-strip__label">
                   <span>我关注的球队</span>
-                  <button
-                    data-team-control
-                    type="button"
-                    className="th-icon-button"
-                    aria-label="管理关注球队"
-                    title="管理关注球队"
-                    onClick={() => openPicker('follow')}
-                  >
-                    <TeamIcon name="plus" />
-                  </button>
+                  <span className="th-follow-strip__actions">
+                    <button
+                      data-team-control
+                      type="button"
+                      className="th-icon-button"
+                      aria-label="调整关注顺序"
+                      title="调整关注顺序"
+                      onClick={() => openBoard('order')}
+                    >
+                      <TeamIcon name="reorder" />
+                    </button>
+                    <button
+                      data-team-control
+                      type="button"
+                      className="th-icon-button"
+                      aria-label="添加关注"
+                      title="添加关注"
+                      onClick={() => openBoard('add')}
+                    >
+                      <TeamIcon name="plus" />
+                    </button>
+                  </span>
                 </div>
                 <HorizontalFollowStrip>
                   {preferences?.followedTeams.length ? (
@@ -203,7 +233,7 @@ function DesktopMyTeamPage() {
                       data-team-control
                       type="button"
                       className="th-empty-chip"
-                      onClick={() => openPicker('follow')}
+                      onClick={() => openBoard('add')}
                     >
                       关注更多校园球队
                     </button>
@@ -217,9 +247,9 @@ function DesktopMyTeamPage() {
                     data-team-control
                     type="button"
                     className="th-icon-button"
-                    aria-label="管理关注球员"
-                    title="管理关注球员"
-                    onClick={() => openPicker('player')}
+                    aria-label="添加关注"
+                    title="添加关注"
+                    onClick={() => openBoard('add')}
                   >
                     <TeamIcon name="plus" />
                   </button>
@@ -253,7 +283,7 @@ function DesktopMyTeamPage() {
                       data-team-control
                       type="button"
                       className="th-empty-chip"
-                      onClick={() => openPicker('player')}
+                      onClick={() => openBoard('add')}
                     >
                       {playerError ? '关注加载失败，点击重试' : '关注球员，追踪绿茵表现'}
                     </button>
@@ -279,7 +309,7 @@ function DesktopMyTeamPage() {
                   data-team-control
                   type="button"
                   className="th-primary-button"
-                  onClick={() => openPicker('primary')}
+                  onClick={() => setPicker('primary')}
                 >
                   选择主队
                   <TeamIcon name="arrow" />
@@ -302,27 +332,29 @@ function DesktopMyTeamPage() {
             )}
           </>
         ) : null}
-        {picker && picker !== 'player' && home ? (
+        {picker === 'primary' && home ? (
           <TeamPicker
-            mode={picker}
+            mode="primary"
             preferences={preferences}
             teams={home.teams}
             onClose={() => setPicker(null)}
             onSaved={(next) => {
-              setPreferences(next)
-              if (picker === 'primary') {
-                setSelectedPlayer('')
-                setSelectedTeam(next.primaryTeam?.id ?? '')
-              }
+              setPreferences(orderPreferences(next))
+              setSelectedPlayer('')
+              setSelectedTeam(next.primaryTeam?.id ?? '')
             }}
           />
         ) : null}
-        {picker === 'player' ? (
-          <PlayerPicker
+        {board && preferences && home ? (
+          <FollowBoard
+            initialPhase={board}
+            preferences={preferences}
+            players={players}
+            teams={home.teams}
             tournamentId={tournamentId}
-            follows={players}
-            onChange={setPlayers}
-            onClose={() => setPicker(null)}
+            onClose={() => setBoard(null)}
+            onTeams={(next) => setPreferences(orderPreferences(next))}
+            onPlayers={(next) => setPlayers(orderPlayers(next))}
           />
         ) : null}
       </div>

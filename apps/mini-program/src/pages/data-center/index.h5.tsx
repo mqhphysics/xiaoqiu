@@ -1,6 +1,7 @@
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { ExpandingTags } from '../../components/interactions/expanding-tags.h5'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { TeamCrest } from '../../components/product-ui'
@@ -239,22 +240,22 @@ function DataHero({
       <div className="data-desktop__intro">
         <div className="data-desktop__title-row">
           <h1>赛事数据</h1>
-          <label className="data-desktop__select data-desktop__select--season">
-            <span className="sr-only">选择赛事赛季</span>
-            <select
-              value={selectedTournamentId}
-              onChange={(event) => onSeasonChange(event.target.value)}
-            >
-              {data.seasons.map((season) => (
-                <option key={season.tournamentId} value={season.tournamentId}>
-                  {season.tournamentName}
-                </option>
-              ))}
-              {!data.seasons.some((season) => season.tournamentId === data.tournament.id) && (
-                <option value={data.tournament.id}>{data.tournament.name}</option>
-              )}
-            </select>
-          </label>
+          <ExpandingTags
+            className="data-season-tags"
+            label="选择赛事赛季"
+            value={selectedTournamentId}
+            disabled={unavailable}
+            options={[
+              ...data.seasons.map((season) => ({
+                id: season.tournamentId,
+                label: season.tournamentName,
+              })),
+              ...(data.seasons.some((season) => season.tournamentId === data.tournament.id)
+                ? []
+                : [{ id: data.tournament.id, label: data.tournament.name }]),
+            ]}
+            onChange={onSeasonChange}
+          />
           {data.resultsMode === 'PENDING' && (
             <span className="data-desktop__demo">赛事筹备中 · 数据待上传</span>
           )}

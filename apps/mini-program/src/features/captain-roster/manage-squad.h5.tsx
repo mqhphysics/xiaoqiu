@@ -7,6 +7,7 @@ import type { CaptainWorkspaceResponse, TeamDashboardResponse } from '../product
 import { RosterApiError, rosterRepository, type RosterWorkflowView } from './roster.repository'
 import { teamManagementRepository } from './team-management.repository'
 import { Icon } from './manage-icons.h5'
+import '../../components/interactions/interactions.h5.scss'
 
 type Member = CaptainWorkspaceResponse['members'][number]
 const EDITABLE = ['', 'DRAFT', 'RETURNED', 'REOPENED']
@@ -51,6 +52,8 @@ export function ManageSquadSection({
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const rosterRef = useRef(roster)
+  const checkDelays = useRef(new Map<string, number>())
+  const stampedChecks = useRef(false)
   rosterRef.current = roster
 
   useEffect(() => {
@@ -217,6 +220,14 @@ export function ManageSquadSection({
     const ib = b.playerId && entries.has(b.playerId) ? 0 : 1
     return ia - ib || Number(b.isCaptain) - Number(a.isCaptain)
   })
+  if (!stampedChecks.current && entries.size > 0) {
+    stampedChecks.current = true
+    members.forEach((member, index) => {
+      if (member.playerId && entries.has(member.playerId)) {
+        checkDelays.current.set(member.id, Math.min(index, 10) * 24)
+      }
+    })
+  }
   const pending = captain.applications.filter((item) => item.status === 'PENDING')
   const policy = roster?.policy ?? null
   const count = entries.size
@@ -360,6 +371,11 @@ export function ManageSquadSection({
                     <button
                       type="button"
                       className={`cmx-toggle ${inRoster ? 'is-on' : ''}`}
+                      style={
+                        inRoster
+                          ? { animationDelay: `${checkDelays.current.get(member.id) ?? 0}ms` }
+                          : undefined
+                      }
                       disabled={!canRegister && !inRoster}
                       title={
                         !playerId ? '尚未建立球员档案' : inRoster ? '移出大名单' : '加入大名单'

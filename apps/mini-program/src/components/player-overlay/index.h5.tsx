@@ -1,3 +1,4 @@
+import { TextDisclosure } from '../interactions/text-disclosure.h5'
 import { SelfPlayerEditor } from './self-editor.h5'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
@@ -492,7 +493,9 @@ export function PlayerProfile({
               </button>
             )}
           </div>
-          <p>{player.bio ?? '热爱足球，记录每一次上场。'}</p>
+          <TextDisclosure className="player-bio-copy" lines={3}>
+            {player.bio ?? '热爱足球，记录每一次上场。'}
+          </TextDisclosure>
         </div>
         <div className="player-profile-hero__aside">
           <CompactStats player={player} goalkeeperStats={presentation.goalkeeperStats} />

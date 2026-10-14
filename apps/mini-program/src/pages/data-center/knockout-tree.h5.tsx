@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { useExpandingTagShift } from '../../components/interactions/expanding-tags.h5'
 import { openMatchFromUrl } from '../../features/product/match-navigation'
 import { TeamCrest, TeamName } from '../../components/product-ui'
 import { DataState } from '../../components/public-ui'
@@ -40,6 +41,8 @@ function readOrientation(): Orientation {
 export function KnockoutPanel({ data, expanded, onExpand }: Props) {
   const { rounds, thirdPlace, eightTeam } = knockoutRounds(data)
   const [orientation, setOrientationState] = useState<Orientation>(readOrientation)
+  const orientationRef = useRef<HTMLDivElement>(null)
+  useExpandingTagShift(orientationRef, orientation)
   const setOrientation = (next: Orientation) => {
     setOrientationState(next)
     try {
@@ -68,12 +71,18 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
           <span aria-hidden="true">{expanded ? '完整对阵' : '展开 ↗'}</span>
         </button>
         {expanded && eightTeam ? (
-          <div className="data-bracket-switch" role="radiogroup" aria-label="晋级图方向">
+          <div
+            ref={orientationRef}
+            className="data-bracket-switch"
+            role="radiogroup"
+            aria-label="晋级图方向"
+          >
             {(['vertical', 'horizontal'] as const).map((value) => (
               <button
                 key={value}
                 type="button"
                 role="radio"
+                data-xq-tag={value}
                 aria-checked={orientation === value}
                 className={'data-bracket-switch__option' + (orientation === value ? ' is-active' : '')}
                 onClick={() => setOrientation(value)}
