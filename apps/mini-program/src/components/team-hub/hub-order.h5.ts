@@ -27,7 +27,7 @@ function writeLocalOrder(order: HubOrderKey[]): void {
 
 export async function loadHubStripOrder(): Promise<HubOrderKey[]> {
   const local = readLocalOrder()
-  if (!readSession() || remoteOrderEnabled === false) return local
+  if (!readSession()) return local
   try {
     const remote = await request<{ items?: unknown }>('/me/hub-strip-order')
     remoteOrderEnabled = true
