@@ -105,8 +105,8 @@ function DualLineups({ match }: { match: MatchExperienceResponse }) {
                       key={player.id}
                       className={`pitch-player ${lane === 'GOALKEEPER' ? 'pitch-player--goalkeeper' : ''}`}
                       style={{
-                        left: `${side === 0 ? 8 + point.y * 0.84 : 92 - point.y * 0.84}%`,
-                        top: `${10 + point.x * 0.8}%`,
+                        left: `${side === 0 ? 7 + point.y * 0.86 : 93 - point.y * 0.86}%`,
+                        top: `${14 + point.x * 0.72}%`,
                       }}
                     >
                       <button
@@ -123,10 +123,10 @@ function DualLineups({ match }: { match: MatchExperienceResponse }) {
                             color={player.profileColor ?? lineup.team.primaryColor}
                             size="small"
                           />
-                          <SubCorner {...(playerEvents ? { events: playerEvents } : {})} />
                         </span>
                         <span className="pitch-player__number">{player.shirtNumber ?? '—'}</span>
                       </button>
+                      <SubCorner {...(playerEvents ? { events: playerEvents } : {})} />
                       <PlayerTrigger
                         playerId={player.id}
                         tournamentId={match.tournamentId}
@@ -307,8 +307,6 @@ function PitchIcons({ events }: { events?: PlayerMatchEvents | undefined }) {
     ...events.goals.map((_, index) => ({ kind: 'GOAL' as const, key: `g${index}` })),
     ...events.assists.map((_, index) => ({ kind: 'ASSIST' as const, key: `a${index}` })),
     ...events.ownGoals.map((_, index) => ({ kind: 'OWN_GOAL' as const, key: `og${index}` })),
-    ...events.yellowCards.map((_, index) => ({ kind: 'YELLOW_CARD' as const, key: `y${index}` })),
-    ...events.redCards.map((_, index) => ({ kind: 'RED_CARD' as const, key: `r${index}` })),
   ]
   if (!icons.length) return null
   return (

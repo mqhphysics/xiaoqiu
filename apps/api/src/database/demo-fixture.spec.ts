@@ -145,7 +145,7 @@ test('every team with seeded appearances has exactly 8 starters per match', () =
   assert.equal(DEMO_STARTERS_PER_TEAM, 8)
   assert.deepEqual(
     Array.from({ length: 14 }, (_, playerIndex) => getDemoMinutesPlayed(playerIndex, 90)),
-    [90, 0, 90, 90, 90, 90, 60, 60, 30, 30, 90, 0, 0, 0],
+    [90, 0, 90, 90, 90, 0, 90, 60, 60, 30, 90, 30, 0, 0],
   )
 
   const matchesWithAppearances = DEMO_MATCHES.filter(
@@ -170,13 +170,16 @@ test('every team with seeded appearances has exactly 8 starters per match', () =
         8,
         `${match.code} team ${teamIndex} should seed exactly 8 starters`,
       )
-      assert.equal(
-        teamPlayers.filter(
-          (player, playerIndex) =>
-            isDemoMatchStarter(playerIndex) && player.position === 'GOALKEEPER',
-        ).length,
-        1,
-        `${match.code} team ${teamIndex} should seed a single starting goalkeeper`,
+      const starters = teamPlayers.filter((_, playerIndex) => isDemoMatchStarter(playerIndex))
+      assert.deepEqual(
+        {
+          GOALKEEPER: starters.filter((player) => player.position === 'GOALKEEPER').length,
+          DEFENDER: starters.filter((player) => player.position === 'DEFENDER').length,
+          MIDFIELDER: starters.filter((player) => player.position === 'MIDFIELDER').length,
+          FORWARD: starters.filter((player) => player.position === 'FORWARD').length,
+        },
+        { GOALKEEPER: 1, DEFENDER: 3, MIDFIELDER: 3, FORWARD: 1 },
+        `${match.code} team ${teamIndex} should seed an eight-a-side 3-3-1`,
       )
       assert.equal(
         seededMinutes.reduce((total, minutes) => total + minutes, 0),

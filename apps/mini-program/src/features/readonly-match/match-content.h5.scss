@@ -161,6 +161,33 @@
   }
 }
 @media (min-width: 721px) {
+  .match-dialog.xq-dialog {
+    container-type: size;
+    container-name: match-dlg;
+  }
+  .match-dialog .experience-match-header {
+    padding: 8px 20px 10px;
+  }
+  .match-dialog .experience-scoreboard {
+    margin-top: 6px;
+    gap: 14px;
+  }
+  .match-dialog .experience-scoreboard .team-crest {
+    width: 52px;
+    height: 52px;
+  }
+  .match-dialog .experience-scoreboard .experience-scoreboard__score .experience-scoreboard__result {
+    font-size: 48px;
+  }
+  .match-dialog .match-detail-tabs {
+    margin-top: 10px;
+  }
+  .match-dialog .match-horizontal-lineups__heading {
+    padding-bottom: 8px;
+  }
+  .match-dialog .match-horizontal-pitch {
+    height: clamp(200px, calc(100cqh - 268px), 340px);
+  }
   .experience-match-header__context {
     display: flex;
     justify-content: center;
