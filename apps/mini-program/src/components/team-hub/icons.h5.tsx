@@ -10,6 +10,9 @@ export function TeamIcon({
     | 'close'
     | 'plus'
     | 'arrow'
+    | 'back'
+    | 'menu'
+    | 'grip'
     | 'pin'
     | 'heart'
     | 'like'
@@ -49,6 +52,22 @@ export function TeamIcon({
     close: <path d="M6 6l12 12M6 18L18 6" />,
     plus: <path d="M12 5v14M5 12h14" />,
     arrow: <path d="M4 12h16M15 7l5 5-5 5" />,
+    back: <path d="M19 12H5M10 7l-5 5 5 5" />,
+    menu: (
+      <>
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </>
+    ),
+    grip: (
+      <>
+        <circle cx="9" cy="7" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="9" cy="17" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="17" r="1.2" fill="currentColor" stroke="none" />
+      </>
+    ),
     pin: (
       <>
         <path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />

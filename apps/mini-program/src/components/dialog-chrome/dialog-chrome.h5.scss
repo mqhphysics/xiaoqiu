@@ -196,7 +196,8 @@
     max-height: min(520px, 86dvh);
   }
 
-  .th-picker.xq-dialog > .th-search {
+  .th-picker.xq-dialog > .th-search,
+  .th-picker.xq-dialog > .th-hub-search {
     flex: 0 0 auto;
     margin: 16px 20px 0;
   }

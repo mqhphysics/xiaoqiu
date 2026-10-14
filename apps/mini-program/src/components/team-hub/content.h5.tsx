@@ -30,6 +30,7 @@ import type {
   TeamSummary,
 } from '../../features/product/product.types'
 import { TeamIcon } from './icons.h5'
+import { pickSpotlightMatches, spotlightKind } from './hub-order.logic'
 
 type Tab = 'feed' | 'players' | 'profile'
 const tabs = [
@@ -195,11 +196,10 @@ export function TeamContent({
       <div className="th-panel" id={panelId} role="tabpanel" aria-labelledby={`${panelId}-${tab}`}>
         {tab === 'feed' ? (
           <div className="th-columns th-columns--feed">
-            <section className="th-surface th-feed">
+            <section className="th-surface th-feed th-feed--compact">
+              <SpotlightMatches matches={matches} tournamentId={tournamentId} />
               <div className="th-heading">
-                <h2>
-                  球队动态
-                </h2>
+                <h2>球队动态</h2>
                 <button
                   data-team-control
                   type="button"
@@ -358,10 +358,7 @@ export function TeamContent({
                 <h2>球队数据</h2>
                 {season}
               </div>
-              <p className="th-small-note">
-                
-                以下统计来自当前赛事的比赛记录。
-              </p>
+              <p className="th-small-note">以下统计来自当前赛事的比赛记录。</p>
               <div className="th-stat-grid">
                 {[
                   ['比赛', data.stats.played],
@@ -489,6 +486,53 @@ export function Empty({ title, copy }: { title: string; copy: string }) {
     <div className="th-empty">
       <strong>{title}</strong>
       <p>{copy}</p>
+    </div>
+  )
+}
+
+function SpotlightMatches({
+  matches,
+  tournamentId,
+}: {
+  matches: MatchSummary[]
+  tournamentId: string
+}) {
+  const cards = pickSpotlightMatches(matches)
+  if (!cards.length) return null
+  return (
+    <div className="th-spotlight" aria-label="主队近期比赛">
+      {cards.map((match, index) => {
+        const kind = spotlightKind(match, index, cards)
+        const hasScore = match.homeScore !== null && match.awayScore !== null
+        return (
+          <button
+            key={match.id}
+            data-team-control
+            type="button"
+            className={`th-spotlight__card th-spotlight__card--${kind}`}
+            aria-label={`查看${match.title}比赛详情`}
+            onClick={() => void openMatch(match.id, tournamentId)}
+          >
+            <span className="th-spotlight__label">
+              {kind === 'upcoming' ? (match.status === 'LIVE' ? '正在进行' : '下一场') : '最近完赛'}
+            </span>
+            <span className="th-spotlight__when">
+              {formatDate(match.scheduledStartAt)} · {formatTime(match.scheduledStartAt)}
+            </span>
+            <span className="th-spotlight__teams">
+              <TeamCrest team={match.homeTeam} size="small" interactive={false} />
+              <strong>{match.homeTeam?.shortName ?? match.homePlaceholder ?? '待定'}</strong>
+              <em>{hasScore ? `${match.homeScore} : ${match.awayScore}` : 'VS'}</em>
+              <strong>{match.awayTeam?.shortName ?? match.awayPlaceholder ?? '待定'}</strong>
+              <TeamCrest team={match.awayTeam} size="small" interactive={false} />
+            </span>
+            <span className="th-spotlight__meta">
+              <MatchStatus status={match.status} />
+              <small>{match.roundName ?? match.stageName ?? match.title}</small>
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

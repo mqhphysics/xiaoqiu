@@ -7,7 +7,9 @@ import { TeamCrest, UserAvatar } from '../../components/product-ui'
 import { TeamContent, Empty } from '../../components/team-hub/content.h5'
 import { PlayerProfile } from '../../components/player-overlay/index.h5'
 import { TeamPicker } from '../../components/team-hub/picker.h5'
-import { PlayerPicker } from '../../components/team-hub/player-picker.h5'
+import { HubManageDialog } from '../../components/team-hub/hub-manage.h5'
+import { loadHubStripOrder, saveHubStripOrder } from '../../components/team-hub/hub-order.h5'
+import { applyHubOrder, type HubOrderKey } from '../../components/team-hub/hub-order.logic'
 import { useDesktopTeamView, useTeamData } from '../../components/team-hub/data.h5'
 import { TeamIcon } from '../../components/team-hub/icons.h5'
 import { productRepository } from '../../features/product/product.repository'
@@ -50,9 +52,11 @@ function DesktopMyTeamPage() {
   const [error, setError] = useState('')
   const [selectedTeam, setSelectedTeam] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState('')
-  const [picker, setPicker] = useState<'primary' | 'follow' | 'player' | null>(null)
+  const [picker, setPicker] = useState<'primary' | 'manage' | null>(null)
+  const [order, setOrder] = useState<HubOrderKey[]>([])
   const sequence = useRef(0)
   const currentPrimary = useRef('')
+  const persistOrder = useRef(false)
   const load = useCallback(async () => {
     const request = ++sequence.current
     setLoading(true)
@@ -82,6 +86,11 @@ function DesktopMyTeamPage() {
       setPlayerError(follows.error)
       setSelectedTeam(prefs?.primaryTeam?.id ?? '')
       setSelectedPlayer('')
+      persistOrder.current = false
+      const nextOrder = await loadHubStripOrder()
+      if (request !== sequence.current) return
+      setOrder(nextOrder)
+      persistOrder.current = true
     } catch (issue) {
       if (request === sequence.current)
         setError(issue instanceof Error ? issue.message : '主队空间加载失败')
@@ -108,18 +117,22 @@ function DesktopMyTeamPage() {
     window.addEventListener(TEAM_PREFERENCES_EVENT, changed)
     return () => window.removeEventListener(TEAM_PREFERENCES_EVENT, changed)
   }, [])
+  useEffect(() => {
+    if (!persistOrder.current) return
+    const timer = window.setTimeout(() => {
+      void saveHubStripOrder(order)
+    }, 280)
+    return () => window.clearTimeout(timer)
+  }, [order])
   const tournamentId = routeTournamentId || home?.tournament.id || ''
-  const openPicker = (mode: 'primary' | 'follow' | 'player') => {
-    if (mode !== 'primary' && !readSession()) {
+  const openPicker = (mode: 'primary' | 'manage') => {
+    if (mode === 'manage' && !readSession()) {
       void Taro.showToast({ title: '登录后可以关注球队和球员', icon: 'none' })
-      return
-    }
-    if (mode === 'follow' && !preferences?.primaryTeam) {
-      setPicker('primary')
       return
     }
     setPicker(mode)
   }
+  const stripItems = applyHubOrder(preferences?.followedTeams ?? [], players.items, order)
   return (
     <PublicShell active="team" tournamentId={tournamentId}>
       <div className="th-root th-page xq-viewport-page">
@@ -134,21 +147,8 @@ function DesktopMyTeamPage() {
           />
         ) : home ? (
           <>
-            <div className="th-follow-strip">
-              <section className="th-follow-strip__primary">
-                <div className="th-follow-strip__label">
-                  <strong>我的主队</strong>
-                  <button
-                    data-team-control
-                    type="button"
-                    className="th-icon-button th-switch"
-                    aria-label="切换主队"
-                    onClick={() => openPicker('primary')}
-                  >
-                    <TeamIcon name="switch" />
-                    <span role="tooltip">切换主队</span>
-                  </button>
-                </div>
+            <div className="th-follow-strip th-follow-strip--single">
+              <HorizontalFollowStrip>
                 {preferences?.primaryTeam ? (
                   <FollowTeamChip
                     team={preferences.primaryTeam}
@@ -163,103 +163,67 @@ function DesktopMyTeamPage() {
                   <button
                     data-team-control
                     type="button"
-                    className="th-follow-chip"
+                    className="th-follow-chip th-follow-chip--add"
                     onClick={() => openPicker('primary')}
                   >
                     <TeamIcon name="plus" />
                     选择我的主队
                   </button>
                 )}
-              </section>
-              <section className="th-follow-strip__teams">
-                <div className="th-follow-strip__label">
-                  <span>我关注的球队</span>
-                  <button
-                    data-team-control
-                    type="button"
-                    className="th-icon-button"
-                    aria-label="管理关注球队"
-                    title="管理关注球队"
-                    onClick={() => openPicker('follow')}
-                  >
-                    <TeamIcon name="plus" />
-                  </button>
-                </div>
-                <HorizontalFollowStrip>
-                  {preferences?.followedTeams.length ? (
-                    preferences.followedTeams.map((team) => (
-                      <FollowTeamChip
-                        key={team.id}
-                        team={team}
-                        selected={!selectedPlayer && selectedTeam === team.id}
-                        onSelect={() => {
-                          setSelectedPlayer('')
-                          setSelectedTeam(team.id)
-                        }}
+                {stripItems.map((entry) =>
+                  entry.kind === 'team' ? (
+                    <FollowTeamChip
+                      key={`team:${entry.item.id}`}
+                      team={entry.item}
+                      selected={!selectedPlayer && selectedTeam === entry.item.id}
+                      onSelect={() => {
+                        setSelectedPlayer('')
+                        setSelectedTeam(entry.item.id)
+                      }}
+                    />
+                  ) : (
+                    <button
+                      data-team-control
+                      type="button"
+                      data-team-selector
+                      className={`th-follow-chip th-follow-chip--player ${selectedPlayer === entry.item.id ? 'is-selected' : ''}`}
+                      key={`player:${entry.item.id}`}
+                      aria-label={`在页面中查看${entry.item.displayName}球员资料`}
+                      aria-pressed={selectedPlayer === entry.item.id}
+                      onClick={() => setSelectedPlayer(entry.item.id)}
+                    >
+                      <UserAvatar
+                        name={entry.item.displayName}
+                        avatarUrl={entry.item.avatarUrl}
+                        size="small"
                       />
-                    ))
-                  ) : (
-                    <button
-                      data-team-control
-                      type="button"
-                      className="th-empty-chip"
-                      onClick={() => openPicker('follow')}
-                    >
-                      关注更多校园球队
+                      <span>
+                        <strong>{entry.item.displayName}</strong>
+                        <small>{positionLabel(entry.item.position)}</small>
+                      </span>
                     </button>
-                  )}
-                </HorizontalFollowStrip>
-              </section>
-              <section className="th-follow-strip__players">
-                <div className="th-follow-strip__label">
-                  <span>我关注的球员</span>
+                  ),
+                )}
+                {!preferences?.primaryTeam && !stripItems.length ? (
                   <button
                     data-team-control
                     type="button"
-                    className="th-icon-button"
-                    aria-label="管理关注球员"
-                    title="管理关注球员"
-                    onClick={() => openPicker('player')}
+                    className="th-empty-chip"
+                    onClick={() => openPicker('manage')}
                   >
-                    <TeamIcon name="plus" />
+                    {playerError ? '关注加载失败，点击重试' : '关注球队和球员，排列在这一条里'}
                   </button>
-                </div>
-                <HorizontalFollowStrip>
-                  {players.items.length ? (
-                    players.items.map((player) => (
-                      <button
-                        data-team-control
-                        type="button"
-                        data-team-selector
-                        className={`th-follow-chip th-follow-chip--player ${selectedPlayer === player.id ? 'is-selected' : ''}`}
-                        key={player.id}
-                        aria-label={`在页面中查看${player.displayName}球员资料`}
-                        aria-pressed={selectedPlayer === player.id}
-                        onClick={() => setSelectedPlayer(player.id)}
-                      >
-                        <UserAvatar
-                          name={player.displayName}
-                          avatarUrl={player.avatarUrl}
-                          size="small"
-                        />
-                        <span>
-                          <strong>{player.displayName}</strong>
-                          <small>{positionLabel(player.position)}</small>
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      data-team-control
-                      type="button"
-                      className="th-empty-chip"
-                      onClick={() => openPicker('player')}
-                    >
-                      {playerError ? '关注加载失败，点击重试' : '关注球员，追踪绿茵表现'}
-                    </button>
-                  )}
-                </HorizontalFollowStrip>
-              </section>
+                ) : null}
+              </HorizontalFollowStrip>
+              <button
+                data-team-control
+                type="button"
+                className="th-icon-button th-follow-strip__manage"
+                aria-label="管理关注与排序"
+                onClick={() => openPicker('manage')}
+              >
+                <TeamIcon name="menu" />
+              </button>
             </div>
             {selectedPlayer ? (
               <SelectedPlayer
@@ -302,27 +266,34 @@ function DesktopMyTeamPage() {
             )}
           </>
         ) : null}
-        {picker && picker !== 'player' && home ? (
+        {picker === 'primary' && home ? (
           <TeamPicker
-            mode={picker}
+            mode="primary"
             preferences={preferences}
             teams={home.teams}
             onClose={() => setPicker(null)}
             onSaved={(next) => {
               setPreferences(next)
-              if (picker === 'primary') {
-                setSelectedPlayer('')
-                setSelectedTeam(next.primaryTeam?.id ?? '')
-              }
+              setSelectedPlayer('')
+              setSelectedTeam(next.primaryTeam?.id ?? '')
             }}
           />
         ) : null}
-        {picker === 'player' ? (
-          <PlayerPicker
-            tournamentId={tournamentId}
+        {picker === 'manage' && home ? (
+          <HubManageDialog
+            preferences={preferences}
+            teams={home.teams}
             follows={players}
-            onChange={setPlayers}
+            order={order}
+            tournamentId={tournamentId}
             onClose={() => setPicker(null)}
+            onOrderChange={setOrder}
+            onPreferences={(next) => {
+              setPreferences(next)
+              if (next.primaryTeam && !selectedPlayer && !selectedTeam)
+                setSelectedTeam(next.primaryTeam.id)
+            }}
+            onFollows={setPlayers}
           />
         ) : null}
       </div>
