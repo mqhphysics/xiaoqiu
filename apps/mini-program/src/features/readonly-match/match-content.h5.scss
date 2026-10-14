@@ -339,3 +339,93 @@
     line-height: 44px;
   }
 }
+
+/* Round 5 — one-line comment composer: avatar · input · emoji · 发送. */
+.match-comment-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 18px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid #dfe7dc;
+  border-radius: 999px;
+  background: #fff;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+  &:focus-within {
+    border-color: #9cc4a6;
+    box-shadow: 0 0 0 3px rgba(76, 154, 98, 0.14);
+  }
+  .user-avatar {
+    width: 30px;
+    height: 30px;
+  }
+  .match-comment-inline__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 4px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: #1f3324;
+    font: inherit;
+    font-size: 14px;
+    &::placeholder {
+      color: #9aa59d;
+    }
+  }
+  .post-emoji-picker {
+    position: relative;
+    flex: none;
+  }
+  .match-comment-inline__send {
+    flex: none;
+    height: 34px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: #234b33;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      transform 120ms ease;
+    &:hover:not(:disabled) {
+      background: #2f6243;
+    }
+    &:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+    &:disabled {
+      background: #c9d5cc;
+      cursor: default;
+    }
+  }
+  &.is-disabled {
+    background: #f7f9f6;
+  }
+}
+.match-comment-inline .post-emoji-picker .post-tool {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 50%;
+  background: transparent;
+  color: #6f8476;
+  box-shadow: none;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+  &:hover:not(:disabled),
+  &[aria-expanded='true'] {
+    background: #eef4ee;
+    color: #2f6243;
+  }
+}

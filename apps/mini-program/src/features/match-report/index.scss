@@ -418,8 +418,9 @@
 .mr-input:focus-within,
 .mr-score-input:focus-within,
 .mr-textarea:focus-within {
-  border-color: #245739;
-  outline: 2px solid #d6e4cb;
+  border-color: #9cc4a6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(76, 154, 98, 0.14);
 }
 .mr-preview {
   padding: 18px 0;

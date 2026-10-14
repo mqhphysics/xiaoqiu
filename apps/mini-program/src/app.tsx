@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 import { useEffect, type PropsWithChildren } from 'react'
 
 import { mountCursorSkin } from './components/auth-cursor'
+import { mountSoftFocus } from './components/public-shell/focus-style'
 import { AccountBoundary } from './components/account-boundary'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
 import { PostOverlayHost } from './components/post-overlay'
@@ -17,6 +18,7 @@ import './components/viewport-page'
 
 export default function App({ children }: PropsWithChildren) {
   useEffect(() => mountCursorSkin(), [])
+  useEffect(() => mountSoftFocus(), [])
 
   useEffect(
     () =>

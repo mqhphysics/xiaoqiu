@@ -14,6 +14,8 @@ import { InlineEventEditor, MatchChangeRequest } from '../match-report/inline-ed
 import type { InlineReportController } from '../match-report/use-inline-report.h5'
 import type { MatchExperienceResponse } from '../product/product.types'
 import { LineupsPanel, EventsPanel } from './panels.h5'
+import { EmojiPicker, insertAtCursor } from '../../components/post-social/emoji-picker'
+import '../../components/post-social/index.h5.scss'
 import './match-content.h5.scss'
 
 type DetailTab = 'ratings' | 'events' | 'lineups'
@@ -231,8 +233,7 @@ function RatingsPanel({
 }) {
   const session = readSession()
   const [reportId, setReportId] = useState<string | null>(null)
-  const [commenting, setCommenting] = useState(false)
-  const textarea = useRef<HTMLTextAreaElement>(null)
+  const input = useRef<HTMLInputElement>(null)
   const lockedRating = match.reviews.viewerReview?.rating ?? 0
   const distribution = match.reviews.ratingDistribution
   return (
@@ -311,53 +312,57 @@ function RatingsPanel({
       </View>
 
       <View className="match-review-section">
-        <div className="match-comment-entry">
+        <form
+          className={`match-comment-inline ${!isFinished || !session ? 'is-disabled' : ''}`}
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!body.trim() || submitting) return
+            void onSubmitComment()
+          }}
+        >
+          <UserAvatar
+            avatarUrl={session?.user.avatarUrl ?? null}
+            name={session?.user.displayName ?? '访客'}
+            size="small"
+          />
+          <input
+            ref={input}
+            className="match-comment-inline__input"
+            aria-label="观赛评论"
+            maxLength={500}
+            value={body}
+            disabled={!isFinished || !session || submitting}
+            placeholder={
+              !isFinished
+                ? '赛后开放评论'
+                : !session
+                  ? '登录后参与评论'
+                  : match.reviews.viewerReview?.body
+                    ? '修改我的评论…'
+                    : '说说比赛节奏、球员表现或现场体验…'
+            }
+            onChange={(event) => onBodyChange(event.target.value)}
+          />
+          <EmojiPicker
+            disabled={!isFinished || !session || submitting}
+            onSelect={(emoji) =>
+              insertAtCursor(
+                input.current as unknown as HTMLTextAreaElement,
+                body,
+                emoji,
+                500,
+                onBodyChange,
+              )
+            }
+          />
           <button
-            type="button"
-            disabled={!isFinished || submitting}
-            aria-expanded={commenting}
-            onClick={() => {
-              setCommenting(true)
-              window.requestAnimationFrame(() => textarea.current?.focus())
-            }}
+            type="submit"
+            className="match-comment-inline__send"
+            disabled={!body.trim() || submitting || !isFinished || !session}
           >
-            {match.reviews.viewerReview?.body ? '编辑我的评论' : '写评论'}
+            {submitting ? '发送中…' : '发送'}
           </button>
-        </div>
-        {commenting && (
-          <form
-            className="match-comment-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void onSubmitComment().then((saved) => {
-                if (saved) setCommenting(false)
-              })
-            }}
-          >
-            <label className="match-comment-form__label" htmlFor={`match-comment-${match.id}`}>
-              观赛评论
-            </label>
-            <textarea
-              className="match-comment-form__textarea"
-              id={`match-comment-${match.id}`}
-              ref={textarea}
-              maxLength={500}
-              value={body}
-              disabled={submitting}
-              placeholder="说说比赛节奏、球员表现或现场体验…"
-              onChange={(event) => onBodyChange(event.target.value)}
-            />
-            <div>
-              <small className="match-comment-form__count">{body.length}/500</small>
-              <button type="button" disabled={submitting} onClick={() => setCommenting(false)}>
-                收起
-              </button>
-              <button type="submit" disabled={!body.trim() || submitting}>
-                {submitting ? '发布中…' : '发布评论'}
-              </button>
-            </div>
-          </form>
-        )}
+        </form>
         <ProductSection
           kicker="MATCH REVIEWS"
           title="观赛评论"
