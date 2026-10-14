@@ -57,6 +57,19 @@ export function DesktopAccount({
     [report, setReport] = useState(false)
   const [testRoles, setTestRoles] = useState(false)
   const [placement, setPlacement] = useState({ left: -116, shift: 0 })
+  // Mail menu: centred under the icon when it fits, nudged left only as far as the edge requires.
+  const [mailPlacement, setMailPlacement] = useState({ left: -58, caret: 75 })
+  const openMail = () => {
+    clearTimeout(mailTimer.current)
+    const rect = mail.current?.getBoundingClientRect()
+    if (rect) {
+      const width = 150
+      const center = rect.left + rect.width / 2
+      const left = Math.max(12, Math.min(center - width / 2, window.innerWidth - width - 12))
+      setMailPlacement({ left: left - rect.left, caret: center - left })
+    }
+    setMailOpen(true)
+  }
   const [stats, setStats] = useState<Array<number | string>>(['—', '—', '—'])
   const account = useRef<HTMLDivElement>(null),
     mail = useRef<HTMLDivElement>(null)
@@ -275,16 +288,13 @@ export function DesktopAccount({
       </div>
       {user && (
         <div
-          className="desktop-mail-hover"
+          className={`desktop-mail-hover ${mailOpen ? 'is-open' : ''}`}
           ref={mail}
-          onMouseEnter={() => {
-            clearTimeout(mailTimer.current)
-            setMailOpen(true)
-          }}
+          onMouseEnter={openMail}
           onMouseLeave={() => {
             mailTimer.current = setTimeout(() => setMailOpen(false), 120)
           }}
-          onFocusCapture={() => setMailOpen(true)}
+          onFocusCapture={openMail}
           onBlurCapture={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node)) setMailOpen(false)
           }}
@@ -308,7 +318,16 @@ export function DesktopAccount({
             </svg>
           </button>
           {mailOpen && (
-            <div className="desktop-mail-menu" aria-label="消息快捷分类">
+            <div
+              className="desktop-mail-menu"
+              aria-label="消息快捷分类"
+              style={
+                {
+                  left: mailPlacement.left,
+                  '--caret-x': `${mailPlacement.caret}px`,
+                } as React.CSSProperties
+              }
+            >
               {visibleMessageCategories(preferences).map((item) => (
                 <button key={item.id} data-account-control onClick={() => void messages(item.id)}>
                   {item.label}

@@ -1,7 +1,7 @@
 .desktop-account-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
   padding-left: 14px;
   border-left: 1px solid #e1e7df;
 }
@@ -108,8 +108,8 @@
 }
 @media (min-width: 721px) and (max-width: 1288px) {
   .desktop-account-tools {
-    gap: 3px;
-    padding-left: 8px;
+    gap: 12px;
+    padding-left: 10px;
   }
 }
 
@@ -263,5 +263,76 @@
   }
   .desktop-account-popover {
     animation: none;
+  }
+}
+
+/* Round 5 — mail: hop on hover while the category menu drops in, centred under the icon. */
+.desktop-mail-menu {
+  right: auto;
+  width: 150px;
+  box-sizing: border-box;
+  transform-origin: var(--caret-x, 50%) top;
+  animation: mail-menu-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.desktop-mail-menu::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: calc(var(--caret-x, 75px) - 6px);
+  width: 11px;
+  height: 11px;
+  border-top: 1px solid #e3eadc;
+  border-left: 1px solid #e3eadc;
+  background: #fff;
+  transform: rotate(45deg);
+}
+.desktop-mail-menu [data-account-control] {
+  justify-content: center;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+.desktop-mail-hover .desktop-account-icon svg {
+  transform-origin: 50% 100%;
+}
+.desktop-mail-hover:hover .desktop-account-icon svg,
+.desktop-mail-hover.is-open .desktop-account-icon svg {
+  animation: mail-hop 520ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+.desktop-mail-hover.is-open .desktop-account-icon {
+  background: #edf3e9;
+  color: #24553a;
+}
+@keyframes mail-hop {
+  0% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-6px) scale(1.04, 0.96);
+  }
+  55% {
+    transform: translateY(0) scale(1.06, 0.92);
+  }
+  75% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes mail-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-mail-hover .desktop-account-icon svg,
+  .desktop-mail-menu {
+    animation: none !important;
   }
 }
