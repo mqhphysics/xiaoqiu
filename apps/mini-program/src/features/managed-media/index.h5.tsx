@@ -177,9 +177,10 @@ function UploadDialog({
     setBusy(true)
     setMessage('')
     try {
-      if (file.size > (purpose === 'GOAL_GIF' ? 6 : 4) * 1024 * 1024)
-        throw new Error(purpose === 'GOAL_GIF' ? 'GIF 不能超过 6 MiB' : '图片不能超过 4 MiB')
-      const dataUrl = await fileDataUrl(file)
+      if (file.size > sourceLimit(purpose))
+        throw new Error(purpose === 'GOAL_GIF' ? 'GIF 不能超过 6 MiB' : '图片太大，请换一张')
+      const dataUrl =
+        purpose === 'USER_BACKGROUND' ? await compressCover(file) : await fileDataUrl(file)
       const item = await mediaRequest<MediaAsset>(
         'media-assets',
         { purpose, targetId, clientSubmissionId: clientId.current, dataUrl },
@@ -207,7 +208,9 @@ function UploadDialog({
             ? 'GIF ≤ 6 MiB，16–960 像素，2–120 帧，单次 ≤ 15 秒。'
             : purpose === 'USER_AVATAR'
               ? 'JPEG、PNG 或静态 WebP，最大 4 MiB；头像需为 64–512 像素的正方形。'
-              : 'JPEG、PNG 或静态 WebP，最大 4 MiB。个人背景建议选择横向照片。'}
+              : purpose === 'USER_BACKGROUND'
+                ? `背景按 2.8:1 横幅显示，建议 ${COVER_RECOMMENDED.width}×${COVER_RECOMMENDED.height}；超过 ${COVER_MAX.width}×${COVER_MAX.height} 会自动压缩，低于 1120×400 可能显得模糊。`
+                : 'JPEG、PNG 或静态 WebP，最大 4 MiB。'}
         </p>
         <p>
           {direct ? '总管理员上传后直接发布。' : '上传后经审核显示，审核结果在“我的投稿”中可见。'}
@@ -224,8 +227,7 @@ function UploadDialog({
                 purpose === 'GOAL_GIF' ? ['image/gif'] : ['image/jpeg', 'image/png', 'image/webp']
               if (
                 selected &&
-                (!allowed.includes(selected.type) ||
-                  selected.size > (purpose === 'GOAL_GIF' ? 6 : 4) * 1024 * 1024)
+                (!allowed.includes(selected.type) || selected.size > sourceLimit(purpose))
               ) {
                 setFile(null)
                 setMessage('请选择符合格式和大小要求的文件')
@@ -237,7 +239,14 @@ function UploadDialog({
             }}
           />
           {preview ? (
-            <img className="managed-media-picker__preview" src={preview} alt="待上传图片预览" />
+            <img
+              className={
+                'managed-media-picker__preview' +
+                (purpose === 'USER_BACKGROUND' ? ' managed-media-picker__preview--cover' : '')
+              }
+              src={preview}
+              alt="待上传图片预览"
+            />
           ) : (
             <svg
               width="32"
@@ -720,4 +729,55 @@ export function usePersonalBackground(userId: string | undefined) {
     }
   }, [userId])
   return resolveMediaUrl(url)
+}
+
+/** Personal / team covers are shown as a 2.80:1 banner. */
+export const COVER_RATIO = 2.8
+export const COVER_RECOMMENDED = { width: 1680, height: 600 }
+export const COVER_MAX = { width: 2240, height: 800 }
+
+function sourceLimit(purpose: MediaPurpose) {
+  if (purpose === 'GOAL_GIF') return 6 * 1024 * 1024
+  // Covers are cropped and re-encoded in the browser first, so large camera photos are fine.
+  if (purpose === 'USER_BACKGROUND') return 25 * 1024 * 1024
+  return 4 * 1024 * 1024
+}
+
+/**
+ * Centre-crop to 2.80:1 (the same frame the card shows) and scale down to at most 2240×800.
+ * Smaller photos are never enlarged. Output is WebP (JPEG fallback) well under the 4 MiB API limit.
+ */
+export async function compressCover(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  try {
+    const crop = coverCrop(bitmap.width, bitmap.height)
+    const canvas = document.createElement('canvas')
+    canvas.width = crop.outWidth
+    canvas.height = crop.outHeight
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('浏览器无法处理图片')
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(bitmap, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.outWidth, crop.outHeight)
+    for (const quality of [0.86, 0.78, 0.68]) {
+      let url = canvas.toDataURL('image/webp', quality)
+      if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', quality)
+      if (url.length * 0.75 < 3.5 * 1024 * 1024) return url
+    }
+    throw new Error('图片压缩后仍然过大，请换一张')
+  } finally {
+    bitmap.close()
+  }
+}
+
+export function coverCrop(width: number, height: number) {
+  let sw = width
+  let sh = Math.round(width / COVER_RATIO)
+  if (sh > height) {
+    sh = height
+    sw = Math.round(height * COVER_RATIO)
+  }
+  const sx = Math.round((width - sw) / 2)
+  const sy = Math.round((height - sh) / 2)
+  const scale = Math.min(1, COVER_MAX.width / sw)
+  return { sx, sy, sw, sh, outWidth: Math.round(sw * scale), outHeight: Math.round(sh * scale) }
 }

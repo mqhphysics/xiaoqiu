@@ -81,10 +81,13 @@ export async function validateMedia(
     if (purpose === 'USER_AVATAR') {
       body = (await normalizeAvatarImage(source, subtype as 'jpeg' | 'png' | 'webp')).body
     } else {
-      const edge = purpose === 'USER_BACKGROUND' ? 1600 : 1200
+      // Covers display as a 2.80:1 banner; keep up to 2240×800 (≈1.9× the largest 1920px
+      // display), anything larger is scaled down. Other photos keep a 1200px edge.
+      const box =
+        purpose === 'USER_BACKGROUND' ? { width: 2240, height: 800 } : { width: 1200, height: 1200 }
       body = await sharp(source, { failOn: 'error', limitInputPixels: 16 * 1024 * 1024 })
         .rotate()
-        .resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true })
+        .resize({ ...box, fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 82, effort: 4 })
         .toBuffer()
     }

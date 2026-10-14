@@ -43,8 +43,9 @@ test('static purposes strip metadata, preserve separate shape rules, and reject 
     .jpeg()
     .toBuffer()
   const background = await validateMedia(dataUrl(source, 'jpeg'), 'USER_BACKGROUND')
-  assert.equal(background.width, 1600)
-  assert.equal(background.height, 900)
+  // Covers fit inside 2240×800 (2.80:1 banner, compressed above that).
+  assert.equal(background.width, 1422)
+  assert.equal(background.height, 800)
   assert.equal((await sharp(background.body).metadata()).exif, undefined)
   const portrait = await validateMedia(dataUrl(source, 'jpeg'), 'PLAYER_PORTRAIT')
   assert.equal(portrait.width, 1200)

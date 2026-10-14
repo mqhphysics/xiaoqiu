@@ -308,3 +308,11 @@
     cursor: default;
   }
 }
+
+.managed-media-picker__preview.managed-media-picker__preview--cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2.8;
+  object-fit: cover;
+  border-radius: 8px;
+}
