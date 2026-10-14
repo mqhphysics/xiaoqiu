@@ -106,7 +106,7 @@ function DualLineups({ match }: { match: MatchExperienceResponse }) {
                       className={`pitch-player ${lane === 'GOALKEEPER' ? 'pitch-player--goalkeeper' : ''}`}
                       style={{
                         left: `${side === 0 ? 7 + point.y * 0.86 : 93 - point.y * 0.86}%`,
-                        top: `${14 + point.x * 0.72}%`,
+                        top: `${18 + point.x * 0.64}%`,
                       }}
                     >
                       <button

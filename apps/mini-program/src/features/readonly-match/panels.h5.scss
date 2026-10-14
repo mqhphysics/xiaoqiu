@@ -64,7 +64,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   container-type: size;
   width: 100%;
-  height: clamp(200px, calc(min(640px, var(--xq-vh, 1vh) * 100 - 72px) - 318px), 340px);
+  height: clamp(180px, calc(min(640px, var(--xq-vh, 1vh) * 100 - 72px) - 400px), 240px);
   min-height: 0;
   overflow: hidden;
   border: 5px solid #2d6a48;
@@ -134,8 +134,8 @@
 }
 .pitch-player__subs {
   position: absolute;
-  top: -3px;
-  left: calc(50% + clamp(11px, 5.4cqh, 18px));
+  top: -6px;
+  left: calc(50% + clamp(14px, 6.8cqh, 22px));
   z-index: 2;
   display: flex;
   flex-direction: column;
