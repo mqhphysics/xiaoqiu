@@ -49,7 +49,7 @@ export class HubStripOrderService {
       if (before && sameHubStripItems(previous, items)) {
         return { items, version: before.version }
       }
-      const payload = items as Prisma.InputJsonValue
+      const payload = toJson(items)
       const saved = await tx.userHubStripOrder.upsert({
         where: { organizationId_userId: key },
         create: { ...key, items: payload, version: 1 },
@@ -63,8 +63,8 @@ export class HubStripOrderService {
           action: 'HUB_STRIP_ORDER_UPDATED',
           targetType: 'USER_HUB_STRIP_ORDER',
           targetId: session.userId,
-          beforeSummary: { items: previous, version: before?.version ?? 0 },
-          afterSummary: { items, version: saved.version },
+          beforeSummary: toJson({ items: previous, version: before?.version ?? 0 }),
+          afterSummary: toJson({ items, version: saved.version }),
           requestId,
           source: 'H5',
         },
@@ -89,6 +89,10 @@ export class HubStripOrderService {
       playerIds: new Set(players.map((row) => row.playerProfileId)),
     }
   }
+}
+
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
 }
 
 export type { HubStripItem }
