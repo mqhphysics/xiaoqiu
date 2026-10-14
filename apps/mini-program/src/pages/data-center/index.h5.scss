@@ -437,6 +437,12 @@
     border-bottom: 1px solid #edf0ed;
   }
   .data-desktop__standings .data-desktop__standing-table td,
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(9) {
+    width: 38px;
+  }
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(10) {
+    width: 36px;
+  }
   .data-desktop__standings .data-desktop__standing-table th {
     height: 30px;
   }
@@ -1331,6 +1337,12 @@
     height: 100%;
   }
   .data-desktop__standings .data-desktop__standing-table td,
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(9) {
+    width: 38px;
+  }
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(10) {
+    width: 36px;
+  }
   .data-desktop__standings .data-desktop__standing-table th {
     height: auto;
     min-height: 30px;
@@ -1561,6 +1573,40 @@
   }
   .data-desktop__compact-team {
     font-size: 12px;
+    text-overflow: clip;
+  }
+}
+
+/* Round 4b — group tables: four-character names never ellipsize beside 主队. */
+@media (min-width: 1024px) {
+  .data-desktop__standings .data-desktop__team-col {
+    width: 33%;
+  }
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(9) {
+    width: 38px;
+  }
+  .data-desktop__standings .data-desktop__standing-table col:nth-child(10) {
+    width: 36px;
+  }
+  .data-desktop__standings .data-desktop__standing-table th {
+    padding: 0 1px;
+    font-size: 11px;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .data-desktop__standings .data-desktop__rank-col {
+    width: 30px;
+  }
+  .data-desktop__standings .data-desktop__standing-table .data-desktop__points {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+  .data-desktop__standings .data-desktop__team-cell {
+    gap: 5px;
+  }
+  .data-desktop__standings .data-desktop__team-cell a {
+    flex: 0 0 auto;
+    overflow: visible;
     text-overflow: clip;
   }
 }

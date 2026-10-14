@@ -119,7 +119,7 @@
     }
     .home-page.xq-viewport-page > .experience-hero {
       flex: 0 0 auto;
-      height: clamp(212px, calc(var(--xq-vh-avail) * 0.27), 270px);
+      height: clamp(226px, calc(var(--xq-vh-avail) * 0.27), 262px);
       container-type: size;
       min-height: 0;
     }
@@ -138,7 +138,11 @@
       font-size: clamp(26px, calc(var(--xq-vh-avail) * 0.042), 34px);
     }
     .home-page.xq-viewport-page .experience-hero__summary {
-      -webkit-line-clamp: 2;
+      display: block;
+      max-width: min(100%, 560px);
+      margin-top: 10px;
+      -webkit-line-clamp: unset;
+      overflow: visible;
     }
     .home-page.xq-viewport-page .experience-hero__action {
       margin-top: clamp(8px, calc(var(--xq-vh-avail) * 0.02), 18px);
@@ -147,8 +151,13 @@
       min-height: 0;
     }
     .home-page.xq-viewport-page .focus-match-grid .compact-match {
+      /* Natural height: never clip the venue line. */
       min-height: 0;
-      height: clamp(142px, calc(var(--xq-vh-avail) * 0.17), 152px);
+      height: auto;
+    }
+    .home-page.xq-viewport-page .focus-match-grid .compact-match__stage {
+      overflow: visible;
+      text-overflow: clip;
     }
     .home-page.xq-viewport-page > .home-product-section,
     .home-page.xq-viewport-page > .notice-rail {
@@ -203,11 +212,32 @@
   }
 }
 
-@container (max-height: 250px) {
+@container (max-height: 214px) {
   .home-page .experience-hero .experience-hero__badge {
     display: none;
   }
   .home-page .experience-hero .experience-hero__summary {
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical;
     -webkit-line-clamp: 1 !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Mid-height desktops (1280×800, 1366×768): keep the full intro, tighten chrome instead. */
+@container (max-height: 240px) {
+  .home-page .experience-hero .experience-hero__badge {
+    display: none;
+  }
+  .home-page .experience-hero .experience-hero__title {
+    margin-top: 2px;
+    line-height: 1.15;
+  }
+  .home-page .experience-hero .experience-hero__summary {
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .home-page .experience-hero .experience-hero__action {
+    margin-top: 8px;
   }
 }
