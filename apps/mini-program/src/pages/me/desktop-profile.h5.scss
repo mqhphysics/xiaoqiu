@@ -2357,3 +2357,158 @@
     grid-auto-rows: minmax(0, 1fr);
   }
 }
+
+/* Round 5: top row ~15% shorter. Profile banner keeps 2.80:1; the team card frames its cover at
+   3.3:1 (object-fit cover) and the columns are solved so both heights match:
+   Wt/3.3 = Wp/2.8 + 70px  →  Wp = 0.459·(W − 16px) − 106px. */
+@media (min-width: 1024px) {
+  .profile-top {
+    grid-template-columns: minmax(0, calc((100% - 16px) * 0.459 - 106px)) minmax(0, 1fr);
+  }
+  .profile-team,
+  html[data-xq-short] .profile-team,
+  html:not([data-xq-short]) .profile-team {
+    aspect-ratio: 3.3;
+  }
+  /* Content block (crest/name/slogan/tags + buttons) sits in the vertical middle. */
+  html:not([data-xq-short]) .profile-team__main,
+  .profile-team__main {
+    margin-top: auto !important;
+  }
+  html:not([data-xq-short]) .profile-team__actions,
+  .profile-team__actions {
+    margin-top: 20px !important;
+    margin-bottom: auto !important;
+  }
+}
+
+/* Round 5: functions take their natural two-row height; 我的赛季 takes the rest and fills it
+   with 近期比赛 (scrolls inside if the screen is short). */
+@media (min-width: 1024px) {
+  html:not([data-xq-short]) .profile-functions > .profile-function-card {
+    flex: 0 0 auto !important;
+  }
+  html:not([data-xq-short]) .profile-function-card .profile-function-grid {
+    flex: none;
+    grid-auto-rows: auto;
+  }
+  html:not([data-xq-short]) .profile-season {
+    flex: 1 1 auto !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0 !important;
+  }
+  .profile-season__card {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: flex-start !important;
+  }
+  .profile-season__recent {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    padding-top: 8px;
+    border-top: 1px solid #edf1ec;
+    text-align: left;
+  }
+  .profile-season__recent > small {
+    color: #7a867d;
+    font-size: 12px;
+  }
+  .profile-season__recent ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .profile-season__recent li {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 56px 84px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: #253229;
+  }
+  .profile-season__recent li + li {
+    border-top: 1px dashed #edf1ec;
+  }
+  .profile-season__recent-date,
+  .profile-season__recent-minutes {
+    color: #7a867d;
+    font-size: 12px;
+  }
+  .profile-season__recent-minutes {
+    text-align: right;
+  }
+  .profile-season__recent-team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .profile-season__recent-team strong {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-season__recent-team em {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: #eef4ee;
+    color: #2f6b45;
+    font-size: 11px;
+    font-style: normal;
+  }
+  .profile-season__recent-score {
+    justify-self: center;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .profile-season__recent-score.is-win { background: #e3f1e6; color: #1f6b3a; }
+  .profile-season__recent-score.is-draw { background: #eef0f2; color: #505a63; }
+  .profile-season__recent-score.is-loss { background: #f8e6e4; color: #a33a2e; }
+}
+@media (min-width: 1024px) {
+  html:not([data-xq-short]) .profile-function-card .profile-shortcut {
+    padding-top: 8px !important;
+    padding-bottom: 7px !important;
+    min-height: 0 !important;
+  }
+  html:not([data-xq-short]) .profile-function-card .profile-function-heading {
+    margin-bottom: 10px !important;
+  }
+  html:not([data-xq-short]) .profile-function-card {
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+  }
+  .profile-season__recent ul { flex: 1 1 auto; }
+  .profile-season__recent li { padding: 4px 0; }
+}
+/* Short screens (e.g. 1366×768): tiles go icon-beside-label, 近期比赛 yields first. */
+@media (min-width: 1024px) {
+  @container (max-height: 420px) {
+    .profile-function-card .profile-shortcut {
+      flex-direction: row !important;
+      justify-content: center;
+      gap: 6px !important;
+      padding-top: 9px !important;
+      padding-bottom: 9px !important;
+    }
+    .profile-function-card .profile-shortcut small {
+      display: none !important;
+    }
+    .profile-season__recent {
+      display: none;
+    }
+  }
+}

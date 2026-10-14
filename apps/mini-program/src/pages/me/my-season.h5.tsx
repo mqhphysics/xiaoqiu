@@ -231,6 +231,38 @@ export function MySeasonCard({
             <p className="profile-season__note">本赛季暂无待进行的比赛。</p>
           )}
         </div>
+        {state.kind === 'ready' && state.recent.length ? (
+          <div className="profile-season__recent">
+            <small>近期比赛</small>
+            <ul>
+              {state.recent.map((match) => {
+                const atHome = match.homeTeam?.id === team?.id
+                const rival = atHome ? match.awayTeam : match.homeTeam
+                const mine = (atHome ? match.homeScore : match.awayScore) ?? 0
+                const theirs = (atHome ? match.awayScore : match.homeScore) ?? 0
+                const result = mine > theirs ? 'win' : mine < theirs ? 'loss' : 'draw'
+                return (
+                  <li key={match.id}>
+                    <span className="profile-season__recent-date">
+                      {match.scheduledStartAt ? formatDate(match.scheduledStartAt) : '—'}
+                    </span>
+                    <span className="profile-season__recent-team">
+                      {rival ? <TeamCrest team={rival} size="small" /> : null}
+                      <strong>{rival?.name ?? '待定'}</strong>
+                      <em>{atHome ? '主' : '客'}</em>
+                    </span>
+                    <span className={`profile-season__recent-score is-${result}`}>
+                      {mine} : {theirs}
+                    </span>
+                    <span className="profile-season__recent-minutes">
+                      {match.starter ? '首发' : '替补'} · {match.minutesPlayed}′
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ) : null}
       </button>
     </section>
   )
