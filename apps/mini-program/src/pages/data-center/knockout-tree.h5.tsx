@@ -26,8 +26,28 @@ export function scrollPanelColumn(event: React.WheelEvent<HTMLElement>) {
   scroller.scrollLeft += event.deltaX
 }
 
+type Orientation = 'vertical' | 'horizontal'
+const ORIENTATION_KEY = 'xiaoqiu.bracket.orientation'
+
+function readOrientation(): Orientation {
+  try {
+    return localStorage.getItem(ORIENTATION_KEY) === 'horizontal' ? 'horizontal' : 'vertical'
+  } catch {
+    return 'vertical'
+  }
+}
+
 export function KnockoutPanel({ data, expanded, onExpand }: Props) {
   const { rounds, thirdPlace, eightTeam } = knockoutRounds(data)
+  const [orientation, setOrientationState] = useState<Orientation>(readOrientation)
+  const setOrientation = (next: Orientation) => {
+    setOrientationState(next)
+    try {
+      localStorage.setItem(ORIENTATION_KEY, next)
+    } catch {
+      /* private mode: keep in memory */
+    }
+  }
   return (
     <section
       className={
@@ -47,13 +67,39 @@ export function KnockoutPanel({ data, expanded, onExpand }: Props) {
           <h2>淘汰赛</h2>
           <span aria-hidden="true">{expanded ? '完整对阵' : '展开 ↗'}</span>
         </button>
-        <span className="data-desktop__knockout-caption">
-          {eightTeam ? '八强晋级图' : '晋级图'}
-        </span>
+        {expanded && eightTeam ? (
+          <div className="data-bracket-switch" role="radiogroup" aria-label="晋级图方向">
+            {(['vertical', 'horizontal'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={orientation === value}
+                className={'data-bracket-switch__option' + (orientation === value ? ' is-active' : '')}
+                onClick={() => setOrientation(value)}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  {value === 'vertical' ? (
+                    <path d="M2 3h3M6.5 3h3M11 3h3M3.5 3v3.5h9V3M8 6.5V10M5 10h6M8 10v3" />
+                  ) : (
+                    <path d="M3 2v3M3 6.5v3M3 11v3M3 3.5h3.5v9H3M6.5 8H10M10 5v6M10 8h3" />
+                  )}
+                </svg>
+                {value === 'vertical' ? '竖版' : '横版'}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="data-desktop__knockout-caption">
+            {eightTeam ? '八强晋级图' : '晋级图'}
+          </span>
+        )}
       </div>
       <div id="data-knockout-content" className="data-desktop__panel-scroll">
         {rounds.length === 0 ? (
           <DataState kind="empty" title="暂无淘汰赛对阵" description="对阵确认后将在这里显示。" />
+        ) : eightTeam && expanded && orientation === 'vertical' ? (
+          <VerticalBracket rounds={rounds} thirdPlace={thirdPlace ?? null} />
         ) : eightTeam && expanded ? (
           <HorizontalBracket rounds={rounds} thirdPlace={thirdPlace ?? null} />
         ) : eightTeam ? (
@@ -418,6 +464,136 @@ function BracketCard({ match, slot, featured = false }: { match: MatchSummary; s
       <time className="data-bracket__date" dateTime={match.scheduledStartAt ?? undefined}>
         {knockoutMatchTime(match.scheduledStartAt, false)}
         {!['FINISHED', 'CONFIRMED', 'SCHEDULED'].includes(match.status) ? ` · ${matchStatusLabel(match.status)}` : ''}
+      </time>
+    </a>
+  )
+}
+
+/**
+ * Expanded 8-team bracket read top → bottom: 八强 (8 teams) / 半决赛 / 决赛 / 季军赛.
+ * Each card shows home · score · away side by side; connectors are measured from the cards.
+ */
+function VerticalBracket({ rounds, thirdPlace }: { rounds: Round[]; thirdPlace: MatchSummary | null }) {
+  const quarters = rounds[0]?.matches ?? []
+  const semis = rounds[1]?.matches ?? []
+  const final = rounds[2]?.matches[0] ?? null
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [paths, setPaths] = useState<string[]>([])
+  const [box, setBox] = useState({ w: 0, h: 0 })
+
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const measure = () => {
+      const origin = root.getBoundingClientRect()
+      const rect = (key: string) => {
+        const el = root.querySelector<HTMLElement>(`[data-slot="${key}"]`)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return { x: r.left - origin.left + r.width / 2, t: r.top - origin.top, b: r.bottom - origin.top }
+      }
+      const next: string[] = []
+      const link = (from: string[], to: string) => {
+        const target = rect(to)
+        if (!target) return
+        for (const key of from) {
+          const source = rect(key)
+          if (!source) continue
+          const mid = (source.b + target.t) / 2
+          next.push(`M${source.x},${source.b} V${mid} H${target.x} V${target.t}`)
+        }
+      }
+      link(['q0', 'q1'], 's0')
+      link(['q2', 'q3'], 's1')
+      link(['s0', 's1'], 'f')
+      setPaths(next)
+      setBox({ w: origin.width, h: origin.height })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [rounds, thirdPlace])
+
+  return (
+    <div className="data-vbracket" ref={rootRef} aria-label="八强、半决赛、决赛与季军赛晋级图（竖版）">
+      <svg className="data-bracket__lines" width={box.w} height={box.h} aria-hidden="true">
+        {paths.map((d, index) => (
+          <path key={index} d={d} />
+        ))}
+      </svg>
+      <span className="data-vbracket__round">八强</span>
+      <div className="data-vbracket__row data-vbracket__row--4">
+        {quarters.map((match, index) => (
+          <VCard key={match.id} match={match} slot={`q${index}`} />
+        ))}
+      </div>
+      <span className="data-vbracket__round">半决赛</span>
+      <div className="data-vbracket__row data-vbracket__row--2">
+        {semis.map((match, index) => (
+          <VCard key={match.id} match={match} slot={`s${index}`} />
+        ))}
+      </div>
+      <span className="data-vbracket__round">决赛</span>
+      <div className="data-vbracket__row data-vbracket__row--1">
+        {final ? <VCard match={final} slot="f" featured /> : null}
+      </div>
+      {thirdPlace ? (
+        <>
+          <span className="data-vbracket__round data-vbracket__round--third">季军赛</span>
+          <div className="data-vbracket__row data-vbracket__row--1">
+            <VCard match={thirdPlace} slot="t" />
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function VCard({ match, slot, featured = false }: { match: MatchSummary; slot: string; featured?: boolean }) {
+  const winner = matchWinnerId(match)
+  const side = (team: TeamSummary | null, placeholder: string | null | undefined) => (
+    <span
+      className={
+        'data-vbracket__team ' + (winner && team?.id === winner ? 'is-winner' : winner ? 'is-loser' : '')
+      }
+    >
+      <span className="data-bracket__crest">
+        {team ? (
+          <TeamCrest team={team} size="small" interactive={false} />
+        ) : (
+          <span className="data-bracket__tbd">?</span>
+        )}
+      </span>
+      <span
+        className={'data-vbracket__name' + (team ? '' : ' is-placeholder')}
+        title={team?.name ?? placeholder ?? '席位待定'}
+      >
+        {team?.name ?? (placeholder ?? '席位待定').replace(/\s+/g, '')}
+      </span>
+    </span>
+  )
+  const penalties =
+    match.homePenaltyScore !== null && match.awayPenaltyScore !== null
+      ? `点球 ${match.homePenaltyScore}–${match.awayPenaltyScore}`
+      : null
+  return (
+    <a
+      className={'data-vbracket__card ' + (featured ? 'is-featured' : '')}
+      data-slot={slot}
+      data-match-id={match.id}
+      href={matchDetailUrl(match.id)}
+      onClick={openMatch}
+      aria-label={`${match.homeTeam?.name ?? match.homePlaceholder ?? '待定'} 对 ${match.awayTeam?.name ?? match.awayPlaceholder ?? '待定'}，${scoreLabel(match)}，查看比赛`}
+    >
+      {side(match.homeTeam, match.homePlaceholder)}
+      <span className="data-vbracket__mid">
+        <strong>{scoreLabel(match)}</strong>
+      </span>
+      {side(match.awayTeam, match.awayPlaceholder)}
+      <time className="data-vbracket__time" dateTime={match.scheduledStartAt ?? undefined}>
+        {knockoutMatchTime(match.scheduledStartAt, false)}
+        {penalties ? ` · ${penalties}` : ''}
       </time>
     </a>
   )

@@ -1610,3 +1610,170 @@
     text-overflow: clip;
   }
 }
+
+/* Round 5 — vertical bracket (default) + 竖版/横版 switch. */
+@media (min-width: 721px) {
+  .data-bracket-switch {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: auto;
+    padding: 2px;
+    border-radius: 8px;
+    background: #eef3ea;
+  }
+  .data-bracket-switch__option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #5f7564;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+    }
+    &:hover {
+      color: #1d4a2e;
+    }
+    &.is-active {
+      background: #fff;
+      color: #1d4a2e;
+      box-shadow: 0 1px 3px rgba(25, 60, 35, 0.14);
+    }
+  }
+  .data-vbracket {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 0;
+    padding: 0 2px 2px;
+  }
+  .data-vbracket__round {
+    position: relative;
+    z-index: 1;
+    align-self: center;
+    padding: 0 10px;
+    background: #fff;
+    color: #7b9278;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 2px;
+    line-height: 16px;
+    text-align: center;
+  }
+  .data-vbracket__round--third {
+    margin-top: 2px;
+  }
+  .data-vbracket__row {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 14px;
+  }
+  .data-vbracket__row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Later rounds keep the quarter-final card width and sit centred under their feeders. */
+  .data-vbracket__row--2 > *,
+  .data-vbracket__row--1 > * {
+    grid-column: span 2;
+    justify-self: center;
+    width: calc((100% - 14px) / 2);
+  }
+  .data-vbracket__row--1 > * {
+    grid-column: 2 / span 2;
+  }
+  .data-vbracket__card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 6px;
+    padding: 8px 8px 6px;
+    border: 1px solid #dfe7d9;
+    border-radius: 8px;
+    background: #fff;
+    color: #254632;
+    box-shadow: 0 1px 2px rgba(25, 60, 35, 0.05);
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    &:hover {
+      border-color: #a9c19c;
+      box-shadow: 0 4px 12px rgba(25, 60, 35, 0.1);
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+    &.is-featured {
+      border-color: #c9dabd;
+      background: linear-gradient(180deg, #fbfdf8, #f2f7ee);
+      .data-vbracket__mid strong {
+        font-size: 17px;
+      }
+    }
+  }
+  .data-vbracket__team {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    min-width: 0;
+    &.is-winner .data-vbracket__name {
+      color: #173b27;
+      font-weight: 750;
+    }
+    &.is-loser {
+      .data-vbracket__name {
+        color: #8a978e;
+      }
+      .data-bracket__crest {
+        opacity: 0.55;
+        filter: grayscale(0.5);
+      }
+    }
+  }
+  .data-vbracket__name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 17px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .data-vbracket__name.is-placeholder {
+    color: #7f8c84;
+    font-size: 12px;
+  }
+  .data-vbracket__mid {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    strong {
+      color: #173b27;
+      font-size: 15px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+  }
+  .data-vbracket__time {
+    grid-column: 1 / -1;
+    margin-top: 3px;
+    padding-top: 4px;
+    border-top: 1px solid #eef2ec;
+    color: #7f8c84;
+    font-size: 11px;
+    line-height: 14px;
+    text-align: center;
+    white-space: nowrap;
+  }
+}
