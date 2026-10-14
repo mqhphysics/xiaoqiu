@@ -5,12 +5,7 @@ import { mountCursorSkin } from './components/auth-cursor'
 import { mountSoftFocus } from './components/public-shell/focus-style'
 import { AccountBoundary } from './components/account-boundary'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
-import { PostOverlayHost } from './components/post-overlay'
-import { TeamOverlayHost } from './components/team-hub'
-import { PlayerOverlayHost } from './components/player-overlay'
-import { MatchOverlayHost } from './components/match-overlay'
-import { MessagingOverlayHost } from './components/messaging-drawer/host'
-import { CaptainManageHost } from './features/captain-roster/manage-modal'
+import { AppOverlays } from './components/app-overlays'
 
 import './app.scss'
 import './app-box-sizing'
@@ -34,16 +29,7 @@ export default function App({ children }: PropsWithChildren) {
 
   return (
     <AccountBoundary
-      overlays={
-        <>
-          <PostOverlayHost />
-          <TeamOverlayHost />
-          <PlayerOverlayHost />
-          <MatchOverlayHost />
-          <MessagingOverlayHost />
-          <CaptainManageHost />
-        </>
-      }
+      overlays={<AppOverlays />}
     >
       {children}
     </AccountBoundary>

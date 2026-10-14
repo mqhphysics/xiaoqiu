@@ -1107,6 +1107,62 @@
   }
 }
 
+@media (max-width: 720px) {
+  .public-app--h5 {
+    .public-content > .data-state--loading {
+      position: relative;
+      min-height: 280PX;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .public-content > .data-state--loading .data-state__eyebrow,
+    .public-content > .data-state--loading .data-state__indicator {
+      display: none;
+    }
+
+    .public-content > .data-state--loading .data-state__title {
+      margin: 0;
+      color: #758174;
+      font-size: 14PX;
+      font-weight: 500;
+    }
+
+    .public-content > .data-state--loading::before,
+    .public-content > .data-state--loading::after {
+      position: absolute;
+      right: 0;
+      left: 0;
+      border-radius: 12PX;
+      content: '';
+      pointer-events: none;
+    }
+
+    .public-content > .data-state--loading::before {
+      top: 28PX;
+      height: 72PX;
+      background:
+        linear-gradient(#e1e6dc, #e1e6dc) 0 0 / 160PX 22PX,
+        linear-gradient(#e8ebe3, #e8ebe3) 0 34PX / 46% 10PX;
+      background-repeat: no-repeat;
+    }
+
+    .public-content > .data-state--loading::after {
+      top: 116PX;
+      height: 140PX;
+      background: linear-gradient(90deg, #e4e8df 0 100%);
+      background-repeat: no-repeat;
+    }
+  }
+}
+
+/* Custom tab cache wraps #app. Collapse the wrapper so viewport-fit stays on the page. */
+html body > .taro-tabbar__container,
+html body > .taro-tabbar__container > .taro-tabbar__panel {
+  display: contents;
+}
+
 @media (min-width: 721px) and (hover: hover) and (pointer: fine) {
   .public-app--h5 {
     .public-nav__item:hover { color: #355541; }

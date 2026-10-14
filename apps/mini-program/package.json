@@ -7,6 +7,7 @@
     "dev:h5": "node scripts/dev-h5.mjs",
     "build": "taro build --type weapp",
     "build:h5": "taro build --type h5",
+    "serve:h5": "node scripts/serve-h5.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types \"src/**/*.test.ts\" \"src/**/*.test.mjs\" scripts/h5-fallback-imports.test.mjs"
   },

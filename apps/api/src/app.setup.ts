@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { NextFunction, Request, Response } from 'express'
 
 import { ApiExceptionFilter } from './common/api-exception.filter'
+import { compressResponse } from './common/http-performance'
 import { requestIdMiddleware } from './common/request-id.middleware'
 import { RequestLoggingInterceptor } from './common/request-logging.interceptor'
 import { createValidationPipe } from './common/validation'
@@ -11,7 +12,9 @@ import { createValidationPipe } from './common/validation'
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api')
   const httpApp = app as NestExpressApplication
+  httpApp.set('etag', 'strong')
   httpApp.useBodyParser('json', { limit: '26mb' })
+  app.use(compressResponse)
   app.use((request: Request, response: Response, next: NextFunction) => {
     if (/^\/api\/public(?:\/|$)/i.test(request.path)) {
       response.vary('X-Organization-Id')
@@ -26,6 +29,8 @@ export function configureApp(app: INestApplication): void {
       // Private API consumers expect fresh JSON rather than a cached 304 body.
       delete request.headers['if-none-match']
       delete request.headers['if-modified-since']
+    } else if (request.method === 'GET' && /^\/api\/public(?:\/|$)/i.test(request.path)) {
+      response.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
     }
     next()
   })
@@ -41,7 +46,9 @@ export function configureApp(app: INestApplication): void {
       'x-dev-user-id',
       'x-request-id',
       'x-request-source',
+      'if-none-match',
     ],
+    exposedHeaders: ['ETag'],
   })
   app.use(requestIdMiddleware)
   app.useGlobalPipes(createValidationPipe())

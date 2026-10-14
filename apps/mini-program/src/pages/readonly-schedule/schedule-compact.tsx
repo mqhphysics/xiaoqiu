@@ -1,6 +1,6 @@
 import { Button, Text, View } from '@tarojs/components'
 import type { BaseEventOrig } from '@tarojs/components/types/common'
-import Taro, { getCurrentInstance } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -14,7 +14,8 @@ import {
   type ScheduleFilter,
 } from '../../features/competition/competition.logic'
 import { formatLongDate, formatTime } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { loadCompetition, peekCompetition, productRepository } from '../../features/product/product.repository'
+import { useLiveSearchParam } from '../../features/product/route-query'
 import { openMatch } from '../../features/product/match-navigation'
 import type { CompetitionDataResponse, MatchSummary } from '../../features/product/product.types'
 
@@ -26,16 +27,18 @@ type PageState =
   | { phase: 'ready'; data: CompetitionDataResponse }
 
 export default function SchedulePage() {
-  const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const routeTournamentId = useLiveSearchParam('tournamentId')
+  const [state, setState] = useState<PageState>(() => {
+    const cached = peekCompetition(routeTournamentId)
+    return cached ? { phase: 'ready', data: cached } : { phase: 'loading' }
+  })
   const [filter, setFilter] = useState<ScheduleFilter>('all')
   const [direction, setDirection] = useState<ScheduleDirection>('asc')
 
   const load = useCallback(async () => {
-    setState({ phase: 'loading' })
+    if (!peekCompetition(routeTournamentId)) setState({ phase: 'loading' })
     try {
-      const tournamentId = routeTournamentId || (await productRepository.getHome()).tournament.id
-      setState({ phase: 'ready', data: await productRepository.getCompetitionData(tournamentId) })
+      setState({ phase: 'ready', data: await loadCompetition(routeTournamentId) })
     } catch (error) {
       setState({
         phase: 'failed',

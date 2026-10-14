@@ -1,5 +1,4 @@
 import { Button, Text, View } from '@tarojs/components'
-import { getCurrentInstance } from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -7,7 +6,8 @@ import { DataState } from '../../components/public-ui'
 import { MatchStatus, ProductSection, TeamCrest, UserAvatar } from '../../components/product-ui'
 import { createBracketLayout } from '../../features/competition/competition.logic'
 import { formatDate, formatTime } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { loadCompetition, peekCompetition, productRepository } from '../../features/product/product.repository'
+import { useLiveSearchParam } from '../../features/product/route-query'
 import { openPlayer } from '../../features/product/player-navigation'
 import { openMatch } from '../../features/product/match-navigation'
 import { PersonTrigger } from '../../components/person-trigger'
@@ -33,18 +33,25 @@ const views: Array<{ key: ViewMode; label: string }> = [
 ]
 
 export default function DataCenterPage() {
-  const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const routeTournamentId = useLiveSearchParam('tournamentId')
+  const [state, setState] = useState<PageState>(() => {
+    const cached = peekCompetition(routeTournamentId)
+    return cached ? { phase: 'ready', data: cached } : { phase: 'loading' }
+  })
   const [mode, setMode] = useState<ViewMode>('overview')
   const [leaderMode, setLeaderMode] = useState<'scorers' | 'assists'>('scorers')
 
   const load = useCallback(
     async (requestedId?: string) => {
-      setState({ phase: 'loading' })
+      const explicit = requestedId || routeTournamentId
+      if (!peekCompetition(explicit)) setState({ phase: 'loading' })
       try {
-        const tournamentId =
-          requestedId || routeTournamentId || (await productRepository.getHome()).tournament.id
-        setState({ phase: 'ready', data: await productRepository.getCompetitionData(tournamentId) })
+        setState({
+          phase: 'ready',
+          data: explicit
+            ? await productRepository.getCompetitionData(explicit)
+            : await loadCompetition(),
+        })
       } catch (error) {
         setState({
           phase: 'failed',

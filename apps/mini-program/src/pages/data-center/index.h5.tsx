@@ -1,10 +1,15 @@
-import Taro, { getCurrentInstance } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { TeamCrest } from '../../components/product-ui'
-import { productRepository } from '../../features/product/product.repository'
+import {
+  loadCompetition,
+  peekCompetition,
+  productRepository,
+} from '../../features/product/product.repository'
+import { useLiveSearchParam } from '../../features/product/route-query'
 import { readSession } from '../../features/product/session'
 import { openTeamFromUrl } from '../../features/product/team-navigation'
 import { openPlayer } from '../../features/product/player-navigation'
@@ -43,8 +48,11 @@ export default function H5DataCenterPage() {
 }
 
 function DesktopDataPage() {
-  const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const routeTournamentId = useLiveSearchParam('tournamentId')
+  const [state, setState] = useState<PageState>(() => {
+    const cached = peekCompetition(routeTournamentId)
+    return cached ? { phase: 'ready', data: cached } : { phase: 'loading' }
+  })
   const [tab, setTab] = useState<DataTab>('teams')
   const [expandedPanel, setExpandedPanel] = useState<'groups' | 'knockout'>('groups')
   const [instantSwitch, setInstantSwitch] = useState(false)
@@ -59,14 +67,13 @@ function DesktopDataPage() {
     async (requestedId?: string) => {
       const sequence = ++requestSequence.current
       if (requestedId) requestedTournament.current = requestedId
-      setState({ phase: 'loading' })
+      const explicit = requestedTournament.current || routeTournamentId
+      if (!peekCompetition(explicit)) setState({ phase: 'loading' })
       try {
-        const id =
-          requestedTournament.current ||
-          routeTournamentId ||
-          (await productRepository.getHome()).tournament.id
-        requestedTournament.current = id
-        const data = await productRepository.getCompetitionData(id)
+        const data = explicit
+          ? await productRepository.getCompetitionData(explicit)
+          : await loadCompetition()
+        requestedTournament.current = data.tournament.id
         if (sequence !== requestSequence.current) return
         lastLoadedData.current = data
         setGroupId('all')
