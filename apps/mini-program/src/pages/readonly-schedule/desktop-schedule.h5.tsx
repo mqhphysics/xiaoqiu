@@ -355,11 +355,11 @@ function ScheduleContent({
         <h1>赛程</h1>
         <div className="schedule-hero__copy">
           <div>
-            <h2>{data.tournament.name.replace(/\s*·\s*演示赛季$/, '')}</h2>
+            <h2>{data.tournament.name}</h2>
             
           </div>
           <p>
-            {`${data.tournament.seasonName.replace(/\s*·?\s*演示赛季/, '')} · 关注每一场校园比赛`}
+            {`${data.tournament.seasonName} · 关注每一场校园比赛`}
           </p>
         </div>
         <div className="schedule-hero__actions">
@@ -705,7 +705,7 @@ function ScheduleContent({
           <section className="schedule-side-card schedule-tournament-card">
             <div>
               <Icon name="cup" />
-              <h3>{data.tournament.name.replace(/\s*·\s*演示赛季$/, '')}</h3>
+              <h3>{data.tournament.name}</h3>
               
             </div>
             <p>在校园的绿茵场上，记录每一份热爱。</p>

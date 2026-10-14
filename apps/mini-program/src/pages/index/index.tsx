@@ -496,10 +496,12 @@ function HomeContent({
   // One-line platform strip: rotate titles every 6 s (paused while the dialog is open).
   const [noticeIndex, setNoticeIndex] = useState(0)
   const [announcementDialog, setAnnouncementDialog] = useState<string | null | undefined>()
-  const noticeAnnouncement =
-    platformAnnouncements[noticeIndex % Math.max(1, platformAnnouncements.length)]
+  // Two announcements side by side; with more than two, rotate one pair at a time.
+  const noticePageCount = Math.max(1, Math.ceil(platformAnnouncements.length / 2))
+  const noticeStart = (noticeIndex % noticePageCount) * 2
+  const noticePair = platformAnnouncements.slice(noticeStart, noticeStart + 2)
   useEffect(() => {
-    if (platformAnnouncements.length < 2 || announcementDialog !== undefined) return
+    if (platformAnnouncements.length < 3 || announcementDialog !== undefined) return
     const timer = setInterval(() => setNoticeIndex((value) => value + 1), 6000)
     return () => clearInterval(timer)
   }, [platformAnnouncements.length, announcementDialog])
@@ -525,9 +527,8 @@ function HomeContent({
       <View className="experience-hero">
         <View className="experience-hero__copy">
           <Text className="experience-hero__eyebrow">
-            {data.tournament.name} · {data.tournament.seasonName}
+            {data.tournament.name}
           </Text>
-          {heroAnnouncement && <Text className="experience-hero__badge">赛事主办</Text>}
           <Text
             className={`experience-hero__title ${
               (heroAnnouncement?.title?.length ?? data.tournament.name.length) > 20
@@ -538,7 +539,7 @@ function HomeContent({
             {heroAnnouncement?.title ?? data.tournament.name}
           </Text>
           <Text className="experience-hero__summary">
-            {heroAnnouncement?.body ?? '校园赛事、球队和绿茵动态，都在这里。'}
+            {heroSummary(heroAnnouncement?.body) ?? '校园赛事、球队和绿茵动态，都在这里。'}
           </Text>
           <Button
             className="experience-hero__action"
@@ -592,21 +593,24 @@ function HomeContent({
             <Text>官方公告</Text>
             <Text className="notice-rail__label-note">平台</Text>
           </View>
-          <Button
-            className="notice-rail__headline"
-            key={noticeAnnouncement?.id ?? 'none'}
-            onClick={() => openAnnouncement(noticeAnnouncement?.id ?? null)}
-          >
-            <Text className="notice-rail__title">{noticeAnnouncement?.title || '平台公告'}</Text>
-            {platformAnnouncements.length > 1 && (
-              <Text className="notice-rail__count">
-                {(noticeIndex % platformAnnouncements.length) + 1}/{platformAnnouncements.length}
-              </Text>
-            )}
-          </Button>
+          <View className="notice-rail__pair" key={`pair-${noticeIndex}`}>
+            {noticePair.map((announcement) => (
+              <Button
+                key={announcement.id}
+                className="notice-rail__headline"
+                onClick={() => openAnnouncement(announcement.id)}
+              >
+                <Text className="notice-rail__dot" />
+                <Text className="notice-rail__title">{announcement.title || '平台公告'}</Text>
+                {announcement.body && (
+                  <Text className="notice-rail__excerpt">{oneLine(announcement.body)}</Text>
+                )}
+              </Button>
+            ))}
+          </View>
           <Button
             className="notice-rail__more"
-            onClick={() => openAnnouncement(noticeAnnouncement?.id ?? null)}
+            onClick={() => openAnnouncement(noticePair[0]?.id ?? null)}
           >
             查看详情 →
           </Button>
@@ -1006,4 +1010,16 @@ async function goToPlayer(playerId: string, tournamentId: string) {
 
 async function goToPost(postId: string) {
   await openPost(postId)
+}
+
+/** First sentence of an announcement body, so the hero stays to one short line. */
+function heroSummary(body?: string | null): string | undefined {
+  const text = body?.trim()
+  if (!text) return undefined
+  const first = text.split(/(?<=[。！？!?])/)[0]!.trim()
+  return first.length > 46 ? `${first.slice(0, 44)}…` : first
+}
+
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
 }

@@ -90,13 +90,13 @@ export async function seedDemoTournament(
       organizationId,
       seasonId,
       tournamentCode: `DEMO-GREEN-CUP-${year}`,
-      name: `${year} 绿茵杯${year === '2026' ? ' · 演示赛季' : ''}`,
+      name: `${year} 绿茵杯`,
       status: year === '2026' ? TournamentStatus.PUBLISHED : TournamentStatus.ARCHIVED,
       createdAt: new Date(`${year}-03-01T08:00:00+08:00`),
     },
     update: {
       seasonId,
-      name: `${year} 绿茵杯${year === '2026' ? ' · 演示赛季' : ''}`,
+      name: `${year} 绿茵杯`,
       status: year === '2026' ? TournamentStatus.PUBLISHED : TournamentStatus.ARCHIVED,
     },
   })

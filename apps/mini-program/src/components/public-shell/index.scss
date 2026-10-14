@@ -313,28 +313,8 @@
   display: none;
 }
 
-.mock-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 38px;
-  padding: 7px 20px;
-  color: #5c4510;
-  background: #fff2c7;
-  border-bottom: 1px solid #ead28a;
-  text-align: center;
-}
 
-.mock-banner__label {
-  flex: 0 0 auto;
-  font-size: 13px;
-  font-weight: 900;
-}
 
-.mock-banner__copy {
-  font-size: 13px;
-}
 
 .public-footer {
   display: flex;

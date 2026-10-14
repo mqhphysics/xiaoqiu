@@ -55,11 +55,45 @@
   .notice-rail--line .notice-rail__more::after {
     display: none;
   }
-  .notice-rail--line .notice-rail__headline {
+  .notice-rail--line .notice-rail__pair {
+    display: flex;
     flex: 1 1 auto;
-    gap: 10px;
     min-width: 0;
     animation: notice-line-in 360ms ease-out;
+  }
+  .notice-rail--line .notice-rail__headline {
+    flex: 1 1 0;
+    gap: 10px;
+    min-width: 0;
+    transition: background-color 160ms ease;
+  }
+  .notice-rail--line .notice-rail__headline + .notice-rail__headline {
+    box-shadow: inset 1px 0 0 rgba(178, 85, 45, 0.18);
+  }
+  .notice-rail--line .notice-rail__headline:hover {
+    background: rgba(201, 101, 59, 0.07);
+  }
+  .notice-rail--line .notice-rail__dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #c9653b;
+  }
+  .notice-rail--line .notice-rail__title {
+    flex: 0 1 auto;
+    max-width: 46%;
+  }
+  .notice-rail--line .notice-rail__excerpt {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    color: #8a6a5a;
+    font-size: 13px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .notice-rail--line .notice-rail__title {
     display: block;
@@ -107,7 +141,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .notice-rail--line .notice-rail__headline {
+  .notice-rail--line .notice-rail__pair {
     animation: none;
   }
 }

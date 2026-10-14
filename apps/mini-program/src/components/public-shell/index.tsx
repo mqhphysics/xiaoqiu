@@ -405,12 +405,6 @@ export function PublicShell({
 
       {menuOpen && !desktopAccount && <View className="public-menu-scrim" onClick={closeMenu} />}
 
-      {source === 'mock' && (
-        <View className="mock-banner">
-          <Text className="mock-banner__label">开发演示数据</Text>
-          <Text className="mock-banner__copy">当前未连接公开 API，页面内容均为虚构数据。</Text>
-        </View>
-      )}
 
       <View className="public-content">{children}</View>
 
