@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   collectPlayerEvents,
+  eventSide,
   hasPublishedPositions,
   lineupGroups,
   lineupHasAppearances,
+  mergeAppearanceEvents,
   minuteLabel,
   playerEventDetails,
   playerAppearanceLabel,
@@ -150,4 +152,39 @@ test('no formation or roster ordering can promote a substitute to a starter', ()
     false,
   )
   assert.equal(minuteLabel({ minute: 90, stoppageMinute: 5 }), '90+5′')
+})
+
+test('home events stay on the left and away events on the right', () => {
+  const home = event('g', 'GOAL', 10, 'a')
+  const away = { ...event('g2', 'GOAL', 12, 'b'), team: { ...team, id: 'away' } }
+  assert.equal(eventSide(home, 'home'), 'home')
+  assert.equal(eventSide(away, 'home'), 'away')
+})
+
+test('missing substitution events are recovered from recorded minutes without inventing scores', () => {
+  const lineup: MatchLineup = {
+    team,
+    players: [
+      {
+        id: 'starter',
+        displayName: 'starter',
+        shirtNumber: '8',
+        position: 'MIDFIELDER',
+        starter: true,
+        minutesPlayed: 60,
+      },
+      {
+        id: 'sub',
+        displayName: 'sub',
+        shirtNumber: '14',
+        position: 'FORWARD',
+        starter: false,
+        minutesPlayed: 30,
+      },
+    ],
+  }
+  const merged = mergeAppearanceEvents(new Map(), lineup)
+  assert.deepEqual(merged.get('starter')?.off, ['60′'])
+  assert.deepEqual(merged.get('sub')?.on, ['60′'])
+  assert.deepEqual(merged.get('starter')?.goals, [])
 })

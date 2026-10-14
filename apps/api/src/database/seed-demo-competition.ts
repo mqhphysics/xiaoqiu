@@ -38,11 +38,13 @@ export interface SeedTournamentFixture {
 export const DEMO_STARTERS_PER_TEAM = 8
 
 export function isDemoMatchStarter(playerIndex: number): boolean {
-  return playerIndex < DEMO_STARTERS_PER_TEAM
+  // Skip the backup goalkeeper (index 1) so the pitch has a single GK, and include one forward.
+  return playerIndex === 0 || (playerIndex >= 2 && playerIndex <= 7) || playerIndex === 10
 }
 
 export function getDemoMinutesPlayed(playerIndex: number, matchMinutes: number): number {
-  if (playerIndex < 6) return matchMinutes
+  if (playerIndex === 1) return 0
+  if (playerIndex < 6 || playerIndex === 10) return matchMinutes
   const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
   if (playerIndex < 8) return substitutionMinute
   if (playerIndex < 10) return matchMinutes - substitutionMinute
@@ -525,22 +527,18 @@ async function seedMatchFacts(
   await tx.matchAppearance.createMany({
     data: teamIndexes.flatMap((teamIndex) => {
       const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
-      return players.flatMap((player, index) => {
+      return players.map((player, index) => {
         const minutesPlayed = getDemoMinutesPlayed(index, matchMinutes)
-        return minutesPlayed > 0
-          ? [
-              {
-                id: fixtureId(`appearance:${definition.code}:${player.id}`),
-                organizationId,
-                matchId,
-                teamId: teams[teamIndex]!.id,
-                playerId: player.id,
-                shirtNumber: player.shirtNumber,
-                starter: isDemoMatchStarter(index),
-                minutesPlayed,
-              },
-            ]
-          : []
+        return {
+          id: fixtureId(`appearance:${definition.code}:${player.id}`),
+          organizationId,
+          matchId,
+          teamId: teams[teamIndex]!.id,
+          playerId: player.id,
+          shirtNumber: player.shirtNumber,
+          starter: isDemoMatchStarter(index),
+          minutesPlayed,
+        }
       })
     }),
   })
@@ -591,6 +589,30 @@ async function seedMatchFacts(
     description: `${cardPlayer.displayName}战术犯规`,
     sortOrder: events.length,
   })
+
+  const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
+  for (const teamIndex of teamIndexes) {
+    const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
+    for (const [offIndex, onIndex] of [
+      [6, 8],
+      [7, 9],
+    ] as const) {
+      const leaving = players[offIndex]!
+      const entering = players[onIndex]!
+      events.push({
+        id: fixtureId(`event:${definition.code}:sub:${teamIndex}:${offIndex}`),
+        organizationId,
+        matchId,
+        teamId: teams[teamIndex]!.id,
+        playerId: leaving.id,
+        relatedPlayerId: entering.id,
+        type: MatchEventType.SUBSTITUTION,
+        minute: substitutionMinute,
+        description: `${entering.displayName}换上，${leaving.displayName}换下`,
+        sortOrder: events.length,
+      })
+    }
+  }
 
   await tx.matchEvent.createMany({ data: events.sort((left, right) => left.minute - right.minute) })
 }

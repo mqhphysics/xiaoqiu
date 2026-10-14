@@ -1023,6 +1023,8 @@ export class ExperienceService {
                 starter: appearance.starter,
                 minutesPlayed: appearance.minutesPlayed,
                 pitchPosition: null,
+                avatarUrl: appearance.player.portraitUrl ?? appearance.player.avatarUrl,
+                profileColor: appearance.player.profileColor,
               })),
             }
           const confirmed = confirmedMatchLineup(

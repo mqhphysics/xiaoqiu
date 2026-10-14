@@ -14,6 +14,7 @@ import { InlineEventEditor, MatchChangeRequest } from '../match-report/inline-ed
 import type { InlineReportController } from '../match-report/use-inline-report.h5'
 import type { MatchExperienceResponse } from '../product/product.types'
 import { LineupsPanel, EventsPanel } from './panels.h5'
+import { matchBulletin } from './match-bulletin.h5'
 import { EmojiPicker, insertAtCursor } from '../../components/post-social/emoji-picker'
 import '../../components/post-social/index.h5.scss'
 import './match-content.h5.scss'
@@ -186,17 +187,20 @@ export function MatchContent({
       )}
 
       {!editor?.editing && activeTab === 'ratings' && (
-        <RatingsPanel
-          body={reviewBody}
-          isFinished={isFinished}
-          match={match}
-          rating={rating}
-          submitting={submitting}
-          onBodyChange={setReviewBody}
-          onRatingChange={setRating}
-          onSubmitRating={() => void submitReview('rating')}
-          onSubmitComment={() => submitReview('comment')}
-        />
+        <>
+          <MatchBulletin match={match} />
+          <RatingsPanel
+            body={reviewBody}
+            isFinished={isFinished}
+            match={match}
+            rating={rating}
+            submitting={submitting}
+            onBodyChange={setReviewBody}
+            onRatingChange={setRating}
+            onSubmitRating={() => void submitReview('rating')}
+            onSubmitComment={() => submitReview('comment')}
+          />
+        </>
       )}
 
       {editor?.editing ? (
@@ -425,6 +429,24 @@ function RatingsPanel({
         />
       )}
     </View>
+  )
+}
+
+function MatchBulletin({ match }: { match: MatchExperienceResponse }) {
+  const bulletin = matchBulletin(match.matchCode)
+  if (!bulletin) return null
+  return (
+    <article className="match-bulletin" aria-label="比赛快报">
+      <header className="match-bulletin__head">
+        <span className="match-bulletin__kicker">比赛快报</span>
+        <span className="match-bulletin__meta">
+          {bulletin.author} · {bulletin.publishedLabel}
+        </span>
+      </header>
+      <h2 className="match-bulletin__title">{bulletin.title}</h2>
+      <p className="match-bulletin__body">{bulletin.body}</p>
+      <img className="match-bulletin__image" src={bulletin.imageSrc} alt={bulletin.imageAlt} />
+    </article>
   )
 }
 

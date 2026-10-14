@@ -409,6 +409,65 @@
     background: #f7f9f6;
   }
 }
+.match-bulletin {
+  margin: 16px 0 18px;
+  padding: 16px 16px 14px;
+  background: #fff;
+  border: 1px solid #d5e3d8;
+  border-radius: 10px;
+}
+.match-bulletin__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.match-bulletin__kicker {
+  color: #3d7a54;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+.match-bulletin__meta {
+  color: #7c8a80;
+  font-size: 11px;
+}
+.match-bulletin__title {
+  margin: 0 0 8px;
+  color: #1f3324;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.match-bulletin__body {
+  margin: 0 0 12px;
+  color: #3f5346;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.match-bulletin__image {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #e8f2ea;
+}
+
+.match-dialog input:focus,
+.match-dialog textarea:focus,
+.match-dialog input:focus-visible,
+.match-dialog textarea:focus-visible {
+  outline: none;
+  border-color: #9cc4a6;
+  box-shadow: 0 0 0 3px rgba(76, 154, 98, 0.14);
+}
+.match-dialog button:focus-visible,
+.match-tab-content button:focus-visible {
+  outline: 2px solid #9cc4a6;
+  outline-offset: 2px;
+}
+
 .match-comment-inline .post-emoji-picker .post-tool {
   display: grid;
   place-items: center;
