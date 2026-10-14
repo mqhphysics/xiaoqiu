@@ -1,5 +1,5 @@
 import { getCurrentInstance, useDidShow } from '@tarojs/taro'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
@@ -215,14 +215,42 @@ function ScheduleContent({
   const session = readSession()
   const accessToken = session?.accessToken
   const primaryTeam = primary.phase === 'ready' ? primary.team : null
-  const initialDate = dateKey(
-    data.schedule.find(
-      (match) => ['LIVE', 'CHECK_IN', 'SCHEDULED'].includes(match.status) && match.scheduledStartAt,
-    )?.scheduledStartAt ??
-      data.schedule.find((match) => match.scheduledStartAt)?.scheduledStartAt ??
-      new Date().toISOString(),
+  // "Today" is the real current date (no demo clock exists). The list anchors on the first
+  // match day on/after today; when the season is over it anchors on the end of the list.
+  const anchor = useMemo(() => {
+    const today = dateKey(new Date().toISOString())
+    const days = [
+      ...new Set(
+        data.schedule
+          .filter((match) => match.scheduledStartAt)
+          .map((match) => dateKey(match.scheduledStartAt)),
+      ),
+    ].sort()
+    const upcoming = days.find((day) => day >= today) ?? null
+    const last = days[days.length - 1] ?? today
+    return { today, upcoming, weekStart: upcoming ? today : shiftDate(last, -6) }
+  }, [data.schedule])
+  const [weekStart, setWeekStart] = useState(anchor.weekStart)
+  const anchored = useRef(false)
+  const scrollToAnchor = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      const list = resultsRef.current
+      if (!list) return
+      const meta = list.querySelector<HTMLElement>('.schedule-results__meta')
+      const target = anchor.upcoming
+        ? list.querySelector<HTMLElement>(`[data-schedule-date="${anchor.upcoming}"]`)
+        : null
+      const top = target
+        ? target.getBoundingClientRect().top -
+          list.getBoundingClientRect().top +
+          list.scrollTop -
+          (meta?.offsetHeight ?? 0) -
+          8
+        : list.scrollHeight
+      list.scrollTo({ top: Math.max(0, top), behavior })
+    },
+    [anchor.upcoming],
   )
-  const [weekStart, setWeekStart] = useState(() => shiftDate(initialDate, -2))
 
   const loadPrimary = useCallback(async () => {
     const request = ++primaryRequest.current
@@ -262,6 +290,12 @@ function ScheduleContent({
     ]),
   )
   useScheduleMotion(datesRef, weekStart, 'x')
+
+  useLayoutEffect(() => {
+    if (anchored.current || view !== 'list') return
+    anchored.current = true
+    scrollToAnchor()
+  })
 
   const teams = useMemo(() => {
     const map = new Map<string, TeamSummary>()
@@ -370,14 +404,14 @@ function ScheduleContent({
             type="button"
             className="schedule-calendar__today"
             onClick={() => {
-              const today = dateKey(new Date().toISOString())
-              setWeekStart(shiftDate(today, -2))
-              setSelectedDate(today)
+              setWeekStart(anchor.weekStart)
+              setSelectedDate(null)
               setView('list')
+              window.requestAnimationFrame(() => scrollToAnchor('smooth'))
             }}
           >
             <Icon name="calendar" />
-            <span>回到今天</span>
+            <span>{anchor.upcoming ? '回到今天' : '最近比赛'}</span>
           </button>
           <button
             data-schedule-button=""
@@ -546,7 +580,7 @@ function ScheduleContent({
                 </div>
               ) : (
                 [...groups].map(([date, dayMatches]) => (
-                  <section className="schedule-date-group" key={date}>
+                  <section className="schedule-date-group" key={date} data-schedule-date={date}>
                     <header>
                       <h3>
                         {date === 'TBD'

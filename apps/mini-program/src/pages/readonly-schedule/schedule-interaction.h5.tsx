@@ -98,7 +98,7 @@ export function ScheduleInteractionProvider({
   return (
     <InteractionContext.Provider value={value}>
       <div
-        className="schedule-desktop"
+        className="schedule-desktop xq-viewport-page"
         ref={root}
         aria-busy={pending}
         onPointerDownCapture={() => recordInput('pointer')}
