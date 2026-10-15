@@ -17,8 +17,9 @@ export function HomeHeroCopy({ tournament, onOpenSchedule }: HomeHeroCopyProps) 
         </defs>
       </svg>
       <div className="reference-hero__canvas">
+        <p className="reference-hero__season">2026 校园足球赛季</p>
         <h1 className="reference-hero__art">
-          <img src={referenceArtwork} alt="2026校园足球赛季，绿茵正燃，青春正好" />
+          <img src={referenceArtwork} alt="绿茵正燃，青春正好" />
         </h1>
         <p className="reference-hero__message">2026绿茵杯火热进行中</p>
         <span className="reference-hero__underline" aria-hidden="true" />
