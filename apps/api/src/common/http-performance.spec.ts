@@ -2,9 +2,13 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import test from 'node:test'
-import express from 'express'
+import { createRequire } from 'node:module'
+import type expressType from 'express'
 
 import { compressResponse } from './http-performance'
+
+// express is a transitive dependency of @nestjs/platform-express, not a direct one; resolve it through Nest.
+const express = createRequire(require.resolve('@nestjs/platform-express'))('express') as typeof expressType
 
 test('public JSON is brotli compressed and keeps a strong etag', async () => {
   const app = express()

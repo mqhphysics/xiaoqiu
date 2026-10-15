@@ -196,7 +196,8 @@
     padding-bottom: 6px;
   }
   .match-dialog .match-horizontal-pitch {
-    height: clamp(180px, calc(100cqh - 360px), 240px);
+    /* Full-size pitch; the lineup tab scrolls inside the dialog body. */
+    height: 380px;
   }
   .experience-match-header__context {
     display: flex;

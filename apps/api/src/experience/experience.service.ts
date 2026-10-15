@@ -1034,7 +1034,6 @@ export class ExperienceService {
                 displayName: appearance.player.displayName,
                 shirtNumber: appearance.shirtNumber,
                 position: appearance.player.position,
-                avatarUrl: appearance.player.avatarUrl,
                 starter: appearance.starter,
                 minutesPlayed: appearance.minutesPlayed,
                 pitchPosition: null,

@@ -64,7 +64,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   container-type: size;
   width: 100%;
-  height: clamp(180px, calc(min(640px, var(--xq-vh, 1vh) * 100 - 72px) - 400px), 240px);
+  /* Tall enough for 3-3-1 rows with 38px avatars; the lineup tab scrolls inside the dialog body. */
+  height: clamp(360px, 30vw, 420px);
   min-height: 0;
   overflow: hidden;
   border: 5px solid #2d6a48;
@@ -91,7 +92,7 @@
 .pitch-player {
   position: absolute;
   display: flex;
-  width: clamp(48px, 20cqh, 70px);
+  width: 84px;
   flex-direction: column;
   align-items: center;
   gap: 1px;
@@ -123,8 +124,8 @@
 .pitch-player__avatar {
   display: grid;
   place-items: center;
-  width: clamp(22px, 10.5cqh, 34px);
-  height: clamp(22px, 10.5cqh, 34px);
+  width: 38px;
+  height: 38px;
   .user-avatar {
     width: 100%;
     height: 100%;
@@ -135,7 +136,7 @@
 .pitch-player__subs {
   position: absolute;
   top: -6px;
-  left: calc(50% + clamp(14px, 6.8cqh, 22px));
+  left: calc(50% + 18px);
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -172,7 +173,7 @@
   min-width: 18px;
   padding: 0 3px;
   color: #f4f8ef;
-  font-size: clamp(9px, 3.4cqh, 12px);
+  font-size: 12px;
   font-weight: 800;
   line-height: 1.15;
   text-shadow: 0 1px 2px #163a28aa;
@@ -183,7 +184,8 @@
 .pitch-player__name {
   max-width: 100%;
   color: #fff;
-  font-size: clamp(8px, 3.1cqh, 10px);
+  font-size: 12px;
+  text-shadow: 0 1px 2px #163a28aa;
   font-weight: 700;
   line-height: 1.15;
   overflow: hidden;
@@ -200,9 +202,9 @@
   gap: 2px;
   margin-top: 1px;
   .match-icon {
-    width: clamp(10px, 3.8cqh, 14px);
-    height: clamp(10px, 3.8cqh, 14px);
-    flex-basis: clamp(10px, 3.8cqh, 14px);
+    width: 14px;
+    height: 14px;
+    flex-basis: 14px;
   }
 }
 .match-horizontal-pitch__empty {
@@ -531,290 +533,3 @@
   }
 }
 
-/* Round 5 — centred event timeline: home left · minute · away right; scorer + assist on one line. */
-@media (min-width: 721px) {
-  .match-events .match-events__list {
-    display: none;
-  }
-  .match-timeline {
-    position: relative;
-    display: grid;
-    gap: 0;
-    margin: 0;
-    padding: 4px 0 8px;
-    list-style: none;
-  }
-  .match-timeline::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    bottom: 8px;
-    left: 50%;
-    width: 2px;
-    margin-left: -1px;
-    background: linear-gradient(180deg, transparent, #d5e0d4 8%, #d5e0d4 92%, transparent);
-  }
-  .match-timeline__row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
-    align-items: start;
-    gap: 12px;
-    padding: 8px 0;
-  }
-  .match-timeline__axis {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    justify-items: center;
-    gap: 4px;
-    time {
-      padding: 1px 7px;
-      border-radius: 999px;
-      background: #eef4ee;
-      color: #3e5a46;
-      font-size: 12px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-    }
-  }
-  .match-timeline__dot {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    background: #f4f8f2;
-    box-shadow: 0 0 0 1px #c9d8c6;
-  }
-  .match-timeline__side {
-    display: flex;
-    min-width: 0;
-  }
-  .match-timeline__side--home {
-    justify-content: flex-end;
-  }
-  .match-timeline__side--away {
-    justify-content: flex-start;
-  }
-  .match-timeline__card {
-    display: grid;
-    gap: 6px;
-    max-width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #e1eadc;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(25, 60, 35, 0.04);
-  }
-  .match-timeline__row--home .match-timeline__card {
-    border-color: #cfe0d2;
-    background: linear-gradient(180deg, #fbfefb, #f4f9f4);
-  }
-  .match-timeline__players {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    color: #1f3324;
-    font-size: 14px;
-    font-weight: 650;
-    .match-icon {
-      flex: 0 0 18px;
-      width: 18px;
-      height: 18px;
-    }
-  }
-  .match-timeline__media {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 8px;
-    img,
-    video {
-      max-width: min(220px, 100%);
-      border-radius: 6px;
-    }
-  }
-}
-
-/* Round 5 — lineup players: avatar (not number disc), number + name below, sub arrow + minute
-   top-right, goal / assist icons repeated underneath. Bench list and 伤停 below the pitch. */
-@media (min-width: 721px) {
-  .match-horizontal-pitch .match-horizontal-player {
-    gap: 3px;
-    min-height: 0;
-  }
-  .match-pitch-avatar {
-    position: relative;
-    display: block;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 2px solid rgba(255, 255, 255, 0.92);
-    border-radius: 50%;
-    background: #e8efe6;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-    transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
-    .user-avatar {
-      width: 100%;
-      height: 100%;
-      font-size: 15px;
-    }
-    &:hover,
-    &[aria-pressed='true'] {
-      transform: scale(1.08);
-    }
-    &[aria-pressed='true'] {
-      border-color: #f2d36b;
-    }
-  }
-  .match-horizontal-player--goalkeeper .match-pitch-avatar {
-    border-color: #f2d36b;
-  }
-  .match-pitch-avatar__sub {
-    position: absolute;
-    top: -8px;
-    right: -26px;
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    padding: 1px 4px 1px 2px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.95);
-    color: #33463a;
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-    .match-icon {
-      flex: 0 0 12px;
-      width: 12px;
-      height: 12px;
-    }
-  }
-  .match-pitch-avatar__card {
-    position: absolute;
-    top: -4px;
-    left: -6px;
-    width: 8px;
-    height: 11px;
-    border-radius: 2px;
-    &.is-yellow { background: #e4bd43; }
-    &.is-red { background: #c2473c; }
-  }
-  .match-horizontal-player__name {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
-    max-width: 96px;
-    overflow: hidden;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 650;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    b {
-      color: #f2d36b;
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
-    }
-  }
-  .match-pitch-avatar__events {
-    display: inline-flex;
-    gap: 1px;
-    padding: 1px 3px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.9);
-    .match-icon {
-      flex: 0 0 13px;
-      width: 13px;
-      height: 13px;
-    }
-  }
-  .match-horizontal-player__keeper {
-    display: none;
-  }
-  .match-bench {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 16px;
-  }
-  .match-bench--absent {
-    margin-top: 12px;
-    > h3 {
-      grid-column: 1 / -1;
-      margin: 4px 0 -4px;
-      color: #183f2a;
-      font-size: 14px;
-    }
-  }
-  .match-bench__team {
-    padding: 10px 14px;
-    border: 1px solid #e1eadc;
-    border-radius: 10px;
-    background: #fff;
-    > header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #eef2ec;
-      .team-crest { width: 22px; height: 22px; }
-      strong { color: #1f3324; font-size: 13px; }
-      span { margin-left: auto; color: #7a867d; font-size: 12px; }
-    }
-    ul {
-      display: grid;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    li {
-      display: grid;
-      grid-template-columns: 28px 22px minmax(0, 1fr) auto auto;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0;
-      border-bottom: 1px solid #f3f5f2;
-      font-size: 13px;
-      .user-avatar { width: 28px; height: 28px; font-size: 11px; }
-    }
-  }
-  .match-bench__number {
-    color: #7a867d;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-  }
-  .match-bench__name { color: #1f3324; font-weight: 600; }
-  .match-bench__pos { color: #8a958e; font-size: 12px; }
-  .match-bench__events {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    .match-icon { flex: 0 0 14px; width: 14px; height: 14px; }
-  }
-  .match-sub {
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    color: #3a7a50;
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .match-bench__empty {
-    margin: 8px 0 2px;
-    color: #8a958e;
-    font-size: 12px;
-  }
-  .match-horizontal-lineups__bench { display: none; }
-}
-@media (min-width: 721px) {
-  .match-bench__team > header {
-    justify-content: flex-start !important;
-    text-align: left;
-  }
-}
