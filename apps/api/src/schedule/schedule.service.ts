@@ -1,5 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
+import { validateTournamentSelection } from '../common/public-tournament'
 
 import { ApiHttpException } from '../common/api-http.exception'
 import { getRequestId, type RequestWithId } from '../common/request-context'
@@ -445,17 +446,29 @@ export class ScheduleService {
     })
   }
 
-  async listPublicTournaments(organizationId: string) {
+  async listPublicTournaments(
+    organizationId: string,
+    selection?: { competitionDefinitionId?: string | undefined; seasonId?: string | undefined },
+  ) {
+    validateTournamentSelection(selection)
     const tournaments = await this.prisma.tournament.findMany({
+      include: { _count: { select: { scheduleRevisions: { where: { status: 'PUBLISHED' } } } } },
       orderBy: { createdAt: 'desc' },
       where: {
         organizationId,
         status: TournamentStatus.PUBLISHED,
+        ...(selection?.competitionDefinitionId
+          ? { competitionDefinitionId: selection.competitionDefinitionId }
+          : {}),
+        ...(selection?.seasonId ? { seasonId: selection.seasonId } : {}),
       },
     })
 
     return {
-      items: tournaments.map((tournament) => this.toTournamentView(tournament)),
+      items: tournaments.map((tournament) => ({
+        ...this.toTournamentView(tournament),
+        hasPublishedSchedule: tournament._count.scheduleRevisions > 0,
+      })),
     }
   }
 

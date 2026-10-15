@@ -22,6 +22,11 @@ export class SearchQueryDto {
   @ApiPropertyOptional({ type: String, format: 'uuid' })
   @IsOptional()
   @IsUUID()
+  competitionId?: string
+  @ApiPropertyOptional({ type: String, format: 'uuid' }) @IsOptional() @IsUUID() seasonId?: string
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
   tournamentId?: string
 
   @ApiProperty({ type: String, example: '物院' })

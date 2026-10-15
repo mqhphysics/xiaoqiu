@@ -33,6 +33,7 @@ import {
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
+import { CampusContext, CampusWelcome } from '../campus-context'
 import { prefetchSection, prefetchTabsWhenIdle } from './prefetch-tabs'
 
 import './index.scss'
@@ -415,8 +416,9 @@ export function PublicShell({
 
       {menuOpen && !desktopAccount && <View className="public-menu-scrim" onClick={closeMenu} />}
 
-
-      <View className="public-content">{children}</View>
+      <View className="public-content">
+        <CampusContext active={active}>{children}</CampusContext>
+      </View>
 
       <View className="public-footer">
         <Text className="public-footer__brand">晓球</Text>
@@ -457,6 +459,7 @@ export function PublicShell({
         )}
       </View>
       {session && <MessagingDrawer />}
+      {session && <CampusWelcome />}
       {feedbackOpen && (
         <ReportModal
           targetType="FEEDBACK"

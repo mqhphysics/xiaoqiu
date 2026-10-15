@@ -284,6 +284,8 @@ enum ReportStatus {
 }
 
 model Organization {
+  students             StudentRecord[]
+  competitions         CompetitionDefinition[]
   identityRecords      IdentityRecord[]
   identityApplications IdentityApplication[]
   managedMediaAssets   ManagedMediaAsset[]
@@ -346,6 +348,14 @@ model Organization {
 }
 
 model User {
+  profileCohort                String                   @default("LEGACY") @map("profile_cohort") @db.VarChar(64)
+  studentRecordId              String?                  @unique @map("student_record_id") @db.Uuid
+  studentRecord                StudentRecord?           @relation(fields: [studentRecordId], references: [id], onDelete: Restrict)
+  studentVerifiedAt            DateTime?                @map("student_verified_at") @db.Timestamptz(3)
+  onboardingCompletedAt        DateTime?                @map("onboarding_completed_at") @db.Timestamptz(3)
+  playerOfferDismissedAt       DateTime?                @map("player_offer_dismissed_at") @db.Timestamptz(3)
+  coverUrl                     String?                  @map("cover_url") @db.VarChar(512)
+  reporterProfiles             ReporterProfile[]
   createdIdentityRecords       IdentityRecord[]         @relation("IdentityRecordCreator")
   linkedIdentityRecords        IdentityRecord[]         @relation("IdentityRecordUser")
   identityApplications         IdentityApplication[]    @relation("IdentityApplicant")
@@ -625,6 +635,8 @@ model OutboxJob {
 }
 
 model Season {
+  isDemo         Boolean      @default(false) @map("is_demo")
+  sortOrder      Int          @default(0) @map("sort_order")
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   seasonCode     String       @map("season_code") @db.VarChar(64)
@@ -642,31 +654,34 @@ model Season {
 }
 
 model Tournament {
-  id                String                   @id @default(uuid()) @db.Uuid
-  organizationId    String                   @map("organization_id") @db.Uuid
-  seasonId          String                   @map("season_id") @db.Uuid
-  tournamentCode    String                   @map("tournament_code") @db.VarChar(64)
-  name              String                   @db.VarChar(160)
-  status            TournamentStatus         @default(DRAFT)
-  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  season            Season                   @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  ruleVersions      CompetitionRuleVersion[]
-  stages            Stage[]
-  schedulePlans     SchedulePlan[]
-  scheduleRevisions ScheduleRevision[]
-  matches           Match[]
-  teamRegistrations TeamRegistration[]
-  rosterSnapshots   RosterSnapshot[]
-  importBatches     ImportBatch[]
-  posts             Post[]
+  competitionDefinitionId String?                  @map("competition_definition_id") @db.Uuid
+  competitionDefinition   CompetitionDefinition?   @relation(fields: [competitionDefinitionId], references: [id], onDelete: Restrict)
+  id                      String                   @id @default(uuid()) @db.Uuid
+  organizationId          String                   @map("organization_id") @db.Uuid
+  seasonId                String                   @map("season_id") @db.Uuid
+  tournamentCode          String                   @map("tournament_code") @db.VarChar(64)
+  name                    String                   @db.VarChar(160)
+  status                  TournamentStatus         @default(DRAFT)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  season                  Season                   @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  ruleVersions            CompetitionRuleVersion[]
+  stages                  Stage[]
+  schedulePlans           SchedulePlan[]
+  scheduleRevisions       ScheduleRevision[]
+  matches                 Match[]
+  teamRegistrations       TeamRegistration[]
+  rosterSnapshots         RosterSnapshot[]
+  importBatches           ImportBatch[]
+  posts                   Post[]
 
   progressionVersion Int                     @default(0) @map("progression_version")
   progressions       TournamentProgression[]
   lineupPlans        TeamLineupPlan[]
 
   @@unique([organizationId, tournamentCode], map: "tournaments_organization_id_tournament_code_key")
+  @@unique([competitionDefinitionId, seasonId], map: "tournaments_competition_season_key")
   @@unique([id, organizationId], map: "tournaments_id_organization_id_key")
   @@index([organizationId, status, createdAt], map: "tournaments_organization_id_status_created_at_idx")
   @@index([seasonId], map: "tournaments_season_id_idx")
@@ -789,6 +804,9 @@ model Team {
 }
 
 model PlayerProfile {
+  studentRecordId String?          @unique @map("student_record_id") @db.Uuid
+  studentRecord   StudentRecord?   @relation(fields: [studentRecordId], references: [id], onDelete: Restrict)
+  coverUrl        String?          @map("cover_url") @db.VarChar(512)
   identityRecords IdentityRecord[]
 
   id                String                @id @default(uuid()) @db.Uuid
@@ -835,6 +853,157 @@ model PlayerProfile {
   @@unique([organizationId, studentId], map: "player_profiles_organization_id_student_id_key")
   @@index([organizationId, displayName], map: "player_profiles_organization_id_display_name_idx")
   @@map("player_profiles")
+}
+
+// The student directory exists independently of registration or a football identity.
+model StudentRecord {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  studentNumber  String?        @map("student_number") @db.VarChar(32)
+  realName       String         @map("real_name") @db.VarChar(120)
+  gender         String         @default("UNSPECIFIED") @db.VarChar(16)
+  collegeName    String         @default("") @map("college_name") @db.VarChar(160)
+  academicYear   String         @default("") @map("academic_year") @db.VarChar(32)
+  status         String         @default("ACTIVE") @db.VarChar(20)
+  sourceType     String         @default("MANUAL") @map("source_type") @db.VarChar(64)
+  cohort         String         @default("CURRENT") @db.VarChar(64)
+  isDemo         Boolean        @default(false) @map("is_demo")
+  version        Int            @default(1)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?
+  player         PlayerProfile?
+
+  @@unique([organizationId, studentNumber])
+  @@index([organizationId, cohort, status])
+  @@map("student_records")
+}
+
+model CompetitionDefinition {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           String       @db.VarChar(64)
+  cupName        String       @map("cup_name") @db.VarChar(80)
+  gender         String       @db.VarChar(16)
+  name           String       @db.VarChar(120)
+  sortOrder      Int          @default(0) @map("sort_order")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournaments    Tournament[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, sortOrder])
+  @@map("competition_definitions")
+}
+
+model ReporterProfile {
+  probationCompletedAt DateTime?                @map("probation_completed_at") @db.Timestamptz(3)
+  probationStartedAt   DateTime?                @map("probation_started_at") @db.Timestamptz(3)
+  probationUntil       DateTime?                @map("probation_until") @db.Timestamptz(3)
+  id                   String                   @id @default(uuid()) @db.Uuid
+  organizationId       String                   @map("organization_id") @db.Uuid
+  userId               String                   @map("user_id") @db.Uuid
+  score                Int                      @default(100)
+  status               String                   @default("ACTIVE") @db.VarChar(24)
+  freezeReason         String?                  @map("freeze_reason") @db.VarChar(80)
+  consecutiveQualified Int                      @default(0) @map("consecutive_qualified")
+  reinstatementCount   Int                      @default(0) @map("reinstatement_count")
+  lastContributionAt   DateTime?                @map("last_contribution_at") @db.Timestamptz(3)
+  activitySince        DateTime                 @default(now()) @map("activity_since") @db.Timestamptz(3)
+  cooldownUntil        DateTime?                @map("cooldown_until") @db.Timestamptz(3)
+  version              Int                      @default(1)
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entries              ReporterScoreEntry[]
+  cases                ReporterCorrectionCase[]
+  applications         ReporterReinstatement[]
+  contributions        ReporterContribution[]
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, status])
+  @@map("reporter_profiles")
+}
+
+model ReporterScoreEntry {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  profileId        String          @map("profile_id") @db.Uuid
+  deduplicationKey String          @map("deduplication_key") @db.VarChar(160)
+  kind             String          @db.VarChar(40)
+  delta            Int
+  scoreBefore      Int             @map("score_before")
+  scoreAfter       Int             @map("score_after")
+  reason           String          @db.VarChar(1000)
+  actorUserId      String?         @map("actor_user_id") @db.Uuid
+  caseId           String?         @map("case_id") @db.Uuid
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  profile          ReporterProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, deduplicationKey])
+  @@index([profileId, createdAt])
+  @@map("reporter_score_entries")
+}
+
+model ReporterCorrectionCase {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  profileId        String          @map("profile_id") @db.Uuid
+  matchId          String          @map("match_id") @db.Uuid
+  reportRevisionId String          @map("report_revision_id") @db.Uuid
+  errorKey         String          @map("error_key") @db.VarChar(120)
+  reportedByUserId String          @map("reported_by_user_id") @db.Uuid
+  description      String          @db.VarChar(2000)
+  evidence         Json            @default("[]") @db.JsonB
+  status           String          @default("OPEN") @db.VarChar(24)
+  reviewNote       String?         @map("review_note") @db.VarChar(2000)
+  reviewedByUserId String?         @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime?       @map("reviewed_at") @db.Timestamptz(3)
+  appeal           String?         @db.VarChar(2000)
+  appealedAt       DateTime?       @map("appealed_at") @db.Timestamptz(3)
+  version          Int             @default(1)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile          ReporterProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, reportRevisionId, errorKey])
+  @@index([organizationId, status, createdAt])
+  @@map("reporter_correction_cases")
+}
+
+model ReporterContribution {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  profileId        String          @map("profile_id") @db.Uuid
+  matchId          String          @map("match_id") @db.Uuid
+  seasonId         String          @map("season_id") @db.Uuid
+  reportRevisionId String          @map("report_revision_id") @db.Uuid
+  qualified        Boolean         @default(true)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  profile          ReporterProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, matchId])
+  @@map("reporter_contributions")
+}
+
+model ReporterReinstatement {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  profileId        String          @map("profile_id") @db.Uuid
+  reason           String          @db.VarChar(2000)
+  status           String          @default("SUBMITTED") @db.VarChar(24)
+  reviewNote       String?         @map("review_note") @db.VarChar(2000)
+  reviewedByUserId String?         @map("reviewed_by_user_id") @db.Uuid
+  cooldownUntil    DateTime?       @map("cooldown_until") @db.Timestamptz(3)
+  version          Int             @default(1)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  profile          ReporterProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+  @@map("reporter_reinstatements")
 }
 
 model Venue {
@@ -966,26 +1135,27 @@ model MatchReview {
 }
 
 model TeamRegistration {
-  id                String                 @id @default(uuid()) @db.Uuid
-  organizationId    String                 @map("organization_id") @db.Uuid
-  tournamentId      String                 @map("tournament_id") @db.Uuid
-  teamId            String                 @map("team_id") @db.Uuid
-  groupId           String?                @map("group_id") @db.Uuid
-  status            TeamRegistrationStatus @default(DRAFT)
-  leaderDisplayName String?                @map("leader_display_name") @db.VarChar(120)
-  coachDisplayName  String?                @map("coach_display_name") @db.VarChar(120)
-  contactName       String?                @map("contact_name") @db.VarChar(120)
-  contactPhone      String?                @map("contact_phone") @db.VarChar(40)
-  approvedAt        DateTime?              @map("approved_at") @db.Timestamptz(3)
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  tournament        Tournament             @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_tournament_organization_fkey")
-  team              Team                   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_team_organization_fkey")
-  group             TournamentGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  rosterSubmissions RosterSubmission[]
-  rosterSnapshots   RosterSnapshot[]
-  importBatches     ImportBatch[]
+  teamProfileSnapshot Json?                  @map("team_profile_snapshot") @db.JsonB
+  id                  String                 @id @default(uuid()) @db.Uuid
+  organizationId      String                 @map("organization_id") @db.Uuid
+  tournamentId        String                 @map("tournament_id") @db.Uuid
+  teamId              String                 @map("team_id") @db.Uuid
+  groupId             String?                @map("group_id") @db.Uuid
+  status              TeamRegistrationStatus @default(DRAFT)
+  leaderDisplayName   String?                @map("leader_display_name") @db.VarChar(120)
+  coachDisplayName    String?                @map("coach_display_name") @db.VarChar(120)
+  contactName         String?                @map("contact_name") @db.VarChar(120)
+  contactPhone        String?                @map("contact_phone") @db.VarChar(40)
+  approvedAt          DateTime?              @map("approved_at") @db.Timestamptz(3)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tournament          Tournament             @relation(fields: [tournamentId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_tournament_organization_fkey")
+  team                Team                   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "team_registrations_team_organization_fkey")
+  group               TournamentGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  rosterSubmissions   RosterSubmission[]
+  rosterSnapshots     RosterSnapshot[]
+  importBatches       ImportBatch[]
 
   @@unique([tournamentId, teamId], map: "team_registrations_tournament_id_team_id_key")
   @@unique([id, organizationId], map: "team_registrations_id_organization_id_key")

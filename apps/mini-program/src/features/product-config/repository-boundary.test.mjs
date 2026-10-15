@@ -110,6 +110,8 @@ function fixture({ web = true, enabled = true, session = null, needsAccount = fa
       if (name === './readonly-schedule.logic')
         return { sortMatchesByStartAt: (matches) => matches }
       if (name === './get-cache') return loadGetCache()
+      if (name.endsWith('/tournament-scope'))
+        return loadRepository('../product/tournament-scope.ts')
       throw new Error(`Unexpected repository dependency: ${name}`)
     }
     new Function('require', 'exports', 'module', 'process', compiled)(

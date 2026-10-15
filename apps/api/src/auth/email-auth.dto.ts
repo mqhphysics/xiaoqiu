@@ -31,6 +31,6 @@ export class EmailVerificationDto {
 export class EmailPasswordResetDto extends EmailVerificationDto {
   @ApiProperty()
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   newPassword!: string
 }

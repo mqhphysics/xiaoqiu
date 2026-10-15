@@ -116,7 +116,7 @@ export const identityEntryActions = {
     }),
   informationEntry: () =>
     accountAction('matchReports.write', async (caps, refresh) => {
-      const tournaments = await readonlyScheduleRepository.listTournaments()
+      const tournaments = await readonlyScheduleRepository.listTournaments(true)
       if (tournaments.source !== 'api') throw new Error('信息录入需要连接真实 API')
       const schedules = await Promise.all(
         tournaments.data.map((tournament) => readonlyScheduleRepository.listMatches(tournament.id)),

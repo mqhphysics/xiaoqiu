@@ -342,6 +342,26 @@ export class MediaService {
     }
   }
 
+  /** Content-addressed profile media; callers must authorize the target and audit the update. */
+  async storeProfilePicture(dataUrl: string, wide = false): Promise<StoredAvatar> {
+    if (!wide) return this.storeAvatar(dataUrl)
+    const image = await normalizePostImage(dataUrl)
+    const fileName = `${createHash('sha256').update(image.body).digest('hex')}.webp`
+    await mkdir(AVATAR_DIRECTORY, { recursive: true })
+    try {
+      await writeFile(resolve(AVATAR_DIRECTORY, fileName), image.body, { flag: 'wx' })
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error
+    }
+    return {
+      avatarUrl: `/api/media/avatars/${fileName}`,
+      bytes: image.body.length,
+      width: image.width,
+      height: image.height,
+      mimeType: 'image/webp',
+    }
+  }
+
   private async storeAvatar(dataUrl: string): Promise<StoredAvatar> {
     const match = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
     if (!match) throw badAvatar('仅支持裁剪后生成的 WebP、PNG 或 JPEG 头像')

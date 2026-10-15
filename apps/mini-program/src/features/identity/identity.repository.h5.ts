@@ -5,6 +5,7 @@ export const identityLabels = {
   TEAM_CAPTAIN: '队长',
   TEAM_COACH: '教练',
   MATCH_REPORTER: '信息管理员',
+  TOURNAMENT_ADMIN: '赛事管理员',
 } as const
 export type IdentityKind = keyof typeof identityLabels
 export interface IdentityCandidate {

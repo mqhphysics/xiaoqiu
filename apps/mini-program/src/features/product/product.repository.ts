@@ -9,6 +9,7 @@ import {
 } from './get-cache'
 
 import { clearSession, leaveGuestMode, readSession, saveSession } from './session'
+import { prepareCompetitionSelection, scopeProductPath } from './tournament-scope'
 import {
   anonymousReadAllowed,
   explicitAnonymousAuthRequest,
@@ -394,7 +395,12 @@ function readEtag(header: Record<string, string> | undefined): string | undefine
 }
 
 function rememberFromBody(path: string, data: unknown) {
-  if (!path.startsWith('/public/home') || !data || typeof data !== 'object' || !('tournament' in data))
+  if (
+    !path.startsWith('/public/home') ||
+    !data ||
+    typeof data !== 'object' ||
+    !('tournament' in data)
+  )
     return
   rememberTournamentId((data as { tournament?: { id?: string } }).tournament?.id)
 }
@@ -419,6 +425,7 @@ function requestHeaders(
 
 export function peekProduct<T>(path: string): T | undefined {
   if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return undefined
+  path = scopeProductPath(path)
   const session = readAccountPresence()?.session
   return productGetCache.peek<T>(cacheKey(path, session?.accessToken), STALE_GET_MS)
 }
@@ -438,10 +445,7 @@ export async function loadCompetition(routeTournamentId = ''): Promise<Competiti
   return productRepository.getCompetitionData(home.tournament.id)
 }
 
-export function sizedMediaUrl(
-  url: string | null | undefined,
-  width: number,
-): string | undefined {
+export function sizedMediaUrl(url: string | null | undefined, width: number): string | undefined {
   if (!url) return undefined
   if (url.startsWith('data:') || url.startsWith('blob:') || !url.includes('/api/media/')) return url
   const [base, search = ''] = url.split('?')
@@ -451,6 +455,7 @@ export function sizedMediaUrl(
 }
 
 export { knownTournamentId }
+export { request as productRequest }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
@@ -474,6 +479,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       }
     }
     if (!allowed) throw new ProductApiError('请先登录账号后再访问晓球', 401)
+  }
+  if (h5) {
+    await prepareCompetitionSelection(path)
+    if (readAccountPresence()?.session?.accessToken !== session?.accessToken)
+      throw new ProductApiError('账号已切换，请重新读取', 409)
+    path = scopeProductPath(path)
   }
   const key = h5 && method === 'GET' ? cacheKey(path, session?.accessToken) : ''
   const cached = key ? productGetCache.read<T>(key) : undefined

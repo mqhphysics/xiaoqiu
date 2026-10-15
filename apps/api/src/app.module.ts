@@ -14,6 +14,7 @@ import { ScheduleModule } from './schedule/schedule.module'
 import { SocialModule } from './social/social.module'
 import { AdminCenterModule } from './admin-center/admin-center.module'
 import { ProductConfigModule } from './product-config/product-config.module'
+import { CampusModule } from './campus/campus.module'
 
 @Module({
   controllers: [AppController],
@@ -30,6 +31,7 @@ import { ProductConfigModule } from './product-config/product-config.module'
     SocialModule,
     AdminCenterModule,
     ProductConfigModule,
+    CampusModule,
   ],
   providers: [AppService],
 })

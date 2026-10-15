@@ -1,4 +1,5 @@
 import { Button, Text, Textarea, View } from '@tarojs/components'
+import { MatchCorrectionButton } from '../../components/campus-context/correction-button'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import { openTeam } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useState } from 'react'
@@ -183,6 +184,7 @@ function MatchContent({
       </View>
 
       <MatchReportEntry matchId={match.id} />
+      <MatchCorrectionButton matchId={match.id} />
 
       {(match.summary || match.statusReason) && (
         <View className="match-summary surface">

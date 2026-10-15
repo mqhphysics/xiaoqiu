@@ -14,6 +14,9 @@ import { Records } from './Records'
 import { IdentityManagement } from './IdentityManagement'
 import { publicWebsiteHref } from '../adminAuth/config'
 import { PeopleManagement } from './PeopleManagement'
+import { CampusDirectory } from './CampusDirectory'
+import { ReporterManagement } from './ReporterManagement'
+import { CompetitionPicker } from './CompetitionPicker'
 import { MediaLibrary } from './MediaLibrary'
 import { PostComposer, PostReview } from './PostManagement'
 import { Badge, DataState, Icon, PendingCapability, time, useAdminData } from './shared'
@@ -28,6 +31,7 @@ type Section =
   | 'publish'
   | 'review'
   | 'media'
+  | 'reporters'
   | 'audit'
   | 'system'
 const NAV: { id: Section; title: string; icon: string; description: string }[] = [
@@ -52,9 +56,9 @@ const NAV: { id: Section; title: string; icon: string; description: string }[] =
   },
   {
     id: 'people',
-    title: '球队与球员',
+    title: '学生与球员档案',
     icon: 'users',
-    description: '每一支球队，每一位球员，都有清晰的档案。',
+    description: '学生、用户与球员相互关联，资料和照片都在各自档案中。',
   },
   {
     id: 'events',
@@ -69,10 +73,10 @@ const NAV: { id: Section; title: string; icon: string; description: string }[] =
     description: '查看用户反馈与举报，记录处理结果并回复。',
   },
   {
-    id: 'media',
-    title: '图片管理',
+    id: 'reporters',
+    title: '信息员管理',
     icon: 'bookmark',
-    description: '查看当前使用的公开图片及关联对象。',
+    description: '核实纠错、查看记录质量分，审核复训与解冻申请。',
   },
   {
     id: 'audit',
@@ -113,12 +117,13 @@ export function AdminCenter({
     '/admin/schedule-workbench',
     mapScheduleData,
   )
-  const [tournamentId, setTournamentId] = useState('')
+  const [tournamentId, setTournamentId] = useState<string | null>(null)
   const selectedTournament =
-    schedule.data?.tournaments.find((t) => t.id === tournamentId) ??
-    schedule.data?.tournaments.find((t) => t.status === 'PUBLISHED') ??
-    schedule.data?.tournaments.find((t) => t.status === 'DRAFT') ??
-    schedule.data?.tournaments[0]
+    tournamentId !== null
+      ? schedule.data?.tournaments.find((t) => t.id === tournamentId)
+      : (schedule.data?.tournaments.find((t) => t.status === 'PUBLISHED') ??
+        schedule.data?.tournaments.find((t) => t.status === 'DRAFT') ??
+        schedule.data?.tournaments[0])
   const item = NAV.find((n) => n.id === section)!
   useEffect(() => {
     const change = () => setSection(currentSection())
@@ -210,24 +215,7 @@ export function AdminCenter({
               <h1>{item.title}</h1>
               <p>{item.description}</p>
             </div>
-            <div className="mc-scope">
-              <span>当前赛事</span>
-              <select
-                aria-label="当前赛事"
-                value={selectedTournament?.id ?? ''}
-                onChange={(e) => setTournamentId(e.target.value)}
-                disabled={schedule.loading || !schedule.data?.tournaments.length}
-              >
-                <option value="" disabled>
-                  选择获授权赛事
-                </option>
-                {schedule.data?.tournaments.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CompetitionPicker context={context} onSelect={setTournamentId} />
           </header>
           {schedule.error ? (
             <div className="mc-alert" role="alert">
@@ -244,8 +232,16 @@ export function AdminCenter({
             {section === 'accounts' ? (
               context.canManageOrganization ? (
                 <>
-                  <PeopleManagement context={context} />
+                  <CampusDirectory
+                    context={context}
+                    initialTab="users"
+                    tournamentId={selectedTournament?.id ?? ''}
+                  />
                   <IdentityManagement context={context} />
+                  <details className="mc-panel">
+                    <summary>历史账号与高级登录管理</summary>
+                    <PeopleManagement context={context} />
+                  </details>
                 </>
               ) : (
                 <Restricted />
@@ -253,12 +249,24 @@ export function AdminCenter({
             ) : null}
             {section === 'people' ? (
               context.canManageOrganization ? (
-                <People key={directoryRevision} context={context} search={directorySearch} />
+                <People
+                  key={directoryRevision}
+                  context={context}
+                  search={directorySearch}
+                  tournamentId={selectedTournament?.id ?? ''}
+                />
               ) : (
                 <Restricted />
               )
             ) : null}
-            {section === 'events' ? (
+            {section === 'events' && !selectedTournament ? (
+              <section className="mc-panel">
+                <h2>当前赛事赛季尚无比赛</h2>
+                <p className="campus-empty-note">
+                  可以在上方切换赛事与赛季，或先建立本赛季赛事草稿，再配置球队、小组赛和淘汰赛。
+                </p>
+              </section>
+            ) : section === 'events' ? (
               <Events
                 key={eventStartTab}
                 context={context}
@@ -282,6 +290,13 @@ export function AdminCenter({
             ) : null}
             {section === 'review' ? <PostReview context={context} /> : null}
             {section === 'media' ? <MediaLibrary context={context} /> : null}
+            {section === 'reporters' ? (
+              context.canManageOrganization ? (
+                <ReporterManagement context={context} />
+              ) : (
+                <Restricted />
+              )
+            ) : null}
             {section === 'audit' || section === 'system' ? (
               context.canManageOrganization ? (
                 <Records context={context} kind={section} />
@@ -307,25 +322,16 @@ function Restricted() {
     </section>
   )
 }
-function People({ context, search }: { context: OrganizationContext; search: string }) {
-  const [kind, setKind] = useState<'teams' | 'players'>(search ? 'players' : 'teams')
-  return (
-    <>
-      <div className="mc-tabs" role="group" aria-label="档案类型">
-        <button className={kind === 'teams' ? 'active' : ''} onClick={() => setKind('teams')}>
-          球队档案
-        </button>
-        <button className={kind === 'players' ? 'active' : ''} onClick={() => setKind('players')}>
-          球员档案
-        </button>
-      </div>
-      <Directory key={kind} kind={kind} context={context} initialSearch={search} />
-      <PendingCapability
-        title="身份认领与导入预览"
-        description="现有档案按稳定编号维护。批量导入、重复身份核验和跨队认领将在对应服务接通后开放。"
-      />
-    </>
-  )
+function People({
+  context,
+  search,
+  tournamentId,
+}: {
+  context: OrganizationContext
+  search: string
+  tournamentId: string
+}) {
+  return <CampusDirectory context={context} initialSearch={search} tournamentId={tournamentId} />
 }
 interface OverviewData {
   organization: { id: string; name: string }

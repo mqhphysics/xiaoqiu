@@ -274,6 +274,19 @@ export class AdminCenterService {
                   { displayName: { contains: term, mode: 'insensitive' } },
                   { loginNameNormalized: { contains: term, mode: 'insensitive' } },
                   { realName: { contains: term, mode: 'insensitive' } },
+                  {
+                    playerProfile: { is: { displayName: { contains: term, mode: 'insensitive' } } },
+                  },
+                  {
+                    studentRecord: {
+                      is: {
+                        OR: [
+                          { realName: { contains: term, mode: 'insensitive' } },
+                          { studentNumber: { contains: term, mode: 'insensitive' } },
+                        ],
+                      },
+                    },
+                  },
                   { studentId: { contains: term, mode: 'insensitive' } },
                   { email: { contains: term, mode: 'insensitive' } },
                 ],

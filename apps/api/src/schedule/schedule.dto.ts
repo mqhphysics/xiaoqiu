@@ -197,6 +197,8 @@ export class SeasonResponseDto implements SeasonView {
 }
 
 export class TournamentResponseDto implements TournamentView {
+  @ApiPropertyOptional({ type: Boolean, description: '赛事列表中是否已有发布赛程' })
+  hasPublishedSchedule?: boolean
   @ApiProperty({ type: String, format: 'uuid' })
   id!: string
 

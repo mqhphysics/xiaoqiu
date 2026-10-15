@@ -8,6 +8,7 @@ import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
 import { PrismaService } from '../database/prisma.service'
 import { Prisma } from '../generated/prisma/client'
 import { SocialService } from '../social/social.service'
+import { assertReporterIdentityEligible } from '../campus/reporter-quality.service'
 import type {
   IdentityApplicationDto,
   IdentityKind,
@@ -155,6 +156,8 @@ export class IdentityService {
     requestId: string,
   ) {
     return this.command(authorization, 'identity:apply', body, key, false, async (tx, actor) => {
+      if (body.kind === 'MATCH_REPORTER')
+        await assertReporterIdentityEligible(tx, actor.organizationId, actor.userId)
       const currentUser = await tx.user.findUniqueOrThrow({
         where: { id: actor.userId },
         select: { realName: true, playerProfileId: true },
@@ -320,7 +323,9 @@ export class IdentityService {
           })
       } else {
         if (
-          !['TEAM_CAPTAIN', 'TEAM_COACH', 'MATCH_REPORTER'].includes(record.kind) ||
+          !['TEAM_CAPTAIN', 'TEAM_COACH', 'MATCH_REPORTER', 'TOURNAMENT_ADMIN'].includes(
+            record.kind,
+          ) ||
           !['TEAM', 'MATCH', 'TOURNAMENT'].includes(record.scopeType)
         )
           throw fail(409, '核验记录的身份范围无效')
@@ -340,7 +345,13 @@ export class IdentityService {
                   select: { id: true },
                 })
         if (!object) throw fail(409, '核验记录的授权对象不可用')
-        const role = record.kind as 'TEAM_CAPTAIN' | 'TEAM_COACH' | 'MATCH_REPORTER'
+        const role = record.kind as
+          | 'TEAM_CAPTAIN'
+          | 'TEAM_COACH'
+          | 'MATCH_REPORTER'
+          | 'TOURNAMENT_ADMIN'
+        if (role === 'MATCH_REPORTER')
+          await assertReporterIdentityEligible(tx, actor.organizationId, actor.userId)
         const scopeType = record.scopeType as 'TEAM' | 'MATCH' | 'TOURNAMENT'
         const existingRecord = await tx.identityRecord.findFirst({
           where: {
@@ -556,7 +567,9 @@ export class IdentityService {
             throw fail(404, '本组织不存在该球队')
           scopeType = 'TEAM'
           scopeId = body.teamId.toLowerCase()
-        } else if (body.kind === 'MATCH_REPORTER') {
+        } else if (body.kind === 'MATCH_REPORTER' || body.kind === 'TOURNAMENT_ADMIN') {
+          if (body.kind === 'TOURNAMENT_ADMIN' && body.scopeType !== 'TOURNAMENT')
+            throw fail(400, '赛事管理员必须绑定具体赛事')
           if (!body.scopeType || !body.scopeId || body.teamId)
             throw fail(400, '信息管理员必须指定比赛或赛事范围')
           const found =
@@ -659,7 +672,13 @@ export class IdentityService {
             status: 'ACTIVE',
             memberships: { some: { organizationId: actor.organizationId, status: 'ACTIVE' } },
           },
-          select: { id: true, playerProfileId: true, verificationLevel: true },
+          select: {
+            id: true,
+            playerProfileId: true,
+            verificationLevel: true,
+            studentRecordId: true,
+            studentId: true,
+          },
         })
         if (!applicant) throw fail(409, '申请人的账号或组织成员身份已失效')
         if (body.decision === 'APPROVED') {
@@ -678,6 +697,16 @@ export class IdentityService {
           const playerId = record?.playerProfileId ?? (parsed.type === 'player' ? parsed.id : null)
           if (application.kind === 'PLAYER') {
             if (!playerId) throw fail(400, '球员记录未指定球员档案')
+            const player = await tx.playerProfile.findFirst({
+              where: { id: playerId, organizationId: actor.organizationId },
+              select: { studentRecordId: true },
+            })
+            if (
+              applicant.studentRecordId &&
+              player?.studentRecordId &&
+              applicant.studentRecordId !== player.studentRecordId
+            )
+              throw fail(409, '球员档案对应其他学生，不能凭姓名认领，请先核对学号与学生关联')
             if (applicant.playerProfileId && applicant.playerProfileId !== playerId)
               throw fail(409, '申请人已关联其他球员，不能覆盖')
             const claimed = await tx.user.findFirst({
@@ -687,17 +716,53 @@ export class IdentityService {
             if (claimed) throw fail(409, '球员档案已关联其他账号，请人工核查')
             await tx.user.update({
               where: { id: applicant.id },
-              data: { playerProfileId: playerId, verificationLevel: 'PLAYER_CONFIRMED' },
+              data: {
+                playerProfileId: playerId,
+                verificationLevel: 'PLAYER_CONFIRMED',
+                ...(applicant.studentRecordId ? { studentVerifiedAt: new Date() } : {}),
+              },
             })
-          } else if (application.kind === 'STUDENT') {
-            if (applicant.verificationLevel === 'UNVERIFIED')
-              await tx.user.update({
-                where: { id: applicant.id },
-                data: { verificationLevel: 'STUDENT_VERIFIED' },
+            if (applicant.studentRecordId && !player?.studentRecordId)
+              await tx.playerProfile.update({
+                where: { id: playerId },
+                data: {
+                  studentRecordId: applicant.studentRecordId,
+                  studentId: applicant.studentId,
+                },
               })
+          } else if (application.kind === 'STUDENT') {
+            if (applicant.studentRecordId) {
+              const student = await tx.studentRecord.findFirst({
+                where: {
+                  id: applicant.studentRecordId,
+                  organizationId: actor.organizationId,
+                  studentNumber: applicant.studentId,
+                },
+              })
+              if (!student) throw fail(409, '学生档案与账号学号不一致，请先在学生目录核查')
+              await tx.studentRecord.update({
+                where: { id: student.id },
+                data: { status: 'ACTIVE', version: { increment: 1 } },
+              })
+            }
+            await tx.user.update({
+              where: { id: applicant.id },
+              data: {
+                ...(applicant.verificationLevel === 'UNVERIFIED'
+                  ? { verificationLevel: 'STUDENT_VERIFIED' as const }
+                  : {}),
+                ...(applicant.studentRecordId ? { studentVerifiedAt: new Date() } : {}),
+              },
+            })
           } else {
             if (!record) throw fail(400, '工作人员角色必须关联管理员录入的任职记录')
-            const role = record.kind as 'TEAM_CAPTAIN' | 'TEAM_COACH' | 'MATCH_REPORTER'
+            const role = record.kind as
+              | 'TEAM_CAPTAIN'
+              | 'TEAM_COACH'
+              | 'MATCH_REPORTER'
+              | 'TOURNAMENT_ADMIN'
+            if (role === 'MATCH_REPORTER')
+              await assertReporterIdentityEligible(tx, actor.organizationId, applicant.id)
             if (
               await tx.identityRecord.findFirst({
                 where: {
@@ -884,7 +949,11 @@ export class IdentityService {
               id: record.grantedAssignmentId,
               organizationId: actor.organizationId,
               userId: record.linkedUserId ?? '',
-              role: record.kind as 'TEAM_COACH' | 'TEAM_CAPTAIN' | 'MATCH_REPORTER',
+              role: record.kind as
+                | 'TEAM_COACH'
+                | 'TEAM_CAPTAIN'
+                | 'MATCH_REPORTER'
+                | 'TOURNAMENT_ADMIN',
               scopeId: record.scopeId,
             },
             data: { revokedAt: new Date() },

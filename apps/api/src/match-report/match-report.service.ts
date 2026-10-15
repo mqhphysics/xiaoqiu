@@ -1,4 +1,8 @@
 import { createHash } from 'node:crypto'
+import {
+  requireActiveReporter,
+  acceptReporterContribution,
+} from '../campus/reporter-quality.service'
 import { HttpStatus, Inject, Injectable } from '@nestjs/common'
 import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { AuthService, type AuthenticatedSession } from '../auth/auth.service'
@@ -166,6 +170,8 @@ export class MatchReportService {
         const match = await this.requireMatch(tx, session.organizationId, matchId)
         const privilege = await this.privilege(tx, session, match)
         if (!privilege.inlineEditor) throw forbidden('只有本场比赛的编辑员可以操作')
+        if (!privilege.administrator)
+          await requireActiveReporter(tx, session.organizationId, session.userId)
         const where = {
           userId_route_idempotencyKey: { userId: session.userId, route, idempotencyKey: key },
         }
@@ -263,6 +269,8 @@ export class MatchReportService {
           const match = await this.requireMatch(tx, session.organizationId, matchId)
           const privilege = await this.privilege(tx, session, match)
           this.requireRead(privilege)
+          if (!privilege.administrator)
+            await requireActiveReporter(tx, session.organizationId, session.userId)
           if (['RETURN', 'CONFIRM', 'CORRECT'].includes(body.action) && !privilege.administrator)
             throw forbidden('此操作需要本赛事的管理员权限')
           const existing = await tx.idempotencyRecord.findUnique({
@@ -484,6 +492,23 @@ export class MatchReportService {
             },
           })
           if (effectiveAction === 'CONFIRM') {
+            const submitted = await tx.matchReportRevision.findFirst({
+              where: {
+                organizationId: session.organizationId,
+                matchId: match.id,
+                action: 'SUBMIT',
+                version: { lt: version },
+              },
+              orderBy: { version: 'desc' },
+            })
+            if (submitted)
+              await acceptReporterContribution(
+                tx,
+                session.organizationId,
+                submitted.createdByUserId,
+                match.id,
+                submitted.id,
+              )
             const abandoned = fields.outcome === 'ABANDONED'
             await tx.match.updateMany({
               where: {

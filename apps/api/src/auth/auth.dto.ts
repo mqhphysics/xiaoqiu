@@ -52,15 +52,16 @@ export class RegisterDto {
   @Matches(/^\d{10}$/, { message: '学号应为10位数字' })
   studentId!: string
 
-  @ApiProperty({ type: String, format: 'email', example: 'student@example.com' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ApiProperty({ type: String, format: 'email', required: false, example: 'student@example.com' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || undefined : value))
+  @IsOptional()
   @IsEmail()
   @Length(5, 254)
-  email!: string
+  email?: string
 
   @ApiProperty({ type: String, example: 'YourPassword2026!' })
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   password!: string
 }
 
@@ -156,7 +157,7 @@ export class ResetPasswordByIdentityDto {
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   newPassword!: string
 }
 

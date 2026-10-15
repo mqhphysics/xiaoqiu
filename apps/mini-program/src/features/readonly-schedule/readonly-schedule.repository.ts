@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { clearSession, readSession } from '../product/session'
+import { prepareCompetitionSelection, scopeProductPath } from '../product/tournament-scope'
 import { anonymousReadAllowed } from '../product-config/access-boundary.logic'
 import {
   getConfiguration,
@@ -36,6 +37,7 @@ interface ApiTournamentList {
 }
 
 interface ApiTournament {
+  hasPublishedSchedule?: boolean
   id: string
   seasonId: string
   tournamentCode: string
@@ -132,7 +134,9 @@ export class PublicApiRequestError extends Error {
 }
 
 class ReadonlyScheduleRepository {
-  async listTournaments(): Promise<RepositoryResult<ReadonlyTournamentSummary[]>> {
+  async listTournaments(
+    ignoreSelection = false,
+  ): Promise<RepositoryResult<ReadonlyTournamentSummary[]>> {
     const apiContext = getApiContext()
     if (!apiContext) {
       return {
@@ -141,9 +145,15 @@ class ReadonlyScheduleRepository {
       }
     }
 
-    const list = await requestApi<ApiTournamentList>(apiContext, '/public/tournaments')
+    const list = await requestApi<ApiTournamentList>(
+      apiContext,
+      '/public/tournaments',
+      !ignoreSelection,
+    )
     const details = await Promise.all(
-      list.items.map((tournament) => this.loadApiTournamentDetail(apiContext, tournament.id)),
+      list.items
+        .filter((tournament) => tournament.hasPublishedSchedule !== false)
+        .map((tournament) => this.loadApiTournamentDetail(apiContext, tournament.id)),
     )
 
     return {
@@ -419,7 +429,11 @@ function formatDateRangePoint(value: string | undefined): string {
   })
 }
 
-async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
+async function requestApi<T>(
+  apiContext: ApiContext,
+  path: string,
+  selectCompetition = true,
+): Promise<T> {
   const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
   const account = h5 ? readAccountPresence() : null
   const session = h5 ? account?.session : readSession()
@@ -433,6 +447,10 @@ async function requestApi<T>(apiContext: ApiContext, path: string): Promise<T> {
       }
     }
     if (!allowed) throw new PublicApiRequestError(401, '请先登录账号后再访问晓球')
+  }
+  if (h5 && selectCompetition) {
+    await prepareCompetitionSelection(path)
+    path = scopeProductPath(path)
   }
   const response = await Taro.request<T>({
     url: `${apiContext.baseUrl}${path}`,

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ReporterQualityPanel } from '../campus-context/reporter-quality.h5'
+import { StudentIdentitySummary } from '../campus-context/student-identity.h5'
+import '../campus-context/index.h5.scss'
 import Taro from '@tarojs/taro'
 import { useOverlayFocus } from '../overlay-focus'
 import {
@@ -90,7 +93,7 @@ export function IdentityEntry({
           type="button"
           onClick={() => void identityEntryActions.identity()}
         >
-          身份认证 <span aria-hidden="true">→</span>
+          我的身份 <span aria-hidden="true">→</span>
         </button>
         {teamIds.length > 0 && (
           <button
@@ -252,13 +255,15 @@ export function IdentityCenterHost() {
         <header className="xq-dialog__header">
           <div>
             <small>身份与认证</small>
-            <h2 id="identity-title">申请身份认证</h2>
+            <h2 id="identity-title">我的身份</h2>
           </div>
           <button data-identity-button type="button" aria-label="关闭认证窗口" onClick={close}>
             ×
           </button>
         </header>
         <div className="xq-dialog__body">
+          <StudentIdentitySummary />
+          <ReporterQualityPanel />
           <p>选择要申请的身份并说明原因。申请结果会通过系统消息通知你。</p>
           {error && (
             <p className="identity-error" role="alert">
