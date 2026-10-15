@@ -7,6 +7,7 @@ import { PersistentHeaderSearch } from '../../components/public-shell/persistent
 import { openSearchPage } from '../../components/public-shell/search-transition'
 import { IconButton } from '../../components/icon-button'
 import { HeroCarousel, type HeroPhoto } from '../../components/hero-carousel'
+import { HomeHeroCopy } from './home-hero-copy'
 import { PostImagePicker } from '../../components/post-image-picker'
 import { DesktopPostComposer } from '../../components/post-composer'
 import { openPost } from '../../features/product/post-navigation'
@@ -551,25 +552,10 @@ function HomeContent({
     // 首页 is the one desktop page that scrolls as a document (no xq-viewport-page).
     <View className="home-page">
       <View className="experience-hero">
-        {/* Desktop (≥721px): the season 总公告 replaces the classic copy; mobile keeps the classic copy. */}
-        <View className="experience-hero__copy hero-season">
-          <Text className="hero-season__season">{data.tournament.seasonName}</Text>
-          <Text className="hero-season__title">
-            {data.tournament.name}
-            <Text className="hero-season__hot">火热进行中</Text>
-          </Text>
-          <View className="hero-season__line">
-            <Text>
-              {data.tournament.teamCount} 支球队 · {data.tournament.matchCount} 场比赛
-            </Text>
-            <Button
-              className="hero-season__link"
-              onClick={() => void goToSchedule(data.tournament.id)}
-            >
-              查看赛程 →
-            </Button>
-          </View>
-        </View>
+        <HomeHeroCopy
+          tournament={data.tournament}
+          onOpenSchedule={() => void goToSchedule(data.tournament.id)}
+        />
         <View className="experience-hero__copy hero-classic">
           <Text className="experience-hero__eyebrow">{data.tournament.name}</Text>
           <Text
