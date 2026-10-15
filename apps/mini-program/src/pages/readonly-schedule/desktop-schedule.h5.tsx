@@ -1,6 +1,7 @@
 import { useDidShow } from '@tarojs/taro'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import { ExpandingTags, useExpandingTagShift } from '../../components/interactions/expanding-tags.h5'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, TeamCrest } from '../../components/product-ui'
@@ -219,6 +220,7 @@ function ScheduleContent({
   const primaryRequest = useRef(0)
   const resultsRef = useRef<HTMLElement>(null)
   const datesRef = useRef<HTMLDivElement>(null)
+  useExpandingTagShift(datesRef, selectedDate ?? '')
   const session = readSession()
   const accessToken = session?.accessToken
   const primaryTeam = primary.phase === 'ready' ? primary.team : null
@@ -370,24 +372,30 @@ function ScheduleContent({
           </p>
         </div>
         <div className="schedule-hero__actions">
-          <select
-            data-schedule-select=""
-            aria-label="选择赛季"
+          <ExpandingTags
+            className="schedule-season-tags"
+            label="选择赛季"
             value={data.tournament.id}
             disabled={pending}
-            onChange={(event) =>
+            options={(data.seasons.length
+              ? data.seasons
+              : [
+                  {
+                    tournamentId: data.tournament.id,
+                    tournamentName: data.tournament.name,
+                  },
+                ]
+            ).map((season) => ({
+              id: season.tournamentId,
+              label: season.tournamentName,
+            }))}
+            onChange={(tournamentId) =>
               void navigate(
-                `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(event.target.value)}`,
+                `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(tournamentId)}`,
                 true,
               )
             }
-          >
-            {data.seasons.map((season) => (
-              <option key={season.tournamentId} value={season.tournamentId}>
-                {season.tournamentName}
-              </option>
-            ))}
-          </select>
+          />
           <button
             data-schedule-button=""
             type="button"
@@ -432,6 +440,7 @@ function ScheduleContent({
                 data-schedule-button=""
                 type="button"
                 key={date}
+                data-xq-tag={date}
                 className={`schedule-date ${selectedDate === date ? 'schedule-date--active' : ''}`}
                 aria-pressed={selectedDate === date}
                 onClick={() => {

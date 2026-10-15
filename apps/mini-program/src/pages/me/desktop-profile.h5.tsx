@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro'
 import { openTeam as openTeamDetail } from '../../features/product/team-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { TextDisclosure } from '../../components/interactions/text-disclosure.h5'
 import { ProfileDialog } from './profile-dialog.h5'
 import { ProfileInformation } from './personal-information.h5'
 import { AvatarCropper } from '../../components/avatar-cropper'
@@ -459,7 +460,9 @@ export function DesktopProfile({ home, user, onUserChange, renderService }: Desk
                     : `@${user.username}`}
                 </span>
               </div>
-              <p>{user.bio || '写一句简介，让球友更了解你。'}</p>
+              <TextDisclosure className="profile-bio" lines={1}>
+                {user.bio || '写一句简介，让球友更了解你。'}
+              </TextDisclosure>
             </div>
           </div>
           <div className="profile-person__stats">

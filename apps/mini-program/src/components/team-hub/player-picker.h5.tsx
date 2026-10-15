@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { playCurvedLeave } from '../interactions/curved-leave.h5'
 import { createPortal } from 'react-dom'
 import { productRepository } from '../../features/product/product.repository'
 import { positionLabel } from '../../features/product/product.format'
@@ -62,11 +63,17 @@ export function PlayerPicker({
     setBusy(id)
     setError('')
     try {
-      onChange(
-        await (follows.items.some((player) => player.id === id)
-          ? productRepository.unfollowPlayer(id)
-          : productRepository.followPlayer(id)),
-      )
+      const removing = !query.trim() && follows.items.some((player) => player.id === id)
+      const next = await (follows.items.some((player) => player.id === id)
+        ? productRepository.unfollowPlayer(id)
+        : productRepository.followPlayer(id))
+      if (removing) {
+        const row = document.querySelector<HTMLElement>(
+          `[data-player-row="${CSS.escape(id)}"]`,
+        )
+        if (row) await playCurvedLeave(row)
+      }
+      onChange(next)
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : '关注操作失败')
     } finally {
@@ -122,7 +129,7 @@ export function PlayerPicker({
         <div className="th-picker__list">
           {!loading
             ? visible.map((player) => (
-                <div className="th-player-result" key={player.id}>
+                <div className="th-player-result" data-player-row={player.id} key={player.id}>
                   <UserAvatar name={player.displayName} avatarUrl={player.avatarUrl} />
                   <span>
                     <strong>{player.displayName}</strong>

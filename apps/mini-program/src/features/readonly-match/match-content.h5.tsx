@@ -1,3 +1,4 @@
+import { TextDisclosure } from '../../components/interactions/text-disclosure.h5'
 import { Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useEffect, useRef, useState } from 'react'
@@ -157,12 +158,22 @@ export function MatchContent({
         </p>
       )}
 
-      {match.statusReason && (
+      {match.summary ? (
+        <View className="match-summary surface">
+          <Text className="match-summary__label">比赛快报</Text>
+          <TextDisclosure className="match-summary__body" lines={2}>
+            {match.summary}
+          </TextDisclosure>
+        </View>
+      ) : null}
+      {match.statusReason ? (
         <View className="match-summary surface">
           <Text className="match-summary__label">比赛说明</Text>
-          <Text className="match-summary__body">{match.statusReason}</Text>
+          <TextDisclosure className="match-summary__body" lines={2}>
+            {match.statusReason}
+          </TextDisclosure>
         </View>
-      )}
+      ) : null}
 
       {!editor?.editing && (
         <View className="match-detail-tabs">

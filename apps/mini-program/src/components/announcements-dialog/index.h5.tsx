@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { TextDisclosure } from '../interactions/text-disclosure.h5'
 import { useOverlayFocus } from '../overlay-focus'
 import { resolveMediaUrl } from '../../features/product/product.repository'
 import { formatLongDate } from '../../features/product/product.format'
@@ -85,13 +86,13 @@ export function AnnouncementsDialog({
               {image ? (
                 <img className="announcements-dialog__image" src={image} alt="" loading="lazy" />
               ) : null}
-              <div className="announcements-dialog__text">
+              <TextDisclosure className="announcements-dialog__text" lines={4}>
                 {selected.body.split(/\n+/).map((line, index) => (
                   <p className="announcements-dialog__para" key={index}>
                     {line}
                   </p>
                 ))}
-              </div>
+              </TextDisclosure>
               <button
                 type="button"
                 className="announcements-dialog__link"

@@ -210,6 +210,10 @@
     margin: 12px 20px 8px;
   }
 
+  .th-follow-board.xq-dialog {
+    width: min(520px, calc(100vw - 64px));
+  }
+
   .th-picker.xq-dialog > .th-picker__list {
     flex: 1 1 auto;
     min-height: 0;

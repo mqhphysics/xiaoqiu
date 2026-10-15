@@ -15,6 +15,7 @@ export function TeamIcon({
     | 'like'
     | 'comment'
     | 'cup'
+    | 'reorder'
 }) {
   const paths = {
     switch: (
@@ -61,6 +62,11 @@ export function TeamIcon({
     cup: (
       <>
         <path d="M7 3h10v5a5 5 0 01-10 0zM7 5H3v3a4 4 0 004 4M17 5h4v3a4 4 0 01-4 4M12 13v6M7 21h10M9 19h6" />
+      </>
+    ),
+    reorder: (
+      <>
+        <path d="M5 7h14M5 12h14M5 17h14" />
       </>
     ),
   }

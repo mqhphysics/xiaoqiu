@@ -190,7 +190,8 @@
   .player-profile-hero__team strong {
     font-size: 16px;
   }
-  .player-profile-hero__identity > p {
+  .player-profile-hero__identity > p,
+  .player-profile-hero__identity > .player-bio-copy {
     margin: 16px 0 0;
     max-width: 470px;
     font-size: 13px;
