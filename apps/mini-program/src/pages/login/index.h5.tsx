@@ -28,7 +28,7 @@ const emptyRegistration: RegisterInput & { confirmPassword: string; emailCode: s
   emailCode: '',
 }
 
-const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
+const minimumLoginPasswordLength = process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 6
 
 export default function H5LoginPage() {
   const { configuration } = useProductConfiguration()

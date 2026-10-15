@@ -30,7 +30,10 @@ test(
     const runtime = resolve(__dirname, '../../../../../private-data/runtime')
     const storage = await mkdtemp(resolve(runtime, 'governance-'))
     const previousStorage = process.env.POST_MEDIA_DIRECTORY
+    const previousPasswordKey = process.env.ADMIN_PASSWORD_KEY_FILE
     process.env.POST_MEDIA_DIRECTORY = storage
+    process.env.ADMIN_PASSWORD_KEY_FILE = resolve(storage, 'password.key')
+    const createdAccountIds: string[] = []
     let org = '',
       otherOrg = ''
     let app: INestApplication | undefined
@@ -519,6 +522,132 @@ test(
           )
         },
       )
+      await t.test(
+        'six-digit password assignment is privileged, versioned, repeatable and invalidates old credentials',
+        async () => {
+          const url = `/api/admin/center/users/${student.id}/login-access`
+          assert.equal((await request(http).get(url)).status, 401)
+          assert.equal(
+            (await request(http).get(url).set('Authorization', `Bearer ${userToken}`)).status,
+            403,
+          )
+          assert.equal(
+            (await adminGet(`/admin/center/users/${outside.id}/login-access`)).status,
+            404,
+          )
+          const row = await prisma.user.findUniqueOrThrow({ where: { id: student.id } })
+          const body = {
+            expectedUpdatedAt: row.updatedAt.toISOString(),
+            reason: 'TEST assign six digit login',
+          }
+          const idempotency = key()
+          const assign = () =>
+            request(http)
+              .post(`/api/admin/center/users/${student.id}/login-password`)
+              .set('Authorization', `Bearer ${adminToken}`)
+              .set('Idempotency-Key', idempotency)
+              .send(body)
+          const assigned = await assign()
+          assert.equal(assigned.status, 201)
+          assert.equal(Object.hasOwn(assigned.body, 'password'), false)
+          const information = await adminGet(`/admin/center/users/${student.id}/login-access`)
+        assert.match(String(information.headers['cache-control']), /no-store/)
+          assert.match(information.body.password, /^\d{6}$/)
+          assert.equal((await assign()).status, 201)
+          assert.equal(
+            (await adminGet(`/admin/center/users/${student.id}/login-access`)).body.password,
+            information.body.password,
+          )
+          assert.equal(
+            (
+              await request(http)
+                .post('/api/auth/login')
+                .set('x-organization-id', org)
+                .send({
+                  username: student.loginNameNormalized,
+                  password: information.body.password,
+                })
+            ).status,
+            200,
+          )
+          assert.equal(
+            (
+              await request(http)
+                .post('/api/auth/login')
+                .set('x-organization-id', org)
+                .send({ username: student.loginNameNormalized, password })
+            ).status,
+            401,
+          )
+          assert.equal(
+            (await request(http).get('/api/auth/me').set('Authorization', `Bearer ${userToken}`))
+              .status,
+            401,
+          )
+          const audit = await prisma.auditLog.findFirstOrThrow({
+            where: {
+              organizationId: org,
+              action: 'ADMIN_LOGIN_PASSWORD_ASSIGNED',
+              targetId: student.id,
+            },
+          })
+          assert.ok((audit.afterSummary as Record<string, unknown>).encrypted)
+        assert.equal(Object.hasOwn(audit.afterSummary as Record<string, unknown>, 'password'), false)
+          const digest = hashPassword('FICTIONAL_User_Changed!')
+          await prisma.passwordCredential.update({
+            where: { userId: student.id },
+            data: { passwordHash: digest.hash, passwordSalt: digest.salt },
+          })
+          const changed = await adminGet(`/admin/center/users/${student.id}/login-access`)
+          assert.equal(changed.body.available, false)
+          assert.equal(changed.body.password, null)
+        },
+      )
+      await t.test(
+        'exactly 60 unlinked player accounts receive working independent six-digit logins without admin roles',
+        async () => {
+          await prisma.playerProfile.createMany({
+            data: Array.from({ length: 60 }, (_, index) => ({
+              organizationId: org,
+              displayName: `FICTIONAL_TEST ${suffix} ${index}`,
+              sourceType: 'TEST',
+              sourceKey: `${suffix}:${index}`,
+            })),
+          })
+          const idempotency = key()
+          const command = { count: 60, reason: 'TEST authorized sixty player logins' }
+          const create = () =>
+            request(http)
+              .post('/api/admin/center/users/provision-from-players')
+              .set('Authorization', `Bearer ${adminToken}`)
+              .set('Idempotency-Key', idempotency)
+              .send(command)
+          const response = await create()
+          assert.equal(response.status, 201)
+          assert.equal(response.body.createdCount, 60)
+          createdAccountIds.push(...response.body.userIds)
+          assert.deepEqual((await create()).body, response.body)
+          assert.equal(
+            await prisma.organizationMembership.count({ where: { organizationId: org } }),
+            62,
+          )
+          assert.equal(
+            await prisma.roleAssignment.count({ where: { userId: { in: createdAccountIds } } }),
+            0,
+          )
+          for (const id of createdAccountIds) {
+            const info = await adminGet(`/admin/center/users/${id}/login-access`)
+            assert.match(info.body.password, /^\d{6}$/)
+            const signedIn = await request(http)
+              .post('/api/auth/login')
+              .set('x-organization-id', org)
+              .send({ username: info.body.username, password: info.body.password })
+            assert.equal(signedIn.status, 200)
+          assert.ok(signedIn.body.user.linkedPlayer?.id)
+            assert.deepEqual(signedIn.body.user.roles, [])
+          }
+        },
+      )
     } finally {
       await app?.close()
       if (org && otherOrg) {
@@ -534,13 +663,21 @@ test(
         await prisma.tournament.deleteMany({ where })
         await prisma.season.deleteMany({ where })
         await prisma.user.deleteMany({
-          where: { loginNameNormalized: { startsWith: 'gov-', endsWith: suffix } },
+          where: {
+            OR: [
+              { loginNameNormalized: { startsWith: 'gov-', endsWith: suffix } },
+              { id: { in: createdAccountIds } },
+            ],
+          },
         })
+        await prisma.playerProfile.deleteMany({ where })
         await prisma.organization.deleteMany({ where: { id: { in: [org, otherOrg] } } })
       }
       await prisma.$disconnect()
       if (previousStorage === undefined) delete process.env.POST_MEDIA_DIRECTORY
       else process.env.POST_MEDIA_DIRECTORY = previousStorage
+      if (previousPasswordKey === undefined) delete process.env.ADMIN_PASSWORD_KEY_FILE
+      else process.env.ADMIN_PASSWORD_KEY_FILE = previousPasswordKey
       if (resolve(storage).startsWith(runtime + sep))
         await rm(storage, { recursive: true, force: true })
       else {

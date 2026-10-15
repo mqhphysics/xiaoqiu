@@ -460,7 +460,7 @@ function AccountLogin({ api, message }: { api: string; message: string }) {
               name="password"
               autoComplete="current-password"
               minLength={
-                import.meta.env.DEV && import.meta.env.VITE_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 8
+                import.meta.env.DEV && import.meta.env.VITE_LOCAL_SHORT_PASSWORDS === '1' ? 1 : 6
               }
               maxLength={128}
               value={password}

@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => {
         enabled: env.ADMIN_SINGLE_OWNER !== '0',
         development: mode === 'development',
         organizationId: env.VITE_ORGANIZATION_ID || '00000000-0000-4000-8000-000000000001',
-        ownerLoginName: env.ADMIN_OWNER_USERNAME || 'admin',
+        ownerLoginName: env.ADMIN_OWNER_USERNAME || (env.ADMIN_OWNER_USER_ID ? '' : 'admin'),
+        ...(env.ADMIN_OWNER_USER_ID ? { ownerUserId: env.ADMIN_OWNER_USER_ID } : {}),
       }),
     ],
     server: {

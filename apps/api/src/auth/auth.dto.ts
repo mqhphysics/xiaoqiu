@@ -16,7 +16,7 @@ export class LoginDto {
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
   @IsString()
-  @Length(localDemoShortPasswordsEnabled() ? 1 : 8, 128)
+  @Length(localDemoShortPasswordsEnabled() ? 1 : 6, 128)
   password!: string
 }
 
