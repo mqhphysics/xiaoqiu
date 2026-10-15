@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Headers, Inject, Param, Put, Req, Res } from '@nestjs/common'
+import { Body, Controller, Get, Headers, Inject, Param, Put, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Response } from 'express'
 
 import { UploadAvatarDto } from '../auth/auth.dto'
 import { getRequestId, type RequestWithId } from '../common/request-context'
+import { parseVariantWidth, resizeMedia } from './media-variant'
 import { MediaService } from './media.service'
 
 @ApiTags('media')
@@ -49,12 +50,17 @@ export class MediaController {
 
   @Get('media/avatars/:fileName')
   @ApiOperation({ summary: '读取公开头像文件' })
-  async avatar(@Param('fileName') fileName: string, @Res() response: Response): Promise<void> {
+  async avatar(
+    @Param('fileName') fileName: string,
+    @Query('w') width: string | undefined,
+    @Res() response: Response,
+  ): Promise<void> {
     const avatar = await this.mediaService.readAvatar(fileName)
-    response.setHeader('Cache-Control', 'no-store')
+    const variant = await resizeMedia(avatar.body, avatar.mimeType, parseVariantWidth(width))
+    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
     response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
-    response.type(avatar.mimeType).send(avatar.body)
+    response.type(variant.mimeType).send(variant.body)
   }
 
   @Get('media/demo/:kind/:fileName')
@@ -62,13 +68,19 @@ export class MediaController {
   async demoMedia(
     @Param('kind') kind: string,
     @Param('fileName') fileName: string,
+    @Query('w') width: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
     const media = await this.mediaService.readDemoMedia(kind, fileName)
-    response.setHeader('Cache-Control', 'no-store')
+    const requested = parseVariantWidth(width)
+    const variant = await resizeMedia(media.body, media.mimeType, requested)
+    response.setHeader(
+      'Cache-Control',
+      requested ? 'public, max-age=86400' : 'no-store',
+    )
     response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
-    response.type(media.mimeType).send(media.body)
+    response.type(variant.mimeType).send(variant.body)
   }
 
   @Get('media/posts/:organizationId/:authorUserId/:fileName')
@@ -77,12 +89,14 @@ export class MediaController {
     @Param('organizationId') organizationId: string,
     @Param('authorUserId') authorUserId: string,
     @Param('fileName') fileName: string,
+    @Query('w') width: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
     const image = await this.mediaService.readPostImage(organizationId, authorUserId, fileName)
+    const variant = await resizeMedia(image.body, image.mimeType, parseVariantWidth(width))
     response.setHeader('Cache-Control', 'no-store')
     response.setHeader('X-Xiaoqiu-Media-Guard', '1')
     response.setHeader('X-Content-Type-Options', 'nosniff')
-    response.type(image.mimeType).send(image.body)
+    response.type(variant.mimeType).send(variant.body)
   }
 }

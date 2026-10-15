@@ -21,9 +21,8 @@ import { useProductConfiguration } from '../../features/product-config/use-produ
 import type { TeamSummary } from '../../features/product/product.types'
 import type { PublicDataSource } from '../../features/readonly-schedule/readonly-schedule.types'
 import { TeamCrest, UserAvatar } from '../product-ui'
-import { MessagingDrawer, openMessaging } from '../messaging-drawer'
-import { ReportModal } from '../report-modal'
-import { SettingsDialog } from '../settings-dialog'
+import { MessagingDrawer, openMessaging } from './messaging-slot'
+import { ReportModal, SettingsDialog } from './dialogs'
 import { IconButton } from '../icon-button'
 import { PersistentHeaderSearch } from './persistent-header-search'
 import {
@@ -34,6 +33,7 @@ import {
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
+import { prefetchSection, prefetchTabsWhenIdle } from './prefetch-tabs'
 
 import './index.scss'
 
@@ -114,6 +114,10 @@ export function PublicShell({
     const observer = new ResizeObserver(publish)
     observer.observe(topbar)
     return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB) prefetchTabsWhenIdle()
   }, [])
 
   useEffect(() => {
@@ -290,10 +294,13 @@ export function PublicShell({
                   key={item.key}
                   aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
+                  {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
+                    ? { onMouseEnter: () => prefetchSection(item.key) }
+                    : {})}
                 >
                   <TeamNavFocus team={primaryTeam} />
                   {primaryTeam ? (
-                    <TeamCrest team={primaryTeam} size="large" />
+                    <TeamCrest team={primaryTeam} size="large" eager />
                   ) : (
                     <Text className="public-team-nav__crest public-team-nav__crest--empty">主</Text>
                   )}
@@ -304,6 +311,9 @@ export function PublicShell({
                   key={item.key}
                   aria-current={normalizedActive === item.key ? 'page' : undefined}
                   onClick={() => void navigateToSection(item.key)}
+                  {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
+                    ? { onMouseEnter: () => prefetchSection(item.key) }
+                    : {})}
                 >
                   <View
                     aria-hidden="true"
@@ -421,9 +431,12 @@ export function PublicShell({
               className={`mobile-team-tab ${normalizedActive === item.key ? 'mobile-team-tab--active' : ''} ${navigatingTo === item.key ? 'mobile-team-tab--switching' : ''}`}
               key={item.key}
               onClick={() => void navigateToSection(item.key)}
+              {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
+                ? { onTouchStart: () => prefetchSection(item.key) }
+                : {})}
             >
               {primaryTeam ? (
-                <TeamCrest team={primaryTeam} size="large" />
+                <TeamCrest team={primaryTeam} size="large" eager />
               ) : (
                 <Text className="mobile-team-tab__crest mobile-team-tab__crest--empty">主</Text>
               )}
@@ -433,6 +446,9 @@ export function PublicShell({
               className={`mobile-tabbar__item ${normalizedActive === item.key ? 'mobile-tabbar__item--active' : ''} ${navigatingTo === item.key ? 'mobile-tabbar__item--switching' : ''}`}
               key={item.key}
               onClick={() => void navigateToSection(item.key)}
+              {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
+                ? { onTouchStart: () => prefetchSection(item.key) }
+                : {})}
             >
               <Text className="mobile-tabbar__mark">{item.shortLabel}</Text>
               <Text className="mobile-tabbar__label">{item.label}</Text>

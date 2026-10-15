@@ -29,24 +29,9 @@ import { NotificationColumns } from './notification-columns.h5'
 import { usePreferenceValues } from '../settings-dialog/preferences.h5'
 import { SettingsDialog } from '../settings-dialog/index.h5'
 import { ProfileIcon } from '../../pages/me/profile-icons.h5'
+import { openMessaging, subscribeMessaging, type OpenMessagingRequest } from './api.h5'
 
-type OpenRequest =
-  | MessageUser
-  | { conversationId: string }
-  | { chooseRecipient: true }
-  | { category: MessageCategory }
-  | undefined
-const listeners = new Set<(user: OpenRequest) => void>()
-
-export function openMessaging(
-  request?:
-    | MessageUser
-    | { conversationId: string }
-    | { chooseRecipient: true }
-    | { category: MessageCategory },
-) {
-  for (const listener of listeners) listener(request)
-}
+export { openMessaging }
 
 // PublicShell keeps its native host; the H5 host lives once at App level so
 // preserved route pages cannot open duplicate drawers for a single event.
@@ -198,7 +183,7 @@ export function MessagingOverlayHost() {
   }, [])
 
   useEffect(() => {
-    const listener = (request: OpenRequest) => {
+    const listener = (request: OpenMessagingRequest) => {
       const user = request && 'category' in request ? undefined : request
       setCategory(request && 'category' in request ? request.category : 'messages')
       const openRequestId = ++openRequestRef.current
@@ -262,10 +247,7 @@ export function MessagingOverlayHost() {
           if (openRequestRef.current === openRequestId) setLoading(false)
         })
     }
-    listeners.add(listener)
-    return () => {
-      listeners.delete(listener)
-    }
+    return subscribeMessaging(listener)
   }, [loadLists, selectConversation])
 
   useEffect(() => {

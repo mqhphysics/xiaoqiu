@@ -180,6 +180,28 @@
     </script>
   </head>
   <body>
+    <div class="xq-boot-skeleton" aria-hidden="true">
+      <div class="xq-boot-skeleton__bar"></div>
+      <div class="xq-boot-skeleton__panel"></div>
+    </div>
+    <style>
+      .xq-boot-skeleton {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        padding: 88px 24px 24px;
+        background: #f7f6f1;
+        pointer-events: none;
+      }
+      .xq-boot-skeleton__bar,
+      .xq-boot-skeleton__panel {
+        border-radius: 12px;
+        background: #e1e6dc;
+      }
+      .xq-boot-skeleton__bar { width: 210px; height: 28px; }
+      .xq-boot-skeleton__panel { margin-top: 28px; height: 180px; background: #e4e8df; }
+      body:has(.taro_page) .xq-boot-skeleton { display: none; }
+    </style>
     <div id="app"></div>
   </body>
 </html>

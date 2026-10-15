@@ -16,7 +16,7 @@ import {
   formatTime,
   positionLabel,
 } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import { peekProduct, productRepository } from '../../features/product/product.repository'
 import { openPlayer } from '../../features/product/player-navigation'
 import { readSession } from '../../features/product/session'
 import { MatchReportEntry } from '../../features/match-report/MatchReportEntry'
@@ -38,7 +38,14 @@ export default function MatchDetailPage() {
     Taro.getEnv() === Taro.ENV_TYPE.WEB
       ? getCurrentInstance().router?.params.tournamentId
       : undefined
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const [state, setState] = useState<PageState>(() => {
+    const cached = matchId
+      ? peekProduct<MatchExperienceResponse>(
+          `/public/matches/${encodeURIComponent(matchId)}/experience`,
+        )
+      : undefined
+    return cached ? { phase: 'ready', match: cached } : { phase: 'loading' }
+  })
   const tournamentId = state.phase === 'ready' ? state.match.tournamentId : routeTournamentId
   useDetailBack(
     `/pages/readonly-schedule/index${tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : ''}`,
@@ -49,7 +56,12 @@ export default function MatchDetailPage() {
       setState({ phase: 'failed', message: '缺少比赛参数。' })
       return
     }
-    setState({ phase: 'loading' })
+    if (
+      !peekProduct<MatchExperienceResponse>(
+        `/public/matches/${encodeURIComponent(matchId)}/experience`,
+      )
+    )
+      setState({ phase: 'loading' })
     try {
       setState({ phase: 'ready', match: await productRepository.getMatch(matchId) })
     } catch (error) {

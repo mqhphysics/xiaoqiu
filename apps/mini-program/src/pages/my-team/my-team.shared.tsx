@@ -19,7 +19,11 @@ import {
   matchStatusLabel,
   positionLabel,
 } from '../../features/product/product.format'
-import { ProductApiError, productRepository } from '../../features/product/product.repository'
+import {
+  knownTournamentId,
+  ProductApiError,
+  productRepository,
+} from '../../features/product/product.repository'
 import { readSession } from '../../features/product/session'
 import { managedTeamIds } from '../me/profile.logic'
 import { openTeam } from '../../features/product/team-navigation'
@@ -90,13 +94,21 @@ export default function MyTeamPage() {
     if (isRosterReview) return
     setState({ phase: 'loading' })
     try {
-      const homeData =
-        requestedTournamentId && readSession()
-          ? await captainRequest<HomeResponse>(
+      const signedIn = Boolean(readSession())
+      const hintedTournamentId = requestedTournamentId || knownTournamentId()
+      const [homeData, preferences, playerFollows, hintedCompetition] = await Promise.all([
+        requestedTournamentId && signedIn
+          ? captainRequest<HomeResponse>(
               `/public/home?tournamentId=${encodeURIComponent(requestedTournamentId)}`,
             )
-          : await productRepository.getHome()
-      if (!readSession()) {
+          : productRepository.getHome(),
+        signedIn ? productRepository.getTeamPreferences() : Promise.resolve(null),
+        signedIn ? productRepository.getPlayerFollows() : Promise.resolve({ items: [] }),
+        signedIn && hintedTournamentId
+          ? productRepository.getCompetitionData(hintedTournamentId)
+          : Promise.resolve(null),
+      ])
+      if (!signedIn || !preferences) {
         setState({
           phase: 'ready',
           home: homeData,
@@ -109,11 +121,10 @@ export default function MyTeamPage() {
         })
         return
       }
-      const [preferences, competition, playerFollows] = await Promise.all([
-        productRepository.getTeamPreferences(),
-        productRepository.getCompetitionData(homeData.tournament.id),
-        productRepository.getPlayerFollows(),
-      ])
+      const competition =
+        hintedCompetition && hintedCompetition.tournament.id === homeData.tournament.id
+          ? hintedCompetition
+          : await productRepository.getCompetitionData(homeData.tournament.id)
       const dashboardTeamId = requestedTeamId || preferences.primaryTeam?.id || ''
       const dashboard = dashboardTeamId
         ? await productRepository.getTeamDashboard(dashboardTeamId, homeData.tournament.id)

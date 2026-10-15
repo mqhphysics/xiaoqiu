@@ -1,3 +1,5 @@
+// `dev:h5` is the webpack watch compiler: unminified, no content hashes, no long-lived cache.
+// Production navigation measurements use `npm run build:h5` and then `npm run serve:h5`.
 import { spawn, spawnSync } from 'node:child_process'
 import console from 'node:console'
 import { createRequire } from 'node:module'

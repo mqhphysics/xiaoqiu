@@ -12,7 +12,7 @@ import {
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
 import { demoCrestUrl } from '../../features/product/demo-media'
-import { productRepository, resolveMediaUrl } from '../../features/product/product.repository'
+import { productRepository, resolveMediaUrl, sizedMediaUrl } from '../../features/product/product.repository'
 import {
   openPost,
   updatePostInteraction,
@@ -22,7 +22,7 @@ import { readSession } from '../../features/product/session'
 import { openMatch } from '../../features/product/match-navigation'
 import { openDesktopTeam, openTeamCrest } from '../../features/product/team-navigation'
 import { PostTags } from '../post-tags'
-import { PostQuote } from '../post-quote'
+import { PostQuote } from './post-quote-view'
 import { PlayerTrigger } from '../player-trigger'
 import { VerificationBadge } from '../verification-badge'
 import { PersonTrigger } from '../person-trigger'
@@ -35,22 +35,26 @@ export function TeamCrest({
   team,
   size = 'medium',
   interactive = true,
+  eager = false,
 }: {
   team: TeamSummary | null
   size?: 'small' | 'medium' | 'large'
   interactive?: boolean
+  eager?: boolean
 }) {
   const label = team ? team.shortName.slice(0, 2) : '待定'
   const crestPath = team?.crestUrl?.includes('/api/media/demo/crests/')
     ? demoCrestUrl(team.teamCode)
     : (team?.crestUrl ?? (team ? demoCrestUrl(team.teamCode) : null))
-  const source = resolveMediaUrl(crestPath)
+  const box = crestBox[size]
+  const source = sizedMediaUrl(resolveMediaUrl(crestPath), crestRequest[size])
   const crest = source ? (
     <Image
       aria-label={`${team?.name ?? '球队'}队徽`}
       className={`team-crest team-crest--${size} ${interactive ? 'team-crest--interactive' : ''}`}
       mode="aspectFit"
       src={source}
+      {...webImageProps(box, box, eager)}
       onClick={(event) => {
         if (interactive && team && openTeamCrest(event, team.id)) event.stopPropagation()
       }}
@@ -120,13 +124,15 @@ export function UserAvatar({
   tournamentId?: string | undefined
   userId?: string | undefined
 }) {
-  const source = resolveMediaUrl(avatarUrl)
+  const box = avatarBox[size]
+  const source = sizedMediaUrl(resolveMediaUrl(avatarUrl), avatarRequest[size])
   const avatar = source ? (
     <Image
       aria-label={`${name}的头像`}
       className={`user-avatar user-avatar--${size}`}
       mode="scaleToFill"
       src={source}
+      {...webImageProps(box, box)}
     />
   ) : (
     <Text
@@ -316,7 +322,8 @@ export function PostCard({
               aria-label={post.title ?? '动态配图'}
               className="post-card__image"
               mode="aspectFill"
-              src={url}
+              src={sizedMediaUrl(url, 480) ?? url}
+              {...webImageProps(480, 320)}
               onError={() => setImageFailed(true)}
               onClick={(event) => {
                 event.stopPropagation()
@@ -395,6 +402,24 @@ export function ProductSection({
       )}
     </View>
   )
+}
+
+const crestBox = { small: 34, medium: 50, large: 72 } as const
+const crestRequest = { small: 96, medium: 128, large: 256 } as const
+const avatarBox = { small: 36, medium: 50, large: 76 } as const
+const avatarRequest = { small: 96, medium: 128, large: 256 } as const
+
+function webImageProps(width: number, height: number, eager = false) {
+  if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return {}
+  return {
+    lazyLoad: !eager,
+    imgProps: {
+      loading: (eager ? 'eager' : 'lazy') as 'eager' | 'lazy',
+      width,
+      height,
+      decoding: 'async' as const,
+    },
+  }
 }
 
 function avatarColor(name: string): string {

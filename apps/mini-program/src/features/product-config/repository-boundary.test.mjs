@@ -24,6 +24,22 @@ const fictionalSession = (token = 'fictional-test-session', organizationId = 'te
   user: { id: 'test-user', organizationId },
 })
 
+function loadGetCache() {
+  const compiled = ts.transpileModule(
+    readFileSync(new URL('../product/get-cache.ts', import.meta.url), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } },
+  ).outputText
+  const module = { exports: {} }
+  new Function('require', 'exports', 'module', compiled)(
+    () => {
+      throw new Error('get-cache has no dependencies')
+    },
+    module.exports,
+    module,
+  )
+  return module.exports
+}
+
 // Execute the real request implementations. Only the network/platform and account storage are fake.
 function fixture({ web = true, enabled = true, session = null, needsAccount = false } = {}) {
   const state = {
@@ -93,6 +109,7 @@ function fixture({ web = true, enabled = true, session = null, needsAccount = fa
       if (name === './mock-fixture') return { readonlyScheduleMockFixture: { tournaments: [] } }
       if (name === './readonly-schedule.logic')
         return { sortMatchesByStartAt: (matches) => matches }
+      if (name === './get-cache') return loadGetCache()
       throw new Error(`Unexpected repository dependency: ${name}`)
     }
     new Function('require', 'exports', 'module', 'process', compiled)(

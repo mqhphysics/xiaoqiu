@@ -10,7 +10,8 @@ import { TeamPicker } from '../../components/team-hub/picker.h5'
 import { PlayerPicker } from '../../components/team-hub/player-picker.h5'
 import { useDesktopTeamView, useTeamData } from '../../components/team-hub/data.h5'
 import { TeamIcon } from '../../components/team-hub/icons.h5'
-import { productRepository } from '../../features/product/product.repository'
+import { peekProduct, productRepository } from '../../features/product/product.repository'
+import { useLiveSearchParam } from '../../features/product/route-query'
 import { positionLabel } from '../../features/product/product.format'
 import { readSession } from '../../features/product/session'
 import { openTeam } from '../../features/product/team-navigation'
@@ -41,21 +42,30 @@ export default function H5MyTeamPage() {
 }
 
 function DesktopMyTeamPage() {
-  const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
-  const [home, setHome] = useState<HomeResponse | null>(null)
-  const [preferences, setPreferences] = useState<TeamPreferencesResponse | null>(null)
+  const routeTournamentId = useLiveSearchParam('tournamentId')
+  const homePath = `/public/home${routeTournamentId ? `?tournamentId=${encodeURIComponent(routeTournamentId)}` : ''}`
+  const prefsPath = `/me/team-preferences${routeTournamentId ? `?tournamentId=${encodeURIComponent(routeTournamentId)}` : ''}`
+  const initialHome = peekProduct<HomeResponse>(homePath)
+  const signedInAtStart = Boolean(readSession())
+  const initialPrefs = signedInAtStart ? peekProduct<TeamPreferencesResponse>(prefsPath) ?? null : null
+  const warmed = Boolean(initialHome) && (!signedInAtStart || Boolean(initialPrefs))
+  const [home, setHome] = useState<HomeResponse | null>(initialHome ?? null)
+  const [preferences, setPreferences] = useState<TeamPreferencesResponse | null>(initialPrefs)
   const [players, setPlayers] = useState<PlayerFollowsResponse>({ items: [] })
   const [playerError, setPlayerError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!warmed)
   const [error, setError] = useState('')
-  const [selectedTeam, setSelectedTeam] = useState('')
+  const [selectedTeam, setSelectedTeam] = useState(initialPrefs?.primaryTeam?.id ?? '')
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [picker, setPicker] = useState<'primary' | 'follow' | 'player' | null>(null)
   const sequence = useRef(0)
-  const currentPrimary = useRef('')
+  const currentPrimary = useRef(initialPrefs?.primaryTeam?.id ?? '')
   const load = useCallback(async () => {
     const request = ++sequence.current
-    setLoading(true)
+    const signedIn = Boolean(readSession())
+    const cachedHome = peekProduct<HomeResponse>(homePath)
+    const cachedPrefs = signedIn ? peekProduct<TeamPreferencesResponse>(prefsPath) : null
+    if (!(cachedHome && (!signedIn || cachedPrefs))) setLoading(true)
     setError('')
     try {
       const signedIn = Boolean(readSession())
@@ -88,7 +98,7 @@ function DesktopMyTeamPage() {
     } finally {
       if (request === sequence.current) setLoading(false)
     }
-  }, [routeTournamentId])
+  }, [homePath, prefsPath, routeTournamentId])
   useEffect(() => {
     void load()
     return () => {

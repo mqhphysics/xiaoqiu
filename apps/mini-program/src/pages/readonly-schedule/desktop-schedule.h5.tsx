@@ -1,4 +1,4 @@
-import { getCurrentInstance, useDidShow } from '@tarojs/taro'
+import { useDidShow } from '@tarojs/taro'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { PublicShell } from '../../components/public-shell'
@@ -11,7 +11,12 @@ import {
   matchDetailUrl,
 } from '../../features/competition/competition.logic'
 import { formatDate, formatTime, matchStatusLabel } from '../../features/product/product.format'
-import { productRepository } from '../../features/product/product.repository'
+import {
+  loadCompetition,
+  peekCompetition,
+  productRepository,
+} from '../../features/product/product.repository'
+import { useLiveSearchParam } from '../../features/product/route-query'
 import { readSession } from '../../features/product/session'
 import type {
   CompetitionDataResponse,
@@ -122,15 +127,17 @@ export default function SchedulePage() {
 }
 
 function DesktopSchedulePage() {
-  const routeTournamentId = getCurrentInstance().router?.params.tournamentId ?? ''
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const routeTournamentId = useLiveSearchParam('tournamentId')
+  const [state, setState] = useState<PageState>(() => {
+    const cached = peekCompetition(routeTournamentId)
+    return cached ? { phase: 'ready', data: cached } : { phase: 'loading' }
+  })
   const [appearance, setAppearance] = useState(0)
   useDidShow(() => setAppearance((value) => value + 1))
   const load = useCallback(async () => {
-    setState({ phase: 'loading' })
+    if (!peekCompetition(routeTournamentId)) setState({ phase: 'loading' })
     try {
-      const id = routeTournamentId || (await productRepository.getHome()).tournament.id
-      setState({ phase: 'ready', data: await productRepository.getCompetitionData(id) })
+      setState({ phase: 'ready', data: await loadCompetition(routeTournamentId) })
     } catch (error) {
       setState({
         phase: 'failed',

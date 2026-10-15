@@ -28,6 +28,7 @@ import {
 import { formatDate, formatTime } from '../../features/product/product.format'
 import {
   createClientActionId,
+  peekProduct,
   productRepository,
   resolveMediaUrl,
 } from '../../features/product/product.repository'
@@ -83,7 +84,10 @@ function readSearchRoute() {
 
 export default function IndexPage() {
   const [initialSearch] = useState(readSearchRoute)
-  const [state, setState] = useState<PageState>({ phase: 'loading' })
+  const [state, setState] = useState<PageState>(() => {
+    const cached = peekProduct<HomeResponse>('/public/home')
+    return cached ? { phase: 'ready', data: cached } : { phase: 'loading' }
+  })
   const [searchText, setSearchText] = useState(initialSearch.query)
   const [searchCategory, setSearchCategory] = useState<SearchCategory>(initialSearch.category)
   const [searchMode, setSearchMode] = useState(initialSearch.expanded)
@@ -106,7 +110,7 @@ export default function IndexPage() {
   )
 
   const load = useCallback(async () => {
-    setState({ phase: 'loading' })
+    if (!peekProduct<HomeResponse>('/public/home')) setState({ phase: 'loading' })
     try {
       setState(
         Taro.getEnv() === Taro.ENV_TYPE.WEB

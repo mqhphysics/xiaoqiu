@@ -1,5 +1,13 @@
 import Taro from '@tarojs/taro'
 
+import {
+  FRESH_GET_MS,
+  STALE_GET_MS,
+  knownTournamentId,
+  productGetCache,
+  rememberTournamentId,
+} from './get-cache'
+
 import { clearSession, leaveGuestMode, readSession, saveSession } from './session'
 import {
   anonymousReadAllowed,
@@ -376,6 +384,74 @@ interface RequestOptions {
   headers?: Record<string, string>
 }
 
+function cacheKey(path: string, token?: string) {
+  return `${token ?? ''} ${path}`
+}
+
+function readEtag(header: Record<string, string> | undefined): string | undefined {
+  const value = header?.etag ?? header?.ETag
+  return typeof value === 'string' && value ? value : undefined
+}
+
+function rememberFromBody(path: string, data: unknown) {
+  if (!path.startsWith('/public/home') || !data || typeof data !== 'object' || !('tournament' in data))
+    return
+  rememberTournamentId((data as { tournament?: { id?: string } }).tournament?.id)
+}
+
+function requestHeaders(
+  session: AuthSession | null | undefined,
+  options: RequestOptions,
+  etag?: string,
+) {
+  return {
+    ...options.headers,
+    'content-type': 'application/json',
+    'x-organization-id':
+      (session?.user.organizationId ?? process.env.TARO_APP_ORGANIZATION_ID?.trim()) ||
+      DEFAULT_ORGANIZATION_ID,
+    ...(options.authenticated !== false && session?.accessToken
+      ? { Authorization: `Bearer ${session.accessToken}` }
+      : {}),
+    ...(etag ? { 'If-None-Match': etag } : {}),
+  }
+}
+
+export function peekProduct<T>(path: string): T | undefined {
+  if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return undefined
+  const session = readAccountPresence()?.session
+  return productGetCache.peek<T>(cacheKey(path, session?.accessToken), STALE_GET_MS)
+}
+
+export function peekCompetition(routeTournamentId = ''): CompetitionDataResponse | undefined {
+  const id = routeTournamentId || knownTournamentId()
+  if (!id) return undefined
+  return peekProduct<CompetitionDataResponse>(
+    `/public/tournaments/${encodeURIComponent(id)}/competition-data`,
+  )
+}
+
+export async function loadCompetition(routeTournamentId = ''): Promise<CompetitionDataResponse> {
+  const id = routeTournamentId || knownTournamentId()
+  if (id) return productRepository.getCompetitionData(id)
+  const home = await productRepository.getHome()
+  return productRepository.getCompetitionData(home.tournament.id)
+}
+
+export function sizedMediaUrl(
+  url: string | null | undefined,
+  width: number,
+): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('data:') || url.startsWith('blob:') || !url.includes('/api/media/')) return url
+  const [base, search = ''] = url.split('?')
+  const params = new URLSearchParams(search)
+  params.set('w', String(width))
+  return `${base}?${params.toString()}`
+}
+
+export { knownTournamentId }
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const h5 = Taro.getEnv() === Taro.ENV_TYPE.WEB
   const account = h5 ? readAccountPresence() : null
@@ -399,24 +475,26 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
     if (!allowed) throw new ProductApiError('请先登录账号后再访问晓球', 401)
   }
+  const key = h5 && method === 'GET' ? cacheKey(path, session?.accessToken) : ''
+  const cached = key ? productGetCache.read<T>(key) : undefined
+  if (cached && Date.now() - cached.at <= FRESH_GET_MS) return cached.data
+  if (cached && Date.now() - cached.at <= STALE_GET_MS) {
+    void revalidateGet<T>(path, key, session, options).catch(() => undefined)
+    return cached.data
+  }
   const response = await Taro.request<T>({
     url: `${getApiBaseUrl()}${path}`,
     method,
     data: options.data,
-    header: {
-      ...options.headers,
-      'content-type': 'application/json',
-      'x-organization-id':
-        (session?.user.organizationId ?? process.env.TARO_APP_ORGANIZATION_ID?.trim()) ||
-        DEFAULT_ORGANIZATION_ID,
-      ...(options.authenticated !== false && session?.accessToken
-        ? { Authorization: `Bearer ${session.accessToken}` }
-        : {}),
-    },
+    header: requestHeaders(session, options, cached?.etag),
     timeout: 8000,
   }).catch(() => {
     throw new ProductApiError('无法连接晓球 API，请检查网络或联系管理员后重试。', 0)
   })
+  if (response.statusCode === 304 && cached) {
+    productGetCache.put(key, cached.data, cached.etag)
+    return cached.data
+  }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     if (response.statusCode === 401 && options.authenticated !== false) {
@@ -428,7 +506,36 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       response.statusCode,
     )
   }
+  if (key) {
+    productGetCache.put(key, response.data, readEtag(response.header))
+    rememberFromBody(path, response.data)
+  } else if (h5 && method !== 'GET') {
+    productGetCache.clear()
+  }
   return response.data
+}
+
+async function revalidateGet<T>(
+  path: string,
+  key: string,
+  session: AuthSession | null | undefined,
+  options: RequestOptions,
+) {
+  const cached = productGetCache.read<T>(key)
+  const response = await Taro.request<T>({
+    url: `${getApiBaseUrl()}${path}`,
+    method: 'GET',
+    header: requestHeaders(session, options, cached?.etag),
+    timeout: 8000,
+  })
+  if (response.statusCode === 304 && cached) {
+    productGetCache.put(key, cached.data, cached.etag)
+    return
+  }
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    productGetCache.put(key, response.data, readEtag(response.header))
+    rememberFromBody(path, response.data)
+  }
 }
 
 function getApiBaseUrl(): string {
