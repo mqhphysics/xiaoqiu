@@ -9,6 +9,7 @@ import { AdminGovernanceController } from './admin-governance.controller'
 import { AdminPeopleService } from './admin-people.service'
 import { AdminMediaService } from './admin-media.service'
 import { AdminModerationService } from './admin-moderation.service'
+import { AdminLoginAccessService } from './admin-login-access.service'
 
 @Module({
   imports: [AuthModule, DatabaseModule, MediaModule],
@@ -19,6 +20,7 @@ import { AdminModerationService } from './admin-moderation.service'
     AdminPeopleService,
     AdminMediaService,
     AdminModerationService,
+    AdminLoginAccessService,
   ],
   exports: [AdminCenterService, LocalOwnerAccessService],
 })

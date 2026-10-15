@@ -42,11 +42,21 @@ export function localManagementPlugin(options) {
       try {
         configureApp(app)
         await app.init()
-        await app.get(PrismaService).$queryRaw`SELECT 1`
+        const prisma = app.get(PrismaService)
+        await prisma.$queryRaw`SELECT 1`
+        let ownerLoginName = options.ownerLoginName
+        if (!ownerLoginName && options.ownerUserId) {
+          const owner = await prisma.user.findUnique({
+            where: { id: options.ownerUserId },
+            select: { loginNameNormalized: true },
+          })
+          ownerLoginName = owner?.loginNameNormalized || ''
+        }
         application = {
           app,
           handler: app.getHttpAdapter().getInstance(),
           access: app.get(LocalOwnerAccessService),
+          ownerLoginName,
         }
         return application
       } catch (error) {
@@ -108,7 +118,7 @@ export function localManagementPlugin(options) {
           return
         }
         const credential = await ready.access.enter(
-          { ...options, origin },
+          { ...options, ownerLoginName: ready.ownerLoginName, origin },
           {
             address: request.socket.remoteAddress,
             host: request.headers.host,

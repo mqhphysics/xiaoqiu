@@ -19,6 +19,7 @@ import { getRequestId, type RequestWithId } from '../common/request-context'
 import { AdminPeopleService } from './admin-people.service'
 import { AdminMediaService } from './admin-media.service'
 import { AdminModerationService } from './admin-moderation.service'
+import { AdminLoginAccessService } from './admin-login-access.service'
 import {
   AdminCenterEditDto,
   AdminCenterPageDto,
@@ -26,6 +27,8 @@ import {
   AdminMediaDecisionDto,
   AdminContentDecisionDto,
   AdminCenterReasonDto,
+  AdminPasswordResetDto,
+  AdminProvisionAccountsDto,
 } from './admin-center.dto'
 
 @ApiTags('admin-governance')
@@ -38,6 +41,8 @@ import {
   AdminMediaDecisionDto,
   AdminContentDecisionDto,
   AdminCenterReasonDto,
+  AdminPasswordResetDto,
+  AdminProvisionAccountsDto,
 )
 @Controller('admin/center')
 export class AdminGovernanceController {
@@ -45,7 +50,35 @@ export class AdminGovernanceController {
     @Inject(AdminPeopleService) private readonly people: AdminPeopleService,
     @Inject(AdminMediaService) private readonly media: AdminMediaService,
     @Inject(AdminModerationService) private readonly moderation: AdminModerationService,
+    @Inject(AdminLoginAccessService) private readonly loginAccess: AdminLoginAccessService,
   ) {}
+  @Post('users/provision-from-players') provision(
+    @Headers('authorization') auth: string | undefined,
+    @Body() body: AdminProvisionAccountsDto,
+    @Headers('idempotency-key') key: string | undefined,
+    @Req() req: RequestWithId,
+  ) {
+    return this.loginAccess.provision(auth, body, key, getRequestId(req))
+  }
+
+  @Get('users/:id/login-access') loginInformation(
+    @Headers('authorization') auth: string | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Cache-Control', 'private, no-store')
+    return this.loginAccess.view(auth, id)
+  }
+
+  @Post('users/:id/login-password') resetLoginPassword(
+    @Headers('authorization') auth: string | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: AdminPasswordResetDto,
+    @Headers('idempotency-key') key: string | undefined,
+    @Req() req: RequestWithId,
+  ) {
+    return this.loginAccess.reset(auth, id, body, key, getRequestId(req))
+  }
   @Get('users/:id') detail(
     @Headers('authorization') auth: string | undefined,
     @Param('id', ParseUUIDPipe) id: string,

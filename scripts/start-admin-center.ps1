@@ -9,12 +9,50 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$activeManagement = Join-Path $repoRoot 'private-data/admin-center/active.json'
+if (Test-Path -LiteralPath $activeManagement) {
+  $active = Get-Content -LiteralPath $activeManagement -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ($active.repoRoot -and $active.repoRoot -ne $repoRoot) {
+    $activeScript = Join-Path $active.repoRoot 'scripts/start-admin-center.ps1'
+    if (-not (Test-Path -LiteralPath $activeScript)) { throw '当前管理中心源码目录不存在，请恢复配置指向的版本。' }
+    $forwardArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $activeScript)
+    foreach ($switchName in @('NoBrowser', 'RequireAccountLogin')) { if ($PSBoundParameters[$switchName]) { $forwardArguments += "-$switchName" } }
+    foreach ($valueName in @('ApiBaseUrl', 'DatabaseUrl', 'OrganizationId')) { if ($PSBoundParameters.ContainsKey($valueName)) { $forwardArguments += "-$valueName"; $forwardArguments += [string]$PSBoundParameters[$valueName] } }
+    & powershell.exe @forwardArguments
+    exit $LASTEXITCODE
+  }
+}
 $adminRoot = Join-Path $repoRoot 'apps\admin-web'
 $runtimeRoot = Join-Path $repoRoot 'private-data\runtime'
 $adminUrl = 'http://127.0.0.1:5173/'
 $apiUrl = $ApiBaseUrl.TrimEnd('/') -replace '/api$', ''
 $mutex = $null
 $ownsMutex = $false
+$sharedConfigPath = Join-Path $repoRoot 'private-data/shared-runtime/config.json'
+if (-not (Test-Path -LiteralPath $sharedConfigPath)) {
+  try {
+    $commonGit = & git -C $repoRoot rev-parse --path-format=absolute --git-common-dir
+    if ($LASTEXITCODE -eq 0) { $sharedConfigPath = Join-Path (Split-Path -Parent $commonGit.Trim()) 'private-data/shared-runtime/config.json' }
+  } catch { }
+}
+if (Test-Path -LiteralPath $sharedConfigPath) {
+  $sharedConfig = Get-Content -LiteralPath $sharedConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  if (-not $DatabaseUrl -and -not $env:ADMIN_DATABASE_URL -and -not $env:DATABASE_URL) {
+    $databasePassword = [Environment]::GetEnvironmentVariable($sharedConfig.databasePasswordEnvironment)
+    if (-not $databasePassword) { $databasePassword = [Environment]::GetEnvironmentVariable($sharedConfig.databasePasswordEnvironment, 'User') }
+    if (-not $databasePassword -and $sharedConfig.databaseUser -eq 'xiaoqiu') { $databasePassword = 'xiaoqiu-local-only' }
+    if (-not $databasePassword) { throw '共享数据库凭据未配置，请设置对应数据库密码环境变量。' }
+    $DatabaseUrl = 'postgresql://' + [Uri]::EscapeDataString($sharedConfig.databaseUser) + ':' + [Uri]::EscapeDataString($databasePassword) + '@' + $sharedConfig.databaseHost + ':' + $sharedConfig.databasePort + '/' + $sharedConfig.databaseName
+  }
+  if (-not $OrganizationId) { $OrganizationId = $sharedConfig.organizationId }
+  if ($sharedConfig.roleSwitchOwnerId) { $env:ADMIN_OWNER_USER_ID = $sharedConfig.roleSwitchOwnerId }
+  $mediaDirectory = if ($sharedConfig.persistentMediaDirectory) { $sharedConfig.persistentMediaDirectory } else { $sharedConfig.mediaDirectory }
+  if ($mediaDirectory) {
+    $env:POST_MEDIA_DIRECTORY = Join-Path $mediaDirectory 'posts'
+    $env:ADMIN_LEGACY_REPOSITORY = Split-Path -Parent (Split-Path -Parent $mediaDirectory)
+  }
+  Write-Host '管理中心连接当前共享后台，保留早期演示库。'
+}
 $hash = [Security.Cryptography.SHA256]::Create()
 try { $repoKey = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($repoRoot.ToLowerInvariant()))).Replace('-', '').ToLowerInvariant() } finally { $hash.Dispose() }
 

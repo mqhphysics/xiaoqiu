@@ -7,7 +7,9 @@ export function PeopleManagement({ context }: { context: OrganizationContext }) 
   const [page, setPage] = useState(1),
     [query, setQuery] = useState(''),
     [input, setInput] = useState(''),
-    [chosen, setChosen] = useState<Row | null>(null)
+    [chosen, setChosen] = useState<Row | null>(null),
+    [provisioning, setProvisioning] = useState(false),
+    [createCount, setCreateCount] = useState(60)
   const list = useAdminData<PageData>(
     context,
     `/admin/center/users?${new URLSearchParams({ page: String(page), pageSize: '25', query })}`,
@@ -18,11 +20,14 @@ export function PeopleManagement({ context }: { context: OrganizationContext }) 
         <div className="mc-panel-heading">
           <div>
             <h2>用户资料与账号管理</h2>
-            <p>管理员可查看完整实名、学号和邮箱，点击用户编辑或查看活动。</p>
+            <p>查看完整资料、活动和后台分配的登录密码，也可为球员创建账号。</p>
           </div>
-          <button className="secondary-button" onClick={list.refresh}>
-            刷新
-          </button>
+          <div className="mc-actions">
+            <button onClick={() => setProvisioning(true)}>为球员创建账号</button>
+            <button className="secondary-button" onClick={list.refresh}>
+              刷新
+            </button>
+          </div>
         </div>
         <form
           className="mc-toolbar"
@@ -53,6 +58,7 @@ export function PeopleManagement({ context }: { context: OrganizationContext }) 
                     <th>邮箱</th>
                     <th>组织状态</th>
                     <th>操作</th>
+                    <th>登录信息</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -71,6 +77,14 @@ export function PeopleManagement({ context }: { context: OrganizationContext }) 
                       <td>
                         <button className="mc-link-button" onClick={() => setChosen(user)}>
                           资料 / 活动 / 管理 ↗
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          className="mc-link-button"
+                          onClick={() => setChosen({ ...user, requestedTab: 'login' })}
+                        >
+                          查看密码
                         </button>
                       </td>
                     </tr>
@@ -93,6 +107,36 @@ export function PeopleManagement({ context }: { context: OrganizationContext }) 
             list.refresh()
           }}
         />
+      ) : null}
+      {provisioning ? (
+        <Modal title="为球员创建登录账号" onClose={() => setProvisioning(false)}>
+          <ActionForm
+            context={context}
+            path="/admin/center/users/provision-from-players"
+            body={{ count: createCount }}
+            submitLabel={`创建${createCount}个账号`}
+            onDone={() => {
+              setProvisioning(false)
+              list.refresh()
+            }}
+          >
+            <label className="mc-field">
+              <span>创建数量（1–60）</span>
+              <input
+                aria-label="创建账号数量"
+                type="number"
+                min={1}
+                max={60}
+                required
+                value={createCount}
+                onChange={(e) => setCreateCount(Number(e.target.value))}
+              />
+            </label>
+            <p>
+              从当前组织尚未绑定账号的球员中创建，分配独立六位随机密码。优先用学号登录，不编造邮箱，不更改现有账号或授予管理权限。
+            </p>
+          </ActionForm>
+        </Modal>
       ) : null}
     </>
   )
@@ -118,7 +162,7 @@ function UserDetail({
   onChanged: () => void
 }) {
   const data = useAdminData<Row>(context, `/admin/center/users/${row.id}`)
-  const [tab, setTab] = useState('info'),
+  const [tab, setTab] = useState(String(row.requestedTab ?? 'info')),
     [action, setAction] = useState<'FREEZE' | 'BAN' | 'RESTORE' | null>(null),
     [editing, setEditing] = useState(false)
   const target = data.data ?? row
@@ -138,6 +182,9 @@ function UserDetail({
         </button>
         <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>
           登录会话
+        </button>
+        <button className={tab === 'login' ? 'active' : ''} onClick={() => setTab('login')}>
+          登录密码
         </button>
       </div>
       <DataState {...data} onRetry={data.refresh} />
@@ -164,6 +211,8 @@ function UserDetail({
           </p>
           <UserState status={String(target.membershipStatus)} />
         </ActionForm>
+      ) : tab === 'login' ? (
+        <LoginInformation context={context} row={target} onReset={data.refresh} />
       ) : tab === 'activity' ? (
         <Activity context={context} id={row.id} />
       ) : tab === 'sessions' ? (
@@ -245,6 +294,76 @@ const fields = [
   ['bio', '简介'],
   ['playerProfileId', '关联球员稳定编号'],
 ] as const
+function LoginInformation({
+  context,
+  row,
+  onReset,
+}: {
+  context: OrganizationContext
+  row: Row
+  onReset: () => void
+}) {
+  const information = useAdminData<{
+    username: string | null
+    available: boolean
+    password: string | null
+    assignedAt: string | null
+    description: string
+  }>(context, `/admin/center/users/${row.id}/login-access`)
+  const [resetting, setResetting] = useState(false)
+  return (
+    <div className="gov-detail-body">
+      <h3>登录信息</h3>
+      <DataState {...information} onRetry={information.refresh} />
+      {information.data ? (
+        <>
+          <dl className="mc-facts">
+            <div>
+              <dt>用户名</dt>
+              <dd>{information.data.username ?? '未设置，可用已绑定的学号或邮箱'}</dd>
+            </div>
+            <div>
+              <dt>六位登录密码</dt>
+              <dd>
+                <code style={{ fontSize: 24, letterSpacing: 3, userSelect: 'all' }}>
+                  {information.data.password ?? '尚无可查看的分配记录'}
+                </code>
+              </dd>
+            </div>
+            <div>
+              <dt>分配时间</dt>
+              <dd>{time(information.data.assignedAt)}</dd>
+            </div>
+          </dl>
+          <p className="mc-muted">{information.data.description}</p>
+        </>
+      ) : null}
+      {resetting ? (
+        <ActionForm
+          context={context}
+          path={`/admin/center/users/${row.id}/login-password`}
+          body={{ expectedUpdatedAt: row.updatedAt }}
+          submitLabel="确认分配新的六位密码"
+          onDone={() => {
+            setResetting(false)
+            information.refresh()
+            onReset()
+          }}
+        >
+          <p>原密码立即失效，其他登录会话会被撤销。当前管理员自己的管理会话保留。</p>
+        </ActionForm>
+      ) : (
+        <button
+          className="secondary-button"
+          disabled={!row.updatedAt}
+          onClick={() => setResetting(true)}
+        >
+          分配新的六位随机密码
+        </button>
+      )}
+    </div>
+  )
+}
 function EditUser({
   context,
   row,

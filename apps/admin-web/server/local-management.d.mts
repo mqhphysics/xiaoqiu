@@ -7,4 +7,5 @@ export function localManagementPlugin(options: {
   development: boolean
   organizationId: string
   ownerLoginName: string
+  ownerUserId?: string
 }): Plugin

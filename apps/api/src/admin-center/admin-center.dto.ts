@@ -73,6 +73,18 @@ export class AdminCenterMembershipDto extends AdminCenterReasonDto {
   expectedUpdatedAt!: string
 }
 
+export class AdminPasswordResetDto extends AdminCenterReasonDto {
+  @IsISO8601({ strict: true })
+  expectedUpdatedAt!: string
+}
+
+export class AdminProvisionAccountsDto extends AdminCenterReasonDto {
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  count!: number
+}
+
 export class AdminCenterEditDto extends AdminCenterReasonDto {
   @IsISO8601({ strict: true })
   expectedUpdatedAt!: string
