@@ -1,6 +1,6 @@
 import { Canvas, View } from '@tarojs/components'
 import Taro, { getCurrentInstance, useDidHide, useDidShow, useReady } from '@tarojs/taro'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TeamSummary } from '../../features/product/product.types'
 // These two existing files contain only geometry and color calculations, no DOM code.
 import { goldLeafLines } from './team-nav-leaf-lines.h5'
@@ -71,6 +71,7 @@ interface DrawingCanvas {
 }
 
 export function NativeTeamTabFocus({ team }: { team?: TeamSummary | null }) {
+  const [overlay, setOverlay] = useState(false)
   const cancel = useRef<(() => void) | null>(null)
   const mounted = useRef(true)
   const color = getTeamNavOrnamentColor(team)
@@ -148,8 +149,16 @@ export function NativeTeamTabFocus({ team }: { team?: TeamSummary | null }) {
   useDidShow(() => Taro.nextTick(start))
   useDidHide(() => cancel.current?.())
   useEffect(() => {
-    Taro.nextTick(start)
-  }, [color, selected])
+    if (overlay) cancel.current?.()
+    else Taro.nextTick(start)
+  }, [color, selected, overlay])
+  useEffect(() => {
+    const listener = (open: boolean) => setOverlay(open)
+    Taro.eventCenter.on('xiaoqiu:native-overlay', listener)
+    return () => {
+      Taro.eventCenter.off('xiaoqiu:native-overlay', listener)
+    }
+  }, [])
   useEffect(
     () => () => {
       mounted.current = false
@@ -157,6 +166,7 @@ export function NativeTeamTabFocus({ team }: { team?: TeamSummary | null }) {
     },
     [],
   )
+  if (overlay) return null
   return (
     <View className="native-team-focus" aria-hidden="true">
       <Canvas

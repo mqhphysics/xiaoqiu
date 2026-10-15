@@ -34,7 +34,7 @@ export function HeroCarousel({
   return (
     <View className="experience-hero__media native-home-hero">
       <View className="native-home-hero__copy">
-        <Text className="native-home-hero__eyebrow">校园足球赛季</Text>
+        <Text className="native-home-hero__eyebrow">2026 校园足球赛季</Text>
         <Text className="native-home-hero__title">绿茵正燃</Text>
         <Text className="native-home-hero__title native-home-hero__title--warm">青春正好</Text>
       </View>

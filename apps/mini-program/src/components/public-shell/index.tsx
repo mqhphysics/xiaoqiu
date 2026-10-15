@@ -1,4 +1,4 @@
-import { Button, Text, View } from '@tarojs/components'
+import { Button, Image, Text, View } from '@tarojs/components'
 import Taro, { getCurrentInstance } from '@tarojs/taro'
 import {
   useEffect,
@@ -33,8 +33,10 @@ import {
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
 import { NativeTeamTabFocus } from './team-tab-focus'
+import brandMark from '../../assets/home-visual/brand-mark.png'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
 import { prefetchSection, prefetchTabsWhenIdle } from './prefetch-tabs'
+import { nativeHeaderMetrics } from './native-header-metrics'
 
 import './index.scss'
 
@@ -89,11 +91,13 @@ export function PublicShell({
       : null,
   )
   const [navigatingTo, setNavigatingTo] = useState<PublicSection | null>(null)
+  const [nativeTeamReplay, setNativeTeamReplay] = useState(0)
   const shellRef = useRef<HTMLElement | null>(null)
   const navigationLock = useRef(false)
   const normalizedActive = active === 'teams' ? 'team' : active === 'tournaments' ? 'data' : active
   const selectedNavItem = navigatingTo ?? normalizedActive
   const currentPath = normalizePath(getCurrentInstance().router?.path ?? '')
+  const nativeHeader = nativeHeaderMetrics()
 
   useLayoutEffect(() => {
     if (!shellRef.current || Taro.getEnv() !== Taro.ENV_TYPE.WEB) return
@@ -187,6 +191,8 @@ export function PublicShell({
     const targetPath = getSectionPath(destination, tournamentId)
     if (navigationLock.current) return
     if (currentPath === normalizePath(targetPath)) {
+      if (section === 'team' && Taro.getEnv() === Taro.ENV_TYPE.WEAPP)
+        setNativeTeamReplay((value) => value + 1)
       if (section === 'team' && isDesktopH5() && shellRef.current) playTeamFocus(shellRef.current)
       onActiveReselect?.()
       return
@@ -258,12 +264,27 @@ export function PublicShell({
   return (
     <View
       ref={shellRef}
+      style={nativeHeader ? `--native-header-height:${nativeHeader.height}px;` : ''}
       className={`public-app ${Taro.getEnv() === Taro.ENV_TYPE.WEB ? 'public-app--h5' : ''} public-app--section-${normalizedActive} ${active === 'home' && !showBack ? 'public-app--home' : ''}`}
     >
-      <View className="public-topbar">
-        <View className="public-topbar__inner">
+      <View
+        className="public-topbar"
+        style={
+          nativeHeader
+            ? `height:${nativeHeader.height}px;padding-top:${nativeHeader.top}px;padding-bottom:12px;`
+            : ''
+        }
+      >
+        <View
+          className="public-topbar__inner"
+          style={
+            nativeHeader
+              ? `height:${nativeHeader.rowHeight}px;min-height:${nativeHeader.rowHeight}px;padding:0 14px;`
+              : ''
+          }
+        >
           <View className="public-brand-area">
-            {showBack && (
+            {showBack && !nativeHeader && (
               <IconButton
                 icon="back"
                 aria-label="返回"
@@ -274,7 +295,11 @@ export function PublicShell({
               </IconButton>
             )}
             <View className="public-brand" onClick={() => void navigateToSection('home')}>
-              <View aria-hidden="true" className="public-brand__mark" />
+              {Taro.getEnv() === Taro.ENV_TYPE.WEAPP ? (
+                <Image className="public-brand__image" mode="aspectFit" src={brandMark} />
+              ) : (
+                <View aria-hidden="true" className="public-brand__mark" />
+              )}
               <View className="public-brand__copy">
                 <Text className="public-brand__name">晓球</Text>
                 <Text className="public-brand__caption">把校园比赛认真记录下来</Text>
@@ -293,7 +318,7 @@ export function PublicShell({
                   aria-label={primaryTeam ? `打开${primaryTeam.name}` : '打开主队'}
                   className={`public-team-nav ${selectedNavItem === item.key ? 'public-team-nav--active' : ''}`}
                   key={item.key}
-                  aria-current={normalizedActive === item.key ? 'page' : undefined}
+                  aria-current={normalizedActive === item.key ? 'page' : ''}
                   onClick={() => void navigateToSection(item.key)}
                   {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
                     ? { onMouseEnter: () => prefetchSection(item.key) }
@@ -310,7 +335,7 @@ export function PublicShell({
                 <Button
                   className={`public-nav__item ${selectedNavItem === item.key ? 'public-nav__item--active' : ''}`}
                   key={item.key}
-                  aria-current={normalizedActive === item.key ? 'page' : undefined}
+                  aria-current={normalizedActive === item.key ? 'page' : ''}
                   onClick={() => void navigateToSection(item.key)}
                   {...(Taro.getEnv() === Taro.ENV_TYPE.WEB
                     ? { onMouseEnter: () => prefetchSection(item.key) }
@@ -416,8 +441,19 @@ export function PublicShell({
 
       {menuOpen && !desktopAccount && <View className="public-menu-scrim" onClick={closeMenu} />}
 
-
-      <View className="public-content">{children}</View>
+      <View className="public-content">
+        {nativeHeader && showBack && (
+          <Button
+            className="native-page-back"
+            onClick={() => void goBack(active, tournamentId)}
+            aria-label="返回上一页"
+          >
+            <View className="native-page-back__icon" />
+            <Text>返回</Text>
+          </Button>
+        )}
+        {children}
+      </View>
 
       <View className="public-footer">
         <Text className="public-footer__brand">晓球</Text>
@@ -436,7 +472,9 @@ export function PublicShell({
                 ? { onTouchStart: () => prefetchSection(item.key) }
                 : {})}
             >
-              {Taro.getEnv() === Taro.ENV_TYPE.WEAPP && <NativeTeamTabFocus team={primaryTeam} />}
+              {Taro.getEnv() === Taro.ENV_TYPE.WEAPP && normalizedActive === 'team' && (
+                <NativeTeamTabFocus key={nativeTeamReplay} team={primaryTeam} />
+              )}
               {primaryTeam ? (
                 <TeamCrest team={primaryTeam} size="large" eager />
               ) : (
@@ -502,7 +540,10 @@ function getSectionPath(section: PublicSection, tournamentId?: string): string {
   const encodedTournamentId = tournamentId ? encodeURIComponent(tournamentId) : ''
   const fallback = '/pages/readonly-tournaments/index'
   const paths: Record<PublicSection, string> = {
-    home: '/pages/index/index',
+    home:
+      Taro.getEnv() === Taro.ENV_TYPE.WEAPP && encodedTournamentId
+        ? `/pages/index/index?tournamentId=${encodedTournamentId}`
+        : '/pages/index/index',
     tournaments: fallback,
     schedule: encodedTournamentId
       ? `/pages/readonly-schedule/index?tournamentId=${encodedTournamentId}`

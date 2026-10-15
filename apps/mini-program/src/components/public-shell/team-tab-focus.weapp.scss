@@ -10,18 +10,17 @@ page .mobile-team-tab--active.mobile-team-tab--active {
   box-shadow: none;
 }
 .native-team-focus {
-  position: absolute;
-  z-index: 0;
-  top: -4px;
-  left: 50%;
-  width: 260px;
-  height: 112px;
+  height: 0;
   pointer-events: none;
-  transform: translateX(-50%);
 }
 .native-team-focus__canvas {
-  width: 100%;
-  height: 100%;
+  position: fixed;
+  z-index: 0;
+  left: 50%;
+  bottom: env(safe-area-inset-bottom);
+  width: 240px;
+  height: 100px;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 page .mobile-team-tab > .team-crest,

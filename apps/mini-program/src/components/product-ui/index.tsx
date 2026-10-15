@@ -12,7 +12,11 @@ import {
 } from '../../features/product/product.format'
 import type { MatchSummary, PostSummary, TeamSummary } from '../../features/product/product.types'
 import { demoCrestUrl } from '../../features/product/demo-media'
-import { productRepository, resolveMediaUrl, sizedMediaUrl } from '../../features/product/product.repository'
+import {
+  productRepository,
+  resolveMediaUrl,
+  sizedMediaUrl,
+} from '../../features/product/product.repository'
 import {
   openPost,
   updatePostInteraction,
@@ -28,6 +32,7 @@ import { VerificationBadge } from '../verification-badge'
 import { PersonTrigger } from '../person-trigger'
 import { ReactionHeart } from '../reaction-heart'
 import { TeamTrigger } from '../team-trigger'
+import { NativeMatchRow } from '../native-match-row'
 
 import './index.scss'
 
@@ -165,6 +170,8 @@ export function MatchStatus({ status }: { status: MatchSummary['status'] }) {
 }
 
 export function MatchCard({ match, onClick }: { match: MatchSummary; onClick?: () => void }) {
+  if (Taro.getEnv() === Taro.ENV_TYPE.WEAPP)
+    return <NativeMatchRow match={match} onClick={onClick} showDate />
   const hasScore = match.homeScore !== null && match.awayScore !== null
   return (
     <View
@@ -229,7 +236,7 @@ export function PostCard({
   const [imageFailed, setImageFailed] = useState(false)
   const likePending = useRef(false)
   const images =
-    variant === 'home' && !imageFailed
+    (variant === 'home' || Taro.getEnv() === Taro.ENV_TYPE.WEAPP) && !imageFailed
       ? (post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [])
           .filter((url) => !url.includes('/demo/album:'))
           .map((url) => resolveMediaUrl(url))
@@ -361,13 +368,15 @@ export function PostCard({
           <ReactionHeart active={post.likedByMe} />
           <Text>{post.likeCount}</Text>
         </Button>
-        <Text
-          aria-label={`评论 ${post.commentCount} 条`}
-          className="post-card__action post-card__action--plain"
-        >
-          <Text className="post-card__comment-icon" />
-          <Text>{post.commentCount}</Text>
-        </Text>
+        {Taro.getEnv() !== Taro.ENV_TYPE.WEAPP && (
+          <Text
+            aria-label={`评论 ${post.commentCount} 条`}
+            className="post-card__action post-card__action--plain"
+          >
+            <Text className="post-card__comment-icon" />
+            <Text>{post.commentCount}</Text>
+          </Text>
+        )}
         <Text className="post-card__open">查看详情</Text>
       </View>
     </View>

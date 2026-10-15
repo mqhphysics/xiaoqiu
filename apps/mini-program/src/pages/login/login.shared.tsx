@@ -63,11 +63,12 @@ export default function LoginPage({
 
   useEffect(() => onScreenChange?.(screenMode), [onScreenChange, screenMode])
 
+  const minimumLength =
+    Taro.getEnv() === Taro.ENV_TYPE.WEAPP ||
+    (Taro.getEnv() === Taro.ENV_TYPE.WEB && process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1')
+      ? 1
+      : 8
   const login = async () => {
-    const minimumLength =
-      Taro.getEnv() === Taro.ENV_TYPE.WEB && process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
-        ? 1
-        : 8
     if (!identifier.trim() || password.length < minimumLength || submitting) return
     setSubmitting(true)
     setFailureMessage('')
@@ -184,7 +185,7 @@ export default function LoginPage({
             </Button>
           </View>
 
-          {!allowGuest && failureMessage ? (
+          {(!allowGuest || Taro.getEnv() === Taro.ENV_TYPE.WEAPP) && failureMessage ? (
             <View className="auth-account-error" role="alert">
               {failureMessage}
             </View>
@@ -236,15 +237,7 @@ export default function LoginPage({
                   </Button>
                   <Button
                     className="auth-primary"
-                    disabled={
-                      !identifier.trim() ||
-                      password.length <
-                        (Taro.getEnv() === Taro.ENV_TYPE.WEB &&
-                        process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
-                          ? 1
-                          : 8) ||
-                      submitting
-                    }
+                    disabled={!identifier.trim() || password.length < minimumLength || submitting}
                     loading={submitting}
                     onClick={() => void login()}
                   >

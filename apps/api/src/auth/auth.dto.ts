@@ -16,7 +16,7 @@ export class LoginDto {
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
   @IsString()
-  @Length(localDemoShortPasswordsEnabled() ? 1 : 8, 128)
+  @Length(localDemoShortPasswordsEnabled() ? 1 : 6, 128)
   password!: string
 }
 
@@ -59,9 +59,15 @@ export class RegisterDto {
   @Length(5, 254)
   email?: string
 
-  @ApiProperty({ type: String, example: 'YourPassword2026!' })
+  @ApiProperty({
+    type: String,
+    minLength: 6,
+    maxLength: 128,
+    description: '至少6位，不限制字符类型',
+    example: '123456',
+  })
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   password!: string
 }
 
@@ -157,7 +163,7 @@ export class ResetPasswordByIdentityDto {
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   newPassword!: string
 }
 

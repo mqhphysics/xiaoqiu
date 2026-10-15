@@ -146,6 +146,38 @@ test(
         },
       )
 
+      await t.test(
+        'six arbitrary password characters register and log in through real HTTP',
+        async () => {
+          for (const [index, password] of [
+            '123456',
+            'abcdef',
+            '......',
+            '中文密码六个',
+            '😀😀😀😀😀😀',
+            '      ',
+          ].entries()) {
+            const username = `six-${index}-${suffix}`
+            const response = await post('register', {
+              ...input,
+              username,
+              studentId: `77${String(Date.now()).slice(-7)}${index}`,
+              email: '',
+              password,
+            })
+            assert.equal(response.status, 201, response.text)
+            userIds.push(response.body.user.id)
+            const loggedIn = await post('login', { username, password })
+            assert.equal(loggedIn.status, 200, loggedIn.text)
+            assert.equal(loggedIn.body.user.id, response.body.user.id)
+          }
+          assert.equal(
+            (await post('register', { ...input, email: '', password: '12345' })).status,
+            400,
+          )
+        },
+      )
+
       await t.test('invalid organization and missing registration code are rejected', async () => {
         assert.equal(
           (await post('email/code', { email, purpose: 'REGISTER' }, undefined, randomUUID()))

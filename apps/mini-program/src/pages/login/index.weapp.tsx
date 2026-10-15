@@ -80,7 +80,7 @@ function RecoveryDialog({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const reset = async () => {
-    if (!name.trim() || !studentId.trim() || password.length < 8 || submitting) return
+    if (!name.trim() || !studentId.trim() || Array.from(password).length < 6 || submitting) return
     setSubmitting(true)
     setError('')
     try {
@@ -138,14 +138,16 @@ function RecoveryDialog({ onClose }: { onClose: () => void }) {
             className="auth-input"
             password
             value={password}
-            placeholder="至少 8 位密码"
+            placeholder="至少 6 位密码"
             onInput={(event) => setPassword(event.detail.value)}
           />
           {error && <Text className="native-recovery__error">{error}</Text>}
           <Button
             className="auth-secondary"
             loading={submitting}
-            disabled={!name.trim() || !studentId.trim() || password.length < 8 || submitting}
+            disabled={
+              !name.trim() || !studentId.trim() || Array.from(password).length < 6 || submitting
+            }
             onClick={() => void reset()}
           >
             重置密码

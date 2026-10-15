@@ -31,3 +31,12 @@ test('mismatched passwords and supplied malformed mail are reported on their fie
   assert.ok(registrationErrors({ ...valid, confirmPassword: 'different' }).confirmPassword)
   assert.ok(registrationErrors({ ...valid, email: 'bad-email' }).email)
 })
+
+test('passwords accept any six characters and reject five without trimming or mixing requirements', () => {
+  for (const password of ['123456', 'abcdef', '......', '中文密码六个', '😀😀😀😀😀😀', '      ']) {
+    assert.deepEqual(registrationErrors({ ...valid, password, confirmPassword: password }), {})
+    assert.equal(missingRegistrationMessage({ ...valid, password, confirmPassword: password }), '')
+  }
+  for (const password of ['12345', '😀😀😀😀😀'])
+    assert.ok(registrationErrors({ ...valid, password, confirmPassword: password }).password)
+})
