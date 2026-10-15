@@ -109,14 +109,11 @@
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
-  .profile-person__copy > p,
-  .profile-person__copy > .profile-bio {
+  .profile-person__copy > p {
     margin: 0 0 11px;
     color: #7c8792;
     font-size: 13px;
     line-height: 1.7;
-  }
-  .profile-person__copy > p {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -2256,13 +2253,10 @@
     margin: 0 0 4px;
     gap: 4px 12px;
   }
-  .profile-top .profile-person__copy > p,
-  .profile-top .profile-person__copy > .profile-bio {
+  .profile-top .profile-person__copy > p {
     margin: 0;
     font-size: 12px;
     line-height: 1.5;
-  }
-  .profile-top .profile-person__copy > p {
     -webkit-line-clamp: 1;
   }
   .profile-top .profile-person__stats {
