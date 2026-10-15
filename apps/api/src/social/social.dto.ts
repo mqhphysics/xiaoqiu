@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { Transform } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -11,8 +13,10 @@ import {
   IsString,
   IsUUID,
   Length,
+  ValidateNested,
 } from 'class-validator'
 import { BADGE_KINDS, type BadgeKind } from './badge-preference.rules'
+import { HUB_STRIP_KINDS, HUB_STRIP_MAX_ITEMS } from './hub-strip-order.rules'
 
 export class UpdateBadgePreferenceDto {
   @ApiProperty({ nullable: true, enum: BADGE_KINDS })
@@ -26,6 +30,25 @@ export class UpdateBadgePreferenceDto {
   @IsString()
   @Length(8, 120)
   clientActionId!: string
+}
+
+export class HubStripOrderItemDto {
+  @ApiProperty({ enum: HUB_STRIP_KINDS })
+  @IsIn([...HUB_STRIP_KINDS])
+  kind!: (typeof HUB_STRIP_KINDS)[number]
+
+  @ApiProperty({ type: String, format: 'uuid' })
+  @IsUUID()
+  id!: string
+}
+
+export class UpdateHubStripOrderDto {
+  @ApiProperty({ type: [HubStripOrderItemDto] })
+  @IsArray()
+  @ArrayMaxSize(HUB_STRIP_MAX_ITEMS)
+  @ValidateNested({ each: true })
+  @Type(() => HubStripOrderItemDto)
+  items!: HubStripOrderItemDto[]
 }
 
 const POSITIONS = ['GOALKEEPER', 'DEFENDER', 'MIDFIELDER', 'FORWARD'] as const

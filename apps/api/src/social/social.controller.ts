@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { getRequestId, type RequestWithId } from '../common/request-context'
 import { MessagingService } from './messaging.service'
 import { BadgePreferenceService } from './badge-preference.service'
+import { HubStripOrderService } from './hub-strip-order.service'
 import {
   CreateDirectMessageDto,
   CreateReportDto,
@@ -27,6 +28,7 @@ import {
   UpdateTeamProfileDto,
   TeamManagementCommandDto,
   UpdateBadgePreferenceDto,
+  UpdateHubStripOrderDto,
 } from './social.dto'
 import { SocialService } from './social.service'
 
@@ -38,6 +40,7 @@ export class SocialController {
     @Inject(SocialService) private readonly socialService: SocialService,
     @Inject(MessagingService) private readonly messagingService: MessagingService,
     @Inject(BadgePreferenceService) private readonly badgePreference: BadgePreferenceService,
+    @Inject(HubStripOrderService) private readonly hubStripOrder: HubStripOrderService,
   ) {}
 
   @Get('me/profile-badge')
@@ -55,6 +58,23 @@ export class SocialController {
     @Req() request: RequestWithId,
   ) {
     return this.badgePreference.update(authorization, input, getRequestId(request))
+  }
+
+  @Get('me/hub-strip-order')
+  @ApiOperation({ summary: '读取主队条关注球队与球员的排列顺序' })
+  hubStripOrderGet(@Headers('authorization') authorization: string | undefined) {
+    return this.hubStripOrder.get(authorization)
+  }
+
+  @Put('me/hub-strip-order')
+  @ApiOperation({ summary: '保存主队条关注排列，主队固定最前且不写入本列表' })
+  @ApiBody({ type: UpdateHubStripOrderDto })
+  hubStripOrderPut(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() input: UpdateHubStripOrderDto,
+    @Req() request: RequestWithId,
+  ) {
+    return this.hubStripOrder.update(authorization, input, getRequestId(request))
   }
 
   @Get('me/player-follows')
