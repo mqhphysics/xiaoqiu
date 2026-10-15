@@ -19,7 +19,7 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 1200px;
   min-height: 100vh;
 }
 
@@ -743,102 +743,4 @@ button:disabled {
   margin: 0;
   color: #6b776f;
   font-size: 13px;
-}
-
-@media (max-width: 1024px) {
-  .roster-review-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .roster-detail-panel {
-    position: static;
-  }
-
-  .roster-toolbar {
-    grid-template-columns: minmax(240px, 1fr) minmax(0, 1fr) 38px;
-  }
-}
-
-@media (max-width: 700px) {
-  .roster-toolbar,
-  .roster-filter-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .roster-mode-note {
-    align-items: flex-start;
-  }
-
-  .roster-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .roster-summary-item:nth-child(2) {
-    border-right: 0;
-  }
-
-  .roster-summary-item:nth-child(-n + 2) {
-    border-bottom: 1px solid #dfe4df;
-  }
-
-  .roster-segmented-control {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .roster-segmented-control button,
-  .roster-segmented-control button:first-of-type,
-  .roster-segmented-control button:last-of-type {
-    border: 1px solid #bfc8c1;
-    border-radius: 0;
-  }
-
-  .roster-segmented-control button:nth-of-type(1) {
-    border-radius: 6px 0 0 0;
-  }
-
-  .roster-segmented-control button:nth-of-type(2) {
-    border-radius: 0 6px 0 0;
-  }
-
-  .roster-segmented-control button:nth-of-type(3) {
-    border-radius: 0 0 0 6px;
-  }
-
-  .roster-segmented-control button:nth-of-type(4) {
-    border-radius: 0 0 6px 0;
-  }
-
-  .roster-facts,
-  .import-summary {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 960px) {
-  .admin-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-nav {
-    position: static;
-  }
-
-  .summary-grid,
-  .form-grid,
-  .two-column {
-    grid-template-columns: 1fr;
-  }
-
-  .wide-field {
-    grid-column: auto;
-  }
-
-  .workspace-header {
-    display: grid;
-  }
-
-  .compact-field {
-    width: auto;
-  }
 }
