@@ -36,7 +36,6 @@ import { readSession } from '../../features/product/session'
 import { loadHomeWithEmptyState, type HomeLoadState } from '../../features/product/home-loading'
 import { tournamentHeroSlides } from './home-announcements'
 import { alternatingColumns } from './home-feed-layout'
-import { HomeTop } from './home-top'
 import './home-desktop'
 import {
   ANNOUNCEMENTS_DIALOG_SUPPORTED,
@@ -551,13 +550,27 @@ function HomeContent({
   return (
     // 首页 is the one desktop page that scrolls as a document (no xq-viewport-page).
     <View className="home-page">
-      <HomeTop
-        data={data}
-        onOpenPost={(postId) => void goToPost(postId)}
-        onOpenSchedule={() => void goToSchedule(data.tournament.id)}
-      />
       <View className="experience-hero">
-        <View className="experience-hero__copy">
+        {/* Desktop (≥721px): the season 总公告 replaces the classic copy; mobile keeps the classic copy. */}
+        <View className="experience-hero__copy hero-season">
+          <Text className="hero-season__season">{data.tournament.seasonName}</Text>
+          <Text className="hero-season__title">
+            {data.tournament.name}
+            <Text className="hero-season__hot">火热进行中</Text>
+          </Text>
+          <View className="hero-season__line">
+            <Text>
+              {data.tournament.teamCount} 支球队 · {data.tournament.matchCount} 场比赛
+            </Text>
+            <Button
+              className="hero-season__link"
+              onClick={() => void goToSchedule(data.tournament.id)}
+            >
+              查看赛程 →
+            </Button>
+          </View>
+        </View>
+        <View className="experience-hero__copy hero-classic">
           <Text className="experience-hero__eyebrow">{data.tournament.name}</Text>
           <Text
             className={`experience-hero__title ${
@@ -590,6 +603,12 @@ function HomeContent({
               }
             : {})}
         />
+        {heroAnnouncement && (
+          <View className="hero-caption" aria-hidden="true">
+            <Text className="hero-caption__title">{heroAnnouncement.title || '赛事公告'}</Text>
+            <Text className="hero-caption__summary">{oneLine(heroAnnouncement.body ?? '')}</Text>
+          </View>
+        )}
       </View>
 
       <HomeSearch

@@ -173,10 +173,18 @@
     overflow: hidden;
     border-radius: 8px;
   }
-  .home-page .community-feed--masonry .post-card--home:nth-child(3n + 2) .post-card__collage--1 .post-card__image {
+  .home-page
+    .community-feed--masonry
+    .post-card--home:nth-child(3n + 2)
+    .post-card__collage--1
+    .post-card__image {
     aspect-ratio: 1 / 1;
   }
-  .home-page .community-feed--masonry .post-card__collage--1 .post-card__image .taro-img__mode-aspectfill {
+  .home-page
+    .community-feed--masonry
+    .post-card__collage--1
+    .post-card__image
+    .taro-img__mode-aspectfill {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover;
@@ -249,5 +257,146 @@
   }
   .home-page .experience-hero .experience-hero__action {
     margin-top: 8px;
+  }
+}
+
+/* Round 6b — slanted hero kept; left copy is the season 总公告, right carousel carries an
+   overlaid one-line caption (no box). Mobile keeps the classic copy. */
+.experience-hero__copy.hero-season {
+  display: none;
+}
+@media (min-width: 721px) {
+  .experience-hero__copy.hero-classic {
+    display: none;
+  }
+  .home-page > .experience-hero {
+    height: 280px;
+    min-height: 0;
+  }
+  .home-page .experience-hero .experience-hero__media,
+  .home-page .experience-hero .hero-carousel {
+    grid-row: 1;
+    grid-column: 2;
+    min-height: 0;
+    height: 100%;
+  }
+  .home-page .experience-hero .experience-hero__copy.hero-season {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .experience-hero__copy.hero-season {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 40px 0 44px;
+  }
+  .hero-season__tag {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-season__seal {
+    padding: 3px 10px;
+    color: #8a5a12;
+    background: #f6e7bf;
+    border: 1px solid #e4c983;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+  .hero-season__season {
+    display: block;
+    color: #ad6244;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .hero-season__title {
+    display: block;
+    margin-top: 12px;
+    color: #173f29;
+    font-size: clamp(38px, 3.6vw, 50px);
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .hero-season__line {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-top: 18px;
+    white-space: nowrap;
+    color: #5b6b60;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .hero-season__link {
+    display: inline-flex;
+    align-items: center;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    color: #1f5a3a;
+    background: none;
+    border: 0;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.4;
+    cursor: pointer;
+    &::after {
+      display: none;
+    }
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* Caption sits in the media cell, follows the same diagonal, never blocks clicks. */
+  .hero-caption {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    grid-row: 1;
+    grid-column: 2;
+    flex-direction: column;
+    align-self: end;
+    gap: 4px;
+    min-width: 0;
+    padding: 56px 150px 18px 13%;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(10, 28, 18, 0) 0%,
+      rgba(10, 28, 18, 0.5) 45%,
+      rgba(10, 28, 18, 0.74) 100%
+    );
+    /* matches the media's 9% diagonal at this height (caption ≈ 46% of the hero) */
+    clip-path: polygon(4.2% 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .hero-caption__title,
+  .hero-caption__summary {
+    display: block;
+    overflow: hidden;
+    color: #fff;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  }
+  .hero-caption__title {
+    font-size: 18px;
+    font-weight: 750;
+  }
+  .hero-caption__summary {
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 13px;
+  }
+}
+@media (min-width: 721px) {
+  .hero-season__hot {
+    display: block;
+    color: #c9653b;
   }
 }
