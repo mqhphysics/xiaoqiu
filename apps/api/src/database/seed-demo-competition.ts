@@ -37,15 +37,18 @@ export interface SeedTournamentFixture {
 
 export const DEMO_STARTERS_PER_TEAM = 8
 
+/** 八人制 3-3-1: GK + 3 DF + 3 MF + 1 FW. Skip backup GK (1) and spare DF (5). */
+const DEMO_STARTER_INDEXES = new Set([0, 2, 3, 4, 6, 7, 8, 10])
+
 export function isDemoMatchStarter(playerIndex: number): boolean {
-  return playerIndex < DEMO_STARTERS_PER_TEAM
+  return DEMO_STARTER_INDEXES.has(playerIndex)
 }
 
 export function getDemoMinutesPlayed(playerIndex: number, matchMinutes: number): number {
-  if (playerIndex < 6) return matchMinutes
   const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
-  if (playerIndex < 8) return substitutionMinute
-  if (playerIndex < 10) return matchMinutes - substitutionMinute
+  if (playerIndex === 7 || playerIndex === 8) return substitutionMinute
+  if (playerIndex === 9 || playerIndex === 11) return matchMinutes - substitutionMinute
+  if (isDemoMatchStarter(playerIndex)) return matchMinutes
   return 0
 }
 
@@ -525,22 +528,18 @@ async function seedMatchFacts(
   await tx.matchAppearance.createMany({
     data: teamIndexes.flatMap((teamIndex) => {
       const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
-      return players.flatMap((player, index) => {
+      return players.map((player, index) => {
         const minutesPlayed = getDemoMinutesPlayed(index, matchMinutes)
-        return minutesPlayed > 0
-          ? [
-              {
-                id: fixtureId(`appearance:${definition.code}:${player.id}`),
-                organizationId,
-                matchId,
-                teamId: teams[teamIndex]!.id,
-                playerId: player.id,
-                shirtNumber: player.shirtNumber,
-                starter: isDemoMatchStarter(index),
-                minutesPlayed,
-              },
-            ]
-          : []
+        return {
+          id: fixtureId(`appearance:${definition.code}:${player.id}`),
+          organizationId,
+          matchId,
+          teamId: teams[teamIndex]!.id,
+          playerId: player.id,
+          shirtNumber: player.shirtNumber,
+          starter: isDemoMatchStarter(index),
+          minutesPlayed,
+        }
       })
     }),
   })
@@ -552,9 +551,13 @@ async function seedMatchFacts(
   ]
   for (const pair of scorePairs) {
     const players = DEMO_PLAYERS.filter((player) => player.teamIndex === pair.teamIndex)
+    const onPitch = players.filter((_, index) => getDemoMinutesPlayed(index, matchMinutes) > 0)
     for (let goalIndex = 0; goalIndex < pair.score; goalIndex += 1) {
-      const scorer = players[4 + ((matchIndex + goalIndex) % 6)]!
-      const assister = players[6 + ((matchIndex + goalIndex * 2) % 4)]!
+      const scorer = onPitch[(matchIndex + goalIndex * 2) % onPitch.length]!
+      const assister =
+        onPitch[(matchIndex + goalIndex * 2 + 3) % onPitch.length]!.id === scorer.id
+          ? onPitch[(matchIndex + goalIndex * 2 + 4) % onPitch.length]!
+          : onPitch[(matchIndex + goalIndex * 2 + 3) % onPitch.length]!
       const minute = Math.min(
         matchMinutes,
         12 +
@@ -591,6 +594,30 @@ async function seedMatchFacts(
     description: `${cardPlayer.displayName}战术犯规`,
     sortOrder: events.length,
   })
+
+  const substitutionMinute = Math.floor((matchMinutes * 2) / 3)
+  for (const teamIndex of teamIndexes) {
+    const players = DEMO_PLAYERS.filter((player) => player.teamIndex === teamIndex)
+    for (const [offIndex, onIndex] of [
+      [7, 9],
+      [8, 11],
+    ] as const) {
+      const leaving = players[offIndex]!
+      const entering = players[onIndex]!
+      events.push({
+        id: fixtureId(`event:${definition.code}:sub:${teamIndex}:${offIndex}`),
+        organizationId,
+        matchId,
+        teamId: teams[teamIndex]!.id,
+        playerId: leaving.id,
+        relatedPlayerId: entering.id,
+        type: MatchEventType.SUBSTITUTION,
+        minute: substitutionMinute,
+        description: `${entering.displayName}换上，${leaving.displayName}换下`,
+        sortOrder: events.length,
+      })
+    }
+  }
 
   await tx.matchEvent.createMany({ data: events.sort((left, right) => left.minute - right.minute) })
 }

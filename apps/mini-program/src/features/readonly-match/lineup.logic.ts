@@ -129,6 +129,78 @@ export function lineupGroups(lineup: MatchLineup) {
   }
 }
 
+export function unavailableReason(player: MatchLineup['players'][number]): string {
+  if (player.position === 'GOALKEEPER') return '受伤'
+  return '停赛'
+}
+
+/** Unused backup keepers and unused last forwards are shown in 伤停, not the bench. */
+export function lineupSections(lineup: MatchLineup) {
+  const { starters, substitutes } = lineupGroups(lineup)
+  const unavailable = substitutes.filter(
+    (player) =>
+      player.minutesPlayed === 0 &&
+      (player.position === 'GOALKEEPER' || player.shirtNumber === '18'),
+  )
+  const unavailableIds = new Set(unavailable.map((player) => player.id))
+  return {
+    starters,
+    bench: substitutes.filter((player) => !unavailableIds.has(player.id)),
+    unavailable,
+  }
+}
+
+function emptyEvents(): PlayerMatchEvents {
+  return {
+    goals: [],
+    assists: [],
+    ownGoals: [],
+    yellowCards: [],
+    redCards: [],
+    on: [],
+    off: [],
+  }
+}
+
+function cloneEvents(events: PlayerMatchEvents): PlayerMatchEvents {
+  return {
+    goals: [...events.goals],
+    assists: [...events.assists],
+    ownGoals: [...events.ownGoals],
+    yellowCards: [...events.yellowCards],
+    redCards: [...events.redCards],
+    on: [...events.on],
+    off: [...events.off],
+  }
+}
+
+/** When substitution events are missing, recover on/off minutes from recorded playing time. */
+export function mergeAppearanceEvents(
+  recorded: Map<string, PlayerMatchEvents>,
+  lineup: MatchLineup,
+): Map<string, PlayerMatchEvents> {
+  const result = new Map<string, PlayerMatchEvents>()
+  for (const [id, events] of recorded) result.set(id, cloneEvents(events))
+  const full = Math.max(90, ...lineup.players.map((player) => player.minutesPlayed ?? 0)) || 90
+  for (const player of lineup.players) {
+    if (player.minutesPlayed === null || player.minutesPlayed <= 0) continue
+    const current = result.get(player.id) ?? emptyEvents()
+    if (player.starter && player.minutesPlayed < full && current.off.length === 0)
+      current.off.push(`${player.minutesPlayed}′`)
+    if (!player.starter && current.on.length === 0)
+      current.on.push(`${Math.max(1, full - player.minutesPlayed)}′`)
+    result.set(player.id, current)
+  }
+  return result
+}
+
+export function eventSide(
+  event: Pick<MatchEvent, 'team'>,
+  homeTeamId: string | null | undefined,
+): 'home' | 'away' {
+  return homeTeamId && event.team.id === homeTeamId ? 'home' : 'away'
+}
+
 export function lineupHasAppearances(lineup: MatchLineup): boolean {
   return lineup.appearanceRecorded ?? lineup.lineupSource !== 'CONFIRMED_MATCH_LINEUP'
 }

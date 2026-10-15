@@ -198,17 +198,19 @@ export function MatchContent({
       )}
 
       {!editor?.editing && activeTab === 'ratings' && (
-        <RatingsPanel
-          body={reviewBody}
-          isFinished={isFinished}
-          match={match}
-          rating={rating}
-          submitting={submitting}
-          onBodyChange={setReviewBody}
-          onRatingChange={setRating}
-          onSubmitRating={() => void submitReview('rating')}
-          onSubmitComment={() => submitReview('comment')}
-        />
+        <>
+          <RatingsPanel
+            body={reviewBody}
+            isFinished={isFinished}
+            match={match}
+            rating={rating}
+            submitting={submitting}
+            onBodyChange={setReviewBody}
+            onRatingChange={setRating}
+            onSubmitRating={() => void submitReview('rating')}
+            onSubmitComment={() => submitReview('comment')}
+          />
+        </>
       )}
 
       {editor?.editing ? (
