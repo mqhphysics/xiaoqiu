@@ -9,6 +9,7 @@ import process from 'node:process'
 import { URL } from 'node:url'
 
 const require = createRequire(import.meta.url)
+const sharp = createRequire(resolve('apps/api/package.json'))('sharp')
 const { chromium } = require(process.env.CURSOR_PLAYWRIGHT_MODULE || 'playwright')
 const output = resolve(process.argv[2] || '.cursor-review')
 await mkdir(output, { recursive: true })
@@ -25,6 +26,7 @@ const browser = await chromium.launch({
 const checks = []
 const failures = []
 const httpErrors = []
+const animationPixels = []
 const types = {
   '.js': 'application/javascript',
   '.css': 'text/css',
@@ -184,14 +186,51 @@ try {
         await page.waitForFunction(() =>
           document.documentElement.classList.contains('xq-cursor-loading'),
         )
-        const first = await page
-          .locator('.xq-loading-rotor')
-          .evaluate((e) => getComputedStyle(e).transform)
-        await page.waitForTimeout(100)
-        const second = await page
-          .locator('.xq-loading-rotor')
-          .evaluate((e) => getComputedStyle(e).transform)
-        assert.notEqual(first, second)
+        assert.equal(
+          await page.locator('.xq-loading-ring').evaluate((e) => getComputedStyle(e).transform),
+          'none',
+        )
+        const first = await sharp(
+          await page
+            .locator('#xq-cursor-loading')
+            .screenshot({ path: resolve(output, `${name}-frame-a.png`) }),
+        )
+          .ensureAlpha()
+          .raw()
+          .toBuffer()
+        await page.waitForTimeout(240)
+        const second = await sharp(
+          await page
+            .locator('#xq-cursor-loading')
+            .screenshot({ path: resolve(output, `${name}-frame-b.png`) }),
+        )
+          .ensureAlpha()
+          .raw()
+          .toBuffer()
+        let changedGreen = 0,
+          changedOrange = 0,
+          orangePixels = 0
+        const orange = (data, offset) =>
+          data[offset] > 140 &&
+          data[offset] > data[offset + 1] * 1.25 &&
+          data[offset + 1] > data[offset + 2] * 1.1
+        for (let offset = 0; offset < first.length; offset += 4) {
+          const firstOrange = orange(first, offset),
+            secondOrange = orange(second, offset)
+          if (firstOrange) orangePixels++
+          if (firstOrange !== secondOrange) changedOrange++
+          if (
+            !firstOrange &&
+            !secondOrange &&
+            Math.abs(first[offset] - second[offset]) > 12 &&
+            first[offset + 1] > first[offset]
+          )
+            changedGreen++
+        }
+        assert.ok(orangePixels > 2, 'upper-right accent is visible')
+        assert.equal(changedOrange, 0, 'orange accent stays at exactly the same pixels')
+        assert.ok(changedGreen > 3, 'dark color progresses across the fixed green segments')
+        animationPixels.push({ skin: name, orangePixels, changedOrange, changedGreen })
         assert.equal(
           await page
             .locator('#xq-cursor-loading')
@@ -223,7 +262,7 @@ try {
       }
     }
     checks.push(
-      'All 18 cursor skins: visible native PNGs, semantic states, busy/progress rotation, pointer-transparent overlays',
+      'All 18 cursor skins: visible native PNGs; dark segments change while upper-right orange pixels remain fixed; pointer-transparent overlays',
     )
 
     const cell = page.locator('[data-test-cursor="hand"]')
@@ -277,7 +316,7 @@ try {
     await page.emulateMedia({ reducedMotion: 'no-preference' })
 
     // A failed animated image must never leave cursor:none without a visible replacement.
-    await page.locator('#xq-cursor-loading .xq-loading-rotor img').evaluate((e) => {
+    await page.locator('#xq-cursor-loading .xq-loading-ring img').evaluate((e) => {
       e.src = 'data:image/png,invalid'
     })
     await page.locator('.art-login__primary').evaluate((e) => e.setAttribute('aria-busy', 'true'))
@@ -344,9 +383,11 @@ try {
   assert.deepEqual(failures, [])
   await writeFile(
     resolve(output, before ? 'before-checks.json' : 'browser-checks.json'),
-    JSON.stringify({ built, checks, pageErrors: failures, httpErrors }, null, 2),
+    JSON.stringify({ built, checks, pageErrors: failures, httpErrors, animationPixels }, null, 2),
   )
-  process.stdout.write(JSON.stringify({ checks, pageErrors: failures, httpErrors }, null, 2) + '\n')
+  process.stdout.write(
+    JSON.stringify({ checks, pageErrors: failures, httpErrors, animationPixels }, null, 2) + '\n',
+  )
 } catch (error) {
   for (const context of browser.contexts())
     for (const page of context.pages()) {

@@ -34,7 +34,7 @@ import zoomInUrl1 from '../../assets/login-art/cursors/zoom-in-32.png'
 import zoomInUrl2 from '../../assets/login-art/cursors/zoom-in-32@2x.png'
 import zoomOutUrl1 from '../../assets/login-art/cursors/zoom-out-32.png'
 import zoomOutUrl2 from '../../assets/login-art/cursors/zoom-out-32@2x.png'
-import loadingRingUrl from '../../assets/login-art/cursors/loading-ring.svg'
+import loadingRingUrl from '../../assets/login-art/cursors/loading-ring-animated.svg'
 import { cursorMorphPath } from './morph.h5'
 
 /**
@@ -161,13 +161,12 @@ export function mountCursorSkin(): () => void {
     #xq-cursor-loading { position: fixed; left: 0; top: 0; width: 48px; height: 40px;
       pointer-events: none; z-index: 2147483647; display: none; }
     #xq-cursor-loading .xq-loading-arrow { display: none; width: 32px; height: 32px; }
-    #xq-cursor-loading .xq-loading-rotor { position: absolute; left: 0; top: 0;
-      width: 32px; height: 32px; animation: xq-cursor-spin 1.2s linear infinite; }
-    #xq-cursor-loading .xq-loading-rotor img { display: block; width: 100%; height: 100%; }
+    #xq-cursor-loading .xq-loading-ring { position: absolute; left: 0; top: 0;
+      width: 32px; height: 32px; }
+    #xq-cursor-loading .xq-loading-ring img { display: block; width: 100%; height: 100%; }
     #xq-cursor-loading[data-skin="progress"] .xq-loading-arrow { display: block; }
-    #xq-cursor-loading[data-skin="progress"] .xq-loading-rotor {
+    #xq-cursor-loading[data-skin="progress"] .xq-loading-ring {
       left: 23px; top: 15px; width: 23px; height: 23px; }
-    @keyframes xq-cursor-spin { to { transform: rotate(360deg); } }
   `
   document.head.append(style)
   const overlay = document.createElement('div')
@@ -176,7 +175,7 @@ export function mountCursorSkin(): () => void {
   // Static internal SVG; no user content is interpolated here.
   overlay.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 72 72">
     <path data-outline fill="#e4ede5" stroke="#173f35" stroke-linecap="round" stroke-linejoin="round"/>
-    <path data-fold d="M4.3 21.7 8.3 18.7 8.3 26.5Z" fill="#ce7e6b"/>
+    <image data-arrow href="${arrowUrl2}" x="-2" y="-2" width="32" height="32"/>
     <g data-seams fill="none" stroke="#173f35" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
       <path d="M0-4.3 4.05-1.35 2.5 3.3h-5l-1.55-4.65Z"/>
       <path d="M0-4.3v-6.2m4.05 9.15 5.55-1.85m-7.1 6.5 3.7 5.2m-8.7-5.2-3.7 5.2m2.15-9.85L-9.6-3.2"/>
@@ -189,15 +188,15 @@ export function mountCursorSkin(): () => void {
   loadingArrow.className = 'xq-loading-arrow'
   loadingArrow.src = arrowUrl1
   loadingArrow.alt = ''
-  const rotor = document.createElement('div')
-  rotor.className = 'xq-loading-rotor'
+  const ringBox = document.createElement('div')
+  ringBox.className = 'xq-loading-ring'
   const ring = new Image()
   ring.alt = ''
-  rotor.append(ring)
-  loading.append(loadingArrow, rotor)
+  ringBox.append(ring)
+  loading.append(loadingArrow, ringBox)
   document.body.append(loading)
   const outline = overlay.querySelector<SVGPathElement>('[data-outline]')!
-  const fold = overlay.querySelector<SVGPathElement>('[data-fold]')!
+  const originalArrow = overlay.querySelector<SVGImageElement>('[data-arrow]')!
   const seams = overlay.querySelector<SVGGElement>('[data-seams]')!
   let target: Element | null = null
   let zone: Zone = null
@@ -260,7 +259,8 @@ export function mountCursorSkin(): () => void {
     outline.setAttribute('d', cursorMorphPath(value))
     outline.setAttribute('stroke-width', String(2.4 - value * 1.3))
     outline.setAttribute('fill-opacity', String(1 - value))
-    fold.setAttribute('opacity', String(Math.max(0, 1 - value * 2)))
+    outline.setAttribute('opacity', String(Math.min(1, value * 3)))
+    originalArrow.setAttribute('opacity', String(Math.max(0, 1 - value * 2.5)))
     seams.setAttribute('opacity', String(Math.max(0, (value - 0.2) / 0.8)))
     overlay.dataset.progress = value.toFixed(3)
   }
