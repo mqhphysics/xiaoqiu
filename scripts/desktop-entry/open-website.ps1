@@ -1,5 +1,5 @@
-[CmdletBinding()]
-param()
+﻿[CmdletBinding()]
+param([switch]$NoBrowser)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
@@ -46,7 +46,7 @@ try {
   }
 
   Write-Host '正在打开晓球网站……' -ForegroundColor Cyan
-  Write-Host '将依次准备 Docker、数据库、API 和网站，首次启动可能需要几分钟。'
+  Write-Host '将检查本机服务并准备网站，已运行的健康服务会复用；首次编译可能需要几分钟。'
   Write-Host '日常启动会保留现有数据。请等浏览器自动打开。'
   Write-Host ''
 
@@ -57,16 +57,24 @@ try {
     throw "服务启动失败（退出码 $LASTEXITCODE），上方是具体错误。"
   }
 
-  Start-Process 'http://127.0.0.1:3000/'
-  Write-Host '网站已打开。服务在后台运行，可以关闭此窗口。' -ForegroundColor Green
+  if (-not $NoBrowser) {
+    Start-Process 'http://127.0.0.1:3000/'
+    Write-Host '网站已打开。服务在后台运行，可以关闭此窗口。' -ForegroundColor Green
+  } else {
+    Write-Host '网站已就绪：http://127.0.0.1:3000/（本次未打开浏览器）。' -ForegroundColor Green
+  }
 } catch {
   $exitCode = 1
   Write-Host ''
   Write-Host ('启动未完成：' + $_.Exception.Message) -ForegroundColor Red
-  Write-Host '如果 Docker 未就绪，请手动打开 Docker Desktop，等它显示正在运行后，再双击启动文件。'
   Write-Host ('启动日志：' + $logDirectory)
   if ($repoRoot) {
-    Write-Host ('服务日志：' + (Join-Path $repoRoot 'private-data\runtime'))
+    $serviceLogDirectory = if (Test-Path -LiteralPath (Join-Path $repoRoot 'private-data\shared-runtime\config.json')) {
+      Join-Path $repoRoot 'private-data\shared-runtime'
+    } else {
+      Join-Path $repoRoot 'private-data\runtime'
+    }
+    Write-Host ('服务日志：' + $serviceLogDirectory)
   }
 } finally {
   if ($transcribing) { Stop-Transcript | Out-Null }

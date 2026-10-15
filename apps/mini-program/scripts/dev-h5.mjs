@@ -2,6 +2,7 @@
 // Production navigation measurements use `npm run build:h5` and then `npm run serve:h5`.
 import { spawn, spawnSync } from 'node:child_process'
 import console from 'node:console'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import net from 'node:net'
 import { dirname, resolve } from 'node:path'
@@ -44,9 +45,23 @@ try {
 
 const repoRoot = resolve(appRoot, '../..')
 console.log('构建管理中心，供网站 /admin/ 使用')
+// Windows cannot execute npm.cmd directly through spawnSync (EINVAL).
+// Run npm's JavaScript entry with Node so paths never pass through a shell.
+const windows = process.platform === 'win32'
+const npmFromEnvironment = process.env.npm_execpath
+const npmCli = npmFromEnvironment && /[\\/]npm-cli\.js$/i.test(npmFromEnvironment)
+  ? npmFromEnvironment
+  : resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
+if (windows && !existsSync(npmCli)) {
+  console.error('无法找到 npm 启动文件，请确认 Node.js 和 npm 安装完整。')
+  process.exit(1)
+}
 const adminBuild = spawnSync(
-  process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['--prefix', resolve(repoRoot, 'apps/admin-web'), 'run', 'build', '--', '--base', '/admin/'],
+  windows ? process.execPath : 'npm',
+  [
+    ...(windows ? [npmCli] : []),
+    '--prefix', resolve(repoRoot, 'apps/admin-web'), 'run', 'build', '--', '--base', '/admin/',
+  ],
   {
     cwd: repoRoot,
     stdio: 'inherit',
@@ -61,6 +76,7 @@ const adminBuild = spawnSync(
   },
 )
 if (adminBuild.status !== 0) {
+  if (adminBuild.error) console.error(adminBuild.error.message)
   console.error('管理中心构建失败，已停止网站启动。')
   process.exit(adminBuild.status ?? 1)
 }
