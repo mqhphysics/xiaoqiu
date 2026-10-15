@@ -16,7 +16,7 @@
   gap: 19px;
 }
 
-.public-team-hero__identity > :last-child {
+.public-team-hero__copy {
   min-width: 0;
   flex: 1;
 }
@@ -298,7 +298,7 @@
   }
 
   .public-roster__player,
-  .public-roster__row > :nth-child(3) {
+  .public-roster__position {
     min-width: 0;
     overflow-wrap: anywhere;
   }

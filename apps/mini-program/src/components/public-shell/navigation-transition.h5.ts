@@ -1,5 +1,7 @@
 import type { NavigationSection } from './navigation-transition.types'
 
+import './page-motion.h5.scss'
+
 interface TeamFocusState extends Keyframe {
   transform: string
   opacity: string

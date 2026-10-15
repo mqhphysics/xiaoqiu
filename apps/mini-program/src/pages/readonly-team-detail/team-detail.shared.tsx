@@ -174,7 +174,7 @@ function TeamContent({
       >
         <View className="public-team-hero__identity">
           <TeamCrest team={data.team} size="large" />
-          <View>
+          <View className="public-team-hero__copy">
             <Text className="public-team-hero__eyebrow">
               {data.team.teamCode} · {data.team.groupName}
             </Text>
@@ -360,7 +360,7 @@ function TeamContent({
                         <Text>{player.displayName}</Text>
                       </PersonTrigger>
                     </View>
-                    <Text>
+                    <Text className="public-roster__position">
                       {positionLabel(player.position)} · {player.academicYear}
                       {Taro.getEnv() === Taro.ENV_TYPE.WEB ? (
                         <Text className="public-roster__source">

@@ -72,7 +72,6 @@ export function PublicShell({
   headerSearch,
   onActiveReselect,
   tournamentId,
-  source,
   showBack = false,
   children,
 }: PublicShellProps) {
@@ -103,6 +102,7 @@ export function PublicShell({
   // Shared viewport-fit primitive: publish the sticky header height so pages can use
   // --xq-vh-avail (effective viewport height after scale C minus the header).
   useEffect(() => {
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return
     const topbar = shellRef.current?.querySelector('.public-topbar')
     if (!topbar || typeof ResizeObserver === 'undefined') return
     const publish = () =>
@@ -520,7 +520,10 @@ function normalizePath(path: string): string {
 
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    Taro.getEnv() === Taro.ENV_TYPE.WEB &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
 }
 
@@ -528,6 +531,7 @@ function isDesktopH5(): boolean {
   return (
     Taro.getEnv() === Taro.ENV_TYPE.WEB &&
     typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
     window.matchMedia('(min-width: 721px)').matches
   )
 }
