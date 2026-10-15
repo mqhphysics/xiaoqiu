@@ -450,6 +450,12 @@ export function PublicShell({
                 ? { onTouchStart: () => prefetchSection(item.key) }
                 : {})}
             >
+              {Taro.getEnv() === Taro.ENV_TYPE.WEAPP && (
+                <View
+                  aria-hidden="true"
+                  className={`mobile-tabbar__icon mobile-tabbar__icon--${item.key}`}
+                />
+              )}
               <Text className="mobile-tabbar__mark">{item.shortLabel}</Text>
               <Text className="mobile-tabbar__label">{item.label}</Text>
             </Button>
