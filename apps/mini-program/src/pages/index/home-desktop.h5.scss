@@ -1,6 +1,6 @@
 /* Round 4 — 首页 on desktop H5.
    1) 官方公告 is a single line: label · rotating title · 查看详情 (opens the announcements dialog).
-   2) Viewport-fit: hero, 焦点赛事 and the strip stay put; 绿茵动态 fills the rest and scrolls inside. */
+   2) The page scrolls as a document; see the Round 6 block below. */
 @media (min-width: 721px) {
   .home-page > .notice-rail.notice-rail--line {
     display: flex;
@@ -146,103 +146,79 @@
   }
 }
 
-@media (min-width: 1024px) {
-  html:not([data-xq-short]) {
-    .home-page.xq-viewport-page {
-      overflow: visible;
-    }
-    .home-page.xq-viewport-page > .experience-hero {
-      flex: 0 0 auto;
-      height: clamp(226px, calc(var(--xq-vh-avail) * 0.27), 262px);
-      container-type: size;
-      min-height: 0;
-    }
-    .home-page.xq-viewport-page .experience-hero__copy,
-    .home-page.xq-viewport-page .experience-hero__media {
-      height: 100%;
-      min-height: 0;
-    }
-    .home-page.xq-viewport-page .experience-hero__copy {
-      justify-content: center;
-      padding-top: 0;
-      padding-bottom: 0;
-    }
-    .home-page.xq-viewport-page .experience-hero__title {
-      margin-top: 4px;
-      font-size: clamp(26px, calc(var(--xq-vh-avail) * 0.042), 34px);
-    }
-    .home-page.xq-viewport-page .experience-hero__summary {
-      display: block;
-      max-width: min(100%, 560px);
-      margin-top: 10px;
-      -webkit-line-clamp: unset;
-      overflow: visible;
-    }
-    .home-page.xq-viewport-page .experience-hero__action {
-      margin-top: clamp(8px, calc(var(--xq-vh-avail) * 0.02), 18px);
-    }
-    .home-page.xq-viewport-page > .home-product-section .product-section-heading {
-      min-height: 0;
-    }
-    .home-page.xq-viewport-page .focus-match-grid .compact-match {
-      /* Natural height: never clip the venue line. */
-      min-height: 0;
-      height: auto;
-    }
-    .home-page.xq-viewport-page .focus-match-grid .compact-match__stage {
-      overflow: visible;
-      text-overflow: clip;
-    }
-    .home-page.xq-viewport-page > .home-product-section,
-    .home-page.xq-viewport-page > .notice-rail {
-      flex: 0 0 auto;
-      margin-top: 14px;
-    }
-    .home-page.xq-viewport-page > .community-column {
-      flex: 1 1 auto;
-      min-height: 0;
-      margin-top: 14px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
-    }
-    /* Heading and composer share one sticky row so the feed gets the height. */
-    .home-page.xq-viewport-page > .community-column {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-rows: auto auto;
-      align-content: start;
-      column-gap: 24px;
-    }
-    .home-page.xq-viewport-page > .community-column > .product-section-heading {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      align-self: stretch;
-      margin: 0;
-      padding-bottom: 8px;
-      background: #f7f8f4;
-    }
-    .home-page.xq-viewport-page
-      > .community-column
-      > .product-section-heading
-      .product-section-heading__note {
-      display: none;
-    }
-    .home-page.xq-viewport-page > .community-column > .composer-entry {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      align-self: end;
-      min-height: 0;
-      height: 46px;
-      margin: 0 0 8px;
-      box-shadow: 0 0 0 8px #f7f8f4;
-    }
-    .home-page.xq-viewport-page > .community-column > .community-feed {
-      grid-column: 1 / -1;
-      margin-top: 4px;
-    }
+/* Round 6 — 首页 scrolls as a normal document (the only exempt page). Top row → 焦点赛事 →
+   官方公告 → 绿茵动态 heading, composer on its own row, then a balanced masonry feed. */
+@media (min-width: 721px) {
+  .home-page > .home-product-section,
+  .home-page > .notice-rail {
+    margin-top: 18px;
+  }
+  .home-page > .home-product-section {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  /* Masonry cards: cap tall portrait photos so one post never dominates a column. */
+  /* Masonry: single photos always span the card; the seed's alternating ratios give the
+     columns rhythm, but portrait shots are squared so one post never towers over a column. */
+  .home-page .community-feed--masonry .post-card__collage--1 {
+    display: block;
+  }
+  .home-page .community-feed--masonry .post-card--home .post-card__collage--1 .post-card__image {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  .home-page .community-feed--masonry .post-card--home:nth-child(3n + 2) .post-card__collage--1 .post-card__image {
+    aspect-ratio: 1 / 1;
+  }
+  .home-page .community-feed--masonry .post-card__collage--1 .post-card__image .taro-img__mode-aspectfill {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+  }
+  .home-page > .community-column {
+    margin-top: 26px;
+    padding-bottom: 32px;
+  }
+  .home-page > .community-column > .product-section-heading {
+    margin: 0;
+  }
+  .home-page > .community-column > .composer-entry {
+    display: flex;
+    width: 100%;
+    height: 54px;
+    min-height: 0;
+    margin: 12px 0 0;
+  }
+  .home-page .community-feed.community-feed--masonry {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .community-feed__column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  .community-feed--masonry .post-card--home {
+    min-height: 0;
+    margin: 0;
+  }
+  .community-feed--masonry .post-card--home .post-card__body {
+    -webkit-line-clamp: 4;
+  }
+}
+@media (min-width: 721px) and (max-width: 1150px) {
+  .home-page .community-feed.community-feed--masonry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

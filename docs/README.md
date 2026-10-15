@@ -29,7 +29,7 @@
 
 ## 开发、运维与协作
 
-当前日常规则见[根目录 README](../README.md#当前开发规则2026-10-01-起)：网站任务默认只推进 H5；每轮完成检查后自行 commit；推送、合并与部署分别授权。AI 协作者同时遵守根目录 AGENTS。
+协作规则只看根目录 [AGENTS.md](../AGENTS.md)：main 是唯一正式版本，桌面/手机按文件隔离，提交前检查并附截图，推送与合并需授权。
 
 - [协作规范](../AGENTS.md)、[贡献说明](development/CONTRIBUTING.md)、[工程配置入口](../工程配置/README.md)。
 - [并行工作树与集成指南](development/并行工作树与集成指南.md)：外置工作树、detached HEAD、提交/推送、共同基线与冲突边界。

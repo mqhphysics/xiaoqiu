@@ -1,7 +1,6 @@
 import Taro from '@tarojs/taro'
 import { useEffect, type PropsWithChildren } from 'react'
 
-import { mountCursorSkin } from './components/auth-cursor'
 import { mountSoftFocus } from './components/public-shell/focus-style'
 import { AccountBoundary } from './components/account-boundary'
 import { readSession, subscribeToExternalSessionChanges } from './features/product/session'
@@ -12,7 +11,7 @@ import './app-box-sizing'
 import './components/viewport-page'
 
 export default function App({ children }: PropsWithChildren) {
-  useEffect(() => mountCursorSkin(), [])
+  // Native system cursors site-wide: the PNG cursor skin rendered as a blocky black hand on links.
   useEffect(() => mountSoftFocus(), [])
 
   useEffect(

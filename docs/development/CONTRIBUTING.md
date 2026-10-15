@@ -2,15 +2,11 @@
 
 ## 分支
 
-```text
-ai/<task-id>-<short-name>
-feature/<task-id>-<short-name>
-fix/<task-id>-<short-name>
-```
-
-每个任务使用独立分支或 Git Worktree。不要让多个 Agent 同时写入同一个工作目录。
+分支、负责人和推送规则以根目录 [AGENTS.md](../../AGENTS.md) 为准：从最新 `main` 拉 `owner/topic` 短分支，PR 合入 `main` 后删除。
 
 ## 提交前
+
+界面改动另附截图（桌面 1440×900，手机 390×844），见 AGENTS.md 第 5 条。
 
 ```powershell
 pnpm format:check

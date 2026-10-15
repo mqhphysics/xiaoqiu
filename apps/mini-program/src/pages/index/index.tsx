@@ -35,6 +35,8 @@ import {
 import { readSession } from '../../features/product/session'
 import { loadHomeWithEmptyState, type HomeLoadState } from '../../features/product/home-loading'
 import { tournamentHeroSlides } from './home-announcements'
+import { alternatingColumns } from './home-feed-layout'
+import { HomeTop } from './home-top'
 import './home-desktop'
 import {
   ANNOUNCEMENTS_DIALOG_SUPPORTED,
@@ -526,13 +528,37 @@ function HomeContent({
       heroAnnouncements[heroAnnouncements.length > 0 ? index % heroAnnouncements.length : 0]
     if (announcement) void goToPost(announcement.id)
   }
+  const feedColumns = useFeedColumns()
+  const renderPost = (post: PostSummary) => (
+    <PostCard
+      key={post.id}
+      post={post}
+      variant="home"
+      onLike={() => onLike(post)}
+      onOpen={() => void goToPost(post.id)}
+      {...(post.author.messageable && readSession()
+        ? {
+            onMessageAuthor: () =>
+              openMessaging({
+                id: post.author.id,
+                displayName: post.author.displayName,
+                avatarUrl: post.author.avatarUrl,
+              }),
+          }
+        : {})}
+    />
+  )
   return (
-    <View className="home-page xq-viewport-page">
+    // 首页 is the one desktop page that scrolls as a document (no xq-viewport-page).
+    <View className="home-page">
+      <HomeTop
+        data={data}
+        onOpenPost={(postId) => void goToPost(postId)}
+        onOpenSchedule={() => void goToSchedule(data.tournament.id)}
+      />
       <View className="experience-hero">
         <View className="experience-hero__copy">
-          <Text className="experience-hero__eyebrow">
-            {data.tournament.name}
-          </Text>
+          <Text className="experience-hero__eyebrow">{data.tournament.name}</Text>
           <Text
             className={`experience-hero__title ${
               (heroAnnouncement?.title?.length ?? data.tournament.name.length) > 20
@@ -643,27 +669,19 @@ function HomeContent({
           <Text className="composer-entry__placeholder">说点什么，记录此刻的校园足球</Text>
           <Text className="composer-entry__action">发布</Text>
         </Button>
-        <View className="community-feed">
+        <View className={`community-feed ${feedColumns > 1 ? 'community-feed--masonry' : ''}`}>
           {data.posts.length > 0 ? (
-            data.posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                variant="home"
-                onLike={() => onLike(post)}
-                onOpen={() => void goToPost(post.id)}
-                {...(post.author.messageable && readSession()
-                  ? {
-                      onMessageAuthor: () =>
-                        openMessaging({
-                          id: post.author.id,
-                          displayName: post.author.displayName,
-                          avatarUrl: post.author.avatarUrl,
-                        }),
-                    }
-                  : {})}
-              />
-            ))
+            feedColumns > 1 ? (
+              alternatingColumns(data.posts, feedColumns, (post) =>
+                Boolean(post.imageUrl || post.imageUrls?.length),
+              ).map((column, columnIndex) => (
+                <View className="community-feed__column" key={columnIndex}>
+                  {column.map(renderPost)}
+                </View>
+              ))
+            ) : (
+              data.posts.map(renderPost)
+            )
           ) : (
             <DataState
               kind="empty"
@@ -1026,4 +1044,22 @@ function heroSummary(body?: string | null): string | undefined {
 
 function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
+}
+
+/** Desktop H5 feed columns: 3 on wide screens, 2 on narrow desktops, 1 elsewhere. */
+function useFeedColumns(): number {
+  const read = () => {
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return 1
+    if (window.matchMedia('(min-width: 1151px)').matches) return 3
+    if (window.matchMedia('(min-width: 721px)').matches) return 2
+    return 1
+  }
+  const [columns, setColumns] = useState(read)
+  useEffect(() => {
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEB) return
+    const update = () => setColumns(read())
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return columns
 }

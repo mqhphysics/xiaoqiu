@@ -50,8 +50,8 @@
     [data-schedule-button]:focus-visible,
     [data-schedule-select]:focus-visible,
     [tabindex]:focus-visible {
-      outline: 2px solid #3d785a;
-      outline-offset: 3px;
+      outline: 2px solid #9cc4a6;
+      outline-offset: 2px;
     }
     [data-schedule-button] {
       border-radius: 5px;
@@ -270,7 +270,18 @@
     font-size: 11px;
   }
   .schedule-selects [data-schedule-select] {
-    width: 96px;
+    width: 104px;
+    padding: 0 26px 0 10px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: #fff
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%236f8576' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      no-repeat right 9px center / 11px 11px;
+    border: 1px solid #d6dfd7;
+    border-radius: 8px;
+    color: #24402f;
+    text-overflow: ellipsis;
+    cursor: pointer;
     height: 33px;
     font-size: 11px;
   }
@@ -1238,5 +1249,136 @@
       overscroll-behavior: contain;
       padding-top: 30px;
     }
+  }
+}
+
+/* Season dropdown — replaces the native select / tag row in the schedule hero. */
+@media (min-width: 721px) {
+  /* The hero (and its open menu) must stack above the filter toolbar below it. */
+  .schedule-desktop .schedule-hero {
+    position: relative;
+    z-index: 30;
+  }
+  .season-dropdown {
+    position: relative;
+    z-index: 20;
+  }
+  .season-dropdown__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+    height: 44px;
+    padding: 0 14px 0 16px;
+    color: #1f4a33;
+    background: #fff;
+    border: 1px solid #d6dfd7;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px #1a3a2a0d;
+    font-size: 15px;
+    font-weight: 650;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+    &:hover {
+      border-color: #b9cdbd;
+    }
+    &:focus-visible {
+      border-color: #9cc4a6;
+      box-shadow: 0 0 0 3px #9cc4a633;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+    svg:first-child {
+      width: 18px;
+      height: 18px;
+      color: #c08a2c;
+    }
+  }
+  .season-dropdown__label {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .season-dropdown__chevron {
+    width: 12px;
+    height: 12px;
+    color: #6f8576;
+    transition: transform 180ms ease;
+  }
+  .season-dropdown.is-open .season-dropdown__chevron {
+    transform: rotate(180deg);
+  }
+  .season-dropdown.is-open .season-dropdown__trigger {
+    border-color: #9cc4a6;
+    box-shadow: 0 0 0 3px #9cc4a622;
+  }
+  .season-dropdown__menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #dfe7e0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px #17352516, 0 2px 6px #1735250d;
+    animation: season-dropdown-in 160ms cubic-bezier(0.22, 0.85, 0.28, 1);
+  }
+  .season-dropdown__option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    color: #24402f;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+    em {
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 650;
+      color: #2e6b47;
+      background: #e8f3ea;
+    }
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background: #f1f6f1;
+    }
+    &.is-selected {
+      color: #17462e;
+      background: #eef6ef;
+    }
+    &.is-disabled {
+      color: #a3aea6;
+      cursor: not-allowed;
+      em {
+        color: #9a8a62;
+        background: #f5f0e3;
+      }
+    }
+  }
+}
+@keyframes season-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

@@ -15,7 +15,6 @@ import { dispatchGuestEntry } from '../../features/product-config/guest-entry.lo
 import { useProductConfiguration } from '../../features/product-config/use-product-config.h5'
 import ExistingLoginPage from './mobile-email-login.h5'
 
-import '../../components/auth-cursor/native-cursors.h5.scss'
 import './index.h5.scss'
 
 const emptyRegistration: RegisterInput & { confirmPassword: string; emailCode: string } = {

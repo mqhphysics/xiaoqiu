@@ -1,7 +1,7 @@
 import { useDidShow } from '@tarojs/taro'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
-import { ExpandingTags, useExpandingTagShift } from '../../components/interactions/expanding-tags.h5'
+import { useExpandingTagShift } from '../../components/interactions/expanding-tags.h5'
 import { PublicShell } from '../../components/public-shell'
 import { DataState } from '../../components/public-ui'
 import { MatchStatus, TeamCrest } from '../../components/product-ui'
@@ -365,30 +365,17 @@ function ScheduleContent({
         <div className="schedule-hero__copy">
           <div>
             <h2>{data.tournament.name}</h2>
-            
           </div>
-          <p>
-            {`${data.tournament.seasonName} · 关注每一场校园比赛`}
-          </p>
+          <p>{`${data.tournament.seasonName} · 关注每一场校园比赛`}</p>
         </div>
         <div className="schedule-hero__actions">
-          <ExpandingTags
-            className="schedule-season-tags"
-            label="选择赛季"
+          <SeasonDropdown
             value={data.tournament.id}
             disabled={pending}
             options={(data.seasons.length
               ? data.seasons
-              : [
-                  {
-                    tournamentId: data.tournament.id,
-                    tournamentName: data.tournament.name,
-                  },
-                ]
-            ).map((season) => ({
-              id: season.tournamentId,
-              label: season.tournamentName,
-            }))}
+              : [{ tournamentId: data.tournament.id, tournamentName: data.tournament.name }]
+            ).map((season) => ({ id: season.tournamentId, label: season.tournamentName }))}
             onChange={(tournamentId) =>
               void navigate(
                 `/pages/readonly-schedule/index?tournamentId=${encodeURIComponent(tournamentId)}`,
@@ -396,16 +383,6 @@ function ScheduleContent({
               )
             }
           />
-          <button
-            data-schedule-button=""
-            type="button"
-            className="schedule-outline"
-            onClick={showBracket}
-          >
-            <Icon name="cup" />
-            杯赛对阵
-            <Icon name="arrow" />
-          </button>
         </div>
       </header>
 
@@ -722,12 +699,9 @@ function ScheduleContent({
             <div>
               <Icon name="cup" />
               <h3>{data.tournament.name}</h3>
-              
             </div>
             <p>在校园的绿茵场上，记录每一份热爱。</p>
-            <p>
-              {`${data.schedule.length} 场比赛 · ${teams.length} 支球队`}
-            </p>
+            <p>{`${data.schedule.length} 场比赛 · ${teams.length} 支球队`}</p>
           </section>
         </aside>
       </div>
@@ -990,5 +964,105 @@ function BracketView({
         </div>
       </div>
     </section>
+  )
+}
+
+/** Upcoming cups are listed so students know they exist, but cannot be chosen yet. */
+const UPCOMING_SEASONS = ['2026计科杯', '2026新生杯']
+
+function SeasonDropdown({
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  value: string
+  options: Array<{ id: string; label: string }>
+  disabled: boolean
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+  const current = options.find((option) => option.id === value) ?? options[0]
+  const known = new Set(options.map((option) => option.label.replace(/\s+/g, '')))
+  const upcoming = UPCOMING_SEASONS.filter((label) => !known.has(label))
+  return (
+    <div ref={root} className={`season-dropdown ${open ? 'is-open' : ''}`}>
+      <button
+        type="button"
+        className="season-dropdown__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((next) => !next)}
+      >
+        <Icon name="cup" />
+        <span className="season-dropdown__label">{current?.label}</span>
+        <svg className="season-dropdown__chevron" viewBox="0 0 12 12" aria-hidden="true">
+          <path
+            d="M3 4.5 6 7.5 9 4.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open && (
+        <ul className="season-dropdown__menu" role="listbox" aria-label="选择赛事">
+          {options.map((option) => {
+            const selected = option.id === value
+            return (
+              <li key={option.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={`season-dropdown__option ${selected ? 'is-selected' : ''}`}
+                  onClick={() => {
+                    setOpen(false)
+                    if (!selected) onChange(option.id)
+                  }}
+                >
+                  <span>{option.label}</span>
+                  {selected && <em>进行中</em>}
+                </button>
+              </li>
+            )
+          })}
+          {upcoming.map((label) => (
+            <li key={label}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                aria-disabled="true"
+                disabled
+                className="season-dropdown__option is-disabled"
+              >
+                <span>{label}</span>
+                <em>即将开始</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
