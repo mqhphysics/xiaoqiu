@@ -27,6 +27,7 @@ export function NativeAuthScene({
   const interactiveNow = useRef(interactive)
   interactiveNow.current = interactive
   const initializing = useRef(false)
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const finger = useRef<number | null>(null)
   const [stats, setStats] = useState<SceneStats>({
     particles: 0,
@@ -34,7 +35,7 @@ export function NativeAuthScene({
     state: 'loading',
   })
   const [ready, setReady] = useState(false)
-  const measure = () => {
+  const measure = (attempt = 0) => {
     if (!active || !interactive || initializing.current) return
     Taro.createSelectorQuery()
       .select('#native-auth-canvas')
@@ -46,14 +47,11 @@ export function NativeAuthScene({
           left?: number
           top?: number
         }
-        if (
-          !mounted.current ||
-          !interactiveNow.current ||
-          !node.node ||
-          !node.width ||
-          !node.height
-        )
+        if (!mounted.current || !interactiveNow.current) return
+        if (!node.node || !node.width || !node.height) {
+          if (attempt < 4) retryTimer.current = setTimeout(() => measure(attempt + 1), 60)
           return
+        }
         bounds.current = { left: node.left ?? 0, top: node.top ?? 0 }
         if (engine.current) {
           engine.current.resize(node.width, node.height)
@@ -121,6 +119,7 @@ export function NativeAuthScene({
   useEffect(
     () => () => {
       mounted.current = false
+      if (retryTimer.current) clearTimeout(retryTimer.current)
       engine.current?.destroy()
     },
     [],

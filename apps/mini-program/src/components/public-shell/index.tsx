@@ -32,6 +32,7 @@ import {
   playTeamFocus,
 } from './navigation-transition'
 import { TeamNavFocus } from './team-nav-focus'
+import { NativeTeamTabFocus } from './team-tab-focus'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
 import { prefetchSection, prefetchTabsWhenIdle } from './prefetch-tabs'
 
@@ -435,6 +436,7 @@ export function PublicShell({
                 ? { onTouchStart: () => prefetchSection(item.key) }
                 : {})}
             >
+              {Taro.getEnv() === Taro.ENV_TYPE.WEAPP && <NativeTeamTabFocus team={primaryTeam} />}
               {primaryTeam ? (
                 <TeamCrest team={primaryTeam} size="large" eager />
               ) : (

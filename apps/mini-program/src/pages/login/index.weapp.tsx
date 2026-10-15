@@ -52,6 +52,7 @@ export default function NativeLoginPage() {
           <ExistingLoginPage
             visual={
               <NativeAuthScene
+                key={`${screen}:${recovery ? 'recovery' : 'page'}`}
                 layoutKey={`${screen}:${height}`}
                 active={!recovery && keyboardHeight === 0}
                 interactive={screen === 'login' && !recovery}
