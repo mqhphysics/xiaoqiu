@@ -34,6 +34,7 @@ import zoomInUrl1 from '../../assets/login-art/cursors/zoom-in-32.png'
 import zoomInUrl2 from '../../assets/login-art/cursors/zoom-in-32@2x.png'
 import zoomOutUrl1 from '../../assets/login-art/cursors/zoom-out-32.png'
 import zoomOutUrl2 from '../../assets/login-art/cursors/zoom-out-32@2x.png'
+import loadingRingUrl from '../../assets/login-art/cursors/loading-ring.svg'
 import { cursorMorphPath } from './morph.h5'
 
 /**
@@ -63,7 +64,13 @@ const zoomInUrl = art(zoomInUrl1, zoomInUrl2)
 const zoomOutUrl = art(zoomOutUrl1, zoomOutUrl2)
 
 /** Plain url() first for older engines, then a resolution-aware image-set that wins where supported. */
-function cursorRule(selector: string, image: { one: string; two: string }, hotspot: string, fallback: string, important = '') {
+function cursorRule(
+  selector: string,
+  image: { one: string; two: string },
+  hotspot: string,
+  fallback: string,
+  important = '',
+) {
   return `${selector} { cursor: url("${image.one}") ${hotspot}, ${fallback}${important}; cursor: -webkit-image-set(url("${image.one}") 1x, url("${image.two}") 2x) ${hotspot}, ${fallback}${important}; cursor: image-set(url("${image.one}") 1x, url("${image.two}") 2x) ${hotspot}, ${fallback}${important}; }`
 }
 
@@ -120,7 +127,7 @@ type Zone = 'art' | 'form' | null
 const ATTRIBUTE = 'data-xq-cursor'
 const DURATION = 280
 
-/** App-wide native cursors; a DOM cursor exists only for the brief login morph. */
+/** Native cursors at rest; only the login morph and busy ring use a temporary overlay. */
 export function mountCursorSkin(): () => void {
   const root = document.documentElement
   const precisePointer = window.matchMedia(
@@ -132,17 +139,35 @@ export function mountCursorSkin(): () => void {
   // Raw H5 CSS keeps native element names out of Taro's stylesheet transform.
   style.textContent = `
     ${cursorRule('html.xq-cursor-skin', arrowUrl, '2 2', 'default')}
+    ${cursorRule('html.xq-cursor-skin :disabled', disabledUrl, '16 16', 'not-allowed', ' !important')}
     ${Object.entries(skins)
       .map(([name, skin]) =>
-        cursorRule(`html.xq-cursor-skin [${ATTRIBUTE}="${name}"]`, skin.url, skin.hotspot, skin.fallback, ' !important'),
+        cursorRule(
+          `html.xq-cursor-skin [${ATTRIBUTE}="${name}"]`,
+          skin.url,
+          skin.hotspot,
+          skin.fallback,
+          ' !important',
+        ),
       )
       .join('\n')}
-    ${cursorRule('html.xq-cursor-skin :disabled', disabledUrl, '16 16', 'not-allowed', ' !important')}
     html.xq-cursor-skin.xq-cursor-morphing,
     html.xq-cursor-skin.xq-cursor-morphing * { cursor: none !important; }
     #xq-cursor-morph { position: fixed; left: 0; top: 0; width: 72px; height: 72px;
       margin: 0; padding: 0; pointer-events: none; z-index: 2147483647; display: none; }
     #xq-cursor-morph svg { display: block; width: 72px; height: 72px; overflow: visible; }
+    html.xq-cursor-skin.xq-cursor-loading,
+    html.xq-cursor-skin.xq-cursor-loading * { cursor: none !important; }
+    #xq-cursor-loading { position: fixed; left: 0; top: 0; width: 48px; height: 40px;
+      pointer-events: none; z-index: 2147483647; display: none; }
+    #xq-cursor-loading .xq-loading-arrow { display: none; width: 32px; height: 32px; }
+    #xq-cursor-loading .xq-loading-rotor { position: absolute; left: 0; top: 0;
+      width: 32px; height: 32px; animation: xq-cursor-spin 1.2s linear infinite; }
+    #xq-cursor-loading .xq-loading-rotor img { display: block; width: 100%; height: 100%; }
+    #xq-cursor-loading[data-skin="progress"] .xq-loading-arrow { display: block; }
+    #xq-cursor-loading[data-skin="progress"] .xq-loading-rotor {
+      left: 23px; top: 15px; width: 23px; height: 23px; }
+    @keyframes xq-cursor-spin { to { transform: rotate(360deg); } }
   `
   document.head.append(style)
   const overlay = document.createElement('div')
@@ -157,6 +182,20 @@ export function mountCursorSkin(): () => void {
       <path d="M0-4.3v-6.2m4.05 9.15 5.55-1.85m-7.1 6.5 3.7 5.2m-8.7-5.2-3.7 5.2m2.15-9.85L-9.6-3.2"/>
     </g></svg>`
   document.body.append(overlay)
+  const loading = document.createElement('div')
+  loading.id = 'xq-cursor-loading'
+  loading.setAttribute('aria-hidden', 'true')
+  const loadingArrow = new Image()
+  loadingArrow.className = 'xq-loading-arrow'
+  loadingArrow.src = arrowUrl1
+  loadingArrow.alt = ''
+  const rotor = document.createElement('div')
+  rotor.className = 'xq-loading-rotor'
+  const ring = new Image()
+  ring.alt = ''
+  rotor.append(ring)
+  loading.append(loadingArrow, rotor)
+  document.body.append(loading)
   const outline = overlay.querySelector<SVGPathElement>('[data-outline]')!
   const fold = overlay.querySelector<SVGPathElement>('[data-fold]')!
   const seams = overlay.querySelector<SVGGElement>('[data-seams]')!
@@ -172,6 +211,33 @@ export function mountCursorSkin(): () => void {
   let pointerX = 0
   let pointerY = 0
 
+  function finishLoading() {
+    loading.style.display = 'none'
+    root.classList.remove('xq-cursor-loading')
+  }
+
+  function positionLoading() {
+    const offset = loading.dataset.skin === 'busy' ? 16 : 2
+    loading.style.transform = `translate3d(${pointerX - offset}px,${pointerY - offset}px,0)`
+  }
+
+  function showLoading(skin: Skin) {
+    if (
+      (skin !== 'busy' && skin !== 'progress') ||
+      reducedMotion.matches ||
+      !ring.complete ||
+      !ring.naturalWidth ||
+      (skin === 'progress' && (!loadingArrow.complete || !loadingArrow.naturalWidth))
+    ) {
+      finishLoading()
+      return
+    }
+    loading.dataset.skin = skin
+    positionLoading()
+    loading.style.display = 'block'
+    root.classList.add('xq-cursor-loading')
+  }
+
   function finishMorph() {
     window.cancelAnimationFrame(frame)
     frame = 0
@@ -186,6 +252,7 @@ export function mountCursorSkin(): () => void {
     target = null
     zone = null
     finishMorph()
+    finishLoading()
   }
 
   function paint(value: number) {
@@ -227,6 +294,7 @@ export function mountCursorSkin(): () => void {
   }
 
   function classify(element: Element): Skin {
+    if (element.closest('[aria-busy="true"]')) return 'progress'
     if (element.closest(':disabled, [disabled], [aria-disabled="true"], .weui-btn_disabled'))
       return 'disabled'
     if (element.closest('.art-login__left')) return 'football'
@@ -246,7 +314,6 @@ export function mountCursorSkin(): () => void {
       !cursor.includes('url(')
     )
       return null
-    if (element.closest('[aria-busy="true"]')) return 'progress'
     if (
       element.closest(
         'input[type="file"], input[type="checkbox"], input[type="radio"], input[type="color"], input[type="button"], input[type="submit"], input[type="reset"]',
@@ -282,11 +349,15 @@ export function mountCursorSkin(): () => void {
     // The temporary cursor:none must not hide the underlying semantic cursor
     // when the pointer enters another element during the same morph.
     const morphing = root.classList.contains('xq-cursor-morphing')
+    const spinning = root.classList.contains('xq-cursor-loading')
     if (morphing) root.classList.remove('xq-cursor-morphing')
+    if (spinning) root.classList.remove('xq-cursor-loading')
     const skin = classify(element)
     if (morphing) root.classList.add('xq-cursor-morphing')
+    if (spinning) root.classList.add('xq-cursor-loading')
     target = element
     if (skin) element.setAttribute(ATTRIBUTE, skin)
+    showLoading(skin)
     const nextZone: Zone = element.closest('.art-login__left')
       ? 'art'
       : element.closest('.art-login__panel')
@@ -304,6 +375,7 @@ export function mountCursorSkin(): () => void {
   function move(event: PointerEvent) {
     hover(event)
     if (frame) position(event.clientX, event.clientY)
+    if (root.classList.contains('xq-cursor-loading')) positionLoading()
   }
 
   function leave(event: PointerEvent) {
@@ -318,6 +390,21 @@ export function mountCursorSkin(): () => void {
     clearHover()
     root.classList.toggle('xq-cursor-skin', precisePointer.matches)
   }
+
+  function refreshMotion() {
+    finishMorph()
+    if (target?.isConnected) applyHover(target, true)
+  }
+
+  ring.onload = () => {
+    if (target?.isConnected) applyHover(target, true)
+  }
+  ring.onerror = finishLoading
+  loadingArrow.onload = () => {
+    if (target?.isConnected) applyHover(target, true)
+  }
+  loadingArrow.onerror = finishLoading
+  ring.src = loadingRingUrl
 
   function refreshAfterInteraction(event: PointerEvent) {
     if (!precisePointer.matches || event.pointerType !== 'mouse') return
@@ -346,12 +433,13 @@ export function mountCursorSkin(): () => void {
   })
   semanticObserver.observe(document.body, {
     subtree: true,
+    childList: true,
     attributes: true,
     attributeFilter: ['disabled', 'aria-disabled', 'aria-busy', 'class', 'style'],
   })
 
   precisePointer.addEventListener('change', syncPointer)
-  reducedMotion.addEventListener('change', finishMorph)
+  reducedMotion.addEventListener('change', refreshMotion)
   document.addEventListener('pointerover', hover, true)
   document.addEventListener('pointermove', move, true)
   document.addEventListener('pointerout', leave, true)
@@ -360,6 +448,7 @@ export function mountCursorSkin(): () => void {
   document.addEventListener('visibilitychange', visibility)
   window.addEventListener('blur', clearHover)
   window.addEventListener('hashchange', clearHover)
+  window.addEventListener('popstate', clearHover)
   window.addEventListener('scroll', clearHover, true)
   syncPointer()
 
@@ -367,7 +456,7 @@ export function mountCursorSkin(): () => void {
     clearHover()
     root.classList.remove('xq-cursor-skin')
     precisePointer.removeEventListener('change', syncPointer)
-    reducedMotion.removeEventListener('change', finishMorph)
+    reducedMotion.removeEventListener('change', refreshMotion)
     document.removeEventListener('pointerover', hover, true)
     document.removeEventListener('pointermove', move, true)
     document.removeEventListener('pointerout', leave, true)
@@ -376,8 +465,11 @@ export function mountCursorSkin(): () => void {
     document.removeEventListener('visibilitychange', visibility)
     window.removeEventListener('blur', clearHover)
     window.removeEventListener('hashchange', clearHover)
+    window.removeEventListener('popstate', clearHover)
     window.removeEventListener('scroll', clearHover, true)
     overlay.remove()
+    ring.onload = ring.onerror = loadingArrow.onload = loadingArrow.onerror = null
+    loading.remove()
     style.remove()
     semanticObserver.disconnect()
   }

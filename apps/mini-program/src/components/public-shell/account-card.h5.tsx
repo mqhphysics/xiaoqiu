@@ -244,7 +244,12 @@ export function DesktopAccount({
                 ))}
               </div>
             )}
-            <button data-account-control onClick={() => select(onProfile)}>
+            <button
+              data-account-control
+              onClick={() =>
+                select(user ? onProfile : () => void Taro.reLaunch({ url: '/pages/login/index' }))
+              }
+            >
               <ProfileIcon name="user" />
               <span>{user ? '个人中心' : '登录或注册'}</span>
               <ProfileIcon name="right" />
