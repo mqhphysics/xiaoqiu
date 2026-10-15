@@ -104,14 +104,3 @@
   color: #45663e;
   cursor: pointer;
 }
-@media (max-width: 760px) {
-  .mc-identity-create {
-    grid-template-columns: 1fr;
-    padding: 16px;
-  }
-  .mc-identity-applications header,
-  .mc-identity-records article {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}

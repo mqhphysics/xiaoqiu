@@ -2,14 +2,16 @@
 
 2026-10-03。独占新增 `apps/api/src/admin-center/`；根任务在 AppModule 注册 `AdminCenterModule`。复用现有 AuthService、AccessPolicyService、Prisma 和 IdempotencyRecord，未改变 schema、迁移、公共契约、锁文件和既有业务模块。
 
-所有 `/api/admin/center` 路由只允许当前组织有效的组织/平台管理员。每次读取和写入在事务中复查会话、用户、组织成员和角色。赛事管理员不能借此读取组织级目录。默认用户列表只返回脱敏学号/邮箱及凭据是否存在，永不返回密码材料。
+所有 `/api/admin/center` 路由只允许当前组织有效的组织/平台管理员。每次读取和写入在事务中复查会话、用户、组织成员和角色。赛事管理员不能借此读取组织级目录。管理员目录返回完整身份，但不返回凭据哈希、盐或密码。用户直接授权的已分配密码仅通过专门的受控查看接口返回，并记录审计和no-store响应。
+
+2026-10-15新增：`POST /users/provision-from-players`为1–60个未绑定球员创建普通账号；`POST /users/:id/login-password`以原因、expectedUpdatedAt和幂等键分配六位随机密码；`GET /users/:id/login-access`供当前组织管理员查看分配的用户名和密码。原密码不能从哈希还原。分配记录在AuditLog内AES-GCM加密，密钥在私有目录，幂等结果和普通审计摘要不包含可读密码；用户自行改密后不再显示旧值。
 
 ## 端点
 
 | 方法/路径                          | 请求与结果                                                                                                                                                            |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET `/overview`                    | `{organization:{id,name},counts:{users,teams,players,pendingRosters,pendingReports,openFeedback},checkedAt}`，只数最新待审名单/报告版本                               |
-| GET `/users`                       | `page/pageSize/query/status`，status 是 Membership 的 PENDING/ACTIVE/SUSPENDED/LEFT；返回分页目录，含 `membershipUpdatedAt`、脱敏身份、当前角色、关联球员、活跃会话数 |
+| GET `/users`                       | `page/pageSize/query/status`，status 是 Membership 的 PENDING/ACTIVE/SUSPENDED/LEFT；返回分页目录，含 `membershipUpdatedAt`、完整身份、当前角色、关联球员、活跃会话数 |
 | POST `/users/:id/membership`       | `{status:ACTIVE                                                                                                                                                       | SUSPENDED,expectedUpdatedAt,reason}`；CAS 来源是 `membershipUpdatedAt`，不是 User 的时间；只修改本组织成员状态；停用同步撤销本组织会话，保护本人和组织/平台管理员 |
 | POST `/users/:id/revoke-sessions`  | `{reason}`，返回 `{id,revokedCount}`；不影响其它组织会话；本人的当前会话使用既有 logout                                                                               |
 | GET `/teams`、`/players`           | 分页公开档案，包含 `updatedAt`；不返回完整学号或修改报名/锁定名单                                                                                                     |
@@ -50,7 +52,7 @@ node scripts/copy-prisma-engine.mjs dist/test/generated/prisma
 node --test dist/test/admin-center/admin-center.policy.spec.js dist/test/admin-center/admin-center.postgres.integration.spec.js
 ```
 
-12项通过、0失败、0跳过：默认脱敏、越权与组织隔离、停用保护/其它组织会话保留/全局User状态不变、单用户撤会话、重复与真实并发幂等、版本冲突、编辑白名单、公告公开可见与隐藏保留、审计脱敏、媒体引用及真实/未知系统状态。浏览器共同验收由根任务负责；此切片未启动预览服务、未修改微信、未推送或部署。
+初版切片历史验收为12项通过、0失败、0跳过（当时默认脱敏）、越权与组织隔离、停用保护/其它组织会话保留/全局User状态不变、单用户撤会话、重复与真实并发幂等、版本冲突、编辑白名单、公告公开可见与隐藏保留、审计脱敏、媒体引用及真实/未知系统状态。浏览器共同验收由根任务负责；此切片未启动预览服务、未修改微信、未推送或部署。
 
 正式密码恢复/一次性令牌、角色授予、球员认领/身份更正、私有证据、媒体持久卷/备份/删除策略、Worker心跳等仍需各自服务与契约，不能用演示实名学号恢复、统一密码或假的成功回执代替。
 
