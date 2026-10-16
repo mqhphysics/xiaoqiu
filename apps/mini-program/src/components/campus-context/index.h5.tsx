@@ -1,4 +1,3 @@
-import Taro from '@tarojs/taro'
 import { useEffect, useState, type PropsWithChildren } from 'react'
 import { campusRepository, type Catalog } from '../../features/campus/campus.repository.h5'
 import {
@@ -7,20 +6,37 @@ import {
   storedCompetitionSelection,
   type CompetitionSelection,
 } from '../../features/campus/competition-selection.h5'
-import { resetProductGetCache } from '../../features/product/get-cache'
 export { CampusWelcome } from './welcome.h5'
 import './index.h5.scss'
 
 let catalogCache: Catalog | null = null
 let catalogOrganization = ''
+
+/** Prefer 绿茵杯男足 and a formal (non-demo) season when nothing is stored. */
+function pickDefault(data: Catalog, stored: { competitionId?: string; seasonId?: string }) {
+  const competition =
+    data.competitions.find((c) => c.id === stored.competitionId) ??
+    data.competitions.find((c) => c.code === 'GREEN_MEN') ??
+    data.competitions.find((c) => /绿茵杯/.test(c.name) && /男/.test(c.name)) ??
+    data.competitions.find((c) => /绿茵杯/.test(c.name)) ??
+    data.competitions[0]
+  const season =
+    data.seasons.find((s) => s.id === stored.seasonId) ??
+    data.seasons.find((s) => !s.isDemo) ??
+    data.seasons.find((s) => s.isDemo) ??
+    data.seasons[0]
+  return { competition, season }
+}
+
 export function CampusContext({ active, children }: PropsWithChildren<{ active: string }>) {
   const organization = competitionOrganizationKey()
   const [catalog, setCatalog] = useState<Catalog | null>(
-      catalogOrganization === organization ? catalogCache : null,
-    ),
-    [selection, setSelection] = useState<CompetitionSelection | null>(null),
-    [error, setError] = useState('')
+    catalogOrganization === organization ? catalogCache : null,
+  )
+  const [selection, setSelection] = useState<CompetitionSelection | null>(null)
+  const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+
   useEffect(() => {
     let current = true
     setError('')
@@ -33,15 +49,7 @@ export function CampusContext({ active, children }: PropsWithChildren<{ active: 
         catalogCache = data
         catalogOrganization = organization
         setCatalog(data)
-        const stored = storedCompetitionSelection()
-        const competition =
-          data.competitions.find((c) => c.id === stored.competitionId) ??
-          data.competitions.find((c) => c.code === 'GREEN_MEN') ??
-          data.competitions[0]
-        const season =
-          data.seasons.find((s) => s.id === stored.seasonId) ??
-          data.seasons.find((s) => s.isDemo) ??
-          data.seasons[0]
+        const { competition, season } = pickDefault(data, storedCompetitionSelection())
         if (competition && season) {
           const instance = data.tournaments.find(
             (t) => t.competitionDefinitionId === competition.id && t.seasonId === season.id,
@@ -65,79 +73,12 @@ export function CampusContext({ active, children }: PropsWithChildren<{ active: 
       current = false
     }
   }, [revision, organization])
-  function change(competitionId: string, seasonId: string) {
-    const competition = catalog?.competitions.find((c) => c.id === competitionId),
-      season = catalog?.seasons.find((s) => s.id === seasonId)
-    if (!competition || !season) return
-    const instance = catalog?.tournaments.find(
-      (t) => t.competitionDefinitionId === competition.id && t.seasonId === season.id,
-    )
-    const value = {
-      competitionId,
-      seasonId,
-      tournamentId: instance?.id,
-      competitionName: competition.name,
-      seasonName: season.name,
-      isDemo: season.isDemo,
-    }
-    publishCompetitionSelection(value)
-    setSelection(value)
-    resetProductGetCache()
-    const pages: Record<string, string> = {
-      schedule: '/pages/readonly-schedule/index',
-      data: '/pages/data-center/index',
-      team: '/pages/readonly-teams/index',
-      teams: '/pages/readonly-teams/index',
-      tournaments: '/pages/readonly-tournaments/index',
-    }
-    void Taro.reLaunch({ url: pages[active] ?? '/pages/index/index' })
-  }
+
   const scoped = ['home', 'schedule', 'data', 'team', 'tournaments', 'teams'].includes(active)
   const empty = selection && !selection.tournamentId
+
   return (
     <>
-      {active !== 'me' && (
-        <div className="campus-context" aria-label="赛事与赛季选择">
-          <div className="campus-context__selectors">
-            <label data-campus-label>
-              <span>赛事</span>
-              <select
-                aria-label="选择赛事"
-                value={selection?.competitionId ?? ''}
-                onChange={(e) => selection && change(e.target.value, selection.seasonId)}
-                disabled={!selection}
-              >
-                {catalog?.competitions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="campus-context__divider" aria-hidden="true" />
-            <label data-campus-label>
-              <span>赛季</span>
-              <select
-                aria-label="选择赛季"
-                value={selection?.seasonId ?? ''}
-                onChange={(e) => selection && change(selection.competitionId, e.target.value)}
-                disabled={!selection}
-              >
-                {catalog?.seasons.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {selection && (
-            <span className={`campus-context__source ${selection.isDemo ? 'is-demo' : ''}`}>
-              {selection.isDemo ? '演示资料' : '正式赛季'}
-            </span>
-          )}
-        </div>
-      )}
       {scoped && (error || !catalog || !selection || empty) ? (
         <section className="campus-context-empty" role="status">
           <span className="campus-context-empty__eyebrow">
@@ -150,7 +91,7 @@ export function CampusContext({ active, children }: PropsWithChildren<{ active: 
             {error ||
               (!selection
                 ? '正在连接赛事目录。'
-                : '当前还没有公布参赛名单和赛程。你可以切换赛事或赛季，查看其他比赛。')}
+                : '当前还没有公布参赛名单和赛程。赛季切换由赛事方在管理端配置。')}
           </p>
           {error && (
             <button

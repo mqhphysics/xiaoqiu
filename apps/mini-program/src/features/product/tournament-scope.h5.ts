@@ -23,6 +23,7 @@ export async function prepareCompetitionSelection(path: string) {
           catalog.competitions[0]
         const season =
           catalog.seasons.find((s) => s.id === stored.seasonId) ??
+          catalog.seasons.find((s) => !s.isDemo) ??
           catalog.seasons.find((s) => s.isDemo) ??
           catalog.seasons[0]
         if (!competition || !season) throw new Error('赛事目录尚未配置，请联系管理员')

@@ -51,46 +51,45 @@ function stopTeamFocus(shell: HTMLElement): void {
   focusAnimations.delete(shell)
 }
 
+/**
+ * Lightweight team-ornament entrance.
+ *
+ * History: the leaf-scroll used ~650 stroke-dashoffset WAAPI animations. After
+ * `00e486f perf(h5): split the first load and keep visited tabs warm` (merged via
+ * `bcbfe1f`), tab revisits kept pages mounted and the heavy draw either skipped
+ * (focus-visible / stale origin) or painted as an instant CSS snap — stripes
+ * appeared with no animation. Restore motion with a single opacity+transform
+ * on the ornament group; strokes stay CSS-final when active.
+ */
 export function playTeamFocus(
   shell: HTMLElement,
-  initialFocus?: Record<string, TeamFocusState>,
+  _initialFocus?: Record<string, TeamFocusState>,
 ): void {
   const button = shell.querySelector<HTMLElement>('.public-team-nav')
-  const replayFocus = initialFocus ? {} : captureTeamFocus(button ?? shell)
   stopTeamFocus(shell)
   if (
     !button?.classList.contains('public-team-nav--active') ||
     !window.matchMedia('(min-width: 721px)').matches ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    document.activeElement?.matches(':focus-visible')
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
     return
 
   const animations: Animation[] = []
-  for (const line of button.querySelectorAll<SVGGElement>('.public-team-focus__line')) {
-    const stroke = line.querySelector<SVGPathElement>('.public-team-focus__stroke')
-    if (!stroke) continue
-    const seed = line.querySelector<SVGPathElement>('.public-team-focus__trace')
-    const seedFraction = seed ? Math.min(1, seed.getTotalLength() / stroke.getTotalLength()) : 0
-    const start: Keyframe = { strokeDashoffset: String(1 - seedFraction), opacity: seed ? 0.28 : 0 }
-    const finish: Keyframe = { strokeDashoffset: '0', opacity: 1 }
-    const key = stroke.getAttribute('data-focus-key') ?? ''
-    const previous = initialFocus?.[key]
-    const frames: Keyframe[] = initialFocus
-      ? [previous && parseFloat(previous.opacity) > 0.01 ? previous : start]
-      : [replayFocus[key] ?? finish, { ...start, offset: 0.1 }]
-    frames.push({ strokeDashoffset: '0.25', opacity: 1, offset: 0.65 }, finish)
+  const ornament = button.querySelector<HTMLElement>('.public-team-focus')
+  if (ornament?.animate) {
     animations.push(
-      stroke.animate(frames, {
-        duration: Number(line.dataset.focusDuration) || 600,
-        delay: Number(line.dataset.focusDelay) || 0,
-        easing: focusEasing,
-        fill: 'backwards',
-      }),
+      ornament.animate(
+        [
+          { opacity: '0', transform: 'translateX(-50%) translateY(8px) scale(0.9)' },
+          { opacity: '1', transform: 'translateX(-50%) translateY(0) scale(1)' },
+        ],
+        { duration: 460, easing: focusEasing, fill: 'backwards' },
+      ),
     )
   }
   focusAnimations.set(shell, animations)
 }
+
 export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSection): void {
   const selection = shell.querySelector<HTMLElement>('.public-nav__selection')
   const line = shell.querySelector<HTMLElement>('.public-nav__line')
@@ -113,9 +112,9 @@ export function captureNavigationOrigin(shell: HTMLElement, target: NavigationSe
     crest: crest?.getBoundingClientRect() ?? null,
     crestOpacity: crest ? getComputedStyle(crest).opacity : '1',
     teamFocus: captureTeamFocus(shell),
-    animate:
-      !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
-      !document.activeElement?.matches(':focus-visible'),
+    // Only skip motion for OS-level reduced-motion — do not treat an unrelated
+    // :focus-visible (dialogs, fields) as a reason to snap the ornament in.
+    animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   }
 }
 
@@ -157,6 +156,13 @@ export function animateNavigationEntrance(
   }
   const previous = origin
   origin = null
+
+  // Always play the lightweight ornament entrance when landing on 主队, even if
+  // the shared nav transition origin was dropped (tab-cache revisit / slow async).
+  const playFocus = () => {
+    if (section === 'team') playTeamFocus(shell, previous?.teamFocus)
+  }
+
   if (
     !previous ||
     previous.target !== section ||
@@ -164,11 +170,13 @@ export function animateNavigationEntrance(
     !previous.animate ||
     window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
     !window.matchMedia('(min-width: 721px)').matches
-  )
+  ) {
+    playFocus()
     return removeKeyboardListener
+  }
 
   const animations: Animation[] = []
-  if (section === 'team') playTeamFocus(shell, previous.teamFocus)
+  playFocus()
   const animate = (element: Element | null, frames: Keyframe[], duration = 260) => {
     if (element?.animate) animations.push(element.animate(frames, { duration, easing }))
   }

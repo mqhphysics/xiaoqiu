@@ -81,8 +81,7 @@
   opacity: 0.55;
   cursor: wait;
 }
-.campus-dialog [data-campus-button]:focus-visible,
-.campus-context select:focus-visible {
+.campus-dialog [data-campus-button]:focus-visible {
   outline: 2px solid #a96c48;
   outline-offset: 4px;
 }
@@ -172,59 +171,9 @@
   font-size: 13px;
 }
 @media (min-width: 721px) {
+  /* Season/tournament selector row removed — keep auto-default to 绿茵杯 in JS. */
   .campus-context {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    margin: 0 0 20px;
-    padding: 0 2px 15px;
-    border-bottom: 1px solid #e2e5da;
-    color: #264b35;
-  }
-  .campus-context__selectors {
-    display: flex;
-    align-items: center;
-    gap: 22px;
-  }
-  .campus-context [data-campus-label] {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.4;
-    color: #788374;
-  }
-  .campus-context select {
-    min-width: 130px;
-    max-width: 230px;
-    padding: 8px 30px 8px 10px;
-    color: #274833;
-    border: 1px solid #d7dfd1;
-    border-radius: 7px;
-    background-color: #fcfbf7;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 650;
-    line-height: 1.5;
-    cursor: pointer;
-  }
-  .campus-context__divider {
-    width: 1px;
-    height: 23px;
-    background: #dce1d6;
-  }
-  .campus-context__source {
-    font-size: 12px;
-    color: #6b7968;
-  }
-  .campus-context__source.is-demo {
-    padding: 4px 11px;
-    border: 1px solid #d8c7b3;
-    border-radius: 20px;
-    color: #9e6b43;
-    background: #f8f1e7;
+    display: none;
   }
   .campus-context-empty {
     min-height: 340px;
@@ -261,41 +210,6 @@
 }
 @media (max-width: 720px) {
   .campus-context {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin: 0 0 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #e1e6d8;
-  }
-  .campus-context__selectors {
-    display: flex;
-    width: 100%;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-  }
-  .campus-context [data-campus-label] {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11px;
-    color: #819077;
-  }
-  .campus-context select {
-    max-width: 150px;
-    min-width: 92px;
-    padding: 7px 4px;
-    border: 1px solid #dbe3d0;
-    border-radius: 6px;
-    background: #fcfbf5;
-    color: #31583d;
-    font-family: inherit;
-    font-size: 12px;
-  }
-  .campus-context__source,
-  .campus-context__divider {
     display: none;
   }
   .campus-modal-backdrop {
