@@ -75,7 +75,7 @@ test(
         code: 'GREEN_MEN',
         cupName: '绿茵杯',
         gender: 'MALE',
-        name: '绿茵杯（男足）',
+        name: '绿茵杯',
       },
     })
     const competition = await prisma.tournament.create({
@@ -424,7 +424,7 @@ test(
             organizationId: org.id,
             code: 'OTHER_WOMEN',
             cupName: '测试杯',
-            name: '测试杯（女足）',
+            name: '测试杯',
             gender: 'FEMALE',
           },
         })

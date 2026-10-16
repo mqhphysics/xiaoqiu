@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import { IsEmail, IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator'
-import { localDemoShortPasswordsEnabled } from './local-demo-password-policy'
 
 export class LoginDto {
   @ApiProperty({
@@ -16,7 +15,7 @@ export class LoginDto {
 
   @ApiProperty({ type: String, example: 'Xiaoqiu2026!' })
   @IsString()
-  @Length(localDemoShortPasswordsEnabled() ? 1 : 6, 128)
+  @Length(6, 128)
   password!: string
 }
 

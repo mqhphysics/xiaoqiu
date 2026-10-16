@@ -161,13 +161,13 @@ export async function seedCampusDirectory(
               code,
               cupName,
               gender,
-              name: `${cupName}（${gender === 'MALE' ? '男足' : '女足'}）`,
+              name: cupName,
               sortOrder: index,
             },
             update: {},
           }),
         )
-      const demoSeason = await tx.season.upsert({
+      await tx.season.upsert({
         where: { organizationId_seasonCode: { organizationId, seasonCode: 'DEMO-CAMPUS' } },
         create: {
           id: id(organizationId, 'season:demo'),
@@ -193,8 +193,8 @@ export async function seedCampusDirectory(
         where: { id: green.id },
         data: {
           competitionDefinitionId: definitions.find((c) => c.code === 'GREEN_MEN')!.id,
-          seasonId: demoSeason.id,
-          name: '绿茵杯（男足）',
+          seasonId: green.seasonId,
+          name: '2026 绿茵杯',
         },
       })
       const realCs = await tx.tournament.findFirst({

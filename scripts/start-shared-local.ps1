@@ -32,7 +32,6 @@ if (-not $ready) {
   $env:POST_MEDIA_DIRECTORY = Join-Path $config.mediaDirectory 'posts'
   $env:MEDIA_ASSETS_DIRECTORY = $config.managedMediaDirectory
   $env:MEDIA_REVIEW_ALLOW_ORGANIZATION_ADMIN = 'true'
-  $env:LOCAL_DEMO_SHORT_PASSWORDS = '0'
   $env:DEMO_ROLE_SWITCH_ENABLED = 'true'
   $env:DEMO_ROLE_SWITCH_OWNER_ID = $config.roleSwitchOwnerId
   foreach ($kind in @('api','worker')) {

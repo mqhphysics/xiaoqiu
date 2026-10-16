@@ -30,7 +30,6 @@ services:
       DEFAULT_ORGANIZATION_ID: ${DEFAULT_ORGANIZATION_ID:-}
       DEFAULT_TOURNAMENT_ID: ${DEFAULT_TOURNAMENT_ID:-}
       POST_MEDIA_DIRECTORY: /app/private-data/media/posts
-      LOCAL_DEMO_SHORT_PASSWORDS: '0'
       ENABLE_DEMO_IDENTITY_RECOVERY: 'false'
       DATABASE_URL: ${DATABASE_URL:-postgresql://replace-me:replace-me@postgres.invalid:5432/xiaoqiu}
       SENTRY_DSN_API: ${SENTRY_DSN_API:-}

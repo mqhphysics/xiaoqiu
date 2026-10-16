@@ -175,7 +175,7 @@ $h5Url = 'http://127.0.0.1:3000/'
 
 if (-not (Test-ApiReady -Uri $apiHealthUrl)) {
   Assert-PortAvailable -Port 3001
-  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; `$env:LOCAL_DEMO_SHORT_PASSWORDS='1'; `$env:DEFAULT_TOURNAMENT_ID='$TournamentId'; npm.cmd --prefix apps/api run dev"
+  Start-BackgroundServer -Name 'api' -Command "`$env:DATABASE_URL='$databaseUrl'; `$env:API_PORT='3001'; `$env:DEFAULT_TOURNAMENT_ID='$TournamentId'; npm.cmd --prefix apps/api run dev"
   $apiReady = $false
   foreach ($attempt in 1..60) {
     Start-Sleep -Seconds 1

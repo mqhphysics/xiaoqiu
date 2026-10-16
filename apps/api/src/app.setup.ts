@@ -55,6 +55,9 @@ export function configureApp(app: INestApplication): void {
   app.useGlobalFilters(new ApiExceptionFilter())
   app.useGlobalInterceptors(new RequestLoggingInterceptor())
 
+  // Public API docs are a development aid; production keeps them off unless explicitly enabled.
+  if (process.env.NODE_ENV === 'production' && process.env.API_DOCS_ENABLED !== 'true') return
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('晓球 API')
     .setDescription('晓球平台 REST API')
