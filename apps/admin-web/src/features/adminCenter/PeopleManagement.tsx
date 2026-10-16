@@ -150,7 +150,7 @@ function UserState({ status }: { status: string }) {
     <Badge value={status} />
   )
 }
-function UserDetail({
+export function UserDetail({
   context,
   row,
   onClose,

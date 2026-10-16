@@ -247,22 +247,6 @@ function DataHero({
       <div className="data-desktop__intro">
         <div className="data-desktop__title-row">
           <h1>赛事数据</h1>
-          <ExpandingTags
-            className="data-season-tags"
-            label="选择赛事赛季"
-            value={selectedTournamentId}
-            disabled={unavailable}
-            options={[
-              ...data.seasons.map((season) => ({
-                id: season.tournamentId,
-                label: season.tournamentName,
-              })),
-              ...(data.seasons.some((season) => season.tournamentId === data.tournament.id)
-                ? []
-                : [{ id: data.tournament.id, label: data.tournament.name }]),
-            ]}
-            onChange={onSeasonChange}
-          />
           {data.resultsMode === 'PENDING' && (
             <span className="data-desktop__demo">赛事筹备中 · 数据待上传</span>
           )}
@@ -422,7 +406,6 @@ function StandingsCard({
             <h2>小组赛积分</h2>
             <span aria-hidden="true">{expanded ? '详细积分' : '展开 ↗'}</span>
           </button>
-          
         </div>
         {expanded && data.groups.length > 0 && (
           <label className="data-desktop__select data-desktop__select--group">
@@ -631,33 +614,33 @@ function LeaderboardCard({
         />
       ) : (
         <div className={expandedList ? 'data-desktop__leader-scroll is-open' : undefined}>
-        <table className="data-desktop__leader-table">
-          <caption className="sr-only">
-            {title}
-            {compact ? '前五名' : ''}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">排名</th>
-              <th scope="col">球员</th>
-              <th scope="col">所属球队</th>
-              {!compact && <th scope="col">出场</th>}
-              <th scope="col">{mode === 'scorers' ? '进球' : '助攻'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((player, index) => (
-              <LeaderRow
-                key={player.id}
-                player={player}
-                rank={index + 1}
-                mode={mode}
-                tournamentId={data.tournament.id}
-                compact={compact}
-              />
-            ))}
-          </tbody>
-        </table>
+          <table className="data-desktop__leader-table">
+            <caption className="sr-only">
+              {title}
+              {compact ? '前五名' : ''}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">排名</th>
+                <th scope="col">球员</th>
+                <th scope="col">所属球队</th>
+                {!compact && <th scope="col">出场</th>}
+                <th scope="col">{mode === 'scorers' ? '进球' : '助攻'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((player, index) => (
+                <LeaderRow
+                  key={player.id}
+                  player={player}
+                  rank={index + 1}
+                  mode={mode}
+                  tournamentId={data.tournament.id}
+                  compact={compact}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       {!compact && !expandedList && allRows.length > 6 && (
@@ -668,7 +651,6 @@ function LeaderboardCard({
       {!compact && (
         <p className="data-desktop__table-note">
           显示赛事接口返回的球员榜单 · 数据来自比赛事件与出场记录
-          
         </p>
       )}
     </section>

@@ -24,7 +24,7 @@ export class AdminMediaService {
     const [users, players, teams, posts] = await Promise.all([
       tx.user.findMany({
         where: { memberships: { some: { organizationId: org } } },
-        select: { id: true, displayName: true, avatarUrl: true, updatedAt: true },
+        select: { id: true, displayName: true, avatarUrl: true, coverUrl: true, updatedAt: true },
       }),
       tx.playerProfile.findMany({
         where: { organizationId: org },
@@ -33,6 +33,7 @@ export class AdminMediaService {
           displayName: true,
           avatarUrl: true,
           portraitUrl: true,
+          coverUrl: true,
           updatedAt: true,
         },
       }),
@@ -56,6 +57,28 @@ export class AdminMediaService {
           updatedAt: u.updatedAt,
           visibility: 'PUBLIC',
           field: 'avatarUrl',
+        })),
+      ...users
+        .filter((u) => u.coverUrl)
+        .map((u) => ({
+          kind: 'USER_COVER',
+          ownerId: u.id,
+          ownerName: u.displayName,
+          url: u.coverUrl!,
+          updatedAt: u.updatedAt,
+          visibility: 'PUBLIC',
+          field: 'coverUrl',
+        })),
+      ...players
+        .filter((p) => p.coverUrl)
+        .map((p) => ({
+          kind: 'PLAYER_COVER',
+          ownerId: p.id,
+          ownerName: p.displayName,
+          url: p.coverUrl!,
+          updatedAt: p.updatedAt,
+          visibility: 'PUBLIC',
+          field: 'coverUrl',
         })),
       ...players.flatMap((p) =>
         ['avatarUrl', 'portraitUrl'].flatMap((field) => {
@@ -223,12 +246,24 @@ export class AdminMediaService {
           const foreign = await tx.$queryRaw<Array<{ count: bigint }>>(
             Prisma.sql`SELECT count(*) AS count FROM (SELECT avatar_url AS url FROM player_profiles WHERE organization_id<>${actor.organizationId}::uuid UNION ALL SELECT portrait_url FROM player_profiles WHERE organization_id<>${actor.organizationId}::uuid UNION ALL SELECT crest_url FROM teams WHERE organization_id<>${actor.organizationId}::uuid UNION ALL SELECT image_url FROM posts WHERE organization_id<>${actor.organizationId}::uuid UNION ALL SELECT u.avatar_url FROM app_users u JOIN organization_memberships m ON m.user_id=u.id WHERE m.organization_id<>${actor.organizationId}::uuid) shared WHERE url=${input.url} OR url LIKE ${'%' + canonical}`,
           )
-          if (Number(foreign[0]?.count))
+          const foreignCover = await tx.$queryRaw<
+            Array<{ count: bigint }>
+          >`SELECT count(*) AS count FROM (SELECT cover_url AS url FROM player_profiles WHERE organization_id<>${actor.organizationId}::uuid UNION ALL SELECT u.cover_url AS url FROM app_users u JOIN organization_memberships m ON m.user_id=u.id WHERE m.organization_id<>${actor.organizationId}::uuid) shared WHERE url=${input.url} OR url LIKE ${'%' + canonical}`
+          if (Number(foreign[0]?.count) || Number(foreignCover[0]?.count))
             throw centerError(409, '该文件有跨组织引用，需平台管理员处理，不能影响其他组织')
         }
         for (const ref of changes) {
           const restored = input.action === 'RESTORE' ? ref.url : null
-          if (ref.kind === 'USER_AVATAR')
+          if (ref.kind === 'USER_COVER')
+            await tx.user.updateMany({
+              where: {
+                id: ref.ownerId,
+                coverUrl: input.action === 'BLOCK' ? ref.url : null,
+                memberships: { some: { organizationId: actor.organizationId } },
+              },
+              data: { coverUrl: restored },
+            })
+          else if (ref.kind === 'USER_AVATAR')
             await tx.user.updateMany({
               where: {
                 id: ref.ownerId,
@@ -246,7 +281,11 @@ export class AdminMediaService {
               },
               data: { crestUrl: restored },
             })
-          else if (ref.kind === 'PLAYER_AVATAR' || ref.kind === 'PLAYER_PORTRAIT')
+          else if (
+            ref.kind === 'PLAYER_AVATAR' ||
+            ref.kind === 'PLAYER_PORTRAIT' ||
+            ref.kind === 'PLAYER_COVER'
+          )
             await tx.playerProfile.updateMany({
               where: {
                 id: ref.ownerId,

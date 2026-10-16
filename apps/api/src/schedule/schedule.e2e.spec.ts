@@ -71,13 +71,27 @@ class FakePrisma {
     findMany: async ({
       orderBy,
       where,
+      include,
     }: {
       orderBy?: { createdAt?: 'asc' | 'desc' }
       where: Row
+      include?: Row
     }) => {
-      const tournaments = this.tournaments.filter((tournament) =>
-        this.matchesWhere(tournament, where),
-      )
+      const tournaments = this.tournaments
+        .filter((tournament) => this.matchesWhere(tournament, where))
+        .map((tournament) =>
+          include?._count
+            ? {
+                ...tournament,
+                _count: {
+                  scheduleRevisions: this.scheduleRevisions.filter(
+                    (revision) =>
+                      revision.tournamentId === tournament.id && revision.status === 'PUBLISHED',
+                  ).length,
+                },
+              }
+            : tournament,
+        )
       const direction = orderBy?.createdAt
       if (direction === undefined) {
         return tournaments

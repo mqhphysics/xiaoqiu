@@ -184,7 +184,12 @@ function fixture() {
     },
   }
   const windowStub = {
-    matchMedia: () => ({ matches: true, media: '', addEventListener() {}, removeEventListener() {} }),
+    matchMedia: () => ({
+      matches: true,
+      media: '',
+      addEventListener() {},
+      removeEventListener() {},
+    }),
     dispatchEvent: (event) => {
       state.events.push(event.type)
       if (event.type === 'xiaoqiu:open-captain-manage') state.captainOpens.push(event.detail)
@@ -202,6 +207,7 @@ function fixture() {
     const module = { exports: {} }
     cache.set(key, module)
     const compiled = ts.transpileModule(readFileSync(url, 'utf8'), {
+      fileName: fileURLToPath(url),
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
         target: ts.ScriptTarget.ES2022,
@@ -284,7 +290,7 @@ function fixture() {
 
 test('actual IdentityEntry keeps identity button clickable and the same callback observes fresh feature changes', async () => {
   const { state, renderButtons, paths } = fixture()
-  const button = renderButtons([]).find((item) => item.label === '身份认证')
+  const button = renderButtons([]).find((item) => item.label === '我的身份')
   assert.ok(button)
   assert.equal(button.props.disabled, undefined)
   state.capabilities.modules.identityApplications.enabled = false
@@ -521,7 +527,7 @@ test('same-token user or organization changes invalidate the handler before a pr
 test('forced-rendered identity/admin buttons close when a malformed DTO grants the action but closes or omits its module', async () => {
   for (const missing of [false, true]) {
     for (const entry of [
-      { module: 'identityApplications', label: '身份认证', roles: [] },
+      { module: 'identityApplications', label: '我的身份', roles: [] },
       {
         module: 'administration',
         label: '管理中心',

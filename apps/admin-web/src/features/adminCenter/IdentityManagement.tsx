@@ -11,6 +11,7 @@ const KINDS = {
   TEAM_CAPTAIN: '队长',
   TEAM_COACH: '教练',
   MATCH_REPORTER: '信息管理员',
+  TOURNAMENT_ADMIN: '赛事管理员',
 } as const
 type Kind = keyof typeof KINDS
 type Named = { id: string; name: string }
@@ -102,7 +103,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
       ...(verifiedUserId ? { verifiedUserId } : {}),
       ...(['TEAM_COACH', 'TEAM_CAPTAIN'].includes(kind) ? { teamId } : {}),
       ...(kind === 'PLAYER' ? { playerProfileId: playerId } : {}),
-      ...(kind === 'MATCH_REPORTER' ? { scopeType, scopeId } : {}),
+      ...(kind === 'MATCH_REPORTER' || kind === 'TOURNAMENT_ADMIN' ? { scopeType, scopeId } : {}),
     }
     if (await mutate('/admin/identity/records', body, '录入任职')) {
       setName('')
@@ -151,6 +152,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
             value={kind}
             onChange={(e) => {
               setKind(e.target.value as Kind)
+              if (e.target.value === 'TOURNAMENT_ADMIN') setScopeType('TOURNAMENT')
               setTeamId('')
               setScopeId('')
             }}
@@ -217,7 +219,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
             </select>
           </label>
         )}
-        {kind === 'MATCH_REPORTER' && (
+        {(kind === 'MATCH_REPORTER' || kind === 'TOURNAMENT_ADMIN') && (
           <>
             <label>
               录入范围
@@ -229,7 +231,7 @@ export function IdentityManagement({ context }: { context: OrganizationContext }
                 }}
               >
                 <option value="TOURNAMENT">指定赛事</option>
-                <option value="MATCH">指定比赛</option>
+                {kind !== 'TOURNAMENT_ADMIN' && <option value="MATCH">指定比赛</option>}
               </select>
             </label>
             <label>

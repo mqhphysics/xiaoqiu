@@ -20,7 +20,6 @@ import {
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
-  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger'
 
@@ -53,20 +52,29 @@ export class ExperienceController {
     @Req() request: RequestWithId,
     @Headers('authorization') authorization: string | undefined,
     @Query('tournamentId') tournamentId: string | undefined,
+    @Query('competitionId') competitionDefinitionId: string | undefined,
+    @Query('seasonId') seasonId: string | undefined,
   ) {
-    return this.experienceService.getHome(getOrganizationId(request), authorization, tournamentId)
+    return this.experienceService.getHome(
+      getOrganizationId(request),
+      authorization,
+      tournamentId,
+      competitionDefinitionId || seasonId ? { competitionDefinitionId, seasonId } : undefined,
+    )
   }
 
   @Get('public/search')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '按球员、球队、比赛和动态搜索' })
-  @ApiQuery({ type: SearchQueryDto })
-  search(
-    @Req() request: RequestWithId,
-    @Query() query: SearchQueryDto,
-    @Query('tournamentId') tournamentId: string | undefined,
-  ) {
-    return this.experienceService.search(getOrganizationId(request), query, tournamentId)
+  search(@Req() request: RequestWithId, @Query() query: SearchQueryDto) {
+    return this.experienceService.search(
+      getOrganizationId(request),
+      query,
+      query.tournamentId,
+      query.competitionId || query.seasonId
+        ? { competitionDefinitionId: query.competitionId, seasonId: query.seasonId }
+        : undefined,
+    )
   }
 
   @Get('public/seasons')
@@ -79,7 +87,6 @@ export class ExperienceController {
   @Get('public/post-tags')
   @PublicOrganizationHeader()
   @ApiOperation({ summary: '读取常用话题以及公开球队、球员标签建议' })
-  @ApiQuery({ type: PostTagQueryDto })
   postTags(@Req() request: RequestWithId, @Query() query: PostTagQueryDto) {
     return this.experienceService.suggestPostTags(
       getOrganizationId(request),

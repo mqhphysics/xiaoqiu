@@ -35,6 +35,7 @@ import { TeamNavFocus } from './team-nav-focus'
 import { NativeTeamTabFocus } from './team-tab-focus'
 import brandMark from '../../assets/home-visual/brand-mark.png'
 import { DesktopAccount, useDesktopAccount } from './desktop-account'
+import { CampusContext, CampusWelcome } from '../campus-context'
 import { prefetchSection, prefetchTabsWhenIdle } from './prefetch-tabs'
 import { nativeHeaderMetrics } from './native-header-metrics'
 
@@ -452,7 +453,7 @@ export function PublicShell({
             <Text>返回</Text>
           </Button>
         )}
-        {children}
+        <CampusContext active={active}>{children}</CampusContext>
       </View>
 
       <View className="public-footer">
@@ -503,6 +504,7 @@ export function PublicShell({
         )}
       </View>
       {session && <MessagingDrawer />}
+      {session && <CampusWelcome />}
       {feedbackOpen && (
         <ReportModal
           targetType="FEEDBACK"

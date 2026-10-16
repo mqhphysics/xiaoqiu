@@ -6,6 +6,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { ApiHttpException } from '../common/api-http.exception'
 import { DEMO_ACCOUNTS, DEMO_ORGANIZATION_ID, fixtureId } from '../database/demo-fixture'
 import { PrismaService } from '../database/prisma.service'
+import { attachRegisteredStudent } from '../campus/student-registration'
 import {
   AuditActorType,
   MembershipStatus,
@@ -384,6 +385,7 @@ export class AuthService {
           status: UserStatus.ACTIVE,
         },
       })
+      await attachRegisteredStudent(tx, organizationId, user.id, body.realName.trim(), studentId)
       await tx.passwordCredential.create({
         data: {
           userId: user.id,

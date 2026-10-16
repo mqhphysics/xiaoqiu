@@ -131,9 +131,28 @@ export class AdminPeopleService {
       async (tx, actor) => {
         const member = await tx.organizationMembership.findFirst({
           where: { organizationId: actor.organizationId, userId: id },
-          select: { user: { select: { id: true, loginNameNormalized: true, updatedAt: true } } },
+          select: {
+            user: {
+              select: {
+                id: true,
+                loginNameNormalized: true,
+                updatedAt: true,
+                studentRecordId: true,
+                realName: true,
+                studentId: true,
+                playerProfileId: true,
+              },
+            },
+          },
         })
         if (!member) throw centerError(404, '本组织中不存在该账号')
+        if (
+          member.user.studentRecordId &&
+          (['realName', 'studentId', 'playerProfileId'] as const).some(
+            (field) => Object.hasOwn(patch, field) && patch[field] !== member.user[field],
+          )
+        )
+          throw centerError(409, '该用户已有学生基础档案，请在学生档案中维护姓名、学号和球员关联')
         if (
           id === actor.userId &&
           patch.loginNameNormalized &&

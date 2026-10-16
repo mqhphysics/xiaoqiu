@@ -25,4 +25,4 @@ apps/mini-program/project.private.config.json
 /tools/wechat-devtools/official-*.html
 /tools/wechat-devtools/official-*.json
 /tools/wechat-devtools/install-receipt.json
-packages/api-client/src/generated/
+# The DTO-derived API client is versioned source alongside docs/api/openapi.json.

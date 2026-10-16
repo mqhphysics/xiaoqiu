@@ -271,13 +271,13 @@ export class ManagedMediaService {
         status: 'ACTIVE',
         user: { status: 'ACTIVE' },
       },
-      select: { id: true },
+      select: { id: true, user: { select: { coverUrl: true } } },
     })
     if (!member) throw notFound()
     const rows = await this.prisma.$queryRaw<
       MediaRow[]
     >`SELECT * FROM managed_media_assets WHERE organization_id=${session.organizationId}::uuid AND target_id=${userId}::uuid AND purpose='USER_BACKGROUND' AND status='APPROVED' AND visibility='ACTIVE' ORDER BY created_at DESC,id DESC LIMIT 1`
-    return { backgroundUrl: rows[0] ? this.url(rows[0]) : null }
+    return { backgroundUrl: rows[0] ? this.url(rows[0]) : member.user.coverUrl }
   }
 
   async content(authorization: string | undefined, id: string, poster: boolean) {

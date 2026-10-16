@@ -7,6 +7,7 @@ export const IDENTITY_KINDS = [
   'TEAM_CAPTAIN',
   'TEAM_COACH',
   'MATCH_REPORTER',
+  'TOURNAMENT_ADMIN',
 ] as const
 export type IdentityKind = (typeof IDENTITY_KINDS)[number]
 

@@ -5,6 +5,7 @@ import { ERROR_CODES } from '@xiaoqiu/contracts'
 import { AuthService } from '../auth/auth.service'
 import { ApiHttpException } from '../common/api-http.exception'
 import { selectPublicTournament } from '../common/public-tournament'
+import { withSeasonTeamProfile } from '../common/season-team-profile'
 import { isDemoFixtureOrganization } from '../common/demo-fixture-organization'
 import { PrismaService } from '../database/prisma.service'
 import { MediaService, postImageUrls } from '../media/media.service'
@@ -58,9 +59,19 @@ export class ExperienceService {
     @Optional() @Inject(ResultsService) private readonly resultsService?: ResultsService,
   ) {}
 
-  async getHome(organizationId: string, authorization?: string, tournamentId?: string) {
+  async getHome(
+    organizationId: string,
+    authorization?: string,
+    tournamentId?: string,
+    selection?: { competitionDefinitionId?: string | undefined; seasonId?: string | undefined },
+  ) {
     const session = await this.authService.getSession(authorization)
-    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
+    const tournament = await this.getFeaturedTournament(
+      organizationId,
+      tournamentId,
+      undefined,
+      selection,
+    )
     const [matches, registrations, posts, directoryTeams, platformPosts] = await Promise.all([
       this.prisma.match.findMany({
         where: { organizationId, tournamentId: tournament.id, status: { not: 'DRAFT' } },
@@ -115,7 +126,13 @@ export class ExperienceService {
       platformAnnouncements: platformPosts.map((post) => mapPost(post, session?.userId)),
       focusMatches: [...live, ...upcoming, ...finished].slice(0, 5).map(mapMatch),
       teams: directoryTeams.map((team) => ({
-        ...mapTeam(team),
+        ...mapTeam(
+          withSeasonTeamProfile(
+            team,
+            registrations.find((registration) => registration.teamId === team.id)
+              ?.teamProfileSnapshot,
+          ),
+        ),
         groupName:
           registrations.find((registration) => registration.teamId === team.id)?.group?.name ??
           null,
@@ -130,8 +147,18 @@ export class ExperienceService {
     }
   }
 
-  async search(organizationId: string, input: SearchQueryDto, tournamentId?: string) {
-    const tournament = await this.getFeaturedTournament(organizationId, tournamentId)
+  async search(
+    organizationId: string,
+    input: SearchQueryDto,
+    tournamentId?: string,
+    selection?: { competitionDefinitionId?: string | undefined; seasonId?: string | undefined },
+  ) {
+    const tournament = await this.getFeaturedTournament(
+      organizationId,
+      tournamentId,
+      undefined,
+      selection,
+    )
     const snapshotScope = {
       organizationId,
       tournamentId: tournament.id,
@@ -595,9 +622,10 @@ export class ExperienceService {
 
     return {
       team: {
-        ...mapTeam(team),
-        description: team.description,
-        motto: team.motto,
+        ...mapTeam(withSeasonTeamProfile(team, team.registrations[0]?.teamProfileSnapshot)),
+        description: withSeasonTeamProfile(team, team.registrations[0]?.teamProfileSnapshot)
+          .description,
+        motto: withSeasonTeamProfile(team, team.registrations[0]?.teamProfileSnapshot).motto,
         foundedYear: team.foundedYear,
         coachName: team.registrations[0]?.coachDisplayName ?? null,
         captainName: team.registrations[0]?.leaderDisplayName ?? null,
@@ -1911,8 +1939,9 @@ export class ExperienceService {
     organizationId: string,
     tournamentId?: string,
     prisma: Pick<PrismaService, 'tournament'> = this.prisma,
+    selection?: { competitionDefinitionId?: string | undefined; seasonId?: string | undefined },
   ) {
-    return selectPublicTournament(prisma, organizationId, tournamentId)
+    return selectPublicTournament(prisma, organizationId, tournamentId, selection)
   }
 
   private async resultContext(
@@ -2381,4 +2410,3 @@ async function contentAudit(
 function forbidden(message: string) {
   return new ApiHttpException(HttpStatus.FORBIDDEN, { code: ERROR_CODES.FORBIDDEN, message })
 }
-

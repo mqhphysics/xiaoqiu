@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Req } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common'
 import {
   ApiBody,
   ApiBearerAuth,
@@ -177,8 +177,15 @@ export class ScheduleController {
   @ApiOperation({ summary: '读取已发布赛事列表' })
   @ApiOkResponse({ type: PublicTournamentListResponseDto })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto })
-  listPublicTournaments(@Req() request: RequestWithId) {
-    return this.scheduleService.listPublicTournaments(requireP1DevOrganizationId(request))
+  listPublicTournaments(
+    @Req() request: RequestWithId,
+    @Query('competitionId') competitionDefinitionId: string | undefined,
+    @Query('seasonId') seasonId: string | undefined,
+  ) {
+    return this.scheduleService.listPublicTournaments(
+      requireP1DevOrganizationId(request),
+      competitionDefinitionId || seasonId ? { competitionDefinitionId, seasonId } : undefined,
+    )
   }
 
   @Get('public/tournaments/:id')

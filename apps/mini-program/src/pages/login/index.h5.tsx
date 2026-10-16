@@ -101,8 +101,8 @@ function ArtLoginPage({
     setSubmitting(true)
     setFailureMessage('')
     try {
-      const { confirmPassword: _confirmPassword, ...input } = registration
-      await productRepository.register(input)
+      const { confirmPassword: _confirmPassword, emailCode, ...input } = registration
+      await productRepository.register({ ...input, ...(input.email.trim() ? { emailCode } : {}) })
       await Taro.reLaunch({ url: '/pages/index/index' })
     } catch (error) {
       setFailureMessage(error instanceof Error ? error.message : '注册失败，请重试。')
@@ -339,7 +339,7 @@ function ArtLoginPage({
                 <Field
                   id="art-register-email"
                   className="art-login__wide"
-                  label="绑定邮箱"
+                  label="绑定邮箱（可选）"
                   value={registration.email}
                   onChange={(value) => {
                     updateRegistration('email', value)
@@ -347,14 +347,16 @@ function ArtLoginPage({
                   }}
                   autoComplete="email"
                 />
-                <div className="art-login__wide">
-                  <EmailCodeField
-                    email={registration.email}
-                    purpose="REGISTER"
-                    value={registration.emailCode}
-                    onChange={(value) => updateRegistration('emailCode', value)}
-                  />
-                </div>
+                {registration.email.trim() && (
+                  <div className="art-login__wide">
+                    <EmailCodeField
+                      email={registration.email}
+                      purpose="REGISTER"
+                      value={registration.emailCode}
+                      onChange={(value) => updateRegistration('emailCode', value)}
+                    />
+                  </div>
+                )}
                 <Field
                   id="art-register-password"
                   label="密码"
@@ -504,10 +506,9 @@ function canRegister(input: RegisterInput & { confirmPassword: string; emailCode
     input.displayName.trim().length >= 2 &&
     input.realName.trim().length >= 2 &&
     /^\d{10}$/.test(input.studentId.trim()) &&
-    input.email.includes('@') &&
-    /^\d{6}$/.test(input.emailCode) &&
-    input.password.length >= 8 &&
-    input.confirmPassword.length >= 8,
+    (!input.email.trim() || (input.email.includes('@') && /^\d{6}$/.test(input.emailCode))) &&
+    input.password.length >= 6 &&
+    input.confirmPassword.length >= 6,
   )
 }
 async function showError(error: unknown, fallback: string) {

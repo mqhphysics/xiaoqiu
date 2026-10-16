@@ -46,6 +46,7 @@ export function publicReadModule(path: string, method = 'GET'): ProductModuleId 
   // IDs are one safe segment; encoded slash/backslash and dot traversal never enter the whitelist.
   const id = '[A-Za-z0-9_-]+'
   if (pathname === '/public/home') return 'home'
+  if (pathname === '/public/competition-catalog') return 'schedule'
   if (pathname === '/public/search') return 'home'
   if (pathname === '/public/seasons' || pathname === '/public/tournaments') return 'schedule'
   if (

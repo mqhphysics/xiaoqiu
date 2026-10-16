@@ -14,6 +14,9 @@ import { SelfPlayerEditor } from '../../components/player-overlay/self-editor.h5
 import { SelfPersonEditor } from '../../components/person-overlay/self-editor.h5'
 import { VerificationBadge } from '../../components/verification-badge/index.h5'
 import { ProfileDialog } from './profile-dialog.h5'
+import { ReporterQualityPanel } from '../../components/campus-context/reporter-quality.h5'
+import { StudentIdentitySummary } from '../../components/campus-context/student-identity.h5'
+import '../../components/campus-context/index.h5.scss'
 import './my-identities.h5.scss'
 
 export function MyIdentitiesDialog({
@@ -116,6 +119,8 @@ export function MyIdentitiesDialog({
                   ? '维护本队资料、成员与比赛名单。'
                   : '查看当前身份与个人资料。'}
         </p>
+        {selected === 'student' && <StudentIdentitySummary />}
+        {selected === 'reporter' && <ReporterQualityPanel />}
         <div className="my-identity-actions">
           {selected === 'player' && user.linkedPlayer ? (
             <>
