@@ -29,8 +29,8 @@ export class EmailVerificationDto {
 }
 
 export class EmailPasswordResetDto extends EmailVerificationDto {
-  @ApiProperty()
+  @ApiProperty({ minLength: 6, maxLength: 128, description: '至少6位，不限制字符类型' })
   @IsString()
-  @Length(8, 128)
+  @Length(6, 128)
   newPassword!: string
 }

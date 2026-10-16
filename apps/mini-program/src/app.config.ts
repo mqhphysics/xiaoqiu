@@ -20,5 +20,12 @@ export default defineAppConfig({
     navigationBarBackgroundColor: '#183f2a',
     navigationBarTitleText: '晓球 · 校园足球',
     navigationBarTextStyle: 'white',
+    ...((process.env as typeof process.env & { TARO_ENV?: string }).TARO_ENV === 'weapp'
+      ? {
+          navigationStyle: 'custom',
+          navigationBarBackgroundColor: '#f7f8f4',
+          navigationBarTextStyle: 'black',
+        }
+      : {}),
   },
 })

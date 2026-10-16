@@ -328,7 +328,7 @@ export class AuthService {
     },
   ): Promise<LoginResponseDto> {
     const username = normalizeIdentifier(body.username)
-    const email = normalizeIdentifier(body.email)
+    const email = body.email ? normalizeIdentifier(body.email) : undefined
     const studentId = body.studentId.trim()
     const organization = await this.prisma.organization.findFirst({
       where: { id: organizationId, status: 'ACTIVE' },
@@ -343,7 +343,11 @@ export class AuthService {
 
     const existing = await this.prisma.user.findFirst({
       where: {
-        OR: [{ loginNameNormalized: username }, { studentId }, { emailNormalized: email }],
+        OR: [
+          { loginNameNormalized: username },
+          { studentId },
+          ...(email ? [{ emailNormalized: email }] : []),
+        ],
       },
       select: {
         loginNameNormalized: true,
@@ -373,9 +377,9 @@ export class AuthService {
           realName: body.realName.trim(),
           realNameNormalized: normalizeIdentifier(body.realName),
           studentId,
-          email: body.email.trim(),
-          emailNormalized: email,
-          emailVerifiedAt: this.emailCodes?.enabled ? new Date() : null,
+          email: body.email?.trim() ?? null,
+          emailNormalized: email ?? null,
+          emailVerifiedAt: email && this.emailCodes?.enabled ? new Date() : null,
           verificationLevel: VerificationLevel.UNVERIFIED,
           status: UserStatus.ACTIVE,
         },
@@ -411,9 +415,14 @@ export class AuthService {
           source: 'API',
         },
       })
+      const registeredUser = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        include: userInclude,
+      })
+      return this.createSession(tx, registeredUser, organizationId, request)
     }
-    await (
-      this.emailCodes?.enabled
+    return (
+      email && this.emailCodes?.enabled
         ? this.emailCodes.withCode(
             email,
             'REGISTER',
@@ -424,10 +433,6 @@ export class AuthService {
           )
         : this.prisma.$transaction(create)
     ).catch((error: unknown) => rethrowUniqueConflict(error, '用户名、学号或邮箱已被使用'))
-
-    // The verified registration write owns this email; a numeric username may
-    // collide with another account's student ID and must not break auto-login.
-    return this.login(email, body.password, organizationId, request)
   }
 
   async requestEmailCode(

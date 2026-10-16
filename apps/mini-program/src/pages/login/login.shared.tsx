@@ -1,6 +1,6 @@
 import { Button, Input, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { productRepository } from '../../features/product/product.repository'
 import { enterGuestMode, readSession } from '../../features/product/session'
@@ -26,10 +26,20 @@ export default function LoginPage({
   allowGuest = true,
   guestPolicy,
   onGuestEntry,
+  visual,
+  onScreenChange,
+  onRequestRecovery,
+  redirectAuthenticated = true,
+  registrationForm,
 }: {
   allowGuest?: boolean
   guestPolicy?: GuestEntryPolicy
   onGuestEntry?: () => Promise<void>
+  visual?: ReactNode
+  onScreenChange?: (screen: ScreenMode) => void
+  onRequestRecovery?: () => void
+  redirectAuthenticated?: boolean
+  registrationForm?: ReactNode
 }) {
   const [screenMode, setScreenMode] = useState<ScreenMode>('login')
   const [loginMode, setLoginMode] = useState<LoginMode>('password')
@@ -46,16 +56,19 @@ export default function LoginPage({
   const [recoveryPassword, setRecoveryPassword] = useState('')
 
   useEffect(() => {
-    if (readSession()) {
+    if (redirectAuthenticated && readSession()) {
       void Taro.reLaunch({ url: '/pages/index/index' })
     }
-  }, [])
+  }, [redirectAuthenticated])
 
+  useEffect(() => onScreenChange?.(screenMode), [onScreenChange, screenMode])
+
+  const minimumLength =
+    Taro.getEnv() === Taro.ENV_TYPE.WEAPP ||
+    (Taro.getEnv() === Taro.ENV_TYPE.WEB && process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1')
+      ? 1
+      : 8
   const login = async () => {
-    const minimumLength =
-      Taro.getEnv() === Taro.ENV_TYPE.WEB && process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
-        ? 1
-        : 8
     if (!identifier.trim() || password.length < minimumLength || submitting) return
     setSubmitting(true)
     setFailureMessage('')
@@ -139,19 +152,21 @@ export default function LoginPage({
 
   return (
     <View className="auth-page">
-      <View className="auth-visual">
-        <View className="auth-brand">
-          <Text className="auth-brand__mark">XQ</Text>
-          <Text className="auth-brand__name">晓球</Text>
+      {visual ?? (
+        <View className="auth-visual">
+          <View className="auth-brand">
+            <Text className="auth-brand__mark">XQ</Text>
+            <Text className="auth-brand__name">晓球</Text>
+          </View>
+          <View className="auth-visual__copy">
+            <Text className="auth-visual__eyebrow">CAMPUS FOOTBALL</Text>
+            <Text className="auth-visual__title">每一场校园比赛，都值得被认真记录</Text>
+            <Text className="auth-visual__body">
+              赛程、数据、球队与同学们的现场声音，在这里汇成完整赛季。
+            </Text>
+          </View>
         </View>
-        <View className="auth-visual__copy">
-          <Text className="auth-visual__eyebrow">CAMPUS FOOTBALL</Text>
-          <Text className="auth-visual__title">每一场校园比赛，都值得被认真记录</Text>
-          <Text className="auth-visual__body">
-            赛程、数据、球队与同学们的现场声音，在这里汇成完整赛季。
-          </Text>
-        </View>
-      </View>
+      )}
 
       <View className="auth-panel">
         <View className="auth-panel__inner">
@@ -170,7 +185,7 @@ export default function LoginPage({
             </Button>
           </View>
 
-          {!allowGuest && failureMessage ? (
+          {(!allowGuest || Taro.getEnv() === Taro.ENV_TYPE.WEAPP) && failureMessage ? (
             <View className="auth-account-error" role="alert">
               {failureMessage}
             </View>
@@ -212,20 +227,17 @@ export default function LoginPage({
                     value={password}
                     onInput={(event) => setPassword(event.detail.value)}
                   />
-                  <Button className="auth-link" onClick={() => setShowRecovery((value) => !value)}>
+                  <Button
+                    className="auth-link"
+                    onClick={() =>
+                      onRequestRecovery ? onRequestRecovery() : setShowRecovery((value) => !value)
+                    }
+                  >
                     忘记密码
                   </Button>
                   <Button
                     className="auth-primary"
-                    disabled={
-                      !identifier.trim() ||
-                      password.length <
-                        (Taro.getEnv() === Taro.ENV_TYPE.WEB &&
-                        process.env.TARO_APP_LOCAL_SHORT_PASSWORDS === '1'
-                          ? 1
-                          : 8) ||
-                      submitting
-                    }
+                    disabled={!identifier.trim() || password.length < minimumLength || submitting}
                     loading={submitting}
                     onClick={() => void login()}
                   >
@@ -302,60 +314,64 @@ export default function LoginPage({
               )}
             </View>
           ) : (
-            <View className="auth-form">
-              <Text className="auth-form__title">创建实名账号</Text>
-              <Text className="auth-form__subtitle">
-                公开页面显示昵称，实名与学号仅供本人和授权管理员使用。
-              </Text>
-              <View className="register-grid">
-                <FormField
-                  label="用户名"
-                  value={registration.username}
-                  onChange={(value) => setRegistration({ ...registration, username: value })}
-                />
-                <FormField
-                  label="公开昵称"
-                  value={registration.displayName}
-                  onChange={(value) => setRegistration({ ...registration, displayName: value })}
-                />
-                <FormField
-                  label="真实姓名"
-                  value={registration.realName}
-                  onChange={(value) => setRegistration({ ...registration, realName: value })}
-                />
-                <FormField
-                  label="学号（10位数字）"
-                  value={registration.studentId}
-                  onChange={(value) => setRegistration({ ...registration, studentId: value })}
-                />
-                <FormField
-                  className="register-grid__wide"
-                  label="绑定邮箱"
-                  value={registration.email}
-                  onChange={(value) => setRegistration({ ...registration, email: value })}
-                />
-                <FormField
-                  label="密码"
-                  password
-                  value={registration.password}
-                  onChange={(value) => setRegistration({ ...registration, password: value })}
-                />
-                <FormField
-                  label="确认密码"
-                  password
-                  value={registration.confirmPassword}
-                  onChange={(value) => setRegistration({ ...registration, confirmPassword: value })}
-                />
+            (registrationForm ?? (
+              <View className="auth-form">
+                <Text className="auth-form__title">创建实名账号</Text>
+                <Text className="auth-form__subtitle">
+                  公开页面显示昵称，实名与学号仅供本人和授权管理员使用。
+                </Text>
+                <View className="register-grid">
+                  <FormField
+                    label="用户名"
+                    value={registration.username}
+                    onChange={(value) => setRegistration({ ...registration, username: value })}
+                  />
+                  <FormField
+                    label="公开昵称"
+                    value={registration.displayName}
+                    onChange={(value) => setRegistration({ ...registration, displayName: value })}
+                  />
+                  <FormField
+                    label="真实姓名"
+                    value={registration.realName}
+                    onChange={(value) => setRegistration({ ...registration, realName: value })}
+                  />
+                  <FormField
+                    label="学号（10位数字）"
+                    value={registration.studentId}
+                    onChange={(value) => setRegistration({ ...registration, studentId: value })}
+                  />
+                  <FormField
+                    className="register-grid__wide"
+                    label="绑定邮箱"
+                    value={registration.email}
+                    onChange={(value) => setRegistration({ ...registration, email: value })}
+                  />
+                  <FormField
+                    label="密码"
+                    password
+                    value={registration.password}
+                    onChange={(value) => setRegistration({ ...registration, password: value })}
+                  />
+                  <FormField
+                    label="确认密码"
+                    password
+                    value={registration.confirmPassword}
+                    onChange={(value) =>
+                      setRegistration({ ...registration, confirmPassword: value })
+                    }
+                  />
+                </View>
+                <Button
+                  className="auth-primary"
+                  disabled={!canRegister(registration) || submitting}
+                  loading={submitting}
+                  onClick={() => void register()}
+                >
+                  注册并进入
+                </Button>
               </View>
-              <Button
-                className="auth-primary"
-                disabled={!canRegister(registration) || submitting}
-                loading={submitting}
-                onClick={() => void register()}
-              >
-                注册并进入
-              </Button>
-            </View>
+            ))
           )}
 
           {(guestPolicy ? guestPolicy.visible : allowGuest) ? (

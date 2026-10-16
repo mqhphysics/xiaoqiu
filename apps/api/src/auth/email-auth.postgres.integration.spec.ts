@@ -109,6 +109,75 @@ test(
         return sent.code
       }
 
+      await t.test(
+        'optional email registration creates independent unbound accounts and real sessions',
+        async () => {
+          const sentBefore = mail.messages.length
+          for (const [index, optionalEmail] of [undefined, '   '].entries()) {
+            const response = await post('register', {
+              ...input,
+              username: `no-mail-${index}-${suffix}`,
+              studentId: `88${String(Date.now()).slice(-7)}${index}`,
+              email: optionalEmail,
+            })
+            assert.equal(response.status, 201, response.text)
+            userIds.push(response.body.user.id)
+            assert.equal(response.body.user.email, null)
+            assert.equal(response.body.user.emailVerifiedAt, null)
+            assert.equal(response.body.user.username, `no-mail-${index}-${suffix}`)
+            const stored = await prisma.user.findUniqueOrThrow({
+              where: { id: response.body.user.id },
+            })
+            assert.equal(stored.emailNormalized, null)
+            const me = await api
+              .get('/api/auth/me')
+              .set('Authorization', `Bearer ${response.body.accessToken}`)
+              .set('x-organization-id', orgId)
+            assert.equal(me.status, 200, me.text)
+            assert.equal(me.body.id, stored.id)
+          }
+          assert.equal(mail.messages.length, sentBefore)
+          assert.equal(await prisma.emailAuthCode.count({ where: { organizationId: orgId } }), 0)
+          assert.equal((await post('register', { ...input, email: 'bad-email' })).status, 400)
+          assert.equal(
+            (await post('register', { ...input, email: '', studentId: '123' })).status,
+            400,
+          )
+        },
+      )
+
+      await t.test(
+        'six arbitrary password characters register and log in through real HTTP',
+        async () => {
+          for (const [index, password] of [
+            '123456',
+            'abcdef',
+            '......',
+            '中文密码六个',
+            '😀😀😀😀😀😀',
+            '      ',
+          ].entries()) {
+            const username = `six-${index}-${suffix}`
+            const response = await post('register', {
+              ...input,
+              username,
+              studentId: `77${String(Date.now()).slice(-7)}${index}`,
+              email: '',
+              password,
+            })
+            assert.equal(response.status, 201, response.text)
+            userIds.push(response.body.user.id)
+            const loggedIn = await post('login', { username, password })
+            assert.equal(loggedIn.status, 200, loggedIn.text)
+            assert.equal(loggedIn.body.user.id, response.body.user.id)
+          }
+          assert.equal(
+            (await post('register', { ...input, email: '', password: '12345' })).status,
+            400,
+          )
+        },
+      )
+
       await t.test('invalid organization and missing registration code are rejected', async () => {
         assert.equal(
           (await post('email/code', { email, purpose: 'REGISTER' }, undefined, randomUUID()))

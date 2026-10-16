@@ -33,6 +33,8 @@ import { captainRequest, RosterApiError } from '../../features/captain-roster/ro
 import { teamManagementRepository } from '../../features/captain-roster/team-management.repository'
 import { createClientActionId } from '../../features/product/product.repository'
 import { RosterReviewWorkspace } from '../../features/captain-roster/roster-review'
+import { TeamPreferenceLayout } from './team-preference-layout'
+import { NativeMatchRow } from '../../components/native-match-row'
 import type {
   HomeResponse,
   CaptainWorkspaceResponse,
@@ -331,66 +333,78 @@ export default function MyTeamPage() {
         <View>
           {!state.preferences ? (
             <VisitorTeamView home={state.home} />
-          ) : editing || !state.dashboard ? (
-            <TeamSelector
-              followedIds={followedIds}
-              primaryId={primaryId}
-              query={teamQuery}
-              saving={saving}
-              teams={state.preferences.availableTeams}
-              onCancel={cancelEditing}
-              canCancel={Boolean(state.dashboard)}
-              onFollowedChange={setFollowedIds}
-              onPrimaryChange={(id) => {
-                setPrimaryId(id)
-                setFollowedIds((current) => current.filter((item) => item !== id))
-              }}
-              onQueryChange={setTeamQuery}
-              onSave={() => void savePreferences()}
-            />
           ) : (
-            <TeamDashboard
-              key={state.dashboard.team.id}
-              data={state.dashboard}
-              primaryTeam={
-                Taro.getEnv() === Taro.ENV_TYPE.WEB && requestedTeamId
-                  ? state.dashboard.team
-                  : (state.preferences.primaryTeam ?? state.dashboard.team)
-              }
-              followedTeams={state.preferences.followedTeams}
+            <TeamPreferenceLayout
+              editing={editing || !state.dashboard}
+              onClose={cancelEditing}
+              onSave={() => void savePreferences()}
               saving={saving}
-              teamMatches={state.schedule.filter(
-                (match) =>
-                  match.homeTeam?.id === state.dashboard?.team.id ||
-                  match.awayTeam?.id === state.dashboard?.team.id,
-              )}
-              tournamentId={state.home.tournament.id}
-              onEdit={openEditor}
-              onRemoveFollow={(team) => void removeFollowedTeam(team)}
-              playerFollows={state.playerFollows.items}
-              playerBusy={playerBusy}
-              captain={state.captain}
-              captainError={state.captainError}
-              onCaptainChange={(captain) =>
-                setState((current) =>
-                  current.phase === 'ready'
-                    ? {
-                        ...current,
-                        captain,
-                        captainError: null,
-                        dashboard: current.dashboard
-                          ? {
-                              ...current.dashboard,
-                              team: { ...current.dashboard.team, ...captain.team },
-                            }
-                          : null,
-                      }
-                    : current,
-                )
+              canSave={Boolean(primaryId)}
+              editor={
+                <TeamSelector
+                  followedIds={followedIds}
+                  primaryId={primaryId}
+                  query={teamQuery}
+                  saving={saving}
+                  teams={state.preferences.availableTeams}
+                  onCancel={cancelEditing}
+                  canCancel={Boolean(state.dashboard)}
+                  onFollowedChange={setFollowedIds}
+                  onPrimaryChange={(id) => {
+                    setPrimaryId(id)
+                    setFollowedIds((current) => current.filter((item) => item !== id))
+                  }}
+                  onQueryChange={setTeamQuery}
+                  onSave={() => void savePreferences()}
+                />
               }
-              onCaptainRetry={() => void retryCaptain()}
-              onFollowPlayer={(playerId) => void followPlayer(playerId)}
-              onUnfollowPlayer={(playerId) => void unfollowPlayer(playerId)}
+              content={
+                state.dashboard ? (
+                  <TeamDashboard
+                    key={state.dashboard.team.id}
+                    data={state.dashboard}
+                    primaryTeam={
+                      Taro.getEnv() === Taro.ENV_TYPE.WEB && requestedTeamId
+                        ? state.dashboard.team
+                        : (state.preferences.primaryTeam ?? state.dashboard.team)
+                    }
+                    followedTeams={state.preferences.followedTeams}
+                    saving={saving}
+                    teamMatches={state.schedule.filter(
+                      (match) =>
+                        match.homeTeam?.id === state.dashboard?.team.id ||
+                        match.awayTeam?.id === state.dashboard?.team.id,
+                    )}
+                    tournamentId={state.home.tournament.id}
+                    onEdit={openEditor}
+                    onRemoveFollow={(team) => void removeFollowedTeam(team)}
+                    playerFollows={state.playerFollows.items}
+                    playerBusy={playerBusy}
+                    captain={state.captain}
+                    captainError={state.captainError}
+                    onCaptainChange={(captain) =>
+                      setState((current) =>
+                        current.phase === 'ready'
+                          ? {
+                              ...current,
+                              captain,
+                              captainError: null,
+                              dashboard: current.dashboard
+                                ? {
+                                    ...current.dashboard,
+                                    team: { ...current.dashboard.team, ...captain.team },
+                                  }
+                                : null,
+                            }
+                          : current,
+                      )
+                    }
+                    onCaptainRetry={() => void retryCaptain()}
+                    onFollowPlayer={(playerId) => void followPlayer(playerId)}
+                    onUnfollowPlayer={(playerId) => void unfollowPlayer(playerId)}
+                  />
+                ) : null
+              }
             />
           )}
         </View>
@@ -654,7 +668,7 @@ function TeamDashboard({
   }
 
   return (
-    <View>
+    <View className="my-team-dashboard">
       <TeamFollowBar
         followedTeams={followedTeams}
         primaryTeam={primaryTeam}
@@ -739,7 +753,7 @@ function TeamDashboard({
       </View>
 
       {showAllMatches && (
-        <View className="my-team-section">
+        <View className="my-team-section my-team-matches-section">
           <ProductSection
             kicker="FIXTURES"
             title="全部球队赛程"
@@ -753,7 +767,7 @@ function TeamDashboard({
         </View>
       )}
 
-      <View className="my-team-section">
+      <View className="my-team-section my-team-data-section">
         <ProductSection kicker="TEAM DATA" title="球队数据" note="来自比赛事实" />
         <View className="team-record">
           <Record value={data.stats.played} label="比赛" />
@@ -1362,6 +1376,7 @@ function FollowedTeamChip({
 }
 
 function CompactMatchRow({ label, match }: { label: string; match: MatchSummary }) {
+  if (Taro.getEnv() === Taro.ENV_TYPE.WEAPP) return <NativeMatchRow match={match} showDate />
   const hasScore = match.homeScore !== null && match.awayScore !== null
   return (
     <View className="compact-match-row" onClick={() => void goToMatch(match.id)}>
