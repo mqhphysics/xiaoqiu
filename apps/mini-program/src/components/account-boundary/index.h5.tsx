@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { mountCursorSkin } from '../auth-cursor/index.h5'
 import { IdentityCenterHost } from '../identity-center/index.h5'
 import { useEffect, useRef, useState, type PropsWithChildren, type ReactNode } from 'react'
 
@@ -32,6 +33,7 @@ export function AccountBoundary({
   children,
   overlays,
 }: PropsWithChildren<{ overlays?: ReactNode }>) {
+  useEffect(() => mountCursorSkin(), [])
   const [entry, setEntry] = useState(atAccountEntry)
   const [token, setToken] = useState(() => readAccountPresence().session?.accessToken ?? null)
   const { configuration, phase, error: configurationError } = useProductConfiguration()

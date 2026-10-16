@@ -1,6 +1,6 @@
 {
   "scope": "All desktop H5 pages; min-width: 1024px, hover: hover, pointer: fine. Football and morph are confined to the login artwork/divider.",
-  "implementation": "Native CSS cursors when settled. A 280ms SVG path morph temporarily replaces the native cursor across the login divider; rapid reversal continues from the current contour. No continuous DOM follower.",
+  "implementation": "Native PNG cursors at rest. Busy/progress use six fixed segment contours whose dark fills chase clockwise in 1200ms. Orange accent is stationary at the upper right. Reduced motion or image failure retains a visible static native cursor.",
   "sourceReferenceDirectory": "参考图片/04-登录页定稿与光标-2026-10-01",
   "assets": [
     {
@@ -21,12 +21,18 @@
       "hotspotY": 2,
       "fallback": "default",
       "role": "Default pointer throughout desktop H5",
-      "source": "Code-native SVG traced from the supplied deep-green outline and coral fold reference, with opaque sage fill",
+      "source": "Original reference bitmap layer retained, with an imagegen-edited interior clipped underneath; no replacement vector outline or coral fold.",
       "sourceSha256": "a3edcb574fbd62a02f3b82eee88fea8de73c9249ad71bd6707bc049ca745802b",
-      "viewBox": [0, 0, 32, 32],
+      "viewBox": [
+        0,
+        0,
+        32,
+        32
+      ],
       "preserveAspectRatio": "xMidYMid meet",
-      "note": "Opaque interior #e4ede5. Source reference retained unchanged in the reference directory; the new SVG is a derivative, not an unchanged embedded raster. Browser-rendered 32px PNG keeps native cursor compatibility.",
-      "sourceSvg": "default-32.svg"
+      "note": "Transparent canvas cropped at [402,274,492,728], scaled proportionally to 30px high at (1,1); 32px/64px native PNGs. Original reference remains unchanged.",
+      "sourceSvg": "default-32.svg",
+      "fillSource": "default-interior-fill-source.png"
     },
     {
       "file": "text-32.svg",
@@ -46,7 +52,7 @@
       "hotspotY": 4,
       "fallback": "pointer",
       "role": "Enabled tabs, buttons and links",
-      "source": "Code-native green outlined index hand based on 02-cursor-style-c.png; tiny coral palm mark replaces small football details"
+      "source": "Simplified sage-filled index hand with a thin green outline and coral palm line."
     },
     {
       "file": "disabled-32.svg",
@@ -66,7 +72,7 @@
       "hotspotY": 16,
       "fallback": "wait",
       "role": "busy",
-      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+      "source": "Six stationary annular segments with clockwise dark-fill chase. Orange arc remains fixed at upper right."
     },
     {
       "file": "progress-32.svg",
@@ -76,7 +82,7 @@
       "hotspotY": 2,
       "fallback": "progress",
       "role": "progress",
-      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+      "source": "Actual original bitmap arrow with the same stationary-contour loading ring."
     },
     {
       "file": "move-32.svg",
@@ -96,7 +102,7 @@
       "hotspotY": 16,
       "fallback": "grab",
       "role": "grab",
-      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+      "source": "Open palm: four fingers of staggered lengths, separate thumb, fine finger creases and coral wrist line."
     },
     {
       "file": "grabbing-32.svg",
@@ -106,7 +112,7 @@
       "hotspotY": 16,
       "fallback": "grabbing",
       "role": "grabbing",
-      "source": "Code-native transparent SVG adapted from cursor scheme C and strip reference; deep green outlines and coral accent"
+      "source": "Compact closed grasp: four rounded knuckles, short finger creases, thumb tucked behind the side; no thumb drawn across the palm."
     },
     {
       "file": "precision-32.svg",
@@ -191,12 +197,27 @@
   ],
   "hotspotVerification": "Positions checked against SVG coordinates. Final perceived tip alignment and operating-system native cursor display require a visible desktop browser check; ordinary Playwright page screenshots omit the native cursor.",
   "integration": {
-    "importStyle": "App effect calls platform-resolved components/auth-cursor mountCursorSkin; non-H5 module is a no-op. Login styles preserve native region defaults.",
+    "importStyle": "H5 AccountBoundary mounts and cleans up mountCursorSkin once for login and product pages. Shared App and WeChat boundary are unchanged.",
     "rootClass": "xq-cursor-skin on document.documentElement",
     "sceneClass": "art-login__scene",
     "panelClass": "art-login__panel",
     "inputClass": "art-login__input",
     "controlClass": "art-login__control",
-    "disabledControls": "Native disabled, disabled attribute, aria-disabled=true, existing Taro disabled class and no-drop show the coral unavailable skin; disabling or re-enabling a hovered control updates without pointer movement."
+    "disabledControls": "Native disabled, disabled attribute, aria-disabled=true, existing Taro disabled class and no-drop show the coral unavailable skin; disabling or re-enabling a hovered control updates without pointer movement. aria-busy=true takes priority over disabled while submitting."
+  },
+  "loading": {
+    "source": "loading-ring-animated.svg",
+    "staticSource": "loading-ring.svg",
+    "segments": 6,
+    "darkSegments": 3,
+    "lightSegments": 3,
+    "contourMotion": "none",
+    "accentPosition": "fixed upper right",
+    "accentStartDegrees": -84,
+    "accentSweepDegrees": 56,
+    "colorCycleMs": 1200,
+    "reviewFrames": 24,
+    "frameMs": 50,
+    "generator": "scripts/build-cursor-assets.mjs"
   }
 }
