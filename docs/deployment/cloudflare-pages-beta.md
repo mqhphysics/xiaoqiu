@@ -46,3 +46,23 @@ pnpm --filter @xiaoqiu/mini-program dev:weapp:beta   # 或 build:weapp:beta
 
 开发者工具需关闭「校验合法域名」（`project.config.json` 已设 `urlCheck: false`）。正式发布仍需已备案的 HTTPS 域名。
 本地开发命令（`dev:weapp`、`dev:h5`）不受影响，仍默认 `http://127.0.0.1:3001`。
+
+
+## Cloudflare Pages 项目状态（已创建）
+
+- 项目名：`xiaoqiu-beta`
+- 生产域名：https://xiaoqiu-beta.pages.dev
+- 当前首次部署为 **Direct Upload**（本机 `wrangler pages deploy dist`），尚未连接 GitHub。
+- 构建环境变量已写入项目：`TARO_APP_API_BASE_URL=https://walter-latter-dont-productive.trycloudflare.com`、`NODE_VERSION=22.14.0`、`NODE_ENV=production`。
+- 当前隧道：https://walter-latter-dont-productive.trycloudflare.com （systemd `xiaoqiu-tunnel`；重启后地址会变）。
+
+### 后续改连 GitHub（需浏览器 OAuth）
+
+1. Cloudflare Dashboard → Workers & Pages → `xiaoqiu-beta` → Settings → Builds & deployments → Connect to Git。
+2. 授权 GitHub，选择仓库 `mqhphysics/xiaoqiu`，Production branch = `beta`。
+3. Build command：`corepack enable && pnpm install --frozen-lockfile --filter @xiaoqiu/mini-program... && pnpm --filter @xiaoqiu/mini-program build:h5`
+4. Build output directory：`apps/mini-program/dist`
+5. Root directory：留空（仓库根）。
+6. 确认 `TARO_APP_API_BASE_URL` 仍指向当前隧道（或以后换成固定域名）。
+
+在连上 Git 之前，可用 `wrangler pages deploy apps/mini-program/dist --project-name=xiaoqiu-beta --branch=beta` 继续直传。
