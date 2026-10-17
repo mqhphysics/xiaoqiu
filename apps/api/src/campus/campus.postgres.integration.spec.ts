@@ -256,6 +256,29 @@ test(
           },
         })
         playerId = player.id
+        const registration = {
+          username: `campus-new-${suffix}`,
+          displayName: '测试昵称',
+          realName: student.realName,
+          studentId: student.studentNumber,
+          password: 'TestOnly6!',
+        }
+        process.env.REGISTRATION_ENABLED = 'false'
+        try {
+          const closed = await http
+            .post('/api/auth/register')
+            .set('x-organization-id', org.id)
+            .send(registration)
+            .expect(403)
+          assert.equal(closed.body.message, '测试阶段暂未开放注册')
+          await http
+            .post('/api/auth/email/code')
+            .set('x-organization-id', org.id)
+            .send({ email: `closed-${suffix}@example.test`, purpose: 'REGISTER' })
+            .expect(403)
+        } finally {
+          delete process.env.REGISTRATION_ENABLED
+        }
         const signed = await http
           .post('/api/auth/register')
           .set('x-organization-id', org.id)

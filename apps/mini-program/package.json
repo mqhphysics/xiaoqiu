@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev:weapp": "taro build --type weapp --watch",
+    "dev:weapp:beta": "taro build --type weapp --watch --mode beta",
     "dev:h5": "node scripts/dev-h5.mjs",
     "build": "taro build --type weapp",
+    "build:weapp:beta": "taro build --type weapp --mode beta",
     "build:h5": "taro build --type h5",
     "serve:h5": "node scripts/serve-h5.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -40,7 +40,14 @@ const config: UserConfigExport = {
   },
   defineConstants: {},
   copy: {
-    patterns: [],
+    // Static-host files (Cloudflare Pages SPA fallback + cache headers); H5 only.
+    patterns:
+      buildEnvironment?.TARO_ENV === 'weapp'
+        ? []
+        : [
+            { from: 'public/_redirects', to: 'dist/_redirects' },
+            { from: 'public/_headers', to: 'dist/_headers' },
+          ],
     options: {},
   },
   framework: 'react',

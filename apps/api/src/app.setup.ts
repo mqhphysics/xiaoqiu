@@ -35,7 +35,7 @@ export function configureApp(app: INestApplication): void {
     next()
   })
   app.enableCors({
-    origin: resolveCorsOrigins(),
+    origin: corsOriginMatcher(resolveCorsOrigins()),
     allowedHeaders: [
       'authorization',
       'content-type',
@@ -71,7 +71,22 @@ export function configureApp(app: INestApplication): void {
   })
 }
 
-function resolveCorsOrigins(): string[] {
+/**
+ * Exact origins plus subdomain wildcards such as `https://*.xiaoqiu-beta.pages.dev`
+ * (Cloudflare Pages preview deployments). A wildcard matches one or more subdomain
+ * labels only — never the bare domain, other schemes, ports or lookalike suffixes.
+ */
+export function corsOriginMatcher(entries: string[]): (string | RegExp)[] {
+  return entries.map((entry) => {
+    const wildcard = /^(https?):\/\/\*\.([a-z0-9.-]+)$/i.exec(entry)
+    if (!wildcard) return entry
+    const [, scheme, domain] = wildcard
+    const escaped = domain!.replace(/[.]/g, '\\.')
+    return new RegExp(`^${scheme}:\\/\\/(?:[a-z0-9-]+\\.)+${escaped}$`, 'i')
+  })
+}
+
+export function resolveCorsOrigins(): string[] {
   const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)

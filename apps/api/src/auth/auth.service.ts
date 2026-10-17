@@ -24,6 +24,7 @@ import type {
   UpdateProfileDto,
 } from './auth.dto'
 import { hashPassword, verifyPassword } from './password'
+import { assertRegistrationOpen } from './registration-policy'
 import {
   EmailCodeService,
   invalidCode,
@@ -328,6 +329,7 @@ export class AuthService {
       userAgent?: string | undefined
     },
   ): Promise<LoginResponseDto> {
+    assertRegistrationOpen()
     const username = normalizeIdentifier(body.username)
     const email = body.email ? normalizeIdentifier(body.email) : undefined
     const studentId = body.studentId.trim()
@@ -444,6 +446,7 @@ export class AuthService {
     request: EmailRequestContext,
     authorization?: string,
   ) {
+    if (purpose === 'REGISTER') assertRegistrationOpen()
     const owner = purpose === 'VERIFY_EMAIL' ? await this.requireSession(authorization) : undefined
     if (owner && owner.organizationId !== organizationId) throw invalidCode()
     if (!this.emailCodes) throw invalidCode()

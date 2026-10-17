@@ -66,6 +66,7 @@ services:
       DEFAULT_TOURNAMENT_ID: ${DEFAULT_TOURNAMENT_ID:-}
       POST_MEDIA_DIRECTORY: /app/private-data/media/posts
       ENABLE_DEMO_IDENTITY_RECOVERY: 'false'
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
     ports:
       - '127.0.0.1:${API_BIND_PORT:-3101}:3000'
     volumes:
