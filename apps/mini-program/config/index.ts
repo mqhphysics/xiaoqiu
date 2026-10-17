@@ -45,8 +45,9 @@ const config: UserConfigExport = {
       buildEnvironment?.TARO_ENV === 'weapp'
         ? []
         : [
-            { from: 'public/_redirects', to: 'dist/_redirects' },
-            { from: 'public/_headers', to: 'dist/_headers' },
+            // `to` is a directory for copy-webpack-plugin; files keep their names.
+            { from: 'public/_redirects', to: 'dist' },
+            { from: 'public/_headers', to: 'dist' },
           ],
     options: {},
   },
