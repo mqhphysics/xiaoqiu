@@ -5,7 +5,7 @@
 - H5：Cloudflare Pages 静态托管（Taro H5 构建产物，hash 路由）。
 - API：`117.72.215.74` 上的 Docker Compose（`/opt/xiaoqiu/src/infra/release`，`compose.yaml` + `compose.dev.yaml`），
   edge nginx 监听 `:9988`（`/api` → api，`/` → 管理中心）。
-- HTTPS：服务器上的 `cloudflared` Quick Tunnel（systemd `xiaoqiu-tunnel.service`）把 `https://<随机>.trycloudflare.com`
+- HTTPS：服务器上的 `cloudflared` Quick Tunnel（systemd `xiaoqiu-tunnel.service`）把 `https://walter-latter-dont-productive.trycloudflare.com`
   转发到 `http://localhost:9988`。Quick Tunnel 地址在服务重启后会变化，变化后需更新 Pages 的
   `TARO_APP_API_BASE_URL` 并重新部署。查看当前地址：
   `journalctl -u xiaoqiu-tunnel --no-pager | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1`
@@ -19,7 +19,7 @@
 | Build command | `corepack enable && pnpm install --frozen-lockfile --filter @xiaoqiu/mini-program... && pnpm --filter @xiaoqiu/mini-program build:h5` |
 | Build output directory | `apps/mini-program/dist` |
 | 环境变量 `NODE_VERSION` | `22.14.0` |
-| 环境变量 `TARO_APP_API_BASE_URL` | `https://<当前隧道>.trycloudflare.com`（可带或不带 `/api`） |
+| 环境变量 `TARO_APP_API_BASE_URL` | `https://walter-latter-dont-productive.trycloudflare.com`（可带或不带 `/api`） |
 | 环境变量 `NODE_ENV` | `production` |
 | 可选 `TARO_APP_ORGANIZATION_ID` | `00000000-0000-4000-8000-000000000001` |
 

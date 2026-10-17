@@ -1,0 +1,19 @@
+# Dev server override: only the edge listens publicly (9988, plain HTTP).
+services:
+  api:
+    ports: !reset []
+    environment:
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+      MEDIA_ASSETS_DIRECTORY: /app/private-data/media/managed
+      POST_MEDIA_DIRECTORY: /app/private-data/media/posts
+      EMAIL_CODE_SECRET: ${EMAIL_CODE_SECRET}
+      EMAIL_AUTH_ENABLED: 'false'
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
+  admin-web:
+    ports: !reset []
+  edge:
+    profiles: !reset []
+    image: nginx:1.27.4-alpine
+    environment: !reset {}
+    ports: !override ['0.0.0.0:9988:80']
+    volumes: !override ['./edge.conf:/etc/nginx/conf.d/default.conf:ro']
